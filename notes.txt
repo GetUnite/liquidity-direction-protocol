@@ -1,0 +1,15 @@
+0x445FE580eF8d70FF569aB36e80c647af338db351 (Curve pool):
+    coins[0] = 0x27F8D03b3a2196956ED754baDc28D73be8830A6e (amDAI) ?=
+        0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063 (i have) = underlying_coins[0]
+
+    coins[1] = 0x1a13F4Ca1d028320A707D99520AbFefca3998b7F (amUSDC) ?=
+        0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174 (i have) = underlying_coins[1]
+
+    coins[2] = 0x60D55F02A771d515e077c9C2403a1ef324885CeC (amUSDT) ?=
+        0xc2132D05D31c914a87C6611C10748AEb04B58e8F (i have) = underlying_coins[2]
+
+    LP = 0xe7a24ef0c5e95ffb0f6684b813a78f2a3ad7d171
+
+
+0x19793B454D3AfC7b454F206Ffe95aDE26cA6912c (Autofarm):
+    LP = 0xe7a24ef0c5e95ffb0f6684b813a78f2a3ad7d171
