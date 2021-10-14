@@ -4,107 +4,50 @@ pragma solidity 0.8.4;
 // Generated from pool contract ABI (https://polygonscan.com/address/0x19793B454D3AfC7b454F206Ffe95aDE26cA6912c#code)
 // and interface generator (https://bia.is/tools/abi2solidity/)
 interface IStaking {
-    function decimals() external view returns (uint256);
-
-    function reward_contract() external view returns (address);
-
-    function last_claim() external view returns (uint256);
-
-    function claimed_reward(address _addr, address _token)
-        external
-        view
-        returns (uint256);
-
-    function claimable_reward(address _addr, address _token)
-        external
-        view
-        returns (uint256);
-
-    function claimable_reward_write(address _addr, address _token)
-        external
-        returns (uint256);
-
-    function set_rewards_receiver(address _receiver) external;
-
-    function claim_rewards() external;
-
-    function claim_rewards(address _addr) external;
-
-    function claim_rewards(address _addr, address _receiver) external;
-
-    function deposit(uint256 _value) external;
-
-    function deposit(uint256 _value, address _addr) external;
-
-    function deposit(
-        uint256 _value,
-        address _addr,
-        bool _claim_rewards
+    function add(
+        uint256 _allocPoint,
+        address _want,
+        bool _withUpdate,
+        address _strat
     ) external;
 
-    function withdraw(uint256 _value) external;
+    function deposit(uint256 _pid, uint256 _wantAmt) external;
 
-    function withdraw(uint256 _value, bool _claim_rewards) external;
+    function inCaseTokensGetStuck(address _token, uint256 _amount) external;
 
-    function transfer(address _to, uint256 _value) external returns (bool);
+    function owner() external view returns (address);
 
-    function transferFrom(
-        address _from,
-        address _to,
-        uint256 _value
-    ) external returns (bool);
-
-    function approve(address _spender, uint256 _value) external returns (bool);
-
-    function increaseAllowance(address _spender, uint256 _added_value)
+    function poolInfo(uint256)
         external
-        returns (bool);
+        view
+        returns (
+            address want,
+            uint256 allocPoint,
+            uint256 lastRewardBlock,
+            uint256 accAUTOPerShare,
+            address strat
+        );
 
-    function decreaseAllowance(address _spender, uint256 _subtracted_value)
-        external
-        returns (bool);
+    function poolLength() external view returns (uint256);
 
-    function set_rewards(
-        address _reward_contract,
-        bytes32 _claim_sig,
-        address[8] calldata _reward_tokens
+    function renounceOwnership() external;
+
+    function set(
+        uint256 _pid,
+        uint256 _allocPoint,
+        bool _withUpdate
     ) external;
 
-    function commit_transfer_ownership(address addr) external;
-
-    function accept_transfer_ownership() external;
-
-    function lp_token() external view returns (address);
-
-    function balanceOf(address arg0) external view returns (uint256);
-
-    function totalSupply() external view returns (uint256);
-
-    function allowance(address arg0, address arg1)
+    function stakedWantTokens(uint256 _pid, address _user)
         external
         view
         returns (uint256);
 
-    function name() external view returns (string calldata);
+    function totalAllocPoint() external view returns (uint256);
 
-    function symbol() external view returns (string calldata);
+    function transferOwnership(address newOwner) external;
 
-    function reward_tokens(uint256 arg0) external view returns (address);
+    function userInfo(uint256, address) external view returns (uint256 shares);
 
-    function reward_balances(address arg0) external view returns (uint256);
-
-    function rewards_receiver(address arg0) external view returns (address);
-
-    function claim_sig() external view returns (bytes calldata);
-
-    function reward_integral(address arg0) external view returns (uint256);
-
-    function reward_integral_for(address arg0, address arg1)
-        external
-        view
-        returns (uint256);
-
-    function admin() external view returns (address);
-
-    function future_admin() external view returns (address);
+    function withdraw(uint256 _pid, uint256 _wantAmt) external;
 }

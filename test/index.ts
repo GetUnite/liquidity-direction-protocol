@@ -4,7 +4,7 @@ import { ethers } from "hardhat";
 import { AToken, AToken__factory, IERC20, IPool, IStaking, MVPStrategy, MVPStrategy__factory } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber } from "@ethersproject/bignumber";
-import { Test__factory } from "../typechain/factories/Test__factory";
+import { BigNumberish } from "@ethersproject/bignumber";
 
 describe("MVPStrategy", function () {
   const mvpContractName = "MVPStrategy";
@@ -12,7 +12,7 @@ describe("MVPStrategy", function () {
 
   const poolAddress = "0x445FE580eF8d70FF569aB36e80c647af338db351";
   const lpTokenAddress = "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171";
-  const stakingAddress = "0x19793B454D3AfC7b454F206Ffe95aDE26cA6912c";
+  const stakingAddress = "0x89d065572136814230A55DdEeDDEC9DF34EB0B76";
 
   const daiAddress = "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063";
   const usdcAddress = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174";
@@ -22,6 +22,8 @@ describe("MVPStrategy", function () {
   const daiTokenAmount = BigNumber.from(tokenAmount).mul(BigNumber.from(10).pow(18));
   const usdcTokenAmount = BigNumber.from(tokenAmount).mul(1e6);
   const usdtTokenAmount = BigNumber.from(tokenAmount).mul(1e6);
+
+  const poolId = 66;
 
   let deployer: SignerWithAddress;
 
@@ -42,13 +44,14 @@ describe("MVPStrategy", function () {
     const accounts = await ethers.getSigners();
 
     const Token = await ethers.getContractFactory(aTokenContractName) as AToken__factory;
-    daiA = await Token.deploy("Alluo wrapped DAI", "DAIa") as AToken;
-    usdcA = await Token.deploy("Alluo wrapped USDC", "USDCa") as AToken;
-    usdtA = await Token.deploy("Alluo wrapped USDT", "USDTa") as AToken;
-    lpA = await Token.deploy("Alluo wrapped LP", "LPa") as AToken;
+    daiA = await Token.deploy("Alluo wrapped DAI", "DAIa", 18) as AToken;
+    usdcA = await Token.deploy("Alluo wrapped USDC", "USDCa", 6) as AToken;
+    usdtA = await Token.deploy("Alluo wrapped USDT", "USDTa", 6) as AToken;
+    lpA = await Token.deploy("Alluo wrapped LP", "LPa", 18) as AToken;
 
     const MVPStrategy = await ethers.getContractFactory(mvpContractName) as MVPStrategy__factory;
     mvpStrategy = await MVPStrategy.deploy(
+      poolId,
       poolAddress,
       lpTokenAddress,
       stakingAddress,
@@ -102,20 +105,41 @@ describe("MVPStrategy", function () {
   });
 
   it("Should go through whole process", async function () {
+    const amounts: [BigNumberish, BigNumberish, BigNumberish] = [daiTokenAmount, usdcTokenAmount, usdtTokenAmount];
+
+    console.log("Before:");
+    console.log(`DAI: ${await dai.balanceOf(deployer.address)}`);
+    console.log(`USDC: ${await usdc.balanceOf(deployer.address)}`);
+    console.log(`USDT: ${await usdt.balanceOf(deployer.address)}`);
+
+    console.log("Approving dai");
     await dai.approve(mvpStrategy.address, daiTokenAmount);
-    await mvpStrategy.receiveFunds(daiTokenAmount, daiAddress);
-
+    console.log("Approving USDC");
     await usdc.approve(mvpStrategy.address, usdcTokenAmount);
-    await mvpStrategy.receiveFunds(usdcTokenAmount, usdcAddress);
-
+    console.log("Approving USDT");
     await usdt.approve(mvpStrategy.address, usdtTokenAmount);
-    await mvpStrategy.receiveFunds(usdtTokenAmount, usdtAddress);
 
-    await mvpStrategy.getLP([daiTokenAmount, usdcTokenAmount, usdtTokenAmount]);
+    console.log("Giving funds");
+    await mvpStrategy.receiveFunds(amounts);
+
+    console.log("A Tokens balance:");
+    console.log(`DAIa: ${await daiA.balanceOf(deployer.address)}`);
+    console.log(`USDCa: ${await usdcA.balanceOf(deployer.address)}`);
+    console.log(`USDTa: ${await usdtA.balanceOf(deployer.address)}`);
+
+    console.log("Getting LPs");
+    await mvpStrategy.getLP(amounts);
 
     const lpAmount = await lpA.balanceOf(deployer.address);
+    console.log(`Got ${lpAmount} LPs, putting them on Autofarm`);
     await mvpStrategy.farmLP(lpAmount);
 
-    console.log(`pAUTO: ${await staking.balanceOf(deployer.address)}`);
+    console.log("Getting all funds back");
+    await mvpStrategy.withdrawMaxStables();
+
+    console.log("After:");
+    console.log(`DAI: ${await dai.balanceOf(deployer.address)}`);
+    console.log(`USDC: ${await usdc.balanceOf(deployer.address)}`);
+    console.log(`USDT: ${await usdt.balanceOf(deployer.address)}`);
   });
 });

@@ -30,7 +30,7 @@ const config: HardhatUserConfig = {
         mnemonic: process.env.MNEMONIC,
       },
       forking: {
-        url: "https://polygon-mainnet.infura.io/v3/aee16fcbdb41413d9ef66e1a1e5ea0e7",
+        url: "https://polygon-mainnet.g.alchemy.com/v2/6QuVBlBaST7y0SX7yjMc5kQjiT5HumAW",
         blockNumber: 20094500
       },
     },
