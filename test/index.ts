@@ -18,7 +18,7 @@ describe("MVPStrategy", function () {
   const usdcAddress = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174";
   const usdtAddress = "0xc2132D05D31c914a87C6611C10748AEb04B58e8F";
 
-  const tokenAmount = 50;
+  const tokenAmount = 10;
   const daiTokenAmount = BigNumber.from(tokenAmount).mul(BigNumber.from(10).pow(18));
   const usdcTokenAmount = BigNumber.from(tokenAmount).mul(1e6);
   const usdtTokenAmount = BigNumber.from(tokenAmount).mul(1e6);
@@ -132,7 +132,8 @@ describe("MVPStrategy", function () {
 
     const lpAmount = await lpA.balanceOf(deployer.address);
     console.log(`Got ${lpAmount} LPs, putting them on Autofarm`);
-    await mvpStrategy.farmLP(lpAmount);
+    await mvpStrategy.farmLP(lpAmount.div(2));
+    await mvpStrategy.farmLP(lpAmount.div(2));
 
     console.log("Getting all funds back");
     await mvpStrategy.withdrawMaxStables();
