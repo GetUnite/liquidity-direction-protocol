@@ -39,7 +39,7 @@ const config: HardhatUserConfig = {
       },
       forking: {
         url: "https://polygon-mainnet.g.alchemy.com/v2/6QuVBlBaST7y0SX7yjMc5kQjiT5HumAW",
-        blockNumber: 20094500
+        blockNumber: 20094469
       },
     },
     ropsten: {

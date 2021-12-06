@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.4;
 
-import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./IToken.sol";
 
-contract AToken is ERC777, Ownable, IToken {
+contract AToken is ERC20, Ownable, IToken {
     address public override mvpContract;
     uint8 private immutable _decimals;
 
@@ -18,11 +18,12 @@ contract AToken is ERC777, Ownable, IToken {
         string memory name_,
         string memory symbol_,
         uint8 decimals_
-    ) ERC777(name_, symbol_, new address[](0)) {
+    ) ERC20(name_, symbol_) {
         _decimals = decimals_;
     }
 
     function setMVPContract(address mvpContract_) external onlyOwner {
+        // solhint-disable-next-line reason-string
         require(
             mvpContract == address(0),
             "AToken: MVPStrategy contract already set"
@@ -39,7 +40,7 @@ contract AToken is ERC777, Ownable, IToken {
         override
         onlyMVPContract
     {
-        _mint(to, amount, "", "");
+        _mint(to, amount);
     }
 
     function burn(address from, uint256 amount)
@@ -47,6 +48,6 @@ contract AToken is ERC777, Ownable, IToken {
         override
         onlyMVPContract
     {
-        _burn(from, amount, "", "");
+        _burn(from, amount);
     }
 }
