@@ -7,7 +7,7 @@ async function main() {
   const token = await ethers.getContractAt("AlluoToken", process.env.TOKEN_ADDR as string);
 
   const governor = await Governor.deploy(token.address);
-  governor.deployed;
+  await governor.deployed();
   console.log("Governor deployed to:", governor.address);
 }
 

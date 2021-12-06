@@ -11,7 +11,7 @@ contract AlluoToken is ERC20, ERC20Burnable, AccessControl, ERC20Permit, ERC20Vo
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     constructor()
-        ERC20("Alluo Token", "ALLUO")
+        ERC20("Alluo Token", "ALL")
         ERC20Permit("Alluo Token")
     {
         _mint(msg.sender, 200000000 * 10 ** decimals());

@@ -3,7 +3,7 @@ import { ethers } from "hardhat"
 async function main() {
   const Token = await ethers.getContractFactory("AlluoToken");
   const token = await Token.deploy();
-  token.deployed;  
+  await token.deployed();  
   console.log("Alluo Token deployed to:", token.address);
 }
 
