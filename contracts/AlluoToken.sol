@@ -8,11 +8,12 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 
 contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
 
-    constructor() ERC20("Alluo Token", "ALL") ERC20Permit("Alluo Token") {
+    constructor() ERC20("Alluo Token", "ALLUO") ERC20Permit("Alluo Token") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _mint(msg.sender, 200000000 * 10 ** decimals());
@@ -20,19 +21,23 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         _grantRole(BURNER_ROLE, msg.sender);
     }
 
-    function pause() public onlyRole(PAUSER_ROLE) {
+    function pause() public {
+        require(hasRole(PAUSER_ROLE, msg.sender), "AlluoToken: must have pauser role to pause");
         _pause();
     }
 
-    function unpause() public onlyRole(PAUSER_ROLE) {
+    function unpause() public {
+        require(hasRole(PAUSER_ROLE, msg.sender), "AlluoToken: must have pauser role to unpause");
         _unpause();
     }
 
-    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
+    function mint(address to, uint256 amount) public {
+        require(hasRole(MINTER_ROLE, msg.sender), "AlluoToken: must have minter role to mint");
         _mint(to, amount);
     }
 
-    function burn(address account, uint256 amount) public onlyRole(BURNER_ROLE) {
+    function burn(address account, uint256 amount) public {
+        require(hasRole(MINTER_ROLE, msg.sender), "AlluoToken: must have burner role to burn");
         _burn(account, amount);
     }
 
