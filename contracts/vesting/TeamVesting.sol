@@ -6,25 +6,19 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract InvestorsVesting is ReentrancyGuard, Ownable {
+contract TeamVesting is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
-    // constant for percent calculation
-    uint8 public constant PERCENT_PRECISION = 100;
+    // cliff period when tokens are frozen
+    uint32 public constant CLIFF_MONTHS = 6;
 
-    // 10% will be allocated upfront on TGE
-    uint8 public constant TGE_AVAILIBLE_PERCENT = 10;
-
-    // 90% vesting over 12 months linearly
-    uint8 public constant VESTING_PERCENT = 90;
-
-    // do I need to say something here? :)
-    uint32 public constant MONTHS_COUNT = 12;
+    // period of time when tokens are getting available
+    uint32 public constant VESTING_MONTHS_COUNT = 24;
 
     // seconds in 1 month
     uint32 public constant MONTH = 2628000;
 
-    // Tokens that will be delivered
+    // tokens that will be delivered
     IERC20 public immutable token;
 
     struct UserInfo {
@@ -35,8 +29,7 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
     // user info storage
     mapping(address => UserInfo) public users;
 
-    // from this timestamp 10% of tokens are available and rest of 90% are
-    // gradually getting available
+    // from this timestamp tokens are gradually getting available
     uint256 public vestingStartTime;
 
     // sum of all tokens to be paid
@@ -48,6 +41,7 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
     // from this timestamp 100% of tokens are available
     uint256 public vestingEndTime;
 
+    // vesting duration
     uint40 public immutable vestingPeriod;
 
     // is vesting countdown live
@@ -62,7 +56,7 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
     constructor(address tokenAddress) {
         token = IERC20(tokenAddress);
 
-        uint40 _vestingPeriod = MONTH * MONTHS_COUNT;
+        uint40 _vestingPeriod = MONTH * VESTING_MONTHS_COUNT;
         vestingPeriod = _vestingPeriod;
     }
 
@@ -99,10 +93,10 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
         require(!isStarted, "Vesting: countdown is already started");
 
         // solhint-disable-next-line not-rely-on-time
-        vestingStartTime = block.timestamp;
+        vestingStartTime = block.timestamp + (MONTH * CLIFF_MONTHS);
 
         // solhint-disable-next-line not-rely-on-time
-        vestingEndTime = block.timestamp + vestingPeriod;
+        vestingEndTime = vestingStartTime + vestingPeriod;
         isStarted = true;
 
         emit CountdownStarted(vestingStartTime, vestingEndTime);
@@ -150,10 +144,6 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
     {
         if (!isStarted) {
             return 0;
-        } else {
-            availableAmount_ =
-                (_amount * TGE_AVAILIBLE_PERCENT) /
-                PERCENT_PRECISION;
         }
 
         // solhint-disable-next-line not-rely-on-time
@@ -161,12 +151,10 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
             return _amount;
         }
 
-        uint256 producedAmount = ((_amount - availableAmount_) *
+        uint256 producedAmount = (_amount *
             // solhint-disable-next-line not-rely-on-time
             (block.timestamp - vestingStartTime)) / vestingPeriod;
 
-        availableAmount_ = availableAmount_ + producedAmount;
-
-        return availableAmount_;
+        return producedAmount;
     }
 }
