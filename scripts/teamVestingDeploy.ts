@@ -7,7 +7,7 @@ async function main() {
     const Token = await ethers.getContractFactory("TeamVesting") as TeamVesting__factory;
     const token = await Token.deploy(tokenAddress);
     await token.deployed();
-    console.log("Investors vesting deployed to:", token.address);
+    console.log("Team vesting deployed to:", token.address);
 }
 
 main()
