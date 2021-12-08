@@ -44,13 +44,15 @@ const config: HardhatUserConfig = {
     },
     rinkeby: {
       url: process.env.RINKEBY_URL || "",
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: {
+        mnemonic: process.env.MNEMONIC,
+      }
     },
     maticmainnet: {
       url: "https://rpc-mainnet.maticvigil.com/",
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: {
+        mnemonic: process.env.MNEMONIC,
+      }
     }
   },
   gasReporter: {
