@@ -29,7 +29,6 @@ describe('Contract: InvestorsVesting', () => {
 
     const percentPrecision = 100;
     const tgeAvailiblePercent = 10;
-    const vestingPercent = 90;
     const monthsCount = 12;
     const month = 2628000;
 
@@ -55,7 +54,6 @@ describe('Contract: InvestorsVesting', () => {
     it("Should check that everything is initialized", async function () {
         expect(await investorsVesting.PERCENT_PRECISION()).to.be.equal(percentPrecision);
         expect(await investorsVesting.TGE_AVAILIBLE_PERCENT()).to.be.equal(tgeAvailiblePercent);
-        expect(await investorsVesting.VESTING_PERCENT()).to.be.equal(vestingPercent);
         expect(await investorsVesting.MONTHS_COUNT()).to.be.equal(monthsCount);
         expect(await investorsVesting.MONTH()).to.be.equal(month);
 
