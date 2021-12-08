@@ -14,7 +14,7 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
     bytes32 public constant INCREASE_MX_SPPL_ROLE = keccak256("INCREASE_MX_SPPL_ROLE");
 
-    uint public maxTotalSupply;
+    uint public MAX_TOTAL_SUPPLY;
 
     event MaxTotalSupplyChange(uint256[] oldMaxTotalSupply, uint256[] newMaxTotalSupply);
 
@@ -29,14 +29,16 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         _grantRole(MINTER_ROLE, _newAdmin);
         _grantRole(BURNER_ROLE, _newAdmin);
         _grantRole(PAUSER_ROLE, _newAdmin);
+        _grantRole(INCREASE_MX_SPPL_ROLE, _newAdmin);
         _setRoleAdmin(MINTER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(BURNER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(PAUSER_ROLE, ADMIN_ROLE);
+        _setRoleAdmin(INCREASE_MX_SPPL_ROLE, ADMIN_ROLE);
         _setMaxTotalSupply(200**25) //200 Mil.
     }
 
     modifier canMint() {
-        require(_totalSupply < maxTotalSupply);
+        require(_totalSupply < MAX_TOTAL_SUPPLY);
         _;
     }
 
@@ -62,13 +64,13 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         // solhint-disable-next-line reason-string
         require(
             hasRole(INCREASE_MX_SPPL_ROLE, msg.sender),
-            "AlluoToken: must have INCREASE_MX_SPPL_ROLE role to increase"
+            "AlluoToken: must have INCREASE_MX_SPPL_ROLE role to increase";
         );
 
          // solhint-disable-next-line reason-string
         require(
-            amount < maxTotalSupply
-            "AlluoToken: new max needs to be greater then old max"
+            amount > MAX_TOTAL_SUPPLY,
+            "AlluoToken: new max needs to be greater then old max";
         );
         _setMaxTotalSupply(account, amount);
     }
@@ -112,7 +114,7 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
     function _setMaxTotalSupply(uint256 _maxTotalSupply)
         internal
     {
-        maxTotalSupply = _maxTotalSupply;
+        MAX_TOTAL_SUPPLY = _maxTotalSupply;
     }
 
 
@@ -129,6 +131,6 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         override(ERC20, ERC20Votes)
     {
         super._burn(account, amount);
-        _setMaxTotalSupply(maxTotalSupply - amount);
+        _setMaxTotalSupply(MAX_TOTAL_SUPPLY - amount);
     }
 }
