@@ -10,17 +10,22 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 let Token: ContractFactory;
 let token: Contract;
 
-let owner: SignerWithAddress;
+let deployer: SignerWithAddress;
 let addr1: SignerWithAddress;
 let addr2: SignerWithAddress;
+let admin: SignerWithAddress;
+let vesting1: SignerWithAddress;
+let vesting2: SignerWithAddress;
+let dao: SignerWithAddress;
 
 describe("Token contract", function (){
     
     beforeEach(async function () {
+        [deployer, addr1, addr2, admin, vesting1, vesting2, dao] = await ethers.getSigners();
+
         Token = await ethers.getContractFactory("AlluoToken");
-        token = await Token.deploy();
+        token = await Token.deploy(admin.address);
         
-        [owner, addr1, addr2] = await ethers.getSigners();
     });
 
     describe("Tokenomics and Info", function () {
@@ -32,9 +37,9 @@ describe("Token contract", function (){
         it("Should return the total supply equal to 200000000", async function () {
             expect(await token.totalSupply()).to.equal(parseEther('200000000'));
         });
-        it("Deployment should assign the total supply of tokens to the owner", async function () {
-            const ownerBalance = await token.balanceOf(owner.address);
-            expect(await token.totalSupply()).to.equal(ownerBalance);
+        it("Deployment should assign the total supply of tokens to the deployer", async function () {
+            const deployerBalance = await token.balanceOf(deployer.address);
+            expect(await token.totalSupply()).to.equal(deployerBalance);
         });
     });
     describe("Balances", function () {
@@ -68,12 +73,12 @@ describe("Token contract", function (){
             });
 
             it('transfer amount exceeds allowance', async function () {
-                await expect(token.transferFrom(owner.address, addr2.address, parseEther('100'))
+                await expect(token.transferFrom(deployer.address, addr2.address, parseEther('100'))
                 ).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
             });
         });
         describe("Should transfer when everything is correct", function () {
-            it('from owner to addr1', async function () {
+            it('from deployer to addr1', async function () {
                 await token.transfer(addr1.address, parseEther('50'));
                 const addr1Balance = await token.balanceOf(addr1.address);
                 expect(addr1Balance).to.equal(parseEther('50'));
@@ -108,7 +113,7 @@ describe("Token contract", function (){
 
     describe('Mint / Burn', function () {
         it("minting", async function () {
-            await token.mint(addr1.address, parseEther('1000'));
+            await token.connect(admin).mint(addr1.address, parseEther('1000'));
             expect(await token.totalSupply()).to.equal(parseEther('200001000')),
             expect(await token.balanceOf(addr1.address)).to.equal(parseEther('1000'));
         });
@@ -120,24 +125,24 @@ describe("Token contract", function (){
 
         it("burning", async function () {
             await token.transfer(addr1.address, parseEther('1000'));
-            await token.burn(addr1.address, parseEther('1000'));
+            await token.connect(admin).burn(addr1.address, parseEther('1000'));
             expect(await token.totalSupply()).to.equal(parseEther('199999000')),
             expect(await token.balanceOf(addr1.address)).to.equal(0);
         });
 
         it("the burn fails because the address doesn't have the role of a burner", async function () {
-            await expect(token.connect(addr1).burn(owner.address, parseEther('200'))
+            await expect(token.connect(addr1).burn(deployer.address, parseEther('200'))
                 ).to.be.revertedWith("AlluoToken: must have burner role to burn");
         });
 
         it("burn fails because the amount exceeds the balance", async function () {
             await token.transfer(addr1.address, parseEther('100'));
-            await expect(token.burn(addr1.address, parseEther('200'))
+            await expect(token.connect(admin).burn(addr1.address, parseEther('200'))
             ).to.be.revertedWith("ERC20: burn amount exceeds balance");
         });
 
         it("adding new burner and burn", async function () {
-            await token.grantRole(await token.MINTER_ROLE(), addr1.address);
+            await token.connect(admin).grantRole(await token.MINTER_ROLE(), addr1.address);
             await token.transfer(addr2.address, parseEther('1000'));
             await token.connect(addr1).burn(addr2.address, parseEther('500'));
             expect(await token.totalSupply()).to.equal(parseEther('199999500')),
@@ -148,15 +153,15 @@ describe("Token contract", function (){
 
     describe('Pause', function () {
         it("Pause token contract and not allow transfers", async function () {
-            await token.pause();
+            await token.connect(admin).pause();
             await expect(token.transfer(addr1.address, parseEther('100'))
             ).to.be.revertedWith("Pausable: paused");
         });
         it("Pause and unpause token contract", async function () {
-            await token.pause();
+            await token.connect(admin).pause();
             await expect(token.transfer(addr1.address, parseEther('100'))
             ).to.be.revertedWith("Pausable: paused");
-            await token.unpause();
+            await token.connect(admin).unpause();
             await token.transfer(addr1.address, parseEther('50'));
             const addr1Balance = await token.balanceOf(addr1.address);
             expect(addr1Balance).to.equal(parseEther('50'));
@@ -165,19 +170,42 @@ describe("Token contract", function (){
         it("Not allow user without pauser role to pause and unpause", async function () {
             await expect(token.connect(addr1).pause()
             ).to.be.revertedWith("AlluoToken: must have pauser role to pause");
-            await token.pause();
+            await token.connect(admin).pause();
             await expect(token.connect(addr1).unpause()
             ).to.be.revertedWith("AlluoToken: must have pauser role to unpause");
         });
     });
 
-    describe('Granting roles', function () {
+    describe('Granting roles example', function () {
+
+        it("Full cycle", async function () {
+            //token contract deployed and all tokens goes to deployer
+            //deployer sends tokens to vestings and admin
+            token.connect(deployer).transfer(vesting1.address, parseEther("50000000"))
+            token.connect(deployer).transfer(vesting2.address, parseEther("50000000"))
+            token.connect(deployer).transfer(admin.address, parseEther("100000000"))
+            expect(await token.balanceOf(deployer.address)).to.equal(0);
+            expect(await token.balanceOf(admin.address)).to.equal(parseEther("100000000"));
+
+            //deployer doesnt have any roles
+            expect(await token.hasRole(token.DEFAULT_ADMIN_ROLE(), deployer.address)).to.be.false;
+            expect(await token.hasRole(token.ADMIN_ROLE(), deployer.address)).to.be.false;
+            //all roles have only admin 
+            expect(await token.hasRole(token.DEFAULT_ADMIN_ROLE(), admin.address)).to.be.true;
+            expect(await token.hasRole(token.ADMIN_ROLE(), admin.address)).to.be.true;
+            expect(await token.hasRole(token.MINTER_ROLE(), admin.address)).to.be.true;
+            //admin can grant roles (for dao)
+            token.connect(admin).grantRole(await token.ADMIN_ROLE(), dao.address)
+            token.connect(admin).grantRole(await token.MINTER_ROLE(), dao.address)
+            token.connect(admin).grantRole(await token.BURNER_ROLE(), dao.address)
+            token.connect(admin).grantRole(await token.PAUSER_ROLE(), dao.address)
+            //but leaves default_admin_role for himself
+        });
         it("Not allow user without admin role grant other roles", async function () {
             await expect(token.connect(addr1).grantRole(await token.MINTER_ROLE(), addr2.address)
-            ).to.be.revertedWith(`AccessControl: account ${addr1.address.toLowerCase()} is missing role ${await token.DEFAULT_ADMIN_ROLE()}`);
+            ).to.be.revertedWith(`AccessControl: account ${addr1.address.toLowerCase()} is missing role ${await token.ADMIN_ROLE()}`);
         });
-        // it("grants admin role to new address", async function () {
-        // });
+
     });
 });
   
