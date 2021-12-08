@@ -86,7 +86,7 @@ contract TeamVesting is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @dev Start vesting countdown.
+     * @dev Start vesting countdown. Can only be called by contract owner.
      */
     function startCountdown() external onlyOwner {
         // solhint-disable-next-line reason-string
@@ -142,7 +142,8 @@ contract TeamVesting is ReentrancyGuard, Ownable {
         view
         returns (uint256 availableAmount_)
     {
-        if (!isStarted) {
+        // solhint-disable-next-line not-rely-on-time
+        if (!isStarted || block.timestamp <= vestingStartTime) {
             return 0;
         }
 
@@ -151,10 +152,9 @@ contract TeamVesting is ReentrancyGuard, Ownable {
             return _amount;
         }
 
-        uint256 producedAmount = (_amount *
-            // solhint-disable-next-line not-rely-on-time
-            (block.timestamp - vestingStartTime)) / vestingPeriod;
-
-        return producedAmount;
+        return
+            (_amount *
+                // solhint-disable-next-line not-rely-on-time
+                (block.timestamp - vestingStartTime)) / vestingPeriod;
     }
 }

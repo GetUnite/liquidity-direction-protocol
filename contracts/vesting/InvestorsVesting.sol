@@ -15,9 +15,6 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
     // 10% will be allocated upfront on TGE
     uint8 public constant TGE_AVAILIBLE_PERCENT = 10;
 
-    // 90% vesting over 12 months linearly
-    uint8 public constant VESTING_PERCENT = 90;
-
     // do I need to say something here? :)
     uint32 public constant MONTHS_COUNT = 12;
 
@@ -92,7 +89,7 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @dev Start vesting countdown.
+     * @dev Start vesting countdown. Can only be called by contract owner.
      */
     function startCountdown() external onlyOwner {
         // solhint-disable-next-line reason-string
@@ -165,7 +162,7 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
             // solhint-disable-next-line not-rely-on-time
             (block.timestamp - vestingStartTime)) / vestingPeriod;
 
-        availableAmount_ = availableAmount_ + producedAmount;
+        availableAmount_ += producedAmount;
 
         return availableAmount_;
     }

@@ -2,9 +2,11 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { ethers } from 'hardhat'
 import { expect } from 'chai'
 
-import { AToken, AToken__factory, InvestorsVesting, InvestorsVesting__factory } from '../typechain'
+import { AToken, AToken__factory } from '../typechain'
 import { parseEther } from '@ethersproject/units'
 import { BigNumber } from '@ethersproject/bignumber'
+import { TeamVesting } from '../typechain/TeamVesting'
+import { TeamVesting__factory } from '../typechain/factories/TeamVesting__factory'
 
 
 async function incrementNextBlockTimestamp(amount: number): Promise<void> {
@@ -22,14 +24,13 @@ async function mine() {
 }
 
 
-describe('Contract: InvestorsVesting', () => {
+describe('Contract: TeamVesting', () => {
     let accounts: SignerWithAddress[];
-    let investorsVesting: InvestorsVesting;
+    let investorsVesting: TeamVesting;
     let token: AToken;
 
-    const percentPrecision = 100;
-    const tgeAvailiblePercent = 10;
-    const monthsCount = 12;
+    const cliffMonths = 6;
+    const vestingMonthsCount = 24;
     const month = 2628000;
 
     before(async function () {
@@ -40,10 +41,10 @@ describe('Contract: InvestorsVesting', () => {
         const deployer = accounts[0].address;
 
         let AcceptedToken = await ethers.getContractFactory('AToken') as AToken__factory;
-        let InvestorsVesting = await ethers.getContractFactory('InvestorsVesting') as InvestorsVesting__factory;
+        let InvestorsVesting = await ethers.getContractFactory("TeamVesting") as TeamVesting__factory;
 
         token = await AcceptedToken.deploy("TKN", "Test vesting token", 18) as AToken;
-        investorsVesting = await InvestorsVesting.deploy(token.address) as InvestorsVesting;
+        investorsVesting = await InvestorsVesting.deploy(token.address) as TeamVesting;
 
         await investorsVesting.deployed();
         await token.deployed();
@@ -52,9 +53,8 @@ describe('Contract: InvestorsVesting', () => {
     });
 
     it("Should check that everything is initialized", async function () {
-        expect(await investorsVesting.PERCENT_PRECISION()).to.be.equal(percentPrecision);
-        expect(await investorsVesting.TGE_AVAILIBLE_PERCENT()).to.be.equal(tgeAvailiblePercent);
-        expect(await investorsVesting.MONTHS_COUNT()).to.be.equal(monthsCount);
+        expect(await investorsVesting.CLIFF_MONTHS()).to.be.equal(cliffMonths);
+        expect(await investorsVesting.VESTING_MONTHS_COUNT()).to.be.equal(vestingMonthsCount);
         expect(await investorsVesting.MONTH()).to.be.equal(month);
 
         expect(await investorsVesting.isStarted()).to.be.false;
@@ -105,10 +105,11 @@ describe('Contract: InvestorsVesting', () => {
     it("Should start vesting countdown", async function () {
         await investorsVesting.startCountdown();
         const blockTimestamp = await getLatestBlockTimestamp();
+        const startTime = blockTimestamp.add(month * cliffMonths);
 
         expect(await investorsVesting.isStarted()).to.be.true;
-        expect(await investorsVesting.vestingStartTime()).to.be.equal(blockTimestamp);
-        expect(await investorsVesting.vestingEndTime()).to.be.equal(blockTimestamp.add(monthsCount * month));
+        expect(await investorsVesting.vestingStartTime()).to.be.equal(startTime);
+        expect(await investorsVesting.vestingEndTime()).to.be.equal(startTime.add(month * vestingMonthsCount));
     });
 
     it("Should not start vesting countdown (not owner)", async function () {
@@ -121,7 +122,22 @@ describe('Contract: InvestorsVesting', () => {
         await expect(investorsVesting.startCountdown()).to.be.revertedWith("Vesting: countdown is already started");
     });
 
-    it("Should claim no tokens (before start)", async function () {
+    it("Should claim no tokens (before vesting start)", async function () {
+        const user = accounts[0].address;
+        const amount = parseEther("1000");
+
+        await token.mint(investorsVesting.address, amount)
+        await investorsVesting.addPrivateUser([user], [amount]);
+        await investorsVesting.startCountdown();
+
+        const userBalanceBeforeClaim = await token.balanceOf(user);
+        await investorsVesting.claimToken();
+        const userBalanceAfterClaim = await token.balanceOf(user);
+
+        expect(userBalanceBeforeClaim).to.be.equal(userBalanceAfterClaim);
+    });
+
+    it("Should claim no tokens (before countdown start)", async function () {
         const user = accounts[0].address;
         const amount = parseEther("1000");
 
@@ -149,19 +165,22 @@ describe('Contract: InvestorsVesting', () => {
         await investorsVesting.addPrivateUser([user], [amount]);
         await investorsVesting.startCountdown();
 
-        incrementNextBlockTimestamp(monthsCount * month);
+        incrementNextBlockTimestamp((vestingMonthsCount + cliffMonths) * month);
 
         await investorsVesting.claimToken();
         await expect(investorsVesting.claimToken()).to.be.revertedWith("Vesting: not enough tokens to claim");
     });
 
-    it("Should be able to claim 10% of tokens and beyond on countdown start", async function () {
+    it("Should be able to claim tokens after vesting start", async function () {
         const user = accounts[0].address;
         const amount = parseEther("1000");
 
         await token.mint(investorsVesting.address, amount);
         await investorsVesting.addPrivateUser([user], [amount]);
         await investorsVesting.startCountdown();
+
+        await incrementNextBlockTimestamp((cliffMonths + (vestingMonthsCount / 2)) * month);
+        await mine();
 
         const userBalanceBeforeClaim = await token.balanceOf(user);
         await investorsVesting.claimToken();
@@ -173,10 +192,9 @@ describe('Contract: InvestorsVesting', () => {
 
         const timeDiff = blockTimestamp.sub(vestingStartTime);
 
-        const initialPercent = amount.mul(tgeAvailiblePercent).div(percentPrecision);
-        const timeEarning = amount.sub(initialPercent).mul(timeDiff).div(monthsCount * month);
+        const timeEarning = amount.mul(timeDiff).div(vestingMonthsCount * month);
 
-        expect(income).to.be.equal(initialPercent.add(timeEarning));
+        expect(income).to.be.equal(timeEarning);
     });
 
     it("Should check token reclaim", async function () {
@@ -187,13 +205,16 @@ describe('Contract: InvestorsVesting', () => {
         await investorsVesting.addPrivateUser([user], [amount]);
         await investorsVesting.startCountdown();
 
+        await incrementNextBlockTimestamp((cliffMonths + (vestingMonthsCount / 4)) * month); // quater way
+        await mine();
+
         const userBalanceBeforeFirstClaim = await token.balanceOf(user);
         const viewAmountFirst = await investorsVesting.getAvailableAmount(user);
         await investorsVesting.claimToken(); // first immediate claim
         const userBalanceAfterFirstClaim = await token.balanceOf(user);
         const firstIncome = userBalanceAfterFirstClaim.sub(userBalanceBeforeFirstClaim);
 
-        await incrementNextBlockTimestamp((monthsCount / 2) * month); // half way
+        await incrementNextBlockTimestamp((cliffMonths + (vestingMonthsCount / 4)) * month); // half way
         await mine();
 
         const userBalanceBeforeSecondClaim = await token.balanceOf(user);
@@ -207,12 +228,9 @@ describe('Contract: InvestorsVesting', () => {
 
         const timeDiff = blockTimestamp.sub(vestingStartTime);
 
-        const initialPercent = amount.mul(tgeAvailiblePercent).div(percentPrecision);
-        const timeEarning = amount.sub(initialPercent).mul(timeDiff).div(monthsCount * month);
+        const timeEarning = amount.mul(timeDiff).div(vestingMonthsCount * month);
 
-        expect(firstIncome.add(secondIncome)).to.be.equal(initialPercent.add(timeEarning));
-        expect(viewAmountFirst).to.be.equal(initialPercent);
-        expect(viewAmountSecond).to.be.equal(amount.sub(initialPercent).div(2));
+        expect(firstIncome.add(secondIncome)).to.be.equal(timeEarning);
     });
 
     it("Should claim all user tokens (beyond vesting period)", async function () {
@@ -223,7 +241,7 @@ describe('Contract: InvestorsVesting', () => {
         await investorsVesting.addPrivateUser([user], [amount]);
         await investorsVesting.startCountdown();
 
-        incrementNextBlockTimestamp(monthsCount * month + 1);
+        incrementNextBlockTimestamp((vestingMonthsCount + cliffMonths) * month + 1);
         await mine();
 
         const userBalanceBeforeClaim = await token.balanceOf(user);
@@ -231,8 +249,6 @@ describe('Contract: InvestorsVesting', () => {
         await investorsVesting.claimToken();
         const userBalanceAfterClaim = await token.balanceOf(user);
 
-        //  100.000000000000000000
-        // 1000.000000000000000000
         expect(userBalanceAfterClaim).to.be.equal(userBalanceBeforeClaim.add(amount));
         expect(viewAmount).to.be.equal(userBalanceAfterClaim.sub(userBalanceBeforeClaim));
     });
