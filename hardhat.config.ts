@@ -42,17 +42,15 @@ const config: HardhatUserConfig = {
         blockNumber: 20094469
       },
     },
-    rinkeby: {
-      url: process.env.RINKEBY_URL || "",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      }
+    ropsten: {
+      url: process.env.ROPSTEN_URL || "",
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
     maticmainnet: {
       url: "https://rpc-mainnet.maticvigil.com/",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      }
+      accounts:
+        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     }
   },
   gasReporter: {

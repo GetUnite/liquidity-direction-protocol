@@ -8,3 +8,6 @@ typechain
 cache
 artifacts
 scripts/workbench.ts
+
+#MACOS FILES
+.DS_Store

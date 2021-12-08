@@ -14,10 +14,7 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
     bytes32 public constant INCREASE_MX_SPPL_ROLE = keccak256("INCREASE_MX_SPPL_ROLE");
 
-    uint public MAX_TOTAL_SUPPLY;
-
-    event MaxTotalSupplyChange(uint256[] oldMaxTotalSupply, uint256[] newMaxTotalSupply);
-
+    uint256 public MAX_TOTAL_SUPPLY;
 
     constructor(address _newAdmin)
         ERC20("Alluo Token", "ALLUO")
@@ -34,11 +31,11 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         _setRoleAdmin(BURNER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(PAUSER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(INCREASE_MX_SPPL_ROLE, ADMIN_ROLE);
-        _setMaxTotalSupply(200**25) //200 Mil.
+        _setMaxTotalSupply(200000000000000000000000000); //200 Mil.
     }
 
     modifier canMint() {
-        require(_totalSupply < MAX_TOTAL_SUPPLY);
+        require(totalSupply() < MAX_TOTAL_SUPPLY);
         _;
     }
 
@@ -60,19 +57,21 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         _unpause();
     }
 
-    function increaseMaxTotalSupply(uint256 amount) public {
+    function increaseMaxTotalSupply(uint256 amount) public returns (bool){
         // solhint-disable-next-line reason-string
         require(
             hasRole(INCREASE_MX_SPPL_ROLE, msg.sender),
-            "AlluoToken: must have INCREASE_MX_SPPL_ROLE role to increase";
+            "AlluoToken: must have INCREASE_MX_SPPL_ROLE role to increase"
         );
 
          // solhint-disable-next-line reason-string
         require(
             amount > MAX_TOTAL_SUPPLY,
-            "AlluoToken: new max needs to be greater then old max";
+            "AlluoToken: new max needs to be greater then old max"
         );
-        _setMaxTotalSupply(account, amount);
+        _setMaxTotalSupply(amount);
+
+        return true;
     }
 
     function mint(address to, uint256 amount) public {
@@ -93,6 +92,10 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         _burn(account, amount);
     }
 
+    function maxTotalSupply() public view virtual returns (uint256) {
+        return MAX_TOTAL_SUPPLY;
+    }
+
     function _beforeTokenTransfer(
         address from,
         address to,
@@ -102,7 +105,6 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
     }
 
     // The following functions are overrides required by Solidity.
-
     function _afterTokenTransfer(
         address from,
         address to,
