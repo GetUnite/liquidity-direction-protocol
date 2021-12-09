@@ -1,5 +1,6 @@
 node_modules
 .env
+.env-rinkeby
 coverage
 coverage.json
 typechain
