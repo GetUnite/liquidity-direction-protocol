@@ -75,9 +75,57 @@ describe('Contract: InvestorsVesting', () => {
         expect(await investorsVesting.totalTokensToPay()).to.be.equal(totalAccumulatedBefore.add(amountSum));
     });
 
+    it("Should add private user (user re-add check)", async function () {
+        const users = [accounts[1].address, accounts[2].address, accounts[3].address];
+        const amounts = [parseEther("1000"), parseEther("2000"), parseEther("3000")];
+        const amountsSum = parseEther("6000");
+
+        await token.mint(investorsVesting.address, amountsSum);
+        await investorsVesting.addPrivateUser(users, amounts);
+
+        expect(await investorsVesting.totalTokensToPay()).to.be.equal(amountsSum);
+
+        for (let index = 0; index < users.length; index++) {
+            const user = users[index];
+            const amount = amounts[index];
+
+            const info = await investorsVesting.getUserInfo(user);
+
+            expect(info.availableAmount).to.be.equal(0);
+            expect(info.paidOut).to.be.equal(0);
+            expect(info.totalAmountToPay).to.be.equal(amount);
+        }
+
+        const newAmounts = [parseEther("2000"), parseEther("3000"), parseEther("4000")];
+        const newAmountsSum = parseEther("9000");
+
+        await token.mint(investorsVesting.address, newAmountsSum.sub(amountsSum));
+        await investorsVesting.addPrivateUser(users, newAmounts);
+
+        expect(await investorsVesting.totalTokensToPay()).to.be.equal(newAmountsSum);
+
+        for (let index = 0; index < users.length; index++) {
+            const user = users[index];
+            const amount = newAmounts[index];
+
+            const info = await investorsVesting.getUserInfo(user);
+
+            expect(info.availableAmount).to.be.equal(0);
+            expect(info.paidOut).to.be.equal(0);
+            expect(info.totalAmountToPay).to.be.equal(amount);
+        }
+    });
+
     it("Should not add private user (not owner)", async function () {
         const notAdmin = accounts[1];
         await expect(investorsVesting.connect(notAdmin).addPrivateUser([], [])).to.be.revertedWith("Ownable: caller is not the owner");
+    });
+
+    it("Should not add private user (some amount is zero)", async function () {
+        const users = [accounts[1].address, accounts[2].address, accounts[3].address];
+        const amounts = [parseEther("1000"), 0, parseEther("3000")];
+
+        await expect(investorsVesting.addPrivateUser(users, amounts)).to.be.revertedWith("Vesting: some amount is zero");
     });
 
     it("Should not add private user (no tokens on contract)", async function () {
@@ -95,14 +143,29 @@ describe('Contract: InvestorsVesting', () => {
         await token.mint(investorsVesting.address, amount)
         await investorsVesting.addPrivateUser([user], [amount]);
 
-        const availableAmount = await investorsVesting.getAvailableAmount(user);
+        const info = await investorsVesting.getUserInfo(user);
 
-        expect(availableAmount).to.be.equal(0);
+        expect(info.availableAmount).to.be.equal(0);
     });
 
     it("Should start vesting countdown", async function () {
+        const users = [accounts[1].address, accounts[2].address, accounts[3].address];
+        const amounts = [parseEther("1000"), parseEther("2000"), parseEther("3000")];
+        const amountsSum = parseEther("6000");
+
+        await token.mint(investorsVesting.address, amountsSum)
+        await investorsVesting.addPrivateUser(users, amounts);
+
         await investorsVesting.startCountdown();
         const blockTimestamp = await getLatestBlockTimestamp();
+
+        for (let index = 0; index < users.length; index++) {
+            const user = users[index];
+            const amount = amounts[index];
+
+            const balance = await token.balanceOf(user);
+            expect(balance).to.be.equal(amount.mul(tgeAvailiblePercent).div(percentPrecision));
+        }
 
         expect(await investorsVesting.isStarted()).to.be.true;
         expect(await investorsVesting.vestingStartTime()).to.be.equal(blockTimestamp);
@@ -159,9 +222,9 @@ describe('Contract: InvestorsVesting', () => {
 
         await token.mint(investorsVesting.address, amount);
         await investorsVesting.addPrivateUser([user], [amount]);
-        await investorsVesting.startCountdown();
 
         const userBalanceBeforeClaim = await token.balanceOf(user);
+        await investorsVesting.startCountdown();
         await investorsVesting.claimToken();
         const userBalanceAfterClaim = await token.balanceOf(user);
         const income = userBalanceAfterClaim.sub(userBalanceBeforeClaim);
@@ -183,10 +246,11 @@ describe('Contract: InvestorsVesting', () => {
 
         await token.mint(investorsVesting.address, amount);
         await investorsVesting.addPrivateUser([user], [amount]);
-        await investorsVesting.startCountdown();
 
         const userBalanceBeforeFirstClaim = await token.balanceOf(user);
-        const viewAmountFirst = await investorsVesting.getAvailableAmount(user);
+        await investorsVesting.startCountdown();
+
+        const viewAmountFirst = await investorsVesting.getUserInfo(user);
         await investorsVesting.claimToken(); // first immediate claim
         const userBalanceAfterFirstClaim = await token.balanceOf(user);
         const firstIncome = userBalanceAfterFirstClaim.sub(userBalanceBeforeFirstClaim);
@@ -195,7 +259,7 @@ describe('Contract: InvestorsVesting', () => {
         await mine();
 
         const userBalanceBeforeSecondClaim = await token.balanceOf(user);
-        const viewAmountSecond = await investorsVesting.getAvailableAmount(user);
+        const viewAmountSecond = await investorsVesting.getUserInfo(user);
         await investorsVesting.claimToken(); // second claim after ~half period
         const userBalanceAfterSecondClaim = await token.balanceOf(user);
         const secondIncome = userBalanceAfterSecondClaim.sub(userBalanceBeforeSecondClaim);
@@ -209,8 +273,8 @@ describe('Contract: InvestorsVesting', () => {
         const timeEarning = amount.sub(initialPercent).mul(timeDiff).div(monthsCount * month);
 
         expect(firstIncome.add(secondIncome)).to.be.equal(initialPercent.add(timeEarning));
-        expect(viewAmountFirst).to.be.equal(initialPercent);
-        expect(viewAmountSecond).to.be.equal(amount.sub(initialPercent).div(2));
+        expect(viewAmountFirst.availableAmount).to.be.equal(0);
+        expect(viewAmountSecond.availableAmount).to.be.equal(amount.sub(initialPercent).div(2));
     });
 
     it("Should claim all user tokens (beyond vesting period)", async function () {
@@ -219,19 +283,18 @@ describe('Contract: InvestorsVesting', () => {
 
         await token.mint(investorsVesting.address, amount);
         await investorsVesting.addPrivateUser([user], [amount]);
+
+        const userBalanceBeforeClaim = await token.balanceOf(user);
         await investorsVesting.startCountdown();
 
         incrementNextBlockTimestamp(monthsCount * month + 1);
         await mine();
 
-        const userBalanceBeforeClaim = await token.balanceOf(user);
-        const viewAmount = await investorsVesting.getAvailableAmount(user);
+        const viewAmount = await investorsVesting.getUserInfo(user);
         await investorsVesting.claimToken();
         const userBalanceAfterClaim = await token.balanceOf(user);
 
-        //  100.000000000000000000
-        // 1000.000000000000000000
         expect(userBalanceAfterClaim).to.be.equal(userBalanceBeforeClaim.add(amount));
-        expect(viewAmount).to.be.equal(userBalanceAfterClaim.sub(userBalanceBeforeClaim));
+        expect(viewAmount.availableAmount).to.be.equal(amount.sub(amount.mul(tgeAvailiblePercent).div(percentPrecision)));
     });
 })

@@ -32,6 +32,9 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
     // user info storage
     mapping(address => UserInfo) public users;
 
+    // users list for enumerating
+    address[] public usersList;
+
     // from this timestamp 10% of tokens are available and rest of 90% are
     // gradually getting available
     uint256 public vestingStartTime;
@@ -73,6 +76,14 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
         onlyOwner
     {
         for (uint256 i = 0; i < _user.length; i++) {
+            require(_amount[i] != 0, "Vesting: some amount is zero");
+
+            if (users[_user[i]].accumulated == 0) {
+                usersList.push(_user[i]);
+            } else {
+                totalTokensToPay -= users[_user[i]].accumulated;
+            }
+
             users[_user[i]].accumulated = _amount[i];
             totalTokensToPay += _amount[i];
         }
@@ -101,6 +112,18 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
         vestingEndTime = block.timestamp + vestingPeriod;
         isStarted = true;
 
+        for (uint256 index = 0; index < usersList.length; index++) {
+            UserInfo storage userInfo = users[usersList[index]];
+
+            uint256 amount = (userInfo.accumulated * TGE_AVAILIBLE_PERCENT) /
+                PERCENT_PRECISION;
+
+            userInfo.paidOut += amount;
+            totalTokensPaid += amount;
+
+            token.safeTransfer(usersList[index], amount);
+        }
+
         emit CountdownStarted(vestingStartTime, vestingEndTime);
     }
 
@@ -128,10 +151,21 @@ contract InvestorsVesting is ReentrancyGuard, Ownable {
         emit TokensClaimed(msg.sender, availableAmount);
     }
 
-    function getAvailableAmount(address user) public view returns (uint256) {
+    function getUserInfo(address user)
+        public
+        view
+        returns (
+            uint256 availableAmount,
+            uint256 paidOut,
+            uint256 totalAmountToPay
+        )
+    {
         UserInfo storage userInfo = users[user];
-        uint256 availableAmount = calcAvailableToken(userInfo.accumulated);
-        return (availableAmount - userInfo.paidOut);
+        return (
+            calcAvailableToken(userInfo.accumulated) - userInfo.paidOut,
+            userInfo.paidOut,
+            userInfo.accumulated
+        );
     }
 
     /**

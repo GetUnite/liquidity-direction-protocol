@@ -70,6 +70,12 @@ contract TeamVesting is ReentrancyGuard, Ownable {
         onlyOwner
     {
         for (uint256 i = 0; i < _user.length; i++) {
+            require(_amount[i] != 0, "Vesting: some amount is zero");
+
+            if (users[_user[i]].accumulated != 0) {
+                totalTokensToPay -= users[_user[i]].accumulated;
+            }
+
             users[_user[i]].accumulated = _amount[i];
             totalTokensToPay += _amount[i];
         }
@@ -94,7 +100,6 @@ contract TeamVesting is ReentrancyGuard, Ownable {
         // solhint-disable-next-line not-rely-on-time
         vestingStartTime = block.timestamp + (MONTH * CLIFF_MONTHS);
 
-        // solhint-disable-next-line not-rely-on-time
         vestingEndTime = vestingStartTime + vestingPeriod;
         isStarted = true;
 
@@ -125,10 +130,21 @@ contract TeamVesting is ReentrancyGuard, Ownable {
         emit TokensClaimed(msg.sender, availableAmount);
     }
 
-    function getAvailableAmount(address user) public view returns (uint256) {
+    function getUserInfo(address user)
+        public
+        view
+        returns (
+            uint256 availableAmount,
+            uint256 paidOut,
+            uint256 totalAmountToPay
+        )
+    {
         UserInfo storage userInfo = users[user];
-        uint256 availableAmount = calcAvailableToken(userInfo.accumulated);
-        return (availableAmount - userInfo.paidOut);
+        return (
+            calcAvailableToken(userInfo.accumulated) - userInfo.paidOut,
+            userInfo.paidOut,
+            userInfo.accumulated
+        );
     }
 
     /**
