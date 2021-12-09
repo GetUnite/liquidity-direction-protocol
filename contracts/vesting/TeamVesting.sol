@@ -56,8 +56,7 @@ contract TeamVesting is ReentrancyGuard, Ownable {
     constructor(address tokenAddress) {
         token = IERC20(tokenAddress);
 
-        uint40 _vestingPeriod = MONTH * VESTING_MONTHS_COUNT;
-        vestingPeriod = _vestingPeriod;
+        vestingPeriod = MONTH * VESTING_MONTHS_COUNT;
     }
 
     /**

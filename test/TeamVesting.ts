@@ -2,7 +2,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { ethers } from 'hardhat'
 import { expect } from 'chai'
 
-import { AToken, AToken__factory } from '../typechain'
+import { AlluoToken, AlluoToken__factory } from '../typechain'
 import { parseEther } from '@ethersproject/units'
 import { BigNumber } from '@ethersproject/bignumber'
 import { TeamVesting } from '../typechain/TeamVesting'
@@ -27,7 +27,7 @@ async function mine() {
 describe('Contract: TeamVesting', () => {
     let accounts: SignerWithAddress[];
     let investorsVesting: TeamVesting;
-    let token: AToken;
+    let token: AlluoToken;
 
     const cliffMonths = 6;
     const vestingMonthsCount = 24;
@@ -40,16 +40,14 @@ describe('Contract: TeamVesting', () => {
     beforeEach(async function () {
         const deployer = accounts[0].address;
 
-        let AcceptedToken = await ethers.getContractFactory('AToken') as AToken__factory;
+        let AcceptedToken = await ethers.getContractFactory('AlluoToken') as AlluoToken__factory;
         let InvestorsVesting = await ethers.getContractFactory("TeamVesting") as TeamVesting__factory;
 
-        token = await AcceptedToken.deploy("TKN", "Test vesting token", 18) as AToken;
+        token = await AcceptedToken.deploy(deployer) as AlluoToken;
         investorsVesting = await InvestorsVesting.deploy(token.address) as TeamVesting;
 
         await investorsVesting.deployed();
         await token.deployed();
-
-        await token.setMVPContract(deployer)
     });
 
     it("Should check that everything is initialized", async function () {
