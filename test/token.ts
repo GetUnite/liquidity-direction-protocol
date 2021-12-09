@@ -88,6 +88,12 @@ describe("Token contract", function (){
                 expect(addr1Balance).to.equal(parseEther('25')),
                 expect(addr2Balance).to.equal(parseEther('25'));
             });
+
+            it('allow admins to transfer accidentally locked tokens on token contract ', async function () {
+                await token.connect(admin).mint(addr1.address, parseEther('1000'));
+                await token.connect(addr1).transfer(token.address, parseEther('1000'));
+                await token.connect(admin).unlockERC20(token.address, admin.address, parseEther('1000'));
+            });
         });
 
     });
@@ -175,6 +181,22 @@ describe("Token contract", function (){
 
         });
 
+        it("Not allow to set cap lower than total supply", async function () {
+
+            await token.connect(admin).mint(addr1.address, parseEther('100000000'))
+            await expect(token.connect(admin).changeCap(parseEther('50000000'))
+            ).to.be.revertedWith("AlluoToken: new cap needs to be greater then total supply and zero");
+
+        });
+
+        it("Not allow to mint more tokens than cap", async function () {
+
+            await token.connect(admin).mint(addr1.address, parseEther('200000000'))
+
+            await expect(token.connect(admin).mint(addr2.address, parseEther('1'))
+            ).to.be.revertedWith("AlluoToken: total supply must be below or equal to the cap");
+        });
+
     });
 
     describe('Pause and blocklist', function () {
@@ -203,38 +225,43 @@ describe("Token contract", function (){
             await expect(token.connect(addr1).setPause(false)
             ).to.be.revertedWith("AlluoToken: must have pauser role to change pause state");
         });
+
+        it("Add user to whitelits and allow transfer funds even on pause", async function () {
+            await token.connect(admin).mint(addr1.address, parseEther('100'))
+            await token.connect(admin).setPause(true);
+            await expect(token.connect(addr1).transfer(addr2.address, parseEther('50'))
+            ).to.be.revertedWith("AlluoToken: Only whitelisted users can transfer while token paused");
+
+            await token.connect(admin).setWhiteStatus(addr1.address, true);
+            await token.connect(addr1).transfer(addr2.address, parseEther('50'))
+            const addr2Balance = await token.balanceOf(addr2.address);
+            expect(addr2Balance).to.equal(parseEther('50'));
+            await token.connect(admin).setPause(false);
+        });
+
+        it("Not allow users without admin role add others to whitelist", async function () {
+            await expect(token.connect(addr1).setWhiteStatus(addr1.address, true)
+            ).to.be.revertedWith("AlluoToken: must have admin role to add to white list");
+
+        });
+
+        it("Not allow user in blocklist to transfer tokens in and out", async function () {
+            await token.connect(admin).mint(addr1.address, parseEther('100'))
+            await token.connect(admin).mint(addr2.address, parseEther('100'))
+            await token.connect(admin).setBlockStatus(addr1.address, true)
+            await expect(token.connect(addr1).transfer(addr2.address, parseEther('100'))
+            ).to.be.revertedWith("AlluoToken: You are in blocklist");
+            await expect(token.connect(addr2).transfer(addr1.address, parseEther('100'))
+            ).to.be.revertedWith("AlluoToken: You are in blocklist");
+        });
+
+        it("Not allow user without admin role to add others in blocklist", async function () {
+            await expect(token.connect(addr1).setBlockStatus(addr2.address, true)
+            ).to.be.revertedWith("AlluoToken: must have admin role to add to block list");
+            await token.connect(admin).setBlockStatus(addr1.address, true)
+
+        });
     });
 
-    // describe('Granting roles example', function () {
-
-    //     it("Full cycle", async function () {
-    //         //token contract deployed and all tokens goes to deployer
-    //         //deployer sends tokens to vestings and admin
-    //         token.connect(deployer).transfer(vesting1.address, parseEther("50000000"))
-    //         token.connect(deployer).transfer(vesting2.address, parseEther("50000000"))
-    //         token.connect(deployer).transfer(admin.address, parseEther("100000000"))
-    //         expect(await token.balanceOf(deployer.address)).to.equal(0);
-    //         expect(await token.balanceOf(admin.address)).to.equal(parseEther("100000000"));
-
-    //         //deployer doesnt have any roles
-    //         expect(await token.hasRole(token.DEFAULT_ADMIN_ROLE(), deployer.address)).to.be.false;
-    //         expect(await token.hasRole(token.ADMIN_ROLE(), deployer.address)).to.be.false;
-    //         //all roles have only admin 
-    //         expect(await token.hasRole(token.DEFAULT_ADMIN_ROLE(), admin.address)).to.be.true;
-    //         expect(await token.hasRole(token.ADMIN_ROLE(), admin.address)).to.be.true;
-    //         expect(await token.hasRole(token.MINTER_ROLE(), admin.address)).to.be.true;
-    //         //admin can grant roles (for dao)
-    //         token.connect(admin).grantRole(await token.ADMIN_ROLE(), dao.address)
-    //         token.connect(admin).grantRole(await token.MINTER_ROLE(), dao.address)
-    //         token.connect(admin).grantRole(await token.BURNER_ROLE(), dao.address)
-    //         token.connect(admin).grantRole(await token.PAUSER_ROLE(), dao.address)
-    //         //but leaves default_admin_role for himself
-    //     });
-    //     it("Not allow user without admin role grant other roles", async function () {
-    //         await expect(token.connect(addr1).grantRole(await token.MINTER_ROLE(), addr2.address)
-    //         ).to.be.revertedWith(`AccessControl: account ${addr1.address.toLowerCase()} is missing role ${await token.ADMIN_ROLE()}`);
-    //     });
-
-    // });
 });
   

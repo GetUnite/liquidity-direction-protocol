@@ -22,14 +22,20 @@ contract AlluoToken is ERC20, AccessControl, ERC20Permit, ERC20Votes {
     uint256 private _cap;
 
     modifier notBlocked(address _recipient) {
-        require(!blocklist[msg.sender] && !blocklist[_recipient], "AlluoToken: You are in blocklist");
+        require(
+            !blocklist[msg.sender] && !blocklist[_recipient], 
+            "AlluoToken: You are in blocklist"
+        );
         _;
     }
 
     modifier pausable(address _recipient) {
         if (paused) {
         // solhint-disable-next-line reason-string
-            require(whitelist[msg.sender] || whitelist[_recipient], "AlluoToken: Only whitelisted users can transfer while token paused");
+            require(
+                whitelist[msg.sender] || whitelist[_recipient], 
+                "AlluoToken: Only whitelisted users can transfer while token paused"
+            );
         }
         _;
     }
@@ -73,7 +79,10 @@ contract AlluoToken is ERC20, AccessControl, ERC20Permit, ERC20Votes {
             "AlluoToken: must have minter role to mint"
         );
         // solhint-disable-next-line reason-string
-        require(totalSupply() + amount <= _cap, "AlluoToken: total supply must be below or equal to the cap");
+        require(
+            totalSupply() + amount <= _cap, 
+            "AlluoToken: total supply must be below or equal to the cap"
+        );
         _mint(to, amount);
     }
 
