@@ -23,8 +23,7 @@ describe("Token contract", function (){
         [deployer, addr1, addr2, admin, vesting1, vesting2, dao] = await ethers.getSigners();
 
         Token = await ethers.getContractFactory("AlluoToken");
-        token = await Token.deploy(deployer.address);
-        
+        token = await Token.deploy(admin.address);        
     });
 
     describe("Tokenomics and Info", function () {
@@ -43,7 +42,7 @@ describe("Token contract", function (){
         });
         
         it('When the requested account has some tokens it returns the amount', async function () {
-            await token.mint(deployer.address, parseEther('50'));
+            await token.connect(admin).mint(deployer.address, parseEther('50'));
             expect(await token.balanceOf(deployer.address)).to.equal(parseEther('50'));
         });
 
@@ -74,7 +73,7 @@ describe("Token contract", function (){
         });
         describe("Should transfer when everything is correct", function () {
             it('from deployer to addr1', async function () {
-                await token.mint(deployer.address, parseEther('50'));
+                await token.connect(admin).mint(deployer.address, parseEther('50'));
 
                 await token.transfer(addr1.address, parseEther('50'));
                 const addr1Balance = await token.balanceOf(addr1.address);
@@ -82,7 +81,7 @@ describe("Token contract", function (){
             });
 
             it('from addr1 to addr2 with correct balances at the end', async function () {
-                await token.mint(addr1.address, parseEther('50'));
+                await token.connect(admin).mint(addr1.address, parseEther('50'));
                 await token.connect(addr1).transfer(addr2.address, parseEther('25'));
                 const addr1Balance = await token.balanceOf(addr1.address);
                 const addr2Balance = await token.balanceOf(addr2.address);
@@ -95,7 +94,7 @@ describe("Token contract", function (){
 
     describe('Approve', function () {
         it("Approving and TransferFrom", async function () {
-            await token.mint(addr1.address, parseEther('100'));
+            await token.connect(admin).mint(addr1.address, parseEther('100'));
             await token.connect(addr1).approve(addr2.address, parseEther('50'));
             expect(await token.allowance(addr1.address, addr2.address)).to.equal(parseEther('50'));
 
@@ -110,7 +109,7 @@ describe("Token contract", function (){
 
     describe('Mint / Burn', function () {
         it("minting", async function () {
-            await token.connect(deployer).mint(addr1.address, parseEther('1000'));
+            await token.connect(admin).mint(addr1.address, parseEther('1000'));
             expect(await token.totalSupply()).to.equal(parseEther('1000')),
             expect(await token.balanceOf(addr1.address)).to.equal(parseEther('1000'));
         });
@@ -121,15 +120,15 @@ describe("Token contract", function (){
         });
 
         it("adding new minter and mint", async function () {
-            await token.grantRole(await token.MINTER_ROLE(), addr1.address);
+            await token.connect(admin).grantRole(await token.MINTER_ROLE(), addr1.address);
             await token.connect(addr1).mint(addr2.address, parseEther('500'));
             expect(await token.totalSupply()).to.equal(parseEther('500')),
             expect(await token.balanceOf(addr2.address)).to.equal(parseEther('500'));
         });
 
         it("burning", async function () {
-            await token.mint(addr1.address, parseEther('1000'));
-            await token.connect(deployer).burn(addr1.address, parseEther('100'));
+            await token.connect(admin).mint(addr1.address, parseEther('1000'));
+            await token.connect(admin).burn(addr1.address, parseEther('100'));
             expect(await token.maxTotalSupply()).to.equal(parseEther('200000000')),
             expect(await token.totalSupply()).to.equal(parseEther('900')),
             expect(await token.balanceOf(addr1.address)).to.equal(parseEther('900'));
@@ -141,14 +140,14 @@ describe("Token contract", function (){
         });
 
         it("burn fails because the amount exceeds the balance", async function () {
-            await token.mint(addr1.address, parseEther('100'));
-            await expect(token.connect(deployer).burn(addr1.address, parseEther('200'))
+            await token.connect(admin).mint(addr1.address, parseEther('100'));
+            await expect(token.connect(admin).burn(addr1.address, parseEther('200'))
             ).to.be.revertedWith("ERC20: burn amount exceeds balance");
         });
 
         it("adding new burner and burn", async function () {
-            await token.grantRole(await token.BURNER_ROLE(), addr1.address);
-            await token.mint(addr2.address, parseEther('1000'));
+            await token.connect(admin).grantRole(await token.BURNER_ROLE(), addr1.address);
+            await token.connect(admin).mint(addr2.address, parseEther('1000'));
             await token.connect(addr1).burn(addr2.address, parseEther('500'));
             expect(await token.totalSupply()).to.equal(parseEther('500')),
             expect(await token.balanceOf(addr2.address)).to.equal(parseEther('500'));
@@ -160,12 +159,12 @@ describe("Token contract", function (){
 
         it("Changing it to a higher number", async function () {
             expect(await token.maxTotalSupply()).to.be.equal(parseEther('200000000'))
-            await token.changeCap(parseEther('300000000'))
+            await token.connect(admin).changeCap(parseEther('300000000'))
             expect(await token.maxTotalSupply()).to.be.equal(parseEther('300000000'))
         });
 
         it("Changing it to a smaller number", async function () {
-            await token.changeCap(parseEther('100000000'))
+            await token.connect(admin).changeCap(parseEther('100000000'))
             expect(await token.maxTotalSupply()).to.be.equal(parseEther('100000000'))
         });
 
@@ -178,33 +177,33 @@ describe("Token contract", function (){
 
     });
 
-    // describe('Pause', function () {
-    //     it("Pause token contract and not allow transfers", async function () {
-    //         await token.mint(addr1.address, parseEther('100'))
-    //         await token.pause();
-    //         await expect(token.transfer(addr1.address, parseEther('100'))
-    //         ).to.be.revertedWith("Pausable: paused");
-    //     });
-    //     it("Pause and unpause token contract", async function () {
-    //         await token.mint(addr1.address, parseEther('100'))
-    //         expect(await token.balanceOf(addr1.address)).to.equal(parseEther('100'));
-    //         await token.pause();
-    //         await expect(token.transfer(addr1.address, parseEther('100'))
-    //         ).to.be.revertedWith("Pausable: paused");
-    //         await token.unpause();
-    //         await token.transfer(addr1.address, parseEther('50'));
-    //         const addr1Balance = await token.balanceOf(addr1.address);
-    //         expect(addr1Balance).to.equal(parseEther('50'));
-    //     });
+    describe('Pause and blocklist', function () {
+        it("Pause token contract and not allow transfers", async function () {
+            await token.connect(admin).mint(addr1.address, parseEther('100'))
+            await token.connect(admin).setPause(true);
+            await expect(token.transfer(addr1.address, parseEther('100'))
+            ).to.be.revertedWith("AlluoToken: Only whitelisted users can transfer while token paused");
+        });
+        it("Pause and unpause token contract", async function () {
+            await token.connect(admin).mint(addr1.address, parseEther('100'))
+            expect(await token.balanceOf(addr1.address)).to.equal(parseEther('100'));
+            await token.connect(admin).setPause(true);
+            await expect(token.connect(addr1).transfer(addr2.address, parseEther('100'))
+            ).to.be.revertedWith("AlluoToken: Only whitelisted users can transfer while token paused");
+            await token.connect(admin).setPause(false);
+            await token.connect(addr1).transfer(addr2.address, parseEther('50'));
+            const addr2Balance = await token.balanceOf(addr2.address);
+            expect(addr2Balance).to.equal(parseEther('50'));
+        });
 
-    //     it("Not allow user without pauser role to pause and unpause", async function () {
-    //         await expect(token.connect(addr1).pause()
-    //         ).to.be.revertedWith("AlluoToken: must have pauser role to pause");
-    //         await token.connect(admin).pause();
-    //         await expect(token.connect(addr1).unpause()
-    //         ).to.be.revertedWith("AlluoToken: must have pauser role to unpause");
-    //     });
-    // });
+        it("Not allow user without pauser role to pause and unpause", async function () {
+            await expect(token.connect(addr1).setPause(true)
+            ).to.be.revertedWith("AlluoToken: must have pauser role to change pause state");
+            await token.connect(admin).setPause(true);
+            await expect(token.connect(addr1).setPause(false)
+            ).to.be.revertedWith("AlluoToken: must have pauser role to change pause state");
+        });
+    });
 
     // describe('Granting roles example', function () {
 

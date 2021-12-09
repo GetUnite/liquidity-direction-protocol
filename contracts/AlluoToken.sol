@@ -7,20 +7,37 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 
-contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
+contract AlluoToken is ERC20, AccessControl, ERC20Permit, ERC20Votes {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
     bytes32 public constant CAP_CHANGER_ROLE = keccak256("CAP_CHANGER_ROLE");
 
+    mapping(address=>bool) public whitelist;
+    mapping(address=>bool) public blocklist;
+
+    bool public paused;
+
     uint256 private _cap;
+
+    modifier notBlocked(address _recipient) {
+        require(!blocklist[msg.sender] && !blocklist[_recipient], "AlluoToken: You are in blocklist");
+        _;
+    }
+
+    modifier pausable(address _recipient) {
+        if (paused) {
+        // solhint-disable-next-line reason-string
+            require(whitelist[msg.sender] || whitelist[_recipient], "AlluoToken: Only whitelisted users can transfer while token paused");
+        }
+        _;
+    }
 
     constructor(address _newAdmin)
         ERC20("Alluo Token", "ALLUO")
         ERC20Permit("Alluo Token")
     {
-        renounceRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(DEFAULT_ADMIN_ROLE, _newAdmin);
         _grantRole(ADMIN_ROLE, _newAdmin);
         _grantRole(MINTER_ROLE, _newAdmin);
@@ -34,25 +51,7 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         _setCap(200000000 * 10 ** decimals());
     }
 
-    function pause() public {
-        // solhint-disable-next-line reason-string
-        require(
-            hasRole(PAUSER_ROLE, msg.sender),
-            "AlluoToken: must have pauser role to pause"
-        );
-        _pause();
-    }
-
-    function unpause() public {
-        // solhint-disable-next-line reason-string
-        require(
-            hasRole(PAUSER_ROLE, msg.sender),
-            "AlluoToken: must have pauser role to unpause"
-        );
-        _unpause();
-    }
-
-    function changeCap(uint256 amount) public returns (bool){
+    function changeCap(uint256 amount) public {
         // solhint-disable-next-line reason-string
         require(
             hasRole(CAP_CHANGER_ROLE, msg.sender),
@@ -65,8 +64,6 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
             "AlluoToken: new cap needs to be greater then total supply and zero"
         );
         _setCap(amount);
-
-        return true;
     }
 
     function mint(address to, uint256 amount) public {
@@ -89,15 +86,44 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         _burn(account, amount);
     }
 
+
+    function setPause(bool _state) public {
+        // solhint-disable-next-line reason-string
+        require(
+            hasRole(PAUSER_ROLE, msg.sender),
+            "AlluoToken: must have pauser role to change pause state"
+        );
+        paused = _state;
+    }
+
+    function setWhiteStatus(address _user, bool _state) public {
+        // solhint-disable-next-line reason-string
+        require(
+            hasRole(ADMIN_ROLE, msg.sender),
+            "AlluoToken: must have admin role to add to white list"
+        );
+        whitelist[_user] = _state;
+    }
+
+    function setBlockStatus(address _user, bool _state) public {
+        // solhint-disable-next-line reason-string
+        require(
+            hasRole(ADMIN_ROLE, msg.sender),
+            "AlluoToken: must have admin role to add to block list"
+        );
+        blocklist[_user] = _state;
+    }
+
     function maxTotalSupply() public view virtual returns (uint256) {
         return _cap;
     }
 
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 amount
-    ) internal override whenNotPaused {
+    function _beforeTokenTransfer(address from, address to, uint256 amount) 
+    internal
+    notBlocked(to)
+    pausable(to)
+    override 
+    {
         super._beforeTokenTransfer(from, to, amount);
     }
 
@@ -129,5 +155,10 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         override(ERC20, ERC20Votes)
     {
         super._burn(account, amount);
+    }
+
+    ///  unlock accidentally sent tokens on contract address
+    function unlockERC20(address _token, address _to, uint256 _amount) public onlyRole(ADMIN_ROLE) {
+        IERC20(_token).transfer(_to, _amount);
     }
 }
