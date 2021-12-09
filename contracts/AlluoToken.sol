@@ -12,9 +12,9 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
-    bytes32 public constant INCREASE_MX_SPPL_ROLE = keccak256("INCREASE_MX_SPPL_ROLE");
+    bytes32 public constant CAP_CHANGER_ROLE = keccak256("CAP_CHANGER_ROLE");
 
-    uint256 public MAX_TOTAL_SUPPLY;
+    uint256 private _cap;
 
     constructor(address _newAdmin)
         ERC20("Alluo Token", "ALLUO")
@@ -26,17 +26,12 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         _grantRole(MINTER_ROLE, _newAdmin);
         _grantRole(BURNER_ROLE, _newAdmin);
         _grantRole(PAUSER_ROLE, _newAdmin);
-        _grantRole(INCREASE_MX_SPPL_ROLE, _newAdmin);
+        _grantRole(CAP_CHANGER_ROLE, _newAdmin);
         _setRoleAdmin(MINTER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(BURNER_ROLE, ADMIN_ROLE);
         _setRoleAdmin(PAUSER_ROLE, ADMIN_ROLE);
-        _setRoleAdmin(INCREASE_MX_SPPL_ROLE, ADMIN_ROLE);
-        _setMaxTotalSupply(200000000000000000000000000); //200 Mil.
-    }
-
-    modifier canMint() {
-        require(totalSupply() < MAX_TOTAL_SUPPLY);
-        _;
+        _setRoleAdmin(CAP_CHANGER_ROLE, ADMIN_ROLE);
+        _setCap(200000000 * 10 ** decimals());
     }
 
     function pause() public {
@@ -57,19 +52,19 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         _unpause();
     }
 
-    function increaseMaxTotalSupply(uint256 amount) public returns (bool){
+    function changeCap(uint256 amount) public returns (bool){
         // solhint-disable-next-line reason-string
         require(
-            hasRole(INCREASE_MX_SPPL_ROLE, msg.sender),
-            "AlluoToken: must have INCREASE_MX_SPPL_ROLE role to increase"
+            hasRole(CAP_CHANGER_ROLE, msg.sender),
+            "AlluoToken: must have cap changer role to change"
         );
 
          // solhint-disable-next-line reason-string
         require(
-            amount > MAX_TOTAL_SUPPLY,
-            "AlluoToken: new max needs to be greater then old max"
+            amount > totalSupply() && amount > 0,
+            "AlluoToken: new cap needs to be greater then total supply and zero"
         );
-        _setMaxTotalSupply(amount);
+        _setCap(amount);
 
         return true;
     }
@@ -80,6 +75,8 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
             hasRole(MINTER_ROLE, msg.sender),
             "AlluoToken: must have minter role to mint"
         );
+        // solhint-disable-next-line reason-string
+        require(totalSupply() + amount <= _cap, "AlluoToken: total supply must be below or equal to the cap");
         _mint(to, amount);
     }
 
@@ -93,7 +90,7 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
     }
 
     function maxTotalSupply() public view virtual returns (uint256) {
-        return MAX_TOTAL_SUPPLY;
+        return _cap;
     }
 
     function _beforeTokenTransfer(
@@ -113,17 +110,16 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         super._afterTokenTransfer(from, to, amount);
     }
 
-    function _setMaxTotalSupply(uint256 _maxTotalSupply)
+    function _setCap(uint256 _newCap)
         internal
     {
-        MAX_TOTAL_SUPPLY = _maxTotalSupply;
+        _cap = _newCap;
     }
 
 
     function _mint (address to, uint256 amount)
         internal
         override(ERC20, ERC20Votes)
-        canMint
     {
         super._mint(to, amount);
     }
@@ -133,6 +129,5 @@ contract AlluoToken is ERC20, Pausable, AccessControl, ERC20Permit, ERC20Votes {
         override(ERC20, ERC20Votes)
     {
         super._burn(account, amount);
-        _setMaxTotalSupply(MAX_TOTAL_SUPPLY - amount);
     }
 }
