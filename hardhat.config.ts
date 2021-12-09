@@ -6,7 +6,7 @@ import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
-
+import "./tasks"
 dotenv.config();
 
 // This is a sample Hardhat task. To learn how to create your own go to
@@ -46,6 +46,14 @@ const config: HardhatUserConfig = {
       url: process.env.ROPSTEN_URL || "",
       accounts:
         process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+    rinkeby: {
+      gas: 5000000,
+      gasPrice: 20000000000,
+      url: process.env.RINKEBY_URL || "",
+      accounts: {
+        mnemonic: process.env.MNEMONIC,
+      }
     },
     maticmainnet: {
       url: "https://rpc-mainnet.maticvigil.com/",
