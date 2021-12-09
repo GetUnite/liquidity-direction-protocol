@@ -33,8 +33,8 @@ describe("Token contract", function (){
             expect(await token.symbol()).to.equal("ALLUO"),
             expect(await token.decimals()).to.equal(18);
         });
-        it("Should return the total supply equal to 200000000000000000000000000", async function () {
-            expect(await token.MAX_TOTAL_SUPPLY()).to.equal(parseEther('200000000'));
+        it("Should return the total max supply equal to 200000000", async function () {
+            expect(await token.maxTotalSupply()).to.equal(parseEther('200000000'));
         });
     });
     describe("Balances", function () {
@@ -120,10 +120,17 @@ describe("Token contract", function (){
                 ).to.be.revertedWith("AlluoToken: must have minter role to mint");
         });
 
+        it("adding new minter and mint", async function () {
+            await token.grantRole(await token.MINTER_ROLE(), addr1.address);
+            await token.connect(addr1).mint(addr2.address, parseEther('500'));
+            expect(await token.totalSupply()).to.equal(parseEther('500')),
+            expect(await token.balanceOf(addr2.address)).to.equal(parseEther('500'));
+        });
+
         it("burning", async function () {
             await token.mint(addr1.address, parseEther('1000'));
             await token.connect(deployer).burn(addr1.address, parseEther('100'));
-            expect(await token.maxTotalSupply()).to.equal(parseEther('199999900')),
+            expect(await token.maxTotalSupply()).to.equal(parseEther('200000000')),
             expect(await token.totalSupply()).to.equal(parseEther('900')),
             expect(await token.balanceOf(addr1.address)).to.equal(parseEther('900'));
         });
@@ -143,7 +150,7 @@ describe("Token contract", function (){
             await token.grantRole(await token.BURNER_ROLE(), addr1.address);
             await token.mint(addr2.address, parseEther('1000'));
             await token.connect(addr1).burn(addr2.address, parseEther('500'));
-            expect(await token.maxTotalSupply()).to.equal(parseEther('199999500')),
+            expect(await token.totalSupply()).to.equal(parseEther('500')),
             expect(await token.balanceOf(addr2.address)).to.equal(parseEther('500'));
         });
 
@@ -151,26 +158,24 @@ describe("Token contract", function (){
 
     describe('Max Total Supply', function () {
 
-        it("Increasing it to a higher number", async function () {
+        it("Changing it to a higher number", async function () {
             expect(await token.maxTotalSupply()).to.be.equal(parseEther('200000000'))
-            expect(await token.increaseMaxTotalSupply(addr1.address, parseEther('300000000'))).to.be.true
+            await token.changeCap(parseEther('300000000'))
+            expect(await token.maxTotalSupply()).to.be.equal(parseEther('300000000'))
         });
 
-        it("Increasing it to a smaller number", async function () {
-            expect(await token.increaseMaxTotalSupply(addr1.address, parseEther('100'))
-            ).to.be.revertedWith('AlluoToken: new max needs to be greater then old max')
+        it("Changing it to a smaller number", async function () {
+            await token.changeCap(parseEther('100000000'))
+            expect(await token.maxTotalSupply()).to.be.equal(parseEther('100000000'))
         });
 
-        it("Increasing when not the correct user", async function () {
-            expect(await token.connect(addr1).increaseMaxTotalSupply(addr1.address, parseEther('100'))
-            ).to.be.revertedWith('AlluoToken: must have INCREASE_MX_SPPL_ROLE role to increase')
+        it("Not allow user without changer role to change cap", async function () {
+
+            await expect(token.connect(addr1).changeCap(parseEther('300000000'))
+            ).to.be.revertedWith("AlluoToken: must have cap changer role to change");
+
         });
 
-        it("When burning reducing max total supply", async function () {
-            await token.mint(addr1.address, 100)
-            await token.burn(addr1.address, 50)
-            expect(await token.maxTotalSupply()).to.be.equal(parseEther('199999950'))
-        });
     });
 
     // describe('Pause', function () {
