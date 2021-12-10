@@ -6,6 +6,7 @@ import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
+import 'hardhat-contract-sizer'
 import "./tasks"
 dotenv.config();
 
@@ -70,7 +71,15 @@ const config: HardhatUserConfig = {
   },
   mocha: {
     timeout: 3600000,
+  },
+
+  contractSizer: {
+    alphaSort: false,
+    disambiguatePaths: false,
+    runOnCompile: false,
+    strict: false,
   }
+  
 };
 
 export default config;

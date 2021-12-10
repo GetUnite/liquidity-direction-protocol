@@ -13,14 +13,11 @@ let deployer: SignerWithAddress;
 let addr1: SignerWithAddress;
 let addr2: SignerWithAddress;
 let admin: SignerWithAddress;
-let vesting1: SignerWithAddress;
-let vesting2: SignerWithAddress;
-let dao: SignerWithAddress;
 
 describe("Token contract", function (){
     
     beforeEach(async function () {
-        [deployer, addr1, addr2, admin, vesting1, vesting2, dao] = await ethers.getSigners();
+        [deployer, addr1, addr2, admin] = await ethers.getSigners();
 
         Token = await ethers.getContractFactory("AlluoToken");
         token = await Token.deploy(admin.address);        
@@ -61,8 +58,7 @@ describe("Token contract", function (){
             });
 
             it('sender doesn’t have enough tokens', async function () {
-                await token.connect(addr1).approve(addr2.address, parseEther('200'));
-                await expect(token.transferFrom(addr1.address, addr2.address, parseEther('100'))
+                await expect(token.connect(addr1).transfer(addr2.address, parseEther('100'))
                 ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
             });
 
@@ -163,13 +159,13 @@ describe("Token contract", function (){
 
     describe('Max Total Supply', function () {
 
-        it("Changing it to a higher number", async function () {
+        it("Changing cap to a higher number", async function () {
             expect(await token.maxTotalSupply()).to.be.equal(parseEther('200000000'))
             await token.connect(admin).changeCap(parseEther('300000000'))
             expect(await token.maxTotalSupply()).to.be.equal(parseEther('300000000'))
         });
 
-        it("Changing it to a smaller number", async function () {
+        it("Changing cap to a smaller number", async function () {
             await token.connect(admin).changeCap(parseEther('100000000'))
             expect(await token.maxTotalSupply()).to.be.equal(parseEther('100000000'))
         });
@@ -185,6 +181,13 @@ describe("Token contract", function (){
 
             await token.connect(admin).mint(addr1.address, parseEther('100000000'))
             await expect(token.connect(admin).changeCap(parseEther('50000000'))
+            ).to.be.revertedWith("AlluoToken: new cap needs to be greater then total supply and zero");
+
+        });
+
+        it("Not allow to set cap to zero", async function () {
+
+            await expect(token.connect(admin).changeCap(0)
             ).to.be.revertedWith("AlluoToken: new cap needs to be greater then total supply and zero");
 
         });
