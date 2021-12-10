@@ -86,12 +86,12 @@ contract AlluoToken is ERC20, AccessControl, ERC20Permit, ERC20Votes {
     function changeCap(uint256 _newCap) public {
         require(
             hasRole(CAP_CHANGER_ROLE, msg.sender),
-            "AlluoToken: must have cap changer role to change"
+            "AlluoToken: must have cap changer role"
         );
 
         require(
             _newCap > totalSupply() && _newCap > 0,
-            "AlluoToken: new cap needs to be greater then total supply and zero"
+            "AlluoToken: wrong new cap value"
         );
         _setCap(_newCap);
     }
@@ -99,11 +99,11 @@ contract AlluoToken is ERC20, AccessControl, ERC20Permit, ERC20Votes {
     function mint(address to, uint256 amount) public {
         require(
             hasRole(MINTER_ROLE, msg.sender),
-            "AlluoToken: must have minter role to mint"
+            "AlluoToken: must have minter role"
         );
         require(
             totalSupply() + amount <= _cap, 
-            "AlluoToken: total supply must be below or equal to the cap"
+            "AlluoToken: can't mint over max cap"
         );
         _mint(to, amount);
     }
@@ -111,7 +111,7 @@ contract AlluoToken is ERC20, AccessControl, ERC20Permit, ERC20Votes {
     function burn(address account, uint256 amount) public {
         require(
             hasRole(BURNER_ROLE, msg.sender),
-            "AlluoToken: must have burner role to burn"
+            "AlluoToken: must have burner role"
         );
         _burn(account, amount);
     }
@@ -123,7 +123,7 @@ contract AlluoToken is ERC20, AccessControl, ERC20Permit, ERC20Votes {
     function setPause(bool _state) public {
         require(
             hasRole(PAUSER_ROLE, msg.sender),
-            "AlluoToken: must have pauser role to change pause state"
+            "AlluoToken: must have pauser role"
         );
         paused = _state;
     }
@@ -137,7 +137,7 @@ contract AlluoToken is ERC20, AccessControl, ERC20Permit, ERC20Votes {
     function setWhiteStatus(address _user, bool _state) public {
         require(
             hasRole(ADMIN_ROLE, msg.sender),
-            "AlluoToken: must have admin role to add to white list"
+            "AlluoToken: must have admin role"
         );
         whitelist[_user] = _state;
     }
@@ -151,7 +151,7 @@ contract AlluoToken is ERC20, AccessControl, ERC20Permit, ERC20Votes {
     function setBlockStatus(address _user, bool _state) public {
         require(
             hasRole(ADMIN_ROLE, msg.sender),
-            "AlluoToken: must have admin role to add to block list"
+            "AlluoToken: must have admin role"
         );
         blocklist[_user] = _state;
     }
