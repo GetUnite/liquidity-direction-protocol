@@ -42,64 +42,75 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         update();
     }
 
-    function update() public{
+    function update() public {
         uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
-        if(timeFromLastUpdate <= lastDFUpdate + updateTimeLimit){
-            DF = (DF * (interest * DENOMINATOR * timeFromLastUpdate / YEAR + 100 * DENOMINATOR) / DENOMINATOR) / 100;
+        if (timeFromLastUpdate <= lastDFUpdate + updateTimeLimit) {
+            DF =
+                ((DF *
+                    ((interest * DENOMINATOR * timeFromLastUpdate) /
+                        YEAR +
+                        100 *
+                        DENOMINATOR)) / DENOMINATOR) /
+                100;
             lastDFUpdate = block.timestamp;
         }
     }
 
-    function claim(address _address) public{
+    function claim(address _address) public {
         update();
-        if(userDF[_address] != 0 ){
+        if (userDF[_address] != 0) {
             uint256 userBalance = balanceOf(_address);
-            uint256 userNewBalance = (DF * userBalance / userDF[_address]);
+            uint256 userNewBalance = ((DF * userBalance) / userDF[_address]);
             mint(_address, userNewBalance - userBalance);
         }
         userDF[_address] = DF;
     }
 
     function safeMint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
-        
         _beforeTokenTransfer(address(0), to, amount);
 
         _mint(to, amount);
 
         _afterTokenTransfer(address(0), to, amount);
-
     }
 
     function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
         _mint(to, amount);
     }
 
-    function safeBurn(address account, uint256 amount) public onlyRole(BURNER_ROLE) {
+    function safeBurn(address account, uint256 amount)
+        public
+        onlyRole(BURNER_ROLE)
+    {
         _beforeTokenTransfer(account, address(0), amount);
-        
+
         _burn(account, amount);
 
         _afterTokenTransfer(account, address(0), amount);
     }
 
-    function burn(address account, uint256 amount) public onlyRole(BURNER_ROLE) {
+    function burn(address account, uint256 amount)
+        public
+        onlyRole(BURNER_ROLE)
+    {
         _burn(account, amount);
     }
 
-    function _beforeTokenTransfer(address from, address to, uint256 amount)
-        internal
-        override 
-    {
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override {
         claim(from);
         super._beforeTokenTransfer(from, to, amount);
     }
 
-    function _afterTokenTransfer(address from, address to, uint256 amount)
-        internal
-        override
-    {
+    function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override {
         claim(to);
         super._afterTokenTransfer(from, to, amount);
     }
-
 }
