@@ -5,11 +5,15 @@ import "./ERC20.sol";
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract UrgentAlluoLp is ERC20, AccessControl {
+    using ECDSA for bytes32;
+
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
 
     // Debt factor: variable which grow after any action from user
     // based on current interest rate and time from last update call
@@ -21,6 +25,9 @@ contract UrgentAlluoLp is ERC20, AccessControl {
 
     // time limit for using update
     uint256 public updateTimeLimit = 3600;
+
+    // nonce for signature verification processes
+    uint256 public nonce;
 
     // DF of user from last user action on contract
     mapping(address => uint256) public userDF;
@@ -42,6 +49,39 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         update();
     }
 
+    function multiSignatureVerify(
+        uint8[] calldata v,
+        bytes32[] calldata r,
+        bytes32[] calldata s,
+        bytes32 dataHash,
+        uint256 timestamp
+    ) private {
+        require(v.length == 3, "UrgentAlluoLp: only 3 sig");
+        require(
+            block.timestamp - timestamp >= 1800,
+            "UrgentAlluoLp: sig expiried"
+        );
+
+        bytes32 signedDataHash = keccak256(
+            abi.encodePacked(dataHash, timestamp, nonce)
+        );
+
+        address[3] memory signers;
+        for (uint256 index = 0; index < 3; index++) {
+            bytes32 message = signedDataHash.toEthSignedMessageHash();
+            address signer = message.recover(v[index], r[index], s[index]);
+            require(hasRole(SIGNER_ROLE, signer), "UrgentAlluoLp: invalid sig");
+            signers[index] = signer;
+        }
+        require(
+            signers[0] != signers[1] &&
+                signers[1] != signers[2] &&
+                signers[2] != signers[0],
+            "UrgentAlluoLp: repeated sig"
+        );
+        nonce++;
+    }
+
     function update() public {
         uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
         if (timeFromLastUpdate <= lastDFUpdate + updateTimeLimit) {
@@ -61,7 +101,7 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         if (userDF[_address] != 0) {
             uint256 userBalance = balanceOf(_address);
             uint256 userNewBalance = ((DF * userBalance) / userDF[_address]);
-            mint(_address, userNewBalance - userBalance);
+            _mint(_address, userNewBalance - userBalance);
         }
         userDF[_address] = DF;
     }
@@ -74,7 +114,16 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         _afterTokenTransfer(address(0), to, amount);
     }
 
-    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
+    function mint(
+        address to,
+        uint256 amount,
+        uint8[] calldata v,
+        bytes32[] calldata r,
+        bytes32[] calldata s,
+        uint256 timestamp
+    ) private onlyRole(MINTER_ROLE) {
+        bytes32 dataHash = keccak256(abi.encodePacked(to, amount));
+        multiSignatureVerify(v, r, s, dataHash, timestamp);
         _mint(to, amount);
     }
 
@@ -89,10 +138,16 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         _afterTokenTransfer(account, address(0), amount);
     }
 
-    function burn(address account, uint256 amount)
-        public
-        onlyRole(BURNER_ROLE)
-    {
+    function burn(
+        address account,
+        uint256 amount,
+        uint8[] calldata v,
+        bytes32[] calldata r,
+        bytes32[] calldata s,
+        uint256 timestamp
+    ) private onlyRole(BURNER_ROLE) {
+        bytes32 dataHash = keccak256(abi.encodePacked(account, amount));
+        multiSignatureVerify(v, r, s, dataHash, timestamp);
         _burn(account, amount);
     }
 
