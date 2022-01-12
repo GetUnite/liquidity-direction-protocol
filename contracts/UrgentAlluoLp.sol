@@ -106,14 +106,6 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         userDF[_address] = DF;
     }
 
-    function safeMint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
-        _beforeTokenTransfer(address(0), to, amount);
-
-        _mint(to, amount);
-
-        _afterTokenTransfer(address(0), to, amount);
-    }
-
     function mint(
         address to,
         uint256 amount,
@@ -124,18 +116,8 @@ contract UrgentAlluoLp is ERC20, AccessControl {
     ) private onlyRole(MINTER_ROLE) {
         bytes32 dataHash = keccak256(abi.encodePacked(to, amount));
         multiSignatureVerify(v, r, s, dataHash, timestamp);
+        claim(to);
         _mint(to, amount);
-    }
-
-    function safeBurn(address account, uint256 amount)
-        public
-        onlyRole(BURNER_ROLE)
-    {
-        _beforeTokenTransfer(account, address(0), amount);
-
-        _burn(account, amount);
-
-        _afterTokenTransfer(account, address(0), amount);
     }
 
     function burn(
@@ -148,6 +130,7 @@ contract UrgentAlluoLp is ERC20, AccessControl {
     ) private onlyRole(BURNER_ROLE) {
         bytes32 dataHash = keccak256(abi.encodePacked(account, amount));
         multiSignatureVerify(v, r, s, dataHash, timestamp);
+        claim(account);
         _burn(account, amount);
     }
 
@@ -167,5 +150,9 @@ contract UrgentAlluoLp is ERC20, AccessControl {
     ) internal override {
         claim(to);
         super._afterTokenTransfer(from, to, amount);
+    }
+
+    function getBalance(address _address) external view returns(uint256){
+        return ((DF * balanceOf(_address)) / userDF[_address]);
     }
 }
