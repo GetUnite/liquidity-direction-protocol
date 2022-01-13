@@ -116,6 +116,17 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         signatureTimeout = value;
     }
 
+    function grantRole(bytes32 role, address account)
+        public
+        override
+        onlyRole(getRoleAdmin(role))
+    {
+        if (role == DEFAULT_ADMIN_ROLE) {
+            require(account.isContract(), "UrgentAlluoLp: not contract");
+        }
+        _grantRole(role, account);
+    }
+
     function getBalance(address _address) external view returns (uint256) {
         return ((DF * balanceOf(_address)) / userDF[_address]);
     }
