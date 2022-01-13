@@ -48,7 +48,7 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         address multiSigWallet,
         address backend,
         address[3] memory signers
-    ) ERC20("ALLUO LP", "LPLL") {
+    ) ERC20("ALLUO LP", "LPALL") {
         require(multiSigWallet.isContract(), "UrgentAlluoLp: not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, multiSigWallet);
         _grantRole(BACKEND_ROLE, backend);
@@ -116,7 +116,10 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         signatureTimeout = value;
     }
 
-    function setInterest(uint8 _newInterest) public onlyRole(DEFAULT_ADMIN_ROLE){
+    function setInterest(uint8 _newInterest)
+        public
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         update();
         interest = _newInterest;
     }
@@ -145,7 +148,6 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         claim(to);
         super._beforeTokenTransfer(from, to, amount);
     }
-
 
     function multiSignatureVerify(
         uint8[3] calldata v,
