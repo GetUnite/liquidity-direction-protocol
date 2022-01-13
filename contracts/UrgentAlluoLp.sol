@@ -105,7 +105,7 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         bytes32 dataHash = keccak256(abi.encodePacked(recepient, amount));
         multiSignatureVerify(v, r, s, dataHash, timestamp);
 
-        claim(msg.sender);
+        claim(recepient);
         _mint(recepient, amount);
     }
 
