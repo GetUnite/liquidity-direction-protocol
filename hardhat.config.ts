@@ -25,9 +25,6 @@ const config: HardhatUserConfig = {
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
-      forking: {
-        url: process.env.POLYGON_FORKING_URL as string,
-      },
     },
     rinkeby: {
       url: process.env.RINKEBY_URL,
