@@ -105,8 +105,8 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         bytes32 dataHash = keccak256(abi.encodePacked(recepient, amount));
         multiSignatureVerify(v, r, s, dataHash, timestamp);
 
-        _mint(recepient, amount);
         claim(msg.sender);
+        _mint(recepient, amount);
     }
 
     function setSignatureTimeout(uint256 value)
@@ -114,6 +114,11 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         signatureTimeout = value;
+    }
+
+    function setInterest(uint8 _newInterest) public onlyRole(DEFAULT_ADMIN_ROLE){
+        update();
+        interest = _newInterest;
     }
 
     function grantRole(bytes32 role, address account)
@@ -137,17 +142,10 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         uint256 amount
     ) internal override {
         claim(from);
+        claim(to);
         super._beforeTokenTransfer(from, to, amount);
     }
 
-    function _afterTokenTransfer(
-        address from,
-        address to,
-        uint256 amount
-    ) internal override {
-        claim(to);
-        super._afterTokenTransfer(from, to, amount);
-    }
 
     function multiSignatureVerify(
         uint8[3] calldata v,
