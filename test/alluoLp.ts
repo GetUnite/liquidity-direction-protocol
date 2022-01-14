@@ -15,10 +15,6 @@ async function getLatestBlockTimestamp(): Promise<BigNumber> {
     return BigNumber.from(cur_block.timestamp);
 }
 
-async function mine() {
-    await ethers.provider.send("evm_mine", []);
-}
-
 describe("AlluoLP", function () {
     let signers: SignerWithAddress[];
 

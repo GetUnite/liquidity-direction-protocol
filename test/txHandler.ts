@@ -1,28 +1,11 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import { PseudoMultisigWallet__factory, TxHandler__factory } from "../typechain";
-import { AlluoERC20 } from "../typechain/AlluoERC20";
-import { AlluoERC20__factory } from "../typechain/factories/AlluoERC20__factory";
 import { TestERC20__factory } from "../typechain/factories/TestERC20__factory";
 import { PseudoMultisigWallet } from "../typechain/PseudoMultisigWallet";
 import { TestERC20 } from "../typechain/TestERC20";
 import { TxHandler } from "../typechain/TxHandler";
-
-async function incrementNextBlockTimestamp(amount: number): Promise<void> {
-    return ethers.provider.send("evm_increaseTime", [amount]);
-}
-
-async function getLatestBlockTimestamp(): Promise<BigNumber> {
-    let bl_num = await ethers.provider.send("eth_blockNumber", []);
-    let cur_block = await ethers.provider.send("eth_getBlockByNumber", [bl_num, false]);
-    return BigNumber.from(cur_block.timestamp);
-}
-
-async function mine() {
-    await ethers.provider.send("evm_mine", []);
-}
 
 describe("TxHandler", function () {
     let signers: SignerWithAddress[];
