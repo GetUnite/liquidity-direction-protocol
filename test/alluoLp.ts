@@ -448,8 +448,38 @@ describe("AlluoLP", function () {
             expect(balance).to.be.lt(parseEther("307.88"));
             await alluoLp.connect(signers[4]).withdraw(balance);
         });
-    });
+        it('Should not give rewards if the interest is zero', async function () {
 
+            // address that will get minted tokens
+            const recepient = signers[3].address;
+            // amount of tokens to be minted, including decimals value of alluoLp
+            const amount = ethers.utils.parseUnits("100.0", await alluoLp.decimals());
+    
+            await mint(recepient, amount);
+    
+            await skipDays(365);
+    
+            await alluoLp.connect(signers[3]).claim(signers[3].address);
+            let balance = await alluoLp.balanceOf(signers[3].address);
+            expect(balance).to.be.gt(parseEther("107.9"));
+            expect(balance).to.be.lt(parseEther("108.1"));
+    
+            //changing interest
+            const newInterest = 0;
+            let ABI = ["function setInterest(uint8 _newInterest)"];
+            let iface = new ethers.utils.Interface(ABI);
+            const calldata = iface.encodeFunctionData("setInterest", [newInterest]);
+            await multisig.executeCall(alluoLp.address, calldata);
+    
+            await skipDays(365);
+    
+            //balance is the same
+            await alluoLp.connect(signers[3]).claim(signers[3].address);
+            let newBalance = await alluoLp.balanceOf(signers[3].address);
+            expect(balance).to.equal(newBalance);
+        });
+    });
+    
     describe('Token basic functionality', function () {
         describe("Tokenomics and Info", function () {
             it("Should return basic information", async function () {
