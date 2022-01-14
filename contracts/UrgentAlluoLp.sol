@@ -66,13 +66,9 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     function update() public {
         uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
         if (timeFromLastUpdate >= updateTimeLimit) {
-            DF =
-                ((DF *
-                    ((interest * DENOMINATOR * timeFromLastUpdate) /
-                        YEAR +
-                        100 *
-                        DENOMINATOR)) / DENOMINATOR) /
-                100;
+            DF = (DF * (
+                (interest * DENOMINATOR * timeFromLastUpdate / YEAR) + (100 * DENOMINATOR)) 
+                / DENOMINATOR) / 100;
             lastDFUpdate = block.timestamp;
         }
     }
