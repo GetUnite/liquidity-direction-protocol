@@ -531,13 +531,27 @@ describe("AlluoLP", function () {
                 await expect(
                     alluoLp.connect(signers[2]).transferFrom(signers[1].address, signers[2].address, parseEther("60") ))
                     .to.be.revertedWith("ERC20: transfer amount exceeds allowance");
-                await alluoLp.connect(signers[1]).increaseAllowance(signers[2].address, parseEther('70'));
+                await alluoLp.connect(signers[1]).increaseAllowance(signers[2].address, parseEther('20'));
                 await alluoLp.connect(signers[1]).decreaseAllowance(signers[2].address, parseEther('10'));
                 await alluoLp.connect(signers[2]).transferFrom(signers[1].address, signers[2].address, parseEther("60") )
-
+                await expect(
+                    alluoLp.connect(signers[1]).decreaseAllowance(signers[2].address, parseEther("50") ))
+                    .to.be.revertedWith("ERC20: decreased allowance below zero");
 
                 let balance = await alluoLp.balanceOf(signers[1].address);
                 expect(balance).to.equal(parseEther('40'));
+            });
+        });
+        describe('Mint / Burn', function () {
+            it("the mint fails because the the zero address ", async function () {
+                await expect(mint(ZERO_ADDRESS, parseEther('100'))
+                    ).to.be.revertedWith("ERC20: mint to the zero address");
+            });
+
+            it("burn fails because the amount exceeds the balance", async function () {
+                await mint(signers[1].address, parseEther('100'));
+                await expect(alluoLp.connect(signers[1]).withdraw(parseEther('200'))
+                ).to.be.revertedWith("ERC20: burn amount exceeds balance");
             });
         });
      });
