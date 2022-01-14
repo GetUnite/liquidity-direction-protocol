@@ -1,9 +1,12 @@
+import { parseEther } from "@ethersproject/units";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
 import { ethers } from "hardhat";
 import { before } from "mocha";
 import { PseudoMultisigWallet, PseudoMultisigWallet__factory, UrgentAlluoLp, UrgentAlluoLp__factory } from "../typechain";
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 async function incrementNextBlockTimestamp(amount: number): Promise<void> {
     return ethers.provider.send("evm_increaseTime", [amount]);
@@ -13,6 +16,11 @@ async function getLatestBlockTimestamp(): Promise<BigNumber> {
     let bl_num = await ethers.provider.send("eth_blockNumber", []);
     let cur_block = await ethers.provider.send("eth_getBlockByNumber", [bl_num, false]);
     return BigNumber.from(cur_block.timestamp);
+}
+
+async function skipDays(d: number){
+    ethers.provider.send('evm_increaseTime', [d * 86400]);
+    ethers.provider.send('evm_mine', []);
 }
 
 describe("AlluoLP", function () {
@@ -357,6 +365,183 @@ describe("AlluoLP", function () {
 
         await expect(tx).to.be.revertedWith(`AccessControl: account ${notBackend.address.toLowerCase()} is missing role ${await alluoLp.BACKEND_ROLE()}`);
     });
+
+    describe('Token transfers and apy calculation', function () { 
+        it('Should return right user balance after one year even without claim', async function () {
+
+            // address that will get minted tokens
+            const recepient = signers[3].address;
+            // amount of tokens to be minted, including decimals value of alluoLp
+            const amount = ethers.utils.parseUnits("100.0", await alluoLp.decimals());
+
+            await mint(recepient, amount);
+    
+            await skipDays(365);
+            await alluoLp.update()
+
+            //view function that returns balance with APY
+            let balance = await alluoLp.getBalance(signers[3].address);
+            expect(balance).to.be.gt(parseEther("107.9"));
+            expect(balance).to.be.lt(parseEther("108.1"));
+        });
+
+        it('Should correctly calculate balances over time and various transfers', async function () {
+
+            const amount = ethers.utils.parseUnits("100.0", await alluoLp.decimals());
+
+            //big holder to simulate transfers between users
+            const largeAmount = ethers.utils.parseUnits("1000.0", await alluoLp.decimals());
+            await mint(signers[9].address, largeAmount);
+
+            //start
+            await mint(signers[1].address, amount);
+            await skipDays(73);
+            
+            //after first period
+            await alluoLp.connect(signers[9]).transfer(signers[1].address, amount);
+            await mint(signers[2].address, amount);
+            await skipDays(73);
+
+            //after second period
+            await mint(signers[4].address, amount);
+            await alluoLp.connect(signers[9]).transfer(signers[3].address, amount);
+            await skipDays(73);
+
+            //after third period
+            await mint(signers[4].address, amount);
+            await skipDays(73);
+
+            //after fourth period
+            await alluoLp.connect(signers[3]).claim(signers[3].address);
+            await alluoLp.update();
+            let balance = await alluoLp.balanceOf(signers[3].address);
+            expect(balance).to.be.gt(parseEther("103.22"));
+            expect(balance).to.be.lt(parseEther("103.23"));
+            await alluoLp.connect(signers[3]).withdraw(balance);
+
+            //changing interest
+            const newInterest = 5;
+            let ABI = ["function setInterest(uint8 _newInterest)"];
+            let iface = new ethers.utils.Interface(ABI);
+            const calldata = iface.encodeFunctionData("setInterest", [newInterest]);
+            await multisig.executeCall(alluoLp.address, calldata);
+
+            await alluoLp.connect(signers[9]).transfer(signers[4].address, amount);
+            await skipDays(73);
+
+            //after fifth period
+            await alluoLp.connect(signers[1]).claim(signers[1].address);
+            balance = await alluoLp.balanceOf(signers[1].address);
+            expect(balance).to.be.gt(parseEther("213.54"));
+            expect(balance).to.be.lt(parseEther("213.55"));
+            await alluoLp.connect(signers[1]).withdraw(balance);
+
+            await alluoLp.connect(signers[2]).claim(signers[2].address);
+            balance = await alluoLp.balanceOf(signers[2].address);
+            expect(balance).to.be.gt(parseEther("105.92"));
+            expect(balance).to.be.lt(parseEther("105.93"));
+            await alluoLp.connect(signers[2]).withdraw(balance);
+
+            await alluoLp.connect(signers[4]).claim(signers[4].address);
+            balance = await alluoLp.balanceOf(signers[4].address);
+            expect(balance).to.be.gt(parseEther("307.87"));
+            expect(balance).to.be.lt(parseEther("307.88"));
+            await alluoLp.connect(signers[4]).withdraw(balance);
+        });
+    });
+
+    describe('Token basic functionality', function () {
+        describe("Tokenomics and Info", function () {
+            it("Should return basic information", async function () {
+                expect(await alluoLp.name()).to.equal("ALLUO LP"),
+                expect(await alluoLp.symbol()).to.equal("LPALL"),
+                expect(await alluoLp.decimals()).to.equal(18);
+            });
+            it("Should return the total supply equal to 0", async function () {
+                expect(await alluoLp.totalSupply()).to.equal(0);
+            });
+        });
+        describe("Balances", function () {
+            it('When the requested account has no tokens it returns zero', async function () {
+                expect(await alluoLp.balanceOf(signers[1].address)).to.equal("0");
+            });
+            
+            it('When the requested account has some tokens it returns the amount', async function () {
+                await mint(signers[1].address, parseEther('50'));
+                expect(await alluoLp.balanceOf(signers[1].address)).to.equal(parseEther('50'));
+            });
+    
+        });
+        describe("Transactions", function () {
+            describe("Should fail when", function (){
+    
+                it('transfer to zero address', async function () {
+                    await expect(alluoLp.transfer(ZERO_ADDRESS, parseEther('100'))
+                    ).to.be.revertedWith("ERC20: transfer to the zero address");
+                });
+                
+                it('transfer from zero address', async function () {
+                    await expect(alluoLp.transferFrom(ZERO_ADDRESS, signers[1].address, parseEther('100'))
+                    ).to.be.revertedWith("ERC20: transfer from the zero address");
+                });
+    
+                it('sender doesn’t have enough tokens', async function () {
+                    await expect(alluoLp.connect(signers[1]).transfer(signers[2].address, parseEther('100'))
+                    ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+                });
+    
+                it('transfer amount exceeds balance', async function () {
+                    await expect(alluoLp.transferFrom(signers[1].address, signers[2].address, parseEther('100'))
+                    ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+                });
+            });
+            describe("Should transfer when everything is correct", function () {  
+                it('from signer1 to signer2 with correct balances at the end', async function () {
+                    await mint(signers[1].address, parseEther('50'));
+                    await alluoLp.connect(signers[1]).transfer(signers[2].address, parseEther('25'));
+                    const addr1Balance = await alluoLp.balanceOf(signers[1].address);
+                    const addr2Balance = await alluoLp.balanceOf(signers[2].address);
+                    expect(addr1Balance).to.equal(parseEther('25'));
+                    expect(addr2Balance).to.equal(parseEther('25'));
+                });
+            });
+    
+        });
+    
+        describe('Approve', function () {
+            it("Approving and TransferFrom", async function () {
+                await mint(signers[1].address, parseEther('100'));
+                await alluoLp.connect(signers[1]).approve(signers[2].address, parseEther('50'));
+                expect(await alluoLp.allowance(signers[1].address, signers[2].address)).to.equal(parseEther('50'));
+    
+                await alluoLp.connect(signers[2]).transferFrom(signers[1].address, signers[2].address, parseEther("50") )
+                let balance = await alluoLp.balanceOf(signers[1].address);
+                expect(balance).to.equal(parseEther('50'));
+            });
+            it("Not approving becouse of zero address", async function () {
+                await expect(alluoLp.approve(ZERO_ADDRESS, parseEther('100'))
+                    ).to.be.revertedWith("ERC20: approve to the zero address");
+            });
+
+            it("increasing and decreasing allowance", async function () {
+                await mint(signers[1].address, parseEther('100'));
+                await alluoLp.connect(signers[1]).increaseAllowance(signers[2].address, parseEther('50'));
+                expect(await alluoLp.allowance(signers[1].address, signers[2].address)).to.equal(parseEther('50'));
+    
+                await expect(
+                    alluoLp.connect(signers[2]).transferFrom(signers[1].address, signers[2].address, parseEther("60") ))
+                    .to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+                await alluoLp.connect(signers[1]).increaseAllowance(signers[2].address, parseEther('70'));
+                await alluoLp.connect(signers[1]).decreaseAllowance(signers[2].address, parseEther('10'));
+                await alluoLp.connect(signers[2]).transferFrom(signers[1].address, signers[2].address, parseEther("60") )
+
+
+                let balance = await alluoLp.balanceOf(signers[1].address);
+                expect(balance).to.equal(parseEther('40'));
+            });
+        });
+     });
+
 
     async function mint(recipient: string, amount: BigNumberish) {
         // Get current UTC timestamp in seconds
