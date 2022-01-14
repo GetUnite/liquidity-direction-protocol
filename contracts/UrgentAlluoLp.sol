@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "./ERC20.sol";
+import "./AlluoERC20.sol";
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-contract UrgentAlluoLp is ERC20, AccessControl {
+contract UrgentAlluoLp is AlluoERC20, AccessControl {
     using ECDSA for bytes32;
     using Address for address;
 
@@ -48,7 +48,7 @@ contract UrgentAlluoLp is ERC20, AccessControl {
         address multiSigWallet,
         address backend,
         address[3] memory signers
-    ) ERC20("ALLUO LP", "LPALL") {
+    ) AlluoERC20("ALLUO LP", "LPALL") {
         require(multiSigWallet.isContract(), "UrgentAlluoLp: not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, multiSigWallet);
         _grantRole(BACKEND_ROLE, backend);
@@ -95,18 +95,18 @@ contract UrgentAlluoLp is ERC20, AccessControl {
     }
 
     function createBridgedTokens(
-        address recepient,
+        address recipient,
         uint256 amount,
         uint8[3] calldata v,
         bytes32[3] calldata r,
         bytes32[3] calldata s,
         uint256 timestamp
     ) external onlyRole(BACKEND_ROLE) {
-        bytes32 dataHash = keccak256(abi.encodePacked(recepient, amount));
+        bytes32 dataHash = keccak256(abi.encodePacked(recipient, amount));
         multiSignatureVerify(v, r, s, dataHash, timestamp);
 
-        claim(recepient);
-        _mint(recepient, amount);
+        claim(recipient);
+        _mint(recipient, amount);
     }
 
     function setSignatureTimeout(uint256 value)

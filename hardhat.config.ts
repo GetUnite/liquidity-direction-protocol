@@ -16,7 +16,7 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 999999999,
+        runs: 1000000,
       },
     },
   },
@@ -33,8 +33,22 @@ const config: HardhatUserConfig = {
         mnemonic: process.env.MNEMONIC,
       },
     },
+    goerli: {
+      url: process.env.GOERLI_URL,
+      gasPrice: "auto",
+      accounts: {
+        mnemonic: process.env.MNEMONIC,
+      },
+    },
     maticmainnet: {
       url: process.env.POLYGON_URL,
+      gasPrice: "auto",
+      accounts: {
+        mnemonic: process.env.MNEMONIC,
+      },
+    },
+    matictestnet: {
+      url: process.env.POLYGON_TESTNET_URL,
       gasPrice: "auto",
       accounts: {
         mnemonic: process.env.MNEMONIC,
@@ -42,7 +56,7 @@ const config: HardhatUserConfig = {
     }
   },
   gasReporter: {
-    enabled: process.env.REPORT_GAS !== undefined,
+    enabled: process.env.REPORT_GAS == "true",
     currency: "USD",
   },
   etherscan: {
@@ -54,7 +68,7 @@ const config: HardhatUserConfig = {
   contractSizer: {
     alphaSort: false,
     disambiguatePaths: false,
-    runOnCompile: false,
+    runOnCompile: process.env.CONTRACT_SIZER == "true",
     strict: false,
   }
 };

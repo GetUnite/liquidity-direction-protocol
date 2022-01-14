@@ -54,15 +54,15 @@ describe("AlluoLP", function () {
 
     it("Should create bridged tokens", async function () {
         // address that will get minted tokens
-        const recepient = signers[1].address;
+        const recipient = signers[1].address;
         // amount of tokens to be minted, including decimals value of token
         const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
 
-        expect(await alluoLp.balanceOf(recepient)).to.be.equal(0);
+        expect(await alluoLp.balanceOf(recipient)).to.be.equal(0);
 
-        await mint(recepient, amount);
+        await mint(recipient, amount);
 
-        expect(await alluoLp.balanceOf(recepient)).to.be.equal(amount);
+        expect(await alluoLp.balanceOf(recipient)).to.be.equal(amount);
     });
 
     it("Should not deploy contract (attempt to put EOA as multisig wallet)", async function () {
@@ -74,7 +74,7 @@ describe("AlluoLP", function () {
 
         const AlluoLP = await ethers.getContractFactory("UrgentAlluoLp");
         const deployPromise = AlluoLP.deploy(eoa.address, backendExecutor.address, backendSignersAddresses);
-        expect(deployPromise).to.be.revertedWith("UrgentAlluoLp: not contract");
+        await expect(deployPromise).to.be.revertedWith("UrgentAlluoLp: not contract");
     });
 
     it("Should set signature timeout", async function () {
@@ -91,15 +91,25 @@ describe("AlluoLP", function () {
         expect(await alluoLp.signatureTimeout()).to.be.equal(newValue);
     });
 
+    it("Should not set signature timeout (missing DEFAULT_ADMIN_ROLE)", async function () {
+        const newValue = 3600;
+        const notAdmin = signers[1];
+
+        const role = await alluoLp.DEFAULT_ADMIN_ROLE();
+        const tx = alluoLp.connect(notAdmin).setSignatureTimeout(newValue);
+
+        await expect(tx).to.be.revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
+    });
+
     it("Should allow user to burn tokens for withdrawal", async () => {
-        const recepient = signers[1];
+        const recipient = signers[1];
         const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
 
-        await mint(recepient.address, amount);
+        await mint(recipient.address, amount);
 
-        await expect(alluoLp.connect(recepient).withdraw(amount))
+        await expect(alluoLp.connect(recipient).withdraw(amount))
             .to.emit(alluoLp, "BurnedForWithdraw")
-            .withArgs(recepient.address, amount);
+            .withArgs(recipient.address, amount);
     });
 
     it("Should grant role that can be granted to anyone", async () => {
@@ -149,7 +159,7 @@ describe("AlluoLP", function () {
     });
 
     it("Should not allow to mint tokens (expired signature)", async () => {
-        const recepient = signers[1].address;
+        const recipient = signers[1].address;
         const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
         const timeout = await alluoLp.signatureTimeout()
 
@@ -157,7 +167,7 @@ describe("AlluoLP", function () {
         const nonce = await alluoLp.nonce();
         const dataHash = ethers.utils.solidityKeccak256(
             ["address", "uint256"],
-            [recepient, amount]
+            [recipient, amount]
         );
 
         const signedDataHash = ethers.utils.solidityKeccak256(
@@ -178,7 +188,7 @@ describe("AlluoLP", function () {
         await incrementNextBlockTimestamp(timeout.toNumber() + 1);
 
         const tx = alluoLp.connect(backendExecutor).createBridgedTokens(
-            recepient,
+            recipient,
             amount,
             [signature1.v, signature2.v, signature3.v],
             [signature1.r, signature2.r, signature3.r],
@@ -190,16 +200,15 @@ describe("AlluoLP", function () {
     });
 
     it("Should not allow to mint tokens (invalid signature)", async () => {
-        const recepient = signers[1].address;
+        const recipient = signers[1].address;
         const wrongSigner = signers[2];
         const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
-        const timeout = await alluoLp.signatureTimeout()
 
         const timestamp = await getLatestBlockTimestamp();
         const nonce = await alluoLp.nonce();
         const dataHash = ethers.utils.solidityKeccak256(
             ["address", "uint256"],
-            [recepient, amount]
+            [recipient, amount]
         );
 
         const signedDataHash = ethers.utils.solidityKeccak256(
@@ -218,7 +227,7 @@ describe("AlluoLP", function () {
         const signature3 = ethers.utils.splitSignature(flatSignature3);
 
         const tx = alluoLp.connect(backendExecutor).createBridgedTokens(
-            recepient,
+            recipient,
             amount,
             [signature1.v, signature2.v, signature3.v],
             [signature1.r, signature2.r, signature3.r],
@@ -230,15 +239,14 @@ describe("AlluoLP", function () {
     });
 
     it("Should not allow to mint tokens (repeated signature)", async () => {
-        const recepient = signers[1].address;
+        const recipient = signers[1].address;
         const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
-        const timeout = await alluoLp.signatureTimeout()
 
         const timestamp = await getLatestBlockTimestamp();
         const nonce = await alluoLp.nonce();
         const dataHash = ethers.utils.solidityKeccak256(
             ["address", "uint256"],
-            [recepient, amount]
+            [recipient, amount]
         );
 
         const signedDataHash = ethers.utils.solidityKeccak256(
@@ -257,7 +265,7 @@ describe("AlluoLP", function () {
         const signature3 = ethers.utils.splitSignature(flatSignature3);
 
         const tx = alluoLp.connect(backendExecutor).createBridgedTokens(
-            recepient,
+            recipient,
             amount,
             [signature1.v, signature2.v, signature3.v],
             [signature1.r, signature2.r, signature3.r],
@@ -268,7 +276,93 @@ describe("AlluoLP", function () {
         await expect(tx).to.be.revertedWith("UrgentAlluoLp: repeated sig");
     });
 
-    async function mint(recepient: string, amount: BigNumberish) {
+    it("Should not allow to mint tokens (retranslation attack)", async () => {
+        const recipient = signers[1].address;
+        const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
+
+        const timestamp = await getLatestBlockTimestamp();
+        const nonce = await alluoLp.nonce();
+        const dataHash = ethers.utils.solidityKeccak256(
+            ["address", "uint256"],
+            [recipient, amount]
+        );
+
+        const signedDataHash = ethers.utils.solidityKeccak256(
+            ["bytes32", "uint256", "uint256"],
+            [dataHash, timestamp, nonce]
+        );
+
+        const bytesArray = ethers.utils.arrayify(signedDataHash);
+
+        const flatSignature1 = await backendSigners[0].signMessage(bytesArray);
+        const flatSignature2 = await backendSigners[1].signMessage(bytesArray);
+        const flatSignature3 = await backendSigners[2].signMessage(bytesArray);
+
+        const signature1 = ethers.utils.splitSignature(flatSignature1);
+        const signature2 = ethers.utils.splitSignature(flatSignature2);
+        const signature3 = ethers.utils.splitSignature(flatSignature3);
+
+        await alluoLp.connect(backendExecutor).createBridgedTokens(
+            recipient,
+            amount,
+            [signature1.v, signature2.v, signature3.v],
+            [signature1.r, signature2.r, signature3.r],
+            [signature1.s, signature2.s, signature3.s],
+            timestamp
+        );
+
+        const retranslatedTx = alluoLp.connect(backendExecutor).createBridgedTokens(
+            recipient,
+            amount,
+            [signature1.v, signature2.v, signature3.v],
+            [signature1.r, signature2.r, signature3.r],
+            [signature1.s, signature2.s, signature3.s],
+            timestamp
+        );
+
+        await expect(retranslatedTx).to.be.revertedWith("UrgentAlluoLp: invalid sig");
+    });
+
+    it("Should not allow to mint tokens (missing backend role)", async () => {
+        const recipient = signers[1].address;
+        const notBackend = signers[2];
+        const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
+
+        const timestamp = await getLatestBlockTimestamp();
+        const nonce = await alluoLp.nonce();
+        const dataHash = ethers.utils.solidityKeccak256(
+            ["address", "uint256"],
+            [recipient, amount]
+        );
+
+        const signedDataHash = ethers.utils.solidityKeccak256(
+            ["bytes32", "uint256", "uint256"],
+            [dataHash, timestamp, nonce]
+        );
+
+        const bytesArray = ethers.utils.arrayify(signedDataHash);
+
+        const flatSignature1 = await backendSigners[0].signMessage(bytesArray);
+        const flatSignature2 = await backendSigners[1].signMessage(bytesArray);
+        const flatSignature3 = await backendSigners[2].signMessage(bytesArray);
+
+        const signature1 = ethers.utils.splitSignature(flatSignature1);
+        const signature2 = ethers.utils.splitSignature(flatSignature2);
+        const signature3 = ethers.utils.splitSignature(flatSignature3);
+
+        const tx = alluoLp.connect(notBackend).createBridgedTokens(
+            recipient,
+            amount,
+            [signature1.v, signature2.v, signature3.v],
+            [signature1.r, signature2.r, signature3.r],
+            [signature1.s, signature2.s, signature3.s],
+            timestamp
+        );
+
+        await expect(tx).to.be.revertedWith(`AccessControl: account ${notBackend.address.toLowerCase()} is missing role ${await alluoLp.BACKEND_ROLE()}`);
+    });
+
+    async function mint(recipient: string, amount: BigNumberish) {
         // Get current UTC timestamp in seconds
         const timestamp = await getLatestBlockTimestamp();
         // Get current nonce from contract for digital signature - it will
@@ -279,7 +373,7 @@ describe("AlluoLP", function () {
         // from Solidity) and values to be hashed
         const dataHash = ethers.utils.solidityKeccak256(
             ["address", "uint256"],
-            [recepient, amount]
+            [recipient, amount]
         );
 
         // now second layer hashing, but including security values
@@ -306,7 +400,7 @@ describe("AlluoLP", function () {
         // Now you're all set up to fire up tokens to that dude! Sender address
         // should be approved to do so - any of signature creators will not work
         await alluoLp.connect(backendExecutor).createBridgedTokens(
-            recepient,
+            recipient,
             amount,
             [signature1.v, signature2.v, signature3.v],
             [signature1.r, signature2.r, signature3.r],

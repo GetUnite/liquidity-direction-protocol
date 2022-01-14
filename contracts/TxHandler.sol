@@ -12,20 +12,21 @@ contract TxHandler is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
     using Address for address;
 
-    IERC20 public constant DAI =
-        IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    IERC20 public immutable dai;
 
     event Deposited(address indexed user, uint256 amount);
     event BulkSent(address[] users, uint256[] amounts);
 
-    constructor(address _gnosisWallet) {
+    constructor(address _gnosisWallet, address tokenAddress) {
         require(_gnosisWallet.isContract(), "TxHandler: EOA not allowed");
 
         _transferOwnership(_gnosisWallet);
+
+        dai = IERC20(tokenAddress);
     }
 
     function deposit(uint256 amount) external nonReentrant {
-        DAI.safeTransferFrom(msg.sender, owner(), amount);
+        dai.safeTransferFrom(msg.sender, owner(), amount);
 
         emit Deposited(msg.sender, amount);
     }
@@ -35,7 +36,7 @@ contract TxHandler is ReentrancyGuard, Ownable {
         onlyOwner
     {
         for (uint256 index = 0; index < users.length; index++) {
-            DAI.safeTransferFrom(owner(), users[index], amounts[index]);
+            dai.safeTransferFrom(owner(), users[index], amounts[index]);
         }
 
         emit BulkSent(users, amounts);
