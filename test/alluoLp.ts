@@ -377,7 +377,6 @@ describe("AlluoLP", function () {
             await mint(recepient, amount);
     
             await skipDays(365);
-            await alluoLp.update()
 
             //view function that returns balance with APY
             let balance = await alluoLp.getBalance(signers[3].address);

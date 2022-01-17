@@ -132,7 +132,17 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     }
 
     function getBalance(address _address) external view returns (uint256) {
-        return ((DF * balanceOf(_address)) / userDF[_address]);
+        uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
+        uint256 localDF;
+        if (timeFromLastUpdate >= updateTimeLimit) {
+            localDF = (DF * (
+                (interest * DENOMINATOR * timeFromLastUpdate / YEAR) + (100 * DENOMINATOR)) 
+                / DENOMINATOR) / 100;
+        }
+        else{
+            localDF = DF;
+        }
+        return ((localDF * balanceOf(_address)) / userDF[_address]);
     }
 
     function _beforeTokenTransfer(
