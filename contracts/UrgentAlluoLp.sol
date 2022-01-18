@@ -7,13 +7,12 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract UrgentAlluoLp is AlluoERC20, AccessControl {
     using ECDSA for bytes32;
     using Address for address;
-
-    bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
-    bytes32 public constant BACKEND_ROLE = keccak256("BACKEND_ROLE");
+    using SafeERC20 for IERC20;
 
     // Debt factor: variable which grow after any action from user
     // based on current interest rate and time from last update call
@@ -26,16 +25,15 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     // time limit for using update
     uint256 public updateTimeLimit = 3600;
 
-    // nonce for signature verification processes
-    uint256 public nonce;
-
-    uint256 public signatureTimeout = 300;
-
     // DF of user from last user action on contract
     mapping(address => uint256) public userDF;
 
     // constant for percent calculation
     uint256 public constant DENOMINATOR = 10**20;
+
+    IERC20 public immutable acceptedToken;
+
+    address public wallet;
 
     // year in seconds
     uint32 public constant YEAR = 31536000;
@@ -43,24 +41,30 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     uint8 public interest = 8;
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
+    event Deposited(address indexed user, uint256 amount);
+    event InterestChanged(uint8 oldInterest, uint8 newInterest);
+    event NewWalletSet(address oldWallet, address newWallet);
+    event ApyClaimed(address indexed user, uint256 apyAmount);
 
-    constructor(
-        address multiSigWallet,
-        address backend,
-        address[3] memory signers
-    ) AlluoERC20("ALLUO LP", "LPALL") {
+    constructor(address multiSigWallet, address usdcAddress)
+        AlluoERC20("ALLUO LP", "LPALL")
+    {
         require(multiSigWallet.isContract(), "UrgentAlluoLp: not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, multiSigWallet);
-        _grantRole(BACKEND_ROLE, backend);
+        wallet = multiSigWallet;
 
         _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
-        for (uint256 index = 0; index < 3; index++) {
-            _grantRole(SIGNER_ROLE, signers[index]);
-        }
-
+        acceptedToken = IERC20(usdcAddress);
         lastDFUpdate = block.timestamp;
         update();
+
+        emit InterestChanged(0, interest);
+        emit NewWalletSet(address(0), wallet);
+    }
+
+    function decimals() public pure virtual override returns (uint8) {
+        return 6;
     }
 
     function update() public {
@@ -79,6 +83,8 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
             uint256 userBalance = balanceOf(_address);
             uint256 userNewBalance = ((DF * userBalance) / userDF[_address]);
             _mint(_address, userNewBalance - userBalance);
+
+            emit ApyClaimed(_address, userNewBalance - userBalance);
         }
         userDF[_address] = DF;
     }
@@ -90,26 +96,13 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         emit BurnedForWithdraw(msg.sender, amount);
     }
 
-    function createBridgedTokens(
-        address recipient,
-        uint256 amount,
-        uint8[3] calldata v,
-        bytes32[3] calldata r,
-        bytes32[3] calldata s,
-        uint256 timestamp
-    ) external onlyRole(BACKEND_ROLE) {
-        bytes32 dataHash = keccak256(abi.encodePacked(recipient, amount));
-        multiSignatureVerify(v, r, s, dataHash, timestamp);
+    function deposit(uint256 amount) external {
+        acceptedToken.safeTransferFrom(msg.sender, wallet, amount);
 
-        claim(recipient);
-        _mint(recipient, amount);
-    }
+        claim(msg.sender);
+        _mint(msg.sender, amount);
 
-    function setSignatureTimeout(uint256 value)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        signatureTimeout = value;
+        emit Deposited(msg.sender, amount);
     }
 
     function setInterest(uint8 _newInterest)
@@ -117,7 +110,10 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         update();
+        uint8 oldValue = interest;
         interest = _newInterest;
+
+        emit InterestChanged(oldValue, _newInterest);
     }
 
     function setUpdateTimeLimit(uint8 _newLimit)
@@ -125,6 +121,16 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         updateTimeLimit = _newLimit;
+    }
+
+    function setWallet(address newWallet)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        address oldValue = wallet;
+        wallet = newWallet;
+
+        emit NewWalletSet(oldValue, newWallet);
     }
 
     function grantRole(bytes32 role, address account)
@@ -160,37 +166,5 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         claim(from);
         claim(to);
         super._beforeTokenTransfer(from, to, amount);
-    }
-
-    function multiSignatureVerify(
-        uint8[3] calldata v,
-        bytes32[3] calldata r,
-        bytes32[3] calldata s,
-        bytes32 dataHash,
-        uint256 timestamp
-    ) private {
-        require(
-            block.timestamp - timestamp <= signatureTimeout,
-            "UrgentAlluoLp: sig expiried"
-        );
-
-        bytes32 signedDataHash = keccak256(
-            abi.encodePacked(dataHash, timestamp, nonce)
-        );
-
-        address[3] memory signers;
-        for (uint256 index = 0; index < 3; index++) {
-            bytes32 message = signedDataHash.toEthSignedMessageHash();
-            address signer = message.recover(v[index], r[index], s[index]);
-            require(hasRole(SIGNER_ROLE, signer), "UrgentAlluoLp: invalid sig");
-            signers[index] = signer;
-        }
-        require(
-            signers[0] != signers[1] &&
-                signers[1] != signers[2] &&
-                signers[2] != signers[0],
-            "UrgentAlluoLp: repeated sig"
-        );
-        nonce++;
     }
 }
