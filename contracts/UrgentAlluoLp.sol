@@ -82,9 +82,11 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         if (userDF[_address] != 0) {
             uint256 userBalance = balanceOf(_address);
             uint256 userNewBalance = ((DF * userBalance) / userDF[_address]);
-            _mint(_address, userNewBalance - userBalance);
-
-            emit ApyClaimed(_address, userNewBalance - userBalance);
+            uint256 newAmount = userNewBalance - userBalance;
+            if(newAmount != 0){
+                _mint(_address, newAmount);
+                emit ApyClaimed(_address, newAmount);
+            }
         }
         userDF[_address] = DF;
     }
@@ -145,17 +147,23 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     }
 
     function getBalance(address _address) external view returns (uint256) {
-        uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
-        uint256 localDF;
-        if (timeFromLastUpdate >= updateTimeLimit) {
-            localDF = (DF * (
-                (interest * DENOMINATOR * timeFromLastUpdate / YEAR) + (100 * DENOMINATOR)) 
-                / DENOMINATOR) / 100;
+        if(userDF[_address] != 0){
+            uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
+            uint256 localDF;
+            if (timeFromLastUpdate >= updateTimeLimit) {
+                localDF = (DF * (
+                    (interest * DENOMINATOR * timeFromLastUpdate / YEAR) + (100 * DENOMINATOR)) 
+                    / DENOMINATOR) / 100;
+            }
+            else{
+                localDF = DF;
+            }
+            return ((localDF * balanceOf(_address)) / userDF[_address]);
         }
         else{
-            localDF = DF;
+            return 0;
         }
-        return ((localDF * balanceOf(_address)) / userDF[_address]);
+
     }
 
     function _beforeTokenTransfer(
