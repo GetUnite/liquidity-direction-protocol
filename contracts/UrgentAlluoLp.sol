@@ -121,7 +121,7 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         emit InterestChanged(oldValue, _newInterest);
     }
 
-    function setUpdateTimeLimit(uint8 _newLimit)
+    function setUpdateTimeLimit(uint256 _newLimit)
         public
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
