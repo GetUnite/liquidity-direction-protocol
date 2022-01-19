@@ -45,6 +45,7 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     event InterestChanged(uint8 oldInterest, uint8 newInterest);
     event NewWalletSet(address oldWallet, address newWallet);
     event ApyClaimed(address indexed user, uint256 apyAmount);
+    event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
 
     constructor(address multiSigWallet, address usdcAddress)
         AlluoERC20("ALLUO LP", "LPALL")
@@ -70,9 +71,11 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     function update() public {
         uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
         if (timeFromLastUpdate >= updateTimeLimit) {
-            DF = (DF * (
-                (interest * DENOMINATOR * timeFromLastUpdate / YEAR) + (100 * DENOMINATOR)) 
-                / DENOMINATOR) / 100;
+            DF =
+                ((DF *
+                    (((interest * DENOMINATOR * timeFromLastUpdate) / YEAR) +
+                        (100 * DENOMINATOR))) / DENOMINATOR) /
+                100;
             lastDFUpdate = block.timestamp;
         }
     }
@@ -83,7 +86,7 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
             uint256 userBalance = balanceOf(_address);
             uint256 userNewBalance = ((DF * userBalance) / userDF[_address]);
             uint256 newAmount = userNewBalance - userBalance;
-            if(newAmount != 0){
+            if (newAmount != 0) {
                 _mint(_address, newAmount);
                 emit ApyClaimed(_address, newAmount);
             }
@@ -122,7 +125,10 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         public
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
+        uint256 oldValue = updateTimeLimit;
         updateTimeLimit = _newLimit;
+
+        emit UpdateTimeLimitSet(oldValue, _newLimit);
     }
 
     function setWallet(address newWallet)
@@ -147,23 +153,22 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     }
 
     function getBalance(address _address) external view returns (uint256) {
-        if(userDF[_address] != 0){
+        if (userDF[_address] != 0) {
             uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
             uint256 localDF;
             if (timeFromLastUpdate >= updateTimeLimit) {
-                localDF = (DF * (
-                    (interest * DENOMINATOR * timeFromLastUpdate / YEAR) + (100 * DENOMINATOR)) 
-                    / DENOMINATOR) / 100;
-            }
-            else{
+                localDF =
+                    ((DF *
+                        (((interest * DENOMINATOR * timeFromLastUpdate) /
+                            YEAR) + (100 * DENOMINATOR))) / DENOMINATOR) /
+                    100;
+            } else {
                 localDF = DF;
             }
             return ((localDF * balanceOf(_address)) / userDF[_address]);
-        }
-        else{
+        } else {
             return 0;
         }
-
     }
 
     function _beforeTokenTransfer(
