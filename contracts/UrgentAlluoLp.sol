@@ -135,6 +135,8 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
+        require(newWallet.isContract(), "UrgentAlluoLp: not contract");
+
         address oldValue = wallet;
         wallet = newWallet;
 
