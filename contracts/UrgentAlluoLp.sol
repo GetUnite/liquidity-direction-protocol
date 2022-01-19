@@ -148,9 +148,7 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         override
         onlyRole(getRoleAdmin(role))
     {
-        if (role == DEFAULT_ADMIN_ROLE) {
-            require(account.isContract(), "UrgentAlluoLp: not contract");
-        }
+        require(account.isContract(), "UrgentAlluoLp: not contract");
         _grantRole(role, account);
     }
 

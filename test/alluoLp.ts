@@ -117,6 +117,78 @@ describe("AlluoLP", function () {
         expect(tx).to.be.revertedWith("UrgentAlluoLp: not contract");
     });
 
+    it("Should set new interest", async () => {
+        const newInterest = 9;
+        const oldInterest = await alluoLp.interest();
+
+        expect(oldInterest).to.be.not.equal(newInterest);
+
+        let ABI = ["function setInterest(uint8 _newInterest)"];
+        let iface = new ethers.utils.Interface(ABI);
+        const calldata = iface.encodeFunctionData("setInterest", [newInterest]);
+
+        await expect(multisig.executeCall(alluoLp.address, calldata))
+            .to.emit(alluoLp, "InterestChanged")
+            .withArgs(oldInterest, newInterest);
+    });
+
+    it("Should not set new interest (caller without DEFAULT_ADMIN_ROLE)", async () => {
+        const newInterest = 9;
+        const role = await alluoLp.DEFAULT_ADMIN_ROLE();
+        const notAdmin = signers[1];
+
+        await expect(alluoLp.connect(notAdmin).setInterest(newInterest)).to.be
+            .revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
+    });
+
+    it("Should set new update time limit", async () => {
+        const newLimit = 7200;
+        const oldLimit = await alluoLp.updateTimeLimit();
+
+        expect(newLimit).to.not.be.equal(oldLimit);
+
+        let ABI = ["function setUpdateTimeLimit(uint256 _newLimit)"];
+        let iface = new ethers.utils.Interface(ABI);
+        const calldata = iface.encodeFunctionData("setUpdateTimeLimit", [newLimit]);
+
+        await expect(multisig.executeCall(alluoLp.address, calldata)).to.emit(alluoLp, "UpdateTimeLimitSet").withArgs(oldLimit, newLimit);
+    });
+
+    it("Should not set new update time limit (caller without DEFAULT_ADMIN_ROLE)", async () => {
+        const newLimit = 7200;
+        const notAdmin = signers[1];
+        const role = await alluoLp.DEFAULT_ADMIN_ROLE();
+
+        await expect(alluoLp.connect(notAdmin).setUpdateTimeLimit(newLimit)).to.be
+            .revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
+    });
+
+    it("Should set new wallet", async () => {
+        const NewWallet = await ethers.getContractFactory('PseudoMultisigWallet') as PseudoMultisigWallet__factory;
+        const newWallet = await NewWallet.deploy();
+        const oldWallet = await alluoLp.wallet();
+
+        expect(newWallet.address).to.not.be.equal(oldWallet);
+
+        let ABI = ["function setWallet(address newWallet)"];
+        let iface = new ethers.utils.Interface(ABI);
+        const calldata = iface.encodeFunctionData("setWallet", [newWallet.address]);
+
+        await expect(multisig.executeCall(alluoLp.address, calldata)).to.emit(alluoLp, "NewWalletSet").withArgs(oldWallet, newWallet.address);
+    });
+
+    it("Should not set new wallet (attempt to make wallet an EOA)", async () => {
+        const newWallet = signers[2]
+
+        let ABI = ["function setWallet(address newWallet)"];
+        let iface = new ethers.utils.Interface(ABI);
+        const calldata = iface.encodeFunctionData("setWallet", [newWallet.address]);
+
+        const tx = multisig.executeCall(alluoLp.address, calldata);
+
+        await expect(tx).to.be.revertedWith("UrgentAlluoLp: not contract")
+    })
+
     describe('Token transfers and apy calculation', function () {
         it('Should return right user balance after one year even without claim', async function () {
 
@@ -277,7 +349,7 @@ describe("AlluoLP", function () {
                     ).to.be.revertedWith("ERC20: transfer from the zero address");
                 });
 
-                it('sender doesn’t have enough tokens', async function () {
+                it('sender doesn\'t have enough tokens', async function () {
                     await expect(alluoLp.connect(signers[1]).transfer(signers[2].address, parseEther('100'))
                     ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
                 });
