@@ -1,4 +1,4 @@
-import { parseEther } from "@ethersproject/units";
+import { parseEther, parseUnits } from "@ethersproject/units";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
@@ -131,8 +131,16 @@ describe("AlluoLP", function () {
 
             //view function that returns balance with APY
             let balance = await alluoLp.getBalance(signers[3].address);
-            expect(balance).to.be.gt(parseEther("107.9"));
-            expect(balance).to.be.lt(parseEther("108.1"));
+            //console.log(balance.toString());
+            expect(balance).to.be.gt(parseUnits("107.9", await alluoLp.decimals()));
+            expect(balance).to.be.lt(parseUnits("108.1", await alluoLp.decimals()));
+        });
+
+        it('getBalance should return zero if user dont have tokens', async function () {
+
+            let balance = await alluoLp.getBalance(signers[3].address);
+            //console.log(balance.toString());
+            expect(balance).to.equal(0);
         });
 
         it('Should correctly calculate balances over time and various transfers', async function () {
@@ -165,8 +173,9 @@ describe("AlluoLP", function () {
             await alluoLp.connect(signers[3]).claim(signers[3].address);
             await alluoLp.update();
             let balance = await alluoLp.balanceOf(signers[3].address);
-            expect(balance).to.be.gt(parseEther("103.22"));
-            expect(balance).to.be.lt(parseEther("103.23"));
+            //console.log(balance.toString());
+            expect(balance).to.be.gt(parseUnits("103.22", await alluoLp.decimals()));
+            expect(balance).to.be.lt(parseUnits("103.23", await alluoLp.decimals()));
             await alluoLp.connect(signers[3]).withdraw(balance);
 
             //changing interest
@@ -182,20 +191,23 @@ describe("AlluoLP", function () {
             //after fifth period
             await alluoLp.connect(signers[1]).claim(signers[1].address);
             balance = await alluoLp.balanceOf(signers[1].address);
-            expect(balance).to.be.gt(parseEther("213.54"));
-            expect(balance).to.be.lt(parseEther("213.55"));
+            //console.log(balance.toString());
+            expect(balance).to.be.gt(parseUnits("213.54", await alluoLp.decimals()));
+            expect(balance).to.be.lt(parseUnits("213.55", await alluoLp.decimals()));
             await alluoLp.connect(signers[1]).withdraw(balance);
 
             await alluoLp.connect(signers[2]).claim(signers[2].address);
             balance = await alluoLp.balanceOf(signers[2].address);
-            expect(balance).to.be.gt(parseEther("105.92"));
-            expect(balance).to.be.lt(parseEther("105.93"));
+            //console.log(balance.toString());
+            expect(balance).to.be.gt(parseUnits("105.92", await alluoLp.decimals()));
+            expect(balance).to.be.lt(parseUnits("105.93", await alluoLp.decimals()));
             await alluoLp.connect(signers[2]).withdraw(balance);
 
             await alluoLp.connect(signers[4]).claim(signers[4].address);
             balance = await alluoLp.balanceOf(signers[4].address);
-            expect(balance).to.be.gt(parseEther("307.87"));
-            expect(balance).to.be.lt(parseEther("307.88"));
+            //console.log(balance.toString());
+            expect(balance).to.be.gt(parseUnits("307.87", await alluoLp.decimals()));
+            expect(balance).to.be.lt(parseUnits("307.88", await alluoLp.decimals()));
             await alluoLp.connect(signers[4]).withdraw(balance);
         });
         it('Should not give rewards if the interest is zero', async function () {
@@ -211,8 +223,8 @@ describe("AlluoLP", function () {
 
             await alluoLp.connect(signers[3]).claim(signers[3].address);
             let balance = await alluoLp.balanceOf(signers[3].address);
-            expect(balance).to.be.gt(parseEther("107.9"));
-            expect(balance).to.be.lt(parseEther("108.1"));
+            expect(balance).to.be.gt(parseUnits("107.9", await alluoLp.decimals()));
+            expect(balance).to.be.lt(parseUnits("108.1", await alluoLp.decimals()));
 
             //changing interest
             const newInterest = 0;
@@ -235,7 +247,7 @@ describe("AlluoLP", function () {
             it("Should return basic information", async function () {
                 expect(await alluoLp.name()).to.equal("ALLUO LP"),
                     expect(await alluoLp.symbol()).to.equal("LPALL"),
-                    expect(await alluoLp.decimals()).to.equal(18);
+                    expect(await alluoLp.decimals()).to.equal(6);
             });
             it("Should return the total supply equal to 0", async function () {
                 expect(await alluoLp.totalSupply()).to.equal(0);
