@@ -207,6 +207,29 @@ describe("AlluoLP", function () {
             expect(balance).to.be.gt(parseUnits("107.9", await alluoLp.decimals()));
             expect(balance).to.be.lt(parseUnits("108.1", await alluoLp.decimals()));
         });
+        it('Should not change DF more than once an hour', async function () {
+
+            // address that will get minted tokens
+            const recepient = signers[3];
+            // amount of tokens to be minted, including decimals value of alluoLp
+            const amount = ethers.utils.parseUnits("100.0", await alluoLp.decimals());
+
+            await mint(recepient, amount);
+
+            await skipDays(365);
+
+            let balance = await alluoLp.getBalance(signers[3].address);
+
+            alluoLp.update();
+            let oldDF = alluoLp.DF().toString;
+            //Does not change DF again
+            alluoLp.update();
+            let newDF = alluoLp.DF().toString;
+            expect(oldDF).to.equal(newDF)
+            balance = await alluoLp.getBalance(signers[3].address);
+            expect(balance).to.be.gt(parseUnits("107.9", await alluoLp.decimals()));
+            expect(balance).to.be.lt(parseUnits("108.1", await alluoLp.decimals()));
+        });
 
         it('getBalance should return zero if user dont have tokens', async function () {
 
