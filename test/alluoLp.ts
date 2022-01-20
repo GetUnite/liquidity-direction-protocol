@@ -86,19 +86,103 @@ describe("AlluoLP", function () {
             .withArgs(recipient.address, amount);
     });
 
-    it("Should allow admin to withdraw and burn tokens in bulk", async () => {
-        const recipient = signers[1];
-        const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
+    it("Should allow admin to withdraw and burn tokens in bulk (all processed)", async () => {
+        const recipients = [
+            signers[1],
+            signers[2],
+            signers[3]
+        ];
+        const recepientAddresses = recipients.map((signer) => signer.address);
+        const amounts = [
+            ethers.utils.parseUnits("10.0", await alluoLp.decimals()),
+            ethers.utils.parseUnits("20.0", await alluoLp.decimals()),
+            ethers.utils.parseUnits("30.0", await alluoLp.decimals()),
+        ];
 
-        await mint(recipient, amount);
+        for (let index = 0; index < recipients.length; index++) {
+            await mint(recipients[index], amounts[index]);
+        }
 
         let ABI = ["function withdrawBulk(uint256[] _amounts, address[] _users)"];
         let iface = new ethers.utils.Interface(ABI);
-        const calldata = iface.encodeFunctionData("withdrawBulk", [[amount],[recipient.address]]);
+        const calldata = iface.encodeFunctionData("withdrawBulk", [amounts, recepientAddresses]);
 
         await multisig.executeCall(alluoLp.address, calldata);
 
-        expect(await alluoLp.balanceOf(recipient.address)).to.be.equal(0);
+        for (let index = 0; index < recipients.length; index++) {
+            const balance = await alluoLp.balanceOf(recipients[index].address);
+            expect(balance).to.be.equal(0);
+        }
+    });
+
+    it("Should allow admin to withdraw and burn tokens in bulk (something skipped)", async () => {
+        const recipients = [
+            signers[1],
+            signers[2],
+            signers[3]
+        ];
+        const recepientAddresses = recipients.map((signer) => signer.address);
+        const amounts = [
+            ethers.utils.parseUnits("10.0", await alluoLp.decimals()),
+            ethers.utils.parseUnits("20.0", await alluoLp.decimals()),
+            ethers.utils.parseUnits("30.0", await alluoLp.decimals()),
+        ];
+        const malformedIndex = 1;
+        const malformedAmount = amounts[malformedIndex].sub(
+            ethers.utils.parseUnits("1.0", await alluoLp.decimals())
+        );
+
+        for (let index = 0; index < recipients.length; index++) {
+            if (index == malformedIndex) {
+                await mint(recipients[index], malformedAmount);
+                continue;
+            }
+            await mint(recipients[index], amounts[index]);
+        }
+
+        let ABI = ["function withdrawBulk(uint256[] _amounts, address[] _users)"];
+        let iface = new ethers.utils.Interface(ABI);
+        const calldata = iface.encodeFunctionData("withdrawBulk", [amounts, recepientAddresses]);
+
+        await multisig.executeCall(alluoLp.address, calldata);
+
+        for (let index = 0; index < recipients.length; index++) {
+            const balance = await alluoLp.balanceOf(recipients[index].address);
+            if (index < malformedIndex) {
+                expect(balance).to.be.equal(0);
+                continue;
+            }
+            else if (index == malformedIndex) {
+                expect(balance).to.be.equal(malformedAmount);
+            }
+            else {
+                expect(balance).to.be.equal(amounts[index]);
+            }
+        }
+    });
+
+    it("Should not allow to withdraw and burn tokens in bulk (caller without DEFAULT_ADMIN_ROLE)", async () => {
+        const recipients = [
+            signers[1],
+            signers[2],
+            signers[3]
+        ];
+        const recepientAddresses = recipients.map((signer) => signer.address);
+        const amounts = [
+            ethers.utils.parseUnits("10.0", await alluoLp.decimals()),
+            ethers.utils.parseUnits("20.0", await alluoLp.decimals()),
+            ethers.utils.parseUnits("30.0", await alluoLp.decimals()),
+        ];
+        const notAdmin = signers[4];
+        const role = await alluoLp.DEFAULT_ADMIN_ROLE();
+
+        for (let index = 0; index < recipients.length; index++) {
+            await mint(recipients[index], amounts[index]);
+        }
+
+        const tx = alluoLp.connect(notAdmin).withdrawBulk(amounts, recepientAddresses);
+        expect(tx).to.be
+            .revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
     });
 
     it("Should grant role that can be granted only to contract", async () => {
