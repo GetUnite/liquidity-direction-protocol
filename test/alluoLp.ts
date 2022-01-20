@@ -115,7 +115,7 @@ describe("AlluoLP", function () {
         }
     });
 
-    it("Should allow admin to withdraw and burn tokens in bulk (something skipped)", async () => {
+    it("Should not allow admin to withdraw and burn tokens in bulk (someone has not enough balance)", async () => {
         const recipients = [
             signers[1],
             signers[2],
@@ -144,21 +144,9 @@ describe("AlluoLP", function () {
         let iface = new ethers.utils.Interface(ABI);
         const calldata = iface.encodeFunctionData("withdrawBulk", [amounts, recepientAddresses]);
 
-        await multisig.executeCall(alluoLp.address, calldata);
+        const tx = multisig.executeCall(alluoLp.address, calldata);
 
-        for (let index = 0; index < recipients.length; index++) {
-            const balance = await alluoLp.balanceOf(recipients[index].address);
-            if (index < malformedIndex) {
-                expect(balance).to.be.equal(0);
-                continue;
-            }
-            else if (index == malformedIndex) {
-                expect(balance).to.be.equal(malformedAmount);
-            }
-            else {
-                expect(balance).to.be.equal(amounts[index]);
-            }
-        }
+        expect(tx).to.be.revertedWith("UrgentAlluoLp: not enough");
     });
 
     it("Should not allow to withdraw and burn tokens in bulk (caller without DEFAULT_ADMIN_ROLE)", async () => {

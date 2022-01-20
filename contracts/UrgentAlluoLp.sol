@@ -176,14 +176,15 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         for (uint256 i = 0; i < _users.length; i++) {
-            if (getBalance(_users[i]) < _amounts[i]) {
-                return;
-            } else {
-                claim(_users[i]);
-                _burn(_users[i], _amounts[i]);
+            require(
+                getBalance(_users[i]) >= _amounts[i],
+                "UrgentAlluoLp: not enough"
+            );
 
-                emit BurnedForWithdraw(_users[i], _amounts[i]);
-            }
+            claim(_users[i]);
+            _burn(_users[i], _amounts[i]);
+
+            emit BurnedForWithdraw(_users[i], _amounts[i]);
         }
     }
 
