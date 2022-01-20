@@ -41,6 +41,7 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     uint8 public interest = 8;
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
+    event BulkBurnedForWithdraw(address[] indexed user, uint256[] amount);
     event Deposited(address indexed user, uint256 amount);
     event InterestChanged(uint8 oldInterest, uint8 newInterest);
     event NewWalletSet(address oldWallet, address newWallet);
@@ -183,9 +184,9 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
 
             claim(_users[i]);
             _burn(_users[i], _amounts[i]);
-
-            emit BurnedForWithdraw(_users[i], _amounts[i]);
         }
+
+        emit BulkBurnedForWithdraw(_users, _amounts);
     }
 
     function _beforeTokenTransfer(
