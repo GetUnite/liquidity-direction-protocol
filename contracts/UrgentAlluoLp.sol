@@ -40,8 +40,14 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     // current interest rate
     uint8 public interest = 8;
 
+    struct PendingOfframpRequests { 
+        address user;
+        uint256 amount;
+    }
+    PendingOfframpRequests[] _pendingOfframpRequests;
+
     event BurnedForWithdraw(address indexed user, uint256 amount);
-    event BulkBurnedForWithdraw(address[] indexed user, uint256[] amount);
+    event BurnRequestExecuted(address[] indexed user);
     event Deposited(address indexed user, uint256 amount);
     event InterestChanged(uint8 oldInterest, uint8 newInterest);
     event NewWalletSet(address oldWallet, address newWallet);
@@ -107,7 +113,7 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     function withdraw(uint256 amount) external {
         claim(msg.sender);
         _burn(msg.sender, amount);
-
+        pendingOfframpRequests.push(PendingOfframpRequests(msg.sender, amount));
         emit BurnedForWithdraw(msg.sender, amount);
     }
 
@@ -172,21 +178,27 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         }
     }
 
-    function withdrawBulk(uint256[] memory _amounts, address[] memory _users)
+    function offrampBulk(address[] memory _users)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        for (uint256 i = 0; i < _users.length; i++) {
+        for (uint256 i = 0; i < _pendingOfframpRequests.length; i++) {
             require(
-                getBalance(_users[i]) >= _amounts[i],
-                "UrgentAlluoLp: not enough"
+                _pendingOfframpRequests[i].user == _users[i],
+                "UrgentAlluoLp: user not requested withdrawl"
             );
-
-            claim(_users[i]);
-            _burn(_users[i], _amounts[i]);
+            _pendingOfframpRequests[i] = _pendingOfframpRequests[i + 1];
+            delete _pendingOfframpRequests[_pendingOfframpRequests.length - 1];
+            _pendingOfframpRequests.pop();
         }
 
-        emit BulkBurnedForWithdraw(_users, _amounts);
+        emit BurnRequestExecuted(_users);
+    }
+
+    function getWithdrawRequests()
+        public
+    {
+        return _pendingOfframpRequests;
     }
 
     function _beforeTokenTransfer(
