@@ -86,6 +86,21 @@ describe("AlluoLP", function () {
             .withArgs(recipient.address, amount);
     });
 
+    it("Should allow admin to withdraw and burn tokens in bulk", async () => {
+        const recipient = signers[1];
+        const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
+
+        await mint(recipient, amount);
+
+        let ABI = ["function withdrawBulk(uint256[] _amounts, address[] _users)"];
+        let iface = new ethers.utils.Interface(ABI);
+        const calldata = iface.encodeFunctionData("withdrawBulk", [[amount],[recipient.address]]);
+
+        await multisig.executeCall(alluoLp.address, calldata);
+
+        expect(await alluoLp.balanceOf(recipient.address)).to.be.equal(0);
+    });
+
     it("Should grant role that can be granted only to contract", async () => {
         const role = await alluoLp.DEFAULT_ADMIN_ROLE();
         const NewContract = await ethers.getContractFactory('PseudoMultisigWallet') as PseudoMultisigWallet__factory;

@@ -94,13 +94,6 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         userDF[_address] = DF;
     }
 
-    function withdraw(uint256 amount) external {
-        claim(msg.sender);
-        _burn(msg.sender, amount);
-
-        emit BurnedForWithdraw(msg.sender, amount);
-    }
-
     function deposit(uint256 amount) external {
         acceptedToken.safeTransferFrom(msg.sender, wallet, amount);
 
@@ -108,6 +101,13 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         _mint(msg.sender, amount);
 
         emit Deposited(msg.sender, amount);
+    }
+
+    function withdraw(uint256 amount) external {
+        claim(msg.sender);
+        _burn(msg.sender, amount);
+
+        emit BurnedForWithdraw(msg.sender, amount);
     }
 
     function setInterest(uint8 _newInterest)
@@ -152,7 +152,7 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         _grantRole(role, account);
     }
 
-    function getBalance(address _address) external view returns (uint256) {
+    function getBalance(address _address) public view returns (uint256) {
         if (userDF[_address] != 0) {
             uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
             uint256 localDF;
@@ -168,6 +168,22 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
             return ((localDF * balanceOf(_address)) / userDF[_address]);
         } else {
             return 0;
+        }
+    }
+
+    function withdrawBulk(uint256[] memory _amounts, address[] memory _users)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        for (uint256 i = 0; i < _users.length; i++) {
+            if (getBalance(_users[i]) < _amounts[i]) {
+                return;
+            } else {
+                claim(_users[i]);
+                _burn(_users[i], _amounts[i]);
+
+                emit BurnedForWithdraw(_users[i], _amounts[i]);
+            }
         }
     }
 
