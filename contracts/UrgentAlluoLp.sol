@@ -40,11 +40,11 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     // current interest rate
     uint8 public interest = 8;
 
-    struct PendingOfframpRequests { 
+    struct PendingOfframpRequests {
         address user;
         uint256 amount;
     }
-    PendingOfframpRequests[] _pendingOfframpRequests;
+    PendingOfframpRequests[] private _pendingOfframpRequests;
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event BurnRequestExecuted(address[] indexed user);
@@ -113,7 +113,9 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     function withdraw(uint256 amount) external {
         claim(msg.sender);
         _burn(msg.sender, amount);
-        pendingOfframpRequests.push(PendingOfframpRequests(msg.sender, amount));
+        _pendingOfframpRequests.push(
+            PendingOfframpRequests(msg.sender, amount)
+        );
         emit BurnedForWithdraw(msg.sender, amount);
     }
 
@@ -196,7 +198,9 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     }
 
     function getWithdrawRequests()
-        public
+        external
+        view
+        returns (PendingOfframpRequests[] memory)
     {
         return _pendingOfframpRequests;
     }
