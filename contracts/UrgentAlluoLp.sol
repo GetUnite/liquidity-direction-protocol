@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "./AlluoERC20.sol";
+import "./AlluoERC20Pausable.sol";
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract UrgentAlluoLp is AlluoERC20, AccessControl {
+contract UrgentAlluoLp is AlluoERC20Pausable, AccessControl {
     using ECDSA for bytes32;
     using Address for address;
     using SafeERC20 for IERC20;
@@ -48,7 +48,7 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
     event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
 
     constructor(address multiSigWallet, address usdcAddress)
-        AlluoERC20("ALLUO LP", "LPALL")
+        AlluoERC20Pausable("ALLUO LP", "LPALL")
     {
         require(multiSigWallet.isContract(), "UrgentAlluoLp: not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, multiSigWallet);
@@ -68,7 +68,7 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         return 6;
     }
 
-    function update() public {
+    function update() public whenNotPaused {
         uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
         if (timeFromLastUpdate >= updateTimeLimit) {
             DF =
@@ -80,7 +80,7 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         }
     }
 
-    function claim(address _address) public {
+    function claim(address _address) public whenNotPaused {
         update();
         if (userDF[_address] != 0) {
             uint256 userBalance = balanceOf(_address);
@@ -94,14 +94,14 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         userDF[_address] = DF;
     }
 
-    function withdraw(uint256 amount) external {
+    function withdraw(uint256 amount) external whenNotPaused {
         claim(msg.sender);
         _burn(msg.sender, amount);
 
         emit BurnedForWithdraw(msg.sender, amount);
     }
 
-    function deposit(uint256 amount) external {
+    function deposit(uint256 amount) external whenNotPaused {
         acceptedToken.safeTransferFrom(msg.sender, wallet, amount);
 
         claim(msg.sender);
@@ -141,6 +141,14 @@ contract UrgentAlluoLp is AlluoERC20, AccessControl {
         wallet = newWallet;
 
         emit NewWalletSet(oldValue, newWallet);
+    }
+
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
     }
 
     function grantRole(bytes32 role, address account)

@@ -141,6 +141,43 @@ describe("AlluoLP", function () {
             .revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
     });
 
+    it("Should pause all public/external user functions", async () => {
+        const address1 = signers[1];
+        const address2 = signers[2];
+        const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
+
+        let ABI = ["function pause()"];
+        let iface = new ethers.utils.Interface(ABI);
+        const calldata = iface.encodeFunctionData("pause", []);
+
+        await multisig.executeCall(alluoLp.address, calldata);
+
+        await expect(alluoLp.transfer(address1.address, amount)).to.be.revertedWith("Pausable: paused");
+        await expect(alluoLp.approve(address1.address, amount)).to.be.revertedWith("Pausable: paused");
+        await expect(alluoLp.transferFrom(address1.address, address2.address, amount)).to.be.revertedWith("Pausable: paused");
+        await expect(alluoLp.increaseAllowance(address1.address, amount)).to.be.revertedWith("Pausable: paused");
+        await expect(alluoLp.decreaseAllowance(address1.address, amount)).to.be.revertedWith("Pausable: paused");
+
+        await expect(alluoLp.update()).to.be.revertedWith("Pausable: paused");
+        await expect(alluoLp.claim(address1.address)).to.be.revertedWith("Pausable: paused");
+        await expect(alluoLp.withdraw(amount)).to.be.revertedWith("Pausable: paused");
+        await expect(alluoLp.deposit(amount)).to.be.revertedWith("Pausable: paused");
+    });
+
+    it("Should unpause all public/external user functions", async () => {
+        let ABI1 = ["function pause()"];
+        let iface1 = new ethers.utils.Interface(ABI1);
+        const calldata1 = iface1.encodeFunctionData("pause", []);
+
+        await multisig.executeCall(alluoLp.address, calldata1);
+
+        let ABI2 = ["function unpause()"];
+        let iface2 = new ethers.utils.Interface(ABI2);
+        const calldata2 = iface2.encodeFunctionData("unpause", []);
+
+        await multisig.executeCall(alluoLp.address, calldata2);
+    });
+
     it("Should set new update time limit", async () => {
         const newLimit = 7200;
         const oldLimit = await alluoLp.updateTimeLimit();
