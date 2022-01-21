@@ -146,11 +146,15 @@ describe("AlluoLP", function () {
         const address2 = signers[2];
         const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
 
+        expect(await alluoLp.paused()).to.be.false;
+
         let ABI = ["function pause()"];
         let iface = new ethers.utils.Interface(ABI);
         const calldata = iface.encodeFunctionData("pause", []);
 
         await multisig.executeCall(alluoLp.address, calldata);
+
+        expect(await alluoLp.paused()).to.be.true;
 
         await expect(alluoLp.transfer(address1.address, amount)).to.be.revertedWith("Pausable: paused");
         await expect(alluoLp.approve(address1.address, amount)).to.be.revertedWith("Pausable: paused");
@@ -176,6 +180,8 @@ describe("AlluoLP", function () {
         const calldata2 = iface2.encodeFunctionData("unpause", []);
 
         await multisig.executeCall(alluoLp.address, calldata2);
+
+        expect(await alluoLp.paused()).to.be.false;
     });
 
     it("Should set new update time limit", async () => {
