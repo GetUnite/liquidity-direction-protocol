@@ -10,6 +10,9 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+
+
 contract AlluoLpUpgradable is 
     Initializable, 
     PausableUpgradeable, 
@@ -19,6 +22,7 @@ contract AlluoLpUpgradable is
 {
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
+    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
@@ -37,7 +41,8 @@ contract AlluoLpUpgradable is
     mapping(address => uint256) public userDF;
 
     // flag for tokens from which deposit available
-    mapping(address => bool) public supportedTokens;
+    //mapping(address => bool) public supportedTokens;
+    EnumerableSetUpgradeable.AddressSet private supportedTokens;
 
     // constant for percent calculation
     uint256 public DENOMINATOR;
@@ -80,7 +85,7 @@ contract AlluoLpUpgradable is
 
         wallet = multiSigWallet;
 
-        supportedTokens[firstTokenAddress] = true;
+        supportedTokens.add(firstTokenAddress);
 
         lastDFUpdate = block.timestamp;
         update();
@@ -124,7 +129,7 @@ contract AlluoLpUpgradable is
     }
 
     function deposit(address _token, uint256 _amount) external whenNotPaused {
-        require(supportedTokens[_token], "this token is not supported");
+        require(supportedTokens.contains(_token), "this token is not supported");
         
         IERC20Upgradeable(_token).safeTransferFrom(msg.sender, wallet, _amount);
 
@@ -138,8 +143,14 @@ contract AlluoLpUpgradable is
     function changeTokenStatus(address _token, bool _status) external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        supportedTokens[_token] = _status;
+        if(_status){
+            supportedTokens.add(_token);
+        }
+        else{
+            supportedTokens.remove(_token);
+        }
     }
+
 
     function setInterest(uint8 _newInterest)
         public
@@ -195,6 +206,7 @@ contract AlluoLpUpgradable is
         for(uint i = 0; i < _users.length; i++){
             uint256 oldBalanceIn18 = AlluoLpUpgradable(_oldContract).getBalance(_users[i]) * 10**12;
             _mint(_users[i], oldBalanceIn18);
+            claim(_users[i]);
         }
     }
 
@@ -215,6 +227,10 @@ contract AlluoLpUpgradable is
         } else {
             return 0;
         }
+    }
+
+    function getListSupportedTokens() public view returns (address[] memory) {
+        return supportedTokens.values();
     }
 
     function _beforeTokenTransfer(
