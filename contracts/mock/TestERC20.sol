@@ -8,9 +8,13 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 contract TestERC20 is ERC20, ERC20Burnable, AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    constructor() ERC20("Testing DAI", "tDAI") {
+    uint8 realDecimals;
+
+    constructor(string memory _name, string memory _symbol, uint8 _decimals) ERC20(_name, _symbol) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+
+        realDecimals = _decimals;
 
         uint256 id;
         // solhint-disable-next-line no-inline-assembly
@@ -23,6 +27,11 @@ contract TestERC20 is ERC20, ERC20Burnable, AccessControl {
             id == 1337 || id == 31337,
             "Do not deploy this contract on public networks!"
         );
+    }
+
+
+    function decimals() public view virtual override returns (uint8) {
+        return realDecimals;
     }
 
     function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
