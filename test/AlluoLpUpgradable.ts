@@ -258,6 +258,9 @@ describe("AlluoLPUpgradable", function () {
         await alluoLp.connect(recipient).deposit(newToken.address, amountIn6);
 
         expect(await alluoLp.balanceOf(recipient.address)).to.equal(parseUnits(amount, await alluoLp.decimals()));
+
+        // console.log(await alluoLp.getListSupportedTokens());
+
     })
 
     it("Should not allow deposit with not supported coin", async () => {
@@ -309,7 +312,11 @@ describe("AlluoLPUpgradable", function () {
             expect(await alluoLp.balanceOf(signers[1].address)).to.equal(parseUnits(amount1, await alluoLp.decimals()));
             expect(await alluoLp.balanceOf(signers[2].address)).to.equal(parseUnits(amount2, await alluoLp.decimals()));
             expect(await alluoLp.balanceOf(signers[3].address)).to.equal(parseUnits(amount3, await alluoLp.decimals()));
-    
+
+            // await skipDays(365)
+            // console.log((await alluoLp.getBalance(signers[2].address)).toString());
+            //await mint(recipient1,parseUnits(amount1, await alluoLp.decimals()) )
+
         });
     });
 
