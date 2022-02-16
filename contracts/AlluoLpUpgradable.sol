@@ -38,20 +38,19 @@ contract AlluoLpUpgradable is
     // DF of user from last user action on contract
     mapping(address => uint256) public userDF;
 
-    // flag for tokens from which deposit available
-    //mapping(address => bool) public supportedTokens;
+    // list of tokens from which deposit available
     EnumerableSetUpgradeable.AddressSet private supportedTokens;
 
     // constant for percent calculation
     uint256 public DENOMINATOR;
 
+    // admin and reserves address
     address public wallet;
 
-    // year in seconds
-    uint32 public YEAR;
     // current interest rate
     uint8 public interest;
-
+    
+    //flag for upgrades availability
     bool public upgradeStatus;
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
@@ -80,7 +79,6 @@ contract AlluoLpUpgradable is
         DF = 10**20;
         updateTimeLimit = 3600;
         DENOMINATOR = 10**20;
-        YEAR = 31536000;
         interest = 8;
 
         wallet = _multiSigWallet;
@@ -102,7 +100,7 @@ contract AlluoLpUpgradable is
         if (timeFromLastUpdate >= updateTimeLimit) {
             DF =
                 ((DF *
-                    (((interest * DENOMINATOR * timeFromLastUpdate) / YEAR) +
+                    (((interest * DENOMINATOR * timeFromLastUpdate) / 31536000) +
                         (100 * DENOMINATOR))) / DENOMINATOR) /
                 100;
             lastDFUpdate = block.timestamp;
@@ -228,7 +226,7 @@ contract AlluoLpUpgradable is
                 localDF =
                     ((DF *
                         (((interest * DENOMINATOR * timeFromLastUpdate) /
-                            YEAR) + (100 * DENOMINATOR))) / DENOMINATOR) /
+                            31536000) + (100 * DENOMINATOR))) / DENOMINATOR) /
                     100;
             } else {
                 localDF = DF;

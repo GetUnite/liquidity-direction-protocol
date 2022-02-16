@@ -2,24 +2,18 @@ import { ethers, upgrades } from "hardhat"
 
 async function main() {
 
-  let gnosisAddress = "";
-  let firstDepositTokenAddress = "";
+  let gnosisAddress = "gnosis";
+  let supprotedTokens = ["usdc","dai"];
 
   const AlluoLP = await ethers.getContractFactory("AlluoLpUpgradable");
 
   let alluoLp = await upgrades.deployProxy(AlluoLP,
         [gnosisAddress,
-        firstDepositTokenAddress],
+        supprotedTokens],
         {initializer: 'initialize', kind:'uups'}
   );
 
   console.log("AlluoLp upgradable deployed to:", alluoLp.address);
-
-  // const AlluoLPOld = await ethers.getContractFactory("UrgentAlluoLp");
-
-  // let alluoLpOld = await AlluoLPOld.deploy(gnosisAddress, firstDepositTokenAddress)
-
-  // console.log("AlluoLp old deployed to:", alluoLpOld.address);
 }
 
 main()
