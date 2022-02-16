@@ -54,6 +54,8 @@ contract AlluoLpUpgradable is
     // current interest rate
     uint8 public interest;
 
+    bool upgradeStatus;
+
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
     event InterestChanged(uint8 oldInterest, uint8 newInterest);
@@ -210,6 +212,13 @@ contract AlluoLpUpgradable is
         }
     }
 
+    function changeUpgradeStatus(bool _status)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        upgradeStatus = _status;
+    }
+
     function getBalance(address _address) public view returns (uint256) {
         if (userDF[_address] != 0) {
             uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
@@ -247,5 +256,5 @@ contract AlluoLpUpgradable is
         internal
         onlyRole(UPGRADER_ROLE)
         override
-    {}
+    {require(upgradeStatus, "Upgrade not allowed");}
 }
