@@ -47,7 +47,7 @@ describe("AlluoLPUpgradable", function () {
 
         alluoLp = await upgrades.deployProxy(AlluoLP,
             [multisig.address,
-            token.address],
+            [token.address]],
             {initializer: 'initialize', kind:'uups'}
         ) as AlluoLpUpgradable;
     });

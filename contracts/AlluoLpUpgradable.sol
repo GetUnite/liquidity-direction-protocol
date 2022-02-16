@@ -9,9 +9,7 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
-
 
 contract AlluoLpUpgradable is 
     Initializable, 
@@ -54,7 +52,7 @@ contract AlluoLpUpgradable is
     // current interest rate
     uint8 public interest;
 
-    bool upgradeStatus;
+    bool public upgradeStatus;
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
@@ -62,21 +60,21 @@ contract AlluoLpUpgradable is
     event NewWalletSet(address oldWallet, address newWallet);
     event ApyClaimed(address indexed user, uint256 apyAmount);
     event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
-
+    event DepositTokenStatusChanged(address token, bool status);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(address multiSigWallet, address firstTokenAddress) initializer public {
+    function initialize(address _multiSigWallet, address[] memory _supportedTokens) public initializer {
         __ERC20_init("ALLUO LP", "LPALL");
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        require(multiSigWallet.isContract(), "AlluoLpUpgradable: not contract");
+        require(_multiSigWallet.isContract(), "AlluoLpUpgradable: not contract");
 
-        _grantRole(DEFAULT_ADMIN_ROLE, multiSigWallet);
-        _grantRole(UPGRADER_ROLE, multiSigWallet);
+        _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
+        _grantRole(UPGRADER_ROLE, _multiSigWallet);
         _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         DF = 10**20;
@@ -85,9 +83,11 @@ contract AlluoLpUpgradable is
         YEAR = 31536000;
         interest = 8;
 
-        wallet = multiSigWallet;
+        wallet = _multiSigWallet;
 
-        supportedTokens.add(firstTokenAddress);
+        for(uint256 i = 0; i < _supportedTokens.length; i++){
+            supportedTokens.add(_supportedTokens[i]);
+        }
 
         lastDFUpdate = block.timestamp;
         update();
@@ -151,6 +151,7 @@ contract AlluoLpUpgradable is
         else{
             supportedTokens.remove(_token);
         }
+        emit DepositTokenStatusChanged(_token, _status);
     }
 
 
