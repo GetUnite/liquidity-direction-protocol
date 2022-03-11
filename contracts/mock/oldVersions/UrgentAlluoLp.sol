@@ -101,13 +101,6 @@ contract UrgentAlluoLp is AlluoERC20Pausable, AccessControl {
         userDF[_address] = DF;
     }
 
-    function withdraw(uint256 amount) external whenNotPaused {
-        claim(msg.sender);
-        _burn(msg.sender, amount);
-
-        emit BurnedForWithdraw(msg.sender, amount);
-    }
-
     function deposit(uint256 amount) external whenNotPaused {
         acceptedToken.safeTransferFrom(msg.sender, wallet, amount);
 
