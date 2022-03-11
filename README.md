@@ -24,7 +24,7 @@
     <img src="https://assets.website-files.com/613b4c4a426c9b2c4d31caaa/6168135b36da4560d493f4d3_Group%20242-p-500.png" alt="Logo">
   </a>
 
-  <h3 align="center">Alluo - Strategies</h3>
+  <h3 align="center">Alluo - Protocol</h3>
 
   <p align="center">
    Main logic of the Alluo liquidity direction protocol.
@@ -62,13 +62,11 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-This repo contains all the strategies the Alluo protocol has access to to invest the funds that are held by Alluo.
+This repo contains all the main logic the Alluo protocol to invest the funds that are held by Alluo.
 
-These strategies are mainly built by the Core Contributors, but we welcome anyone to help or new protocols to submit strategies for their own farms.
+The main logic deals with liquidity management, interaction with the DAO, orchestration of the vote execution.
 
-Strategies hold the logic on what to do the funds from the vote executor and how to interact with the target procotol, this is really the heart of the logic.
-
-Strategies have to implement a set of standard functions that are needed by the Protocol to be executed, we are currently working on an Interface for our community.
+It also manages the deposit and withdraw process, accross chains.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -76,7 +74,7 @@ Strategies have to implement a set of standard functions that are needed by the 
 
 ### Built With
 
-Here are the major framework / languages used to build the Strategies.
+Here are the major framework / languages used to build the Protocol.
 
 * [Hardhat](https://hardhat.org/)
 * [Typescript](https://www.typescriptlang.org/)
@@ -166,7 +164,7 @@ This is an example of how to list things you need to use the software and how to
 
 See our public roadmap here: [Roadmap](https://roadmap.alluo.com/)
 
-See the [open issues](https://github.com/GetAlluo/alluo-strategies/issues) for a full list of proposed features (and known issues).
+See the [open issues](https://github.com/GetAlluo/alluo-protocol/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -208,24 +206,24 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 0xtuytuy.eth - [@0xtuytuy](https://twitter.com/0xtuytuy) - rt@alluo.com
 
-Project Link: [https://github.com/GetAlluo/alluo-strategies](https://github.com/GetAlluo/alluo-strategies)
+Project Link: [https://github.com/GetAlluo/alluo-protocol](https://github.com/GetAlluo/alluo-protocol)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/GetAlluo/alluo-strategies?style=for-the-badge
-[contributors-url]: https://github.com/GetAlluo/alluo-strategies/graphs/contributors
+[contributors-shield]: https://img.shields.io/github/contributors/GetAlluo/alluo-protocol?style=for-the-badge
+[contributors-url]: https://github.com/GetAlluo/alluo-protocol/graphs/contributors
 
-[forks-shield]: https://img.shields.io/github/forks/GetAlluo/alluo-strategies?style=for-the-badge
-[forks-url]: https://github.com/GetAlluo/alluo-strategies/network/members
+[forks-shield]: https://img.shields.io/github/forks/GetAlluo/alluo-protocol?style=for-the-badge
+[forks-url]: https://github.com/GetAlluo/alluo-protocol/network/members
 
-[stars-shield]: https://img.shields.io/github/stars/GetAlluo/alluo-strategies?style=for-the-badge
-[stars-url]: https://github.com/GetAlluo/alluo-strategies/stargazers
+[stars-shield]: https://img.shields.io/github/stars/GetAlluo/alluo-protocol?style=for-the-badge
+[stars-url]: https://github.com/GetAlluo/alluo-protocol/stargazers
 
-[issues-shield]: https://img.shields.io/github/issues/GetAlluo/alluo-strategies?style=for-the-badge
-[issues-url]: https://github.com/GetAlluo/alluo-strategies/issues
+[issues-shield]: https://img.shields.io/github/issues/GetAlluo/alluo-protocol?style=for-the-badge
+[issues-url]: https://github.com/GetAlluo/alluo-protocol/issues
 
 [discord-shield]: https://img.shields.io/badge/Discord-Join%20us-blue?style=for-the-badge
 [discord-url]: https://discord.gg/tuN3y3Tfe4
