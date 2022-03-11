@@ -6,6 +6,7 @@ pragma solidity ^0.8.11;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -32,7 +33,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IERC20-approve}.
  */
-contract AlluoERC20 is Context, IERC20, IERC20Metadata {
+contract AlluoERC20Pausable is Context, IERC20, IERC20Metadata, Pausable {
     mapping(address => uint256) private _balances;
 
     mapping(address => mapping(address => uint256)) private _allowances;
@@ -120,6 +121,7 @@ contract AlluoERC20 is Context, IERC20, IERC20Metadata {
         public
         virtual
         override
+        whenNotPaused
         returns (bool)
     {
         _transfer(_msgSender(), recipient, amount);
@@ -150,6 +152,7 @@ contract AlluoERC20 is Context, IERC20, IERC20Metadata {
         public
         virtual
         override
+        whenNotPaused
         returns (bool)
     {
         _approve(_msgSender(), spender, amount);
@@ -173,7 +176,7 @@ contract AlluoERC20 is Context, IERC20, IERC20Metadata {
         address sender,
         address recipient,
         uint256 amount
-    ) public virtual override returns (bool) {
+    ) public virtual override whenNotPaused returns (bool) {
         _transfer(sender, recipient, amount);
 
         uint256 currentAllowance = _allowances[sender][_msgSender()];
@@ -203,6 +206,7 @@ contract AlluoERC20 is Context, IERC20, IERC20Metadata {
     function increaseAllowance(address spender, uint256 addedValue)
         public
         virtual
+        whenNotPaused
         returns (bool)
     {
         _approve(
@@ -230,6 +234,7 @@ contract AlluoERC20 is Context, IERC20, IERC20Metadata {
     function decreaseAllowance(address spender, uint256 subtractedValue)
         public
         virtual
+        whenNotPaused
         returns (bool)
     {
         uint256 currentAllowance = _allowances[_msgSender()][spender];

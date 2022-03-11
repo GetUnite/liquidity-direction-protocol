@@ -1,5 +1,7 @@
 node_modules
 .env
+.openzeppelin/unknown-*.json
+.vscode
 coverage
 coverage.json
 typechain
