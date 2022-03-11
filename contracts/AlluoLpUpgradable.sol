@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
-contract AlluoLpUpgradable is 
+contract AlluoLpUpgradableMintable is 
     Initializable, 
     PausableUpgradeable, 
     AlluoERC20Upgradable, 
@@ -140,6 +140,12 @@ contract AlluoLpUpgradable is
         emit Deposited(msg.sender, _token, amountIn18);
     }
 
+    function mint(address _user, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
+        
+        claim(_user);
+        _mint(_user, _amount);
+    }
+
     function changeTokenStatus(address _token, bool _status) external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
@@ -199,16 +205,10 @@ contract AlluoLpUpgradable is
         override
         onlyRole(getRoleAdmin(role))
     {
-        require(account.isContract(), "UrgentAlluoLp: not contract");
-        _grantRole(role, account);
-    }
-
-    function migrate(address _oldContract, address[] memory _users) external onlyRole(DEFAULT_ADMIN_ROLE){
-        for(uint i = 0; i < _users.length; i++){
-            uint256 oldBalanceIn18 = AlluoLpUpgradable(_oldContract).getBalance(_users[i]) * 10**12;
-            _mint(_users[i], oldBalanceIn18);
-            claim(_users[i]);
+        if(role == DEFAULT_ADMIN_ROLE){
+            require(account.isContract(), "UrgentAlluoLp: not contract");
         }
+        _grantRole(role, account);
     }
 
     function changeUpgradeStatus(bool _status)
@@ -255,5 +255,6 @@ contract AlluoLpUpgradable is
         internal
         onlyRole(UPGRADER_ROLE)
         override
+        view
     {require(upgradeStatus, "Upgrade not allowed");}
 }

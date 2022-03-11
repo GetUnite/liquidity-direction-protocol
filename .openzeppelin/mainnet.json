@@ -1,0 +1,304 @@
+{
+  "manifestVersion": "3.2",
+  "proxies": [
+    {
+      "address": "0x34618270647971a3203579380b61De79ecC474D1",
+      "txHash": "0xb45f1a408569416bfffa8a5b9319ec570d6e7968c30089ff3da46dc5705794e6",
+      "kind": "uups"
+    }
+  ],
+  "impls": {
+    "85df2103dd5b4eb944e096ad107736801701b5ea7de5f5abb385f4e6fdb4d94a": {
+      "address": "0xb625dA6b38FD7c62747c777121140cA4b3D7fD05",
+      "txHash": "0x3fa97d8fb797b3420c26c63761548b0186946fa00cbac98eea034b930d7d4b39",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:39"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:44"
+          },
+          {
+            "contract": "ERC1967UpgradeUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/ERC1967/ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "contract": "UUPSUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol:107"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "contract": "ERC165Upgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol:41"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "_roles",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:235"
+          },
+          {
+            "contract": "ReentrancyGuardUpgradeable",
+            "label": "_status",
+            "type": "t_uint256",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:38"
+          },
+          {
+            "contract": "ReentrancyGuardUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:74"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:102"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "lockingToken",
+            "type": "t_contract(IERC20Upgradeable)1248",
+            "src": "contracts/AlluoLocked.sol:26"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "rewardToken",
+            "type": "t_contract(IERC20Upgradeable)1248",
+            "src": "contracts/AlluoLocked.sol:28"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "rewardPerDistribution",
+            "type": "t_uint256",
+            "src": "contracts/AlluoLocked.sol:31"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "startTime",
+            "type": "t_uint256",
+            "src": "contracts/AlluoLocked.sol:33"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "distributionTime",
+            "type": "t_uint256",
+            "src": "contracts/AlluoLocked.sol:35"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "totalLocked",
+            "type": "t_uint256",
+            "src": "contracts/AlluoLocked.sol:37"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "tokensPerLock",
+            "type": "t_uint256",
+            "src": "contracts/AlluoLocked.sol:40"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "rewardProduced",
+            "type": "t_uint256",
+            "src": "contracts/AlluoLocked.sol:42"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "allProduced",
+            "type": "t_uint256",
+            "src": "contracts/AlluoLocked.sol:44"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "producedTime",
+            "type": "t_uint256",
+            "src": "contracts/AlluoLocked.sol:46"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "depositLockDuration",
+            "type": "t_uint256",
+            "src": "contracts/AlluoLocked.sol:49"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "withdrawLockDuration",
+            "type": "t_uint256",
+            "src": "contracts/AlluoLocked.sol:51"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "additionalLockInfo",
+            "type": "t_struct(AdditionalLockInfo)2143_storage",
+            "src": "contracts/AlluoLocked.sol:65"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "token",
+            "type": "t_struct(TokenInfo)2153_storage",
+            "src": "contracts/AlluoLocked.sol:74"
+          },
+          {
+            "contract": "AlluoLocked",
+            "label": "_lockers",
+            "type": "t_mapping(t_address,t_struct(Locker)2171_storage)",
+            "src": "contracts/AlluoLocked.sol:88"
+          }
+        ],
+        "types": {
+          "t_contract(IERC20Upgradeable)1248": {
+            "label": "contract IERC20Upgradeable"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_struct(AdditionalLockInfo)2143_storage": {
+            "label": "struct AlluoLocked.AdditionalLockInfo",
+            "members": [
+              {
+                "label": "waitingForWithdrawal",
+                "type": "t_uint256"
+              },
+              {
+                "label": "totalDistributed",
+                "type": "t_uint256"
+              },
+              {
+                "label": "upgradeStatus",
+                "type": "t_bool"
+              },
+              {
+                "label": "migrationStatus",
+                "type": "t_bool"
+              }
+            ]
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_struct(TokenInfo)2153_storage": {
+            "label": "struct AlluoLocked.TokenInfo",
+            "members": [
+              {
+                "label": "name",
+                "type": "t_string_storage"
+              },
+              {
+                "label": "symbol",
+                "type": "t_string_storage"
+              },
+              {
+                "label": "decimals",
+                "type": "t_uint8"
+              }
+            ]
+          },
+          "t_string_storage": {
+            "label": "string"
+          },
+          "t_uint8": {
+            "label": "uint8"
+          },
+          "t_mapping(t_address,t_struct(Locker)2171_storage)": {
+            "label": "mapping(address => struct AlluoLocked.Locker)"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_struct(Locker)2171_storage": {
+            "label": "struct AlluoLocked.Locker",
+            "members": [
+              {
+                "label": "amount",
+                "type": "t_uint256"
+              },
+              {
+                "label": "rewardAllowed",
+                "type": "t_uint256"
+              },
+              {
+                "label": "rewardDebt",
+                "type": "t_uint256"
+              },
+              {
+                "label": "distributed",
+                "type": "t_uint256"
+              },
+              {
+                "label": "unlockAmount",
+                "type": "t_uint256"
+              },
+              {
+                "label": "depositUnlockTime",
+                "type": "t_uint256"
+              },
+              {
+                "label": "withdrawUnlockTime",
+                "type": "t_uint256"
+              }
+            ]
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32"
+              }
+            ]
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          }
+        }
+      }
+    }
+  }
+}
