@@ -3,6 +3,7 @@ node_modules
 .openzeppelin/unknown-*.json
 .vscode
 coverage
+tasks/localTasks
 coverage.json
 typechain
 
