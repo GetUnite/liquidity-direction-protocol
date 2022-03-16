@@ -68,6 +68,7 @@ The main logic deals with liquidity management, interaction with the DAO, orches
 
 It also manages the deposit and withdraw process, accross chains.
 
+All the addresses of the contracts deployed to all the networks that are part of the Alluo Protocol are available here: [Protocol Library](https://library.alluo.com/)
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 
