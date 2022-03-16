@@ -244,7 +244,6 @@ contract AlluoLpV2UpgradableMintable is
 
         uint256 amountIn18 = _amount *
             10**(18 - AlluoERC20Upgradable(_token).decimals());
-        _intrestAccured(msg.sender);
 
         uint256 userBalance = balanceOf(msg.sender);
         update();
