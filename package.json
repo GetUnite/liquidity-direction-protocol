@@ -52,6 +52,7 @@
   },
   "dependencies": {
     "@openzeppelin/contracts-upgradeable": "^4.5.1",
-    "alluo-strategies": "github:GetAlluo/alluo-strategies"
+    "alluo-strategies": "github:GetAlluo/alluo-strategies",
+    "alluo-exchange": "git@github.com:GetAlluo/alluo-exchange.git"
   }
 }
