@@ -153,7 +153,10 @@ contract AlluoLpV2UpgradableMintable is
             "AlluoLpV2UpgradableMintable#withdraw:TOKEN_NOT_SUPPORTED"
         );
         uint256 userBalance = balanceOf(msg.sender);
-        require(userBalance != 0 && userBalance >= _amount, "AlluoLpV2UpgradableMintable#withdraw:BALANCE_TO_LOW");
+        require(
+            userBalance != 0 && userBalance >= _amount,
+            "AlluoLpV2UpgradableMintable#withdraw:BALANCE_TO_LOW"
+        );
         update();
 
         uint256 intrestAmount = (((DF * _amount) / userDF[msg.sender]) -
@@ -194,7 +197,7 @@ contract AlluoLpV2UpgradableMintable is
             );
         }
 
-        _burn(msg.sender, realAmount);
+        _burn(msg.sender, _amount);
 
         emit BurnedForWithdraw(msg.sender, realAmount);
     }
