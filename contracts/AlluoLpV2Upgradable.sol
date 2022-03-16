@@ -164,27 +164,34 @@ contract AlluoLpV2UpgradableMintable is
 
         uint256 realAmount = _amount + intrestAmount;
 
+        uint256 targetTokenDecimalsMult = 10 **
+            (AlluoERC20Upgradable(targetToken).decimals() - 18);
+
+        uint256 targetTokenAmount = realAmount * targetTokenDecimalsMult;
+
         if (_desiredToken != targetToken) {
-            uint256 targetTokenDecimalsMult = 10 **
+            uint256 desiredTokenDecimalsMult = 10 **
                 (AlluoERC20Upgradable(_desiredToken).decimals() -
                     AlluoERC20Upgradable(targetToken).decimals());
 
             IERC20Upgradeable(targetToken).safeTransferFrom(
                 wallet,
                 address(this),
-                realAmount
+                targetTokenAmount
             );
 
             // subtract slippage and format to targetToken decimals
-            uint256 minOutput = (realAmount -
-                ((realAmount * slippageBPS) / 10000)) * targetTokenDecimalsMult;
+            uint256 minOutput = (targetTokenAmount -
+                ((targetTokenAmount * slippageBPS) / 10000)) *
+                desiredTokenDecimalsMult;
 
             uint256 outputAmount = Exchange(exchangeAddress).exchange(
                 targetToken,
                 _desiredToken,
-                realAmount,
+                targetTokenAmount,
                 minOutput
             );
+
             IERC20Upgradeable(_desiredToken).safeTransfer(
                 msg.sender,
                 outputAmount
@@ -193,7 +200,7 @@ contract AlluoLpV2UpgradableMintable is
             IERC20Upgradeable(targetToken).safeTransferFrom(
                 wallet,
                 msg.sender,
-                realAmount
+                targetTokenAmount
             );
         }
 
