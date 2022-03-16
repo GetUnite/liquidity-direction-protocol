@@ -75,7 +75,7 @@ contract AlluoLpV3 is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        require(_multiSigWallet.isContract(), "AlluoLp: not contract");
+        require(_multiSigWallet.isContract(), "AlluoLp: Not contract");
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
@@ -129,7 +129,7 @@ contract AlluoLpV3 is
     
     function withdraw(address _token, uint256 _amount) external whenNotPaused {
 
-        require(supportedTokens.contains(_token), "this token is not supported");
+        require(supportedTokens.contains(_token), "AlluoLp: Token is not supported");
         claim(msg.sender);
         _burn(msg.sender, _amount);
         liquidityBuffer.withdraw(msg.sender, _token, _amount);
@@ -138,7 +138,7 @@ contract AlluoLpV3 is
     }
 
     function deposit(address _token, uint256 _amount) external whenNotPaused {
-        require(supportedTokens.contains(_token), "this token is not supported");
+        require(supportedTokens.contains(_token), "AlluoLp: Token is not supported");
         
         IERC20Upgradeable(_token).safeTransferFrom(msg.sender, address(liquidityBuffer), _amount);
         claim(msg.sender);
@@ -194,7 +194,7 @@ contract AlluoLpV3 is
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(newWallet.isContract(), "AlluoLp: not contract");
+        require(newWallet.isContract(), "AlluoLp: Not contract");
 
         address oldValue = wallet;
         wallet = newWallet;
@@ -206,7 +206,7 @@ contract AlluoLpV3 is
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(newBuffer.isContract(), "AlluoLp: not contract");
+        require(newBuffer.isContract(), "AlluoLp: Not contract");
 
         //address oldValue = wallet;
         liquidityBuffer = LiquidityBufferVault(newBuffer);
@@ -228,7 +228,7 @@ contract AlluoLpV3 is
         onlyRole(getRoleAdmin(role))
     {
         if(role == DEFAULT_ADMIN_ROLE){
-            require(account.isContract(), "AlluoLp: not contract");
+            require(account.isContract(), "AlluoLp: Not contract");
         }
         _grantRole(role, account);
     }

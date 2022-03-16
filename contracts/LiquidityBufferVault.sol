@@ -80,7 +80,7 @@ contract LiquidityBufferVault is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        require(_multiSigWallet.isContract(), "LiquidityBufferVault: not contract");
+        require(_multiSigWallet.isContract(), "Buffer: Not contract");
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _alluoLp);
@@ -98,56 +98,34 @@ contract LiquidityBufferVault is
     }
 
     // function checks how much in buffer now and hom much should be
-    // fill buffer and send to wallet what left (conveting it to usdc)
-    function deposit(address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
+    // fills buffer and sends to wallet what left (conveting it to usdc)
+    function deposit(address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
 
         uint256 inPool = getBufferAmount();
-        if (IERC20Upgradeable(_token) == USDT) {
-            uint256 amountIn18 = _amount * 10 ** 12;
-            uint256 lpAmount = curvePool.add_liquidity([0, 0, _amount], 0, true);
-            uint256 shouldBeInPool = getExpectedBufferAmount(amountIn18);
-            if (inPool < shouldBeInPool) {
 
-                if (shouldBeInPool < inPool + amountIn18) {
-                    uint256 toWallet = inPool + amountIn18 - shouldBeInPool;
-                    uint256 toWalletIn6 = toWallet / 10 ** 12;
-                    curvePool.remove_liquidity_imbalance(
-                        [0, toWalletIn6, 0], 
-                        toWallet * (10000 + slippage) / 10000, 
-                        true
-                    );
-                    USDC.safeTransfer(wallet, toWalletIn6);
-                }
-            } else {
-                uint256 toWallet = curvePool.remove_liquidity_one_coin(
-                    lpAmount, 
-                    1, 
-                    _amount * (10000 - slippage) / 10000,
-                    true
-                );
-                USDC.safeTransfer(wallet, toWallet);
-            }
-        } else if (IERC20Upgradeable(_token) == DAI) {
+        if (IERC20Upgradeable(_token) == DAI) {
             uint256 lpAmount = curvePool.add_liquidity([_amount, 0, 0], 0, true);
             uint256 shouldBeInPool = getExpectedBufferAmount(_amount);
             if (inPool < shouldBeInPool) {
+
                 if (shouldBeInPool < inPool + _amount) {
                     uint256 toWallet = inPool + _amount - shouldBeInPool;
-
                     uint256 toWalletIn6 = toWallet / 10 ** 12;
+                    
                     curvePool.remove_liquidity_imbalance(
-                        [0, toWalletIn6, 0], 
-                        toWallet * (10000 + slippage) / 10000, 
+                        [0, toWalletIn6, 0],
+                        toWallet * (10000 + slippage) / 10000,
                         true
                     );
                     USDC.safeTransfer(wallet, toWalletIn6);
                 }
             } else {
                 uint minAmountOut = _amount * (10000 - slippage) / 10000;
+
                 uint256 toWallet = curvePool.remove_liquidity_one_coin(
-                    lpAmount, 
-                    1, 
-                    minAmountOut / 10 ** 12,  
+                    lpAmount,
+                    1,
+                    minAmountOut / 10 ** 12,
                     true
                 );
                 USDC.safeTransfer(wallet, toWallet);
@@ -160,8 +138,8 @@ contract LiquidityBufferVault is
                 if (shouldBeInPool < inPool + amountIn18) {
                     uint256 toPoolIn18 = shouldBeInPool - inPool;
                     curvePool.add_liquidity(
-                        [0, toPoolIn18 / 10 ** 12, 0], 
-                        0, 
+                        [0, toPoolIn18 / 10 ** 12, 0],
+                        0,
                         true
                     );
                     USDC.safeTransfer(wallet, (amountIn18 - toPoolIn18) / 10 ** 12);
@@ -170,6 +148,32 @@ contract LiquidityBufferVault is
                 }
             } else {
                 USDC.safeTransfer(wallet, _amount);
+            }
+        } 
+        else {      //      _token == USDT
+            uint256 amountIn18 = _amount * 10 ** 12;
+            uint256 lpAmount = curvePool.add_liquidity([0, 0, _amount], 0, true);
+            uint256 shouldBeInPool = getExpectedBufferAmount(amountIn18);
+            if (inPool < shouldBeInPool) {
+
+                if (shouldBeInPool < inPool + amountIn18) {
+                    uint256 toWallet = inPool + amountIn18 - shouldBeInPool;
+                    uint256 toWalletIn6 = toWallet / 10 ** 12;
+                    curvePool.remove_liquidity_imbalance(
+                        [0, toWalletIn6, 0],
+                        toWallet * (10000 + slippage) / 10000,
+                        true
+                    );
+                    USDC.safeTransfer(wallet, toWalletIn6);
+                }
+            } else {
+                uint256 toWallet = curvePool.remove_liquidity_one_coin(
+                    lpAmount,
+                    1,
+                    _amount * (10000 - slippage) / 10000,
+                    true
+                );
+                USDC.safeTransfer(wallet, toWallet);
             }
         }
 
@@ -184,8 +188,15 @@ contract LiquidityBufferVault is
         uint256 inPool = getBufferAmount();
         if (inPool > _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
 
-            if (IERC20Upgradeable(_token) == USDC) {
-                // We want to be safe agains arbitragers so at any withraw of USDT/USDC
+            if (IERC20Upgradeable(_token) == DAI) {
+                curvePool.remove_liquidity_imbalance(
+                    [_amount, 0, 0], 
+                    _amount * (10000 + slippage) / 10000, 
+                    true
+                );
+                DAI.safeTransfer(_user, _amount);
+            } else if (IERC20Upgradeable(_token) == USDC) {
+                // We want to be save agains arbitragers so at any withraw of USDT/USDC
                 // contract checks how much will be burned curveLp by withrawing this amount in DAI
                 // and passes this burned amount to get USDC/USDT
                 uint256 toBurn = curvePool.calc_token_amount([_amount, 0, 0], false);
@@ -197,7 +208,8 @@ contract LiquidityBufferVault is
                     true
                 );
                 USDC.safeTransfer(_user, toUser);
-            } else if (IERC20Upgradeable(_token) == USDT) {
+            } else {    //      _token == USDT
+                
                 uint256 toBurn = curvePool.calc_token_amount([_amount, 0, 0], false);
                 uint256 amountIn6 = _amount / 10 ** 12;
                 uint256 toUser = curvePool.remove_liquidity_one_coin(
@@ -207,13 +219,6 @@ contract LiquidityBufferVault is
                     true
                 );
                 USDT.safeTransfer(_user, toUser);
-            } else if (IERC20Upgradeable(_token) == DAI) {
-                curvePool.remove_liquidity_imbalance(
-                    [_amount, 0, 0], 
-                    _amount * (10000 + slippage) / 10000, 
-                    true
-                );
-                DAI.safeTransfer(_user, _amount);
             }
         } else {
             withdrawals[lastWithdrawalRequest] = Withdrawal({
@@ -236,7 +241,16 @@ contract LiquidityBufferVault is
                 Withdrawal memory withdrawal = withdrawals[lastSatisfiedWithdrawal];
                 uint256 amount = withdrawal.amount;
                 if (amount <= inPool) {
-                    if (IERC20Upgradeable(withdrawal.token) == USDC) {
+                    
+                    if (IERC20Upgradeable(withdrawal.token) == DAI) {
+
+                        curvePool.remove_liquidity_imbalance(
+                            [amount, 0, 0], 
+                            amount * (10000 + slippage) / 10000, 
+                            true
+                        );
+                        DAI.safeTransfer(withdrawal.user, amount);
+                    } else if (IERC20Upgradeable(withdrawal.token) == USDC) {
                         uint256 toBurn = curvePool.calc_token_amount([amount, 0, 0], false);
                         uint256 amountIn6 = amount / 10 ** 12;
                         uint256 toUser = curvePool.remove_liquidity_one_coin(
@@ -247,7 +261,7 @@ contract LiquidityBufferVault is
                         );
                         USDC.safeTransfer(withdrawal.user, toUser);
                     } 
-                    else if (IERC20Upgradeable(withdrawal.token) == USDT) {
+                    else {     //      _token == USDT
                         uint256 toBurn = curvePool.calc_token_amount([amount, 0, 0], false);
                         uint256 amountIn6 = amount / 10 ** 12;
                         uint256 toUser = curvePool.remove_liquidity_one_coin(
@@ -258,16 +272,7 @@ contract LiquidityBufferVault is
                         );
                         USDT.safeTransfer(withdrawal.user, toUser);
                     }
-                    else if (IERC20Upgradeable(withdrawal.token) == DAI) {
-
-                        curvePool.remove_liquidity_imbalance(
-                            [amount, 0, 0], 
-                            amount * (10000 + slippage) / 10000, 
-                            true
-                        );
-
-                        DAI.safeTransfer(withdrawal.user, amount);
-                    }
+  
                     inPool -= amount;
                     totalWithdrawalAmount -= amount;
                     lastSatisfiedWithdrawal++;
@@ -302,7 +307,7 @@ contract LiquidityBufferVault is
     function setWallet(address newWallet)
     external
     onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newWallet.isContract(), "LiquidityBufferVault: not contract");
+        require(newWallet.isContract(), "Buffer: Not contract");
 
         wallet = newWallet;
     }
@@ -321,7 +326,7 @@ contract LiquidityBufferVault is
         onlyRole(getRoleAdmin(role))
     {
         if(role == DEFAULT_ADMIN_ROLE){
-            require(account.isContract(), "LiquidityBufferVault: Not contract");
+            require(account.isContract(), "Buffer: Not contract");
         }
         _grantRole(role, account);
     }
@@ -338,6 +343,6 @@ contract LiquidityBufferVault is
     internal
     onlyRole(UPGRADER_ROLE)
     override {
-        require(upgradeStatus, "LiquidityBufferVault: Upgrade not allowed");
+        require(upgradeStatus, "Buffer: Upgrade not allowed");
     }
 }

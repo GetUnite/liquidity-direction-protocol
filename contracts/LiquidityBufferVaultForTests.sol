@@ -104,40 +104,7 @@ contract LiquidityBufferVaultForTests is
         console.log("The beginning of distribution %s of %s to pool and wallet", _amount  / 10 ** ERC20(_token).decimals(), ERC20(_token).name());
 
         uint256 inPool = getBufferAmount();
-        if (IERC20Upgradeable(_token) == USDT) {
-            uint256 amountIn18 = _amount * 10 ** 12;
-            uint256 lpAmount = curvePool.add_liquidity([0, 0, _amount], 0, true);
-            uint256 shouldBeInPool = getExpectedBufferAmount(amountIn18);
-            console.log("In buffer now %s but should be ", inPool / 10 ** 18, shouldBeInPool / 10 ** 18);
-            if (inPool < shouldBeInPool) {
-
-                if (shouldBeInPool < inPool + amountIn18) {
-                    uint256 toWallet = inPool + amountIn18 - shouldBeInPool;
-                    uint256 toWalletIn6 = toWallet / 10 ** 12;
-                    console.log("To wallet wiil go %s ", toWallet / 10 ** 18);
-                    console.log("To buffer will go %s ", (amountIn18 - toWallet) / 10 ** 18);
-                    curvePool.remove_liquidity_imbalance(
-                        [0, toWalletIn6, 0], 
-                        toWallet * (10000 + slippage) / 10000, 
-                        true
-                    );
-                    USDC.safeTransfer(wallet, toWalletIn6);
-                }
-                else{
-                    console.log("All amount went directly to the pool, in pool now", getBufferAmount()/ 10 ** 18);
-                }
-            } else {
-                uint256 toWallet = curvePool.remove_liquidity_one_coin(
-                    lpAmount, 
-                    1, 
-                    _amount * (10000 - slippage) / 10000, 
-                    true
-                );
-                console.log("min %s and real %s", _amount * (10000 - slippage) / 10000 / 10 ** 4, toWallet / 10 ** 4);
-                console.log("All amount went directly to the wallet in usdc: %s with 2 decimals", toWallet / 10 ** 4);
-                USDC.safeTransfer(wallet, toWallet);
-            }
-        } else if (IERC20Upgradeable(_token) == DAI) {
+        if (IERC20Upgradeable(_token) == DAI) {
             uint256 lpAmount = curvePool.add_liquidity([_amount, 0, 0], 0, true);
             uint256 shouldBeInPool = getExpectedBufferAmount(_amount);
             console.log("In buffer now %s but should be ", inPool / 10 ** 18, shouldBeInPool / 10 ** 18);
@@ -170,7 +137,8 @@ contract LiquidityBufferVaultForTests is
                 console.log("All amount went directly to the wallet in usdc: %s with 2 decimals", toWallet / 10 ** 4);
                 USDC.safeTransfer(wallet, toWallet);
             }
-        } else if (IERC20Upgradeable(_token) == USDC) {
+        }
+        else if (IERC20Upgradeable(_token) == USDC) {
             uint256 amountIn18 = _amount * 10 ** 12;
             uint256 shouldBeInPool = getExpectedBufferAmount(amountIn18);
             console.log("In buffer now %s but should be ", inPool / 10 ** 18, shouldBeInPool / 10 ** 18);
@@ -195,6 +163,41 @@ contract LiquidityBufferVaultForTests is
                 USDC.safeTransfer(wallet, _amount);
             }
         }
+        //      _token == USDT
+        else {
+            uint256 amountIn18 = _amount * 10 ** 12;
+            uint256 lpAmount = curvePool.add_liquidity([0, 0, _amount], 0, true);
+            uint256 shouldBeInPool = getExpectedBufferAmount(amountIn18);
+            console.log("In buffer now %s but should be ", inPool / 10 ** 18, shouldBeInPool / 10 ** 18);
+            if (inPool < shouldBeInPool) {
+
+                if (shouldBeInPool < inPool + amountIn18) {
+                    uint256 toWallet = inPool + amountIn18 - shouldBeInPool;
+                    uint256 toWalletIn6 = toWallet / 10 ** 12;
+                    console.log("To wallet wiil go %s ", toWallet / 10 ** 18);
+                    console.log("To buffer will go %s ", (amountIn18 - toWallet) / 10 ** 18);
+                    curvePool.remove_liquidity_imbalance(
+                        [0, toWalletIn6, 0], 
+                        toWallet * (10000 + slippage) / 10000, 
+                        true
+                    );
+                    USDC.safeTransfer(wallet, toWalletIn6);
+                }
+                else{
+                    console.log("All amount went directly to the pool, in pool now", getBufferAmount()/ 10 ** 18);
+                }
+            } else {
+                uint256 toWallet = curvePool.remove_liquidity_one_coin(
+                    lpAmount, 
+                    1, 
+                    _amount * (10000 - slippage) / 10000, 
+                    true
+                );
+                console.log("min %s and real %s", _amount * (10000 - slippage) / 10000 / 10 ** 4, toWallet / 10 ** 4);
+                console.log("All amount went directly to the wallet in usdc: %s with 2 decimals", toWallet / 10 ** 4);
+                USDC.safeTransfer(wallet, toWallet);
+            }
+        } 
 
         console.log("-------------------------------------------------------------------------------");
     }
@@ -211,7 +214,16 @@ contract LiquidityBufferVaultForTests is
         if (inPool > _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
             console.log("In pool anouth tokens and queue empty");
 
-            if (IERC20Upgradeable(_token) == USDC) {
+            if (IERC20Upgradeable(_token) == DAI) {
+                curvePool.remove_liquidity_imbalance(
+                    [_amount, 0, 0], 
+                    _amount * (10000 + slippage) / 10000, 
+                    true
+                );
+                console.log("User gets", _amount / 10 ** 18, ERC20(_token).name());
+                DAI.safeTransfer(_user, _amount);
+            }
+            else if (IERC20Upgradeable(_token) == USDC) {
                 // We want to be safe agains arbitragers so at any withraw of USDT/USDC
                 // contract checks how much will be burned curveLp by withrawing this amount in DAI
                 // and passes this burned amount to get USDC/USDT
@@ -225,7 +237,7 @@ contract LiquidityBufferVaultForTests is
                 );
                 console.log("User gets %s %s with 2 deciamals", toUser / 10 ** 4, ERC20(_token).name());
                 USDC.safeTransfer(_user, toUser);
-            } else if (IERC20Upgradeable(_token) == USDT) {
+            } else {    //      _token == USDT
                 uint256 toBurn = curvePool.calc_token_amount([_amount, 0, 0], false);
                 uint256 amountIn6 = _amount / 10 ** 12;
                 uint256 toUser = curvePool.remove_liquidity_one_coin(
@@ -236,17 +248,9 @@ contract LiquidityBufferVaultForTests is
                 );
                 console.log("User gets %s %s with 2 deciamals", toUser / 10 ** 4, ERC20(_token).name());
                 USDT.safeTransfer(_user, toUser);
-            } else if (IERC20Upgradeable(_token) == DAI) {
-                curvePool.remove_liquidity_imbalance(
-                    [_amount, 0, 0], 
-                    _amount * (10000 + slippage) / 10000, 
-                    true
-                );
-                console.log("User gets", _amount / 10 ** 18, ERC20(_token).name());
-                DAI.safeTransfer(_user, _amount);
-            }
+            } 
             console.log("In pool was %s and left ", inPool / 10 ** 18, getBufferAmount() / 10 ** 18);
-        } else {
+        } else {    
             console.log("In pool not enough tokens or the queue is not empty");
             withdrawals[lastWithdrawalRequest] = Withdrawal({
                 user: _user,
@@ -274,7 +278,19 @@ contract LiquidityBufferVaultForTests is
                 uint256 amount = withdrawal.amount;
                 console.log("In pool %s and requested", inPool / 10 ** 18, amount / 10 ** 18);
                 if (amount <= inPool) {
-                    if (IERC20Upgradeable(withdrawal.token) == USDC) {
+
+                    if (IERC20Upgradeable(withdrawal.token) == DAI) {
+
+                        curvePool.remove_liquidity_imbalance(
+                            [amount, 0, 0], 
+                            amount * (10000 + slippage) / 10000, 
+                            true
+                        );
+
+                        console.log("User gets", amount / 10 ** 18, ERC20(withdrawal.token).name());
+                        DAI.safeTransfer(withdrawal.user, amount);
+                    }
+                    else if (IERC20Upgradeable(withdrawal.token) == USDC) {
                         uint256 toBurn = curvePool.calc_token_amount([amount, 0, 0], false);
                         uint256 amountIn6 = amount / 10 ** 12;
                         uint256 toUser = curvePool.remove_liquidity_one_coin(
@@ -286,7 +302,7 @@ contract LiquidityBufferVaultForTests is
                         console.log("User gets %s %s with 2 deciamals", toUser / 10 ** 4, ERC20(withdrawal.token).name());
                         USDC.safeTransfer(withdrawal.user, toUser);
                     } 
-                    else if (IERC20Upgradeable(withdrawal.token) == USDT) {
+                    else {       //      _token == USDT
                         uint256 toBurn = curvePool.calc_token_amount([amount, 0, 0], false);
                         uint256 amountIn6 = amount / 10 ** 12;
                         uint256 toUser = curvePool.remove_liquidity_one_coin(
@@ -298,17 +314,7 @@ contract LiquidityBufferVaultForTests is
                         console.log("User gets %s %s with 2 deciamals", toUser / 10 ** 4, ERC20(withdrawal.token).name());
                         USDT.safeTransfer(withdrawal.user, toUser);
                     }
-                    else if (IERC20Upgradeable(withdrawal.token) == DAI) {
-
-                        curvePool.remove_liquidity_imbalance(
-                            [amount, 0, 0], 
-                            amount * (10000 + slippage) / 10000, 
-                            true
-                        );
-
-                        console.log("User gets", amount / 10 ** 18, ERC20(withdrawal.token).name());
-                        DAI.safeTransfer(withdrawal.user, amount);
-                    }
+                     
                     inPool -= amount;
                     totalWithdrawalAmount -= amount;
                     console.log("In pool after withdrawal %s ", inPool / 10 ** 18);
