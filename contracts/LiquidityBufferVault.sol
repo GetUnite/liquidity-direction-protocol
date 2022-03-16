@@ -122,7 +122,7 @@ contract LiquidityBufferVault is
                 uint256 toWallet = curvePool.remove_liquidity_one_coin(
                     lpAmount, 
                     1, 
-                    lpAmount * (10000 - slippage) / 10000, 
+                    _amount * (10000 - slippage) / 10000,
                     true
                 );
                 USDC.safeTransfer(wallet, toWallet);
@@ -143,10 +143,11 @@ contract LiquidityBufferVault is
                     USDC.safeTransfer(wallet, toWalletIn6);
                 }
             } else {
+                uint minAmountOut = _amount * (10000 - slippage) / 10000;
                 uint256 toWallet = curvePool.remove_liquidity_one_coin(
                     lpAmount, 
                     1, 
-                    lpAmount * (10000 - slippage) / 10000, 
+                    minAmountOut / 10 ** 12,  
                     true
                 );
                 USDC.safeTransfer(wallet, toWallet);

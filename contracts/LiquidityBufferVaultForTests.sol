@@ -130,9 +130,11 @@ contract LiquidityBufferVaultForTests is
                 uint256 toWallet = curvePool.remove_liquidity_one_coin(
                     lpAmount, 
                     1, 
-                    lpAmount * (10000 - slippage) / 10000, 
+                    _amount * (10000 - slippage) / 10000, 
                     true
                 );
+                console.log("min %s and real %s", _amount * (10000 - slippage) / 10000 / 10 ** 4, toWallet / 10 ** 4);
+                console.log("All amount went directly to the wallet in usdc: %s with 2 decimals", toWallet / 10 ** 4);
                 USDC.safeTransfer(wallet, toWallet);
             }
         } else if (IERC20Upgradeable(_token) == DAI) {
@@ -157,12 +159,15 @@ contract LiquidityBufferVaultForTests is
                     console.log("All amount went directly to the pool, in pool now", getBufferAmount() / 10 ** 18);
                 }
             } else {
+                uint minAmountOut = _amount * (10000 - slippage) / 10000;
                 uint256 toWallet = curvePool.remove_liquidity_one_coin(
                     lpAmount, 
                     1, 
-                    lpAmount * (10000 - slippage) / 10000, 
+                    minAmountOut / 10 ** 12, 
                     true
                 );
+                console.log("min %s and real %s", minAmountOut / 10 ** 12 / 10 ** 4, toWallet / 10 ** 4);
+                console.log("All amount went directly to the wallet in usdc: %s with 2 decimals", toWallet / 10 ** 4);
                 USDC.safeTransfer(wallet, toWallet);
             }
         } else if (IERC20Upgradeable(_token) == USDC) {
@@ -186,6 +191,7 @@ contract LiquidityBufferVaultForTests is
                     console.log("All amount went directly to the pool, in pool now", getBufferAmount() / 10 ** 18);
                 }
             } else {
+                console.log("All amount went directly to the wallet:", _amount  / 10 ** 6);
                 USDC.safeTransfer(wallet, _amount);
             }
         }
