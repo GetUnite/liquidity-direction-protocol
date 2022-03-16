@@ -165,7 +165,7 @@ contract LiquidityBufferVault is
                     );
                     USDC.safeTransfer(wallet, (amountIn18 - toPoolIn18) / 10 ** 12);
                 } else {
-                    curvePool.add_liquidity([_amount, 0, 0], 0, true);
+                    curvePool.add_liquidity([0, _amount, 0], 0, true);
                 }
             } else {
                 USDC.safeTransfer(wallet, _amount);

@@ -123,6 +123,9 @@ contract LiquidityBufferVaultForTests is
                     );
                     USDC.safeTransfer(wallet, toWalletIn6);
                 }
+                else{
+                    console.log("All amount went directly to the pool, in pool now", getBufferAmount()/ 10 ** 18);
+                }
             } else {
                 uint256 toWallet = curvePool.remove_liquidity_one_coin(
                     lpAmount, 
@@ -150,6 +153,9 @@ contract LiquidityBufferVaultForTests is
                     );
                     USDC.safeTransfer(wallet, toWalletIn6);
                 }
+                else{
+                    console.log("All amount went directly to the pool, in pool now", getBufferAmount() / 10 ** 18);
+                }
             } else {
                 uint256 toWallet = curvePool.remove_liquidity_one_coin(
                     lpAmount, 
@@ -176,7 +182,8 @@ contract LiquidityBufferVaultForTests is
                     console.log("To wallet will go", (amountIn18 - toPoolIn18) / 10 ** 18);
                     USDC.safeTransfer(wallet, (amountIn18 - toPoolIn18) / 10 ** 12);
                 } else {
-                    curvePool.add_liquidity([_amount, 0, 0], 0, true);
+                    curvePool.add_liquidity([0, _amount, 0], 0, true);
+                    console.log("All amount went directly to the pool, in pool now", getBufferAmount() / 10 ** 18);
                 }
             } else {
                 USDC.safeTransfer(wallet, _amount);
