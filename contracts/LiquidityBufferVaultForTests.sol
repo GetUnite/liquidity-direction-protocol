@@ -426,7 +426,7 @@ contract LiquidityBufferVaultForTests is
     }
 
     function getWithdrawalPosition(uint256 _index) external view returns(uint256){
-        if((_index <= lastWithdrawalRequest ||_index > lastSatisfiedWithdrawal ) && _index != 0){
+        if(_index != 0 && _index <= lastWithdrawalRequest && _index > lastSatisfiedWithdrawal ){
             return _index - lastSatisfiedWithdrawal;
         }
         else{
