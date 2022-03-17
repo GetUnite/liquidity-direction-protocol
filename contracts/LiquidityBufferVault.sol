@@ -72,6 +72,27 @@ contract LiquidityBufferVault is
     IERC20Upgradeable public constant USDT =
         IERC20Upgradeable(0xc2132D05D31c914a87C6611C10748AEb04B58e8F);
 
+
+    event EnoughToSatisfy(
+        uint256 inPoolAfterDeposit, 
+        uint256 totalAmountInWithdrawals
+    );
+
+    event WithrawalSatisfied(
+        address indexed user, 
+        address token, 
+        uint256 amount, 
+        uint256 queueIndex
+    );
+
+    event AddedToQueue(
+        address indexed user, 
+        address token, 
+        uint256 amount,
+        uint256 queueIndex
+    );
+
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
@@ -177,6 +198,13 @@ contract LiquidityBufferVault is
             }
         }
 
+        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+            uint256 inPoolNow = getBufferAmount();
+            if(withdrawals[lastSatisfiedWithdrawal + 1].amount <= inPoolNow){
+                emit EnoughToSatisfy(inPoolNow, totalWithdrawalAmount);
+            }
+        }
+
     }
 
 
@@ -187,6 +215,7 @@ contract LiquidityBufferVault is
 
         uint256 inPool = getBufferAmount();
         if (inPool > _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
+            uint256 toUser;
 
             if (IERC20Upgradeable(_token) == DAI) {
                 curvePool.remove_liquidity_imbalance(
@@ -194,14 +223,15 @@ contract LiquidityBufferVault is
                     _amount * (10000 + slippage) / 10000, 
                     true
                 );
-                DAI.safeTransfer(_user, _amount);
+                toUser = _amount;
+                DAI.safeTransfer(_user, toUser);
             } else if (IERC20Upgradeable(_token) == USDC) {
                 // We want to be save agains arbitragers so at any withraw of USDT/USDC
                 // contract checks how much will be burned curveLp by withrawing this amount in DAI
                 // and passes this burned amount to get USDC/USDT
                 uint256 toBurn = curvePool.calc_token_amount([_amount, 0, 0], false);
                 uint256 amountIn6 = _amount / 10 ** 12;
-                uint256 toUser = curvePool.remove_liquidity_one_coin(
+                toUser = curvePool.remove_liquidity_one_coin(
                     toBurn, 
                     1, 
                     amountIn6 * (10000 - slippage) / 10000, 
@@ -212,7 +242,7 @@ contract LiquidityBufferVault is
                 
                 uint256 toBurn = curvePool.calc_token_amount([_amount, 0, 0], false);
                 uint256 amountIn6 = _amount / 10 ** 12;
-                uint256 toUser = curvePool.remove_liquidity_one_coin(
+                toUser = curvePool.remove_liquidity_one_coin(
                     toBurn, 
                     2, 
                     amountIn6 * (10000 - slippage) / 10000, 
@@ -220,14 +250,17 @@ contract LiquidityBufferVault is
                 );
                 USDT.safeTransfer(_user, toUser);
             }
+
+            emit WithrawalSatisfied(_user, _token, toUser, 0);
         } else {
+            lastWithdrawalRequest++;
             withdrawals[lastWithdrawalRequest] = Withdrawal({
                 user: _user,
                 token: _token,
                 amount: _amount
             });
             totalWithdrawalAmount += _amount;
-            lastWithdrawalRequest++;
+            emit AddedToQueue(_user, _token, _amount, lastWithdrawalRequest);
         }
     }
 
@@ -238,10 +271,12 @@ contract LiquidityBufferVault is
 
             uint256 inPool = getBufferAmount();
             while (lastSatisfiedWithdrawal != lastWithdrawalRequest) {
-                Withdrawal memory withdrawal = withdrawals[lastSatisfiedWithdrawal];
+                Withdrawal memory withdrawal = withdrawals[lastSatisfiedWithdrawal + 1];
                 uint256 amount = withdrawal.amount;
                 if (amount <= inPool) {
                     
+                    uint256 toUser;
+
                     if (IERC20Upgradeable(withdrawal.token) == DAI) {
 
                         curvePool.remove_liquidity_imbalance(
@@ -249,11 +284,12 @@ contract LiquidityBufferVault is
                             amount * (10000 + slippage) / 10000, 
                             true
                         );
-                        DAI.safeTransfer(withdrawal.user, amount);
+                        toUser = amount;
+                        DAI.safeTransfer(withdrawal.user, toUser);
                     } else if (IERC20Upgradeable(withdrawal.token) == USDC) {
                         uint256 toBurn = curvePool.calc_token_amount([amount, 0, 0], false);
                         uint256 amountIn6 = amount / 10 ** 12;
-                        uint256 toUser = curvePool.remove_liquidity_one_coin(
+                        toUser = curvePool.remove_liquidity_one_coin(
                             toBurn, 
                             1, 
                             amountIn6 * (10000 - slippage) / 10000, 
@@ -264,7 +300,7 @@ contract LiquidityBufferVault is
                     else {     //      _token == USDT
                         uint256 toBurn = curvePool.calc_token_amount([amount, 0, 0], false);
                         uint256 amountIn6 = amount / 10 ** 12;
-                        uint256 toUser = curvePool.remove_liquidity_one_coin(
+                        toUser = curvePool.remove_liquidity_one_coin(
                             toBurn, 
                             2, 
                             amountIn6 * (10000 - slippage) / 10000, 
@@ -272,10 +308,18 @@ contract LiquidityBufferVault is
                         );
                         USDT.safeTransfer(withdrawal.user, toUser);
                     }
-  
+                    
                     inPool -= amount;
                     totalWithdrawalAmount -= amount;
                     lastSatisfiedWithdrawal++;
+                    
+                    emit WithrawalSatisfied(
+                        withdrawal.user, 
+                        withdrawal.token, 
+                        toUser, 
+                        lastSatisfiedWithdrawal
+                    );
+
                 } else {
                     break;
                 }
@@ -337,6 +381,23 @@ contract LiquidityBufferVault is
     onlyRole(DEFAULT_ADMIN_ROLE) {
         upgradeStatus = _status;
     }
+
+    function getWithdrawalPosition(uint256 _index) external view returns(uint256){
+        if((_index <= lastWithdrawalRequest ||_index > lastSatisfiedWithdrawal ) && _index != 0){
+            return _index - lastSatisfiedWithdrawal;
+        }
+        else{
+            return 0;
+        }
+    }
+
+    // function getUserActiveWithdrawals(address _user) external view returns(uint256[] memory indexes){
+    //     for(uint i = lastSatisfiedWithdrawal; i <= lastWithdrawalRequest; i++){
+    //         if(withdrawals[i].user == _user){
+    //             indexes.push(i);
+    //         }
+    //     }
+    // }
 
 
     function _authorizeUpgrade(address newImplementation)

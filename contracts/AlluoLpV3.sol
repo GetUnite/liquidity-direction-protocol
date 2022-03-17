@@ -126,17 +126,7 @@ contract AlluoLpV3 is
         userDF[_address] = DF;
     }
 
-    
-    function withdraw(address _token, uint256 _amount) external whenNotPaused {
-
-        require(supportedTokens.contains(_token), "AlluoLp: Token is not supported");
-        claim(msg.sender);
-        _burn(msg.sender, _amount);
-        liquidityBuffer.withdraw(msg.sender, _token, _amount);
-
-        emit BurnedForWithdraw(msg.sender, _amount);
-    }
-
+  
     function deposit(address _token, uint256 _amount) external whenNotPaused {
         require(supportedTokens.contains(_token), "AlluoLp: Token is not supported");
         
@@ -150,6 +140,17 @@ contract AlluoLpV3 is
 
         emit Deposited(msg.sender, _token, amountIn18);
     }
+      
+    function withdraw(address _token, uint256 _amount) external whenNotPaused {
+
+        require(supportedTokens.contains(_token), "AlluoLp: Token is not supported");
+        claim(msg.sender);
+        _burn(msg.sender, _amount);
+        liquidityBuffer.withdraw(msg.sender, _token, _amount);
+
+        emit BurnedForWithdraw(msg.sender, _amount);
+    }
+
 
     function mint(address _user, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
         

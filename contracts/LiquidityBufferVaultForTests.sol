@@ -72,6 +72,26 @@ contract LiquidityBufferVaultForTests is
     IERC20Upgradeable public constant USDT =
         IERC20Upgradeable(0xc2132D05D31c914a87C6611C10748AEb04B58e8F);
 
+
+    event EnoughToSatisfy(
+        uint256 inPoolAfterDeposit, 
+        uint256 totalAmountInWithdrawals
+    );
+
+    event WithrawalSatisfied(
+        address indexed user, 
+        address token, 
+        uint256 amount, 
+        uint256 queueIndex
+    );
+
+    event AddedToQueue(
+        address indexed user, 
+        address token, 
+        uint256 amount,
+        uint256 queueIndex
+    );
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
@@ -80,7 +100,7 @@ contract LiquidityBufferVaultForTests is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        require(_multiSigWallet.isContract(), "LiquidityBufferVault: not contract");
+        require(_multiSigWallet.isContract(), "Buffer: not contract");
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _alluoLp);
@@ -199,6 +219,13 @@ contract LiquidityBufferVaultForTests is
             }
         } 
 
+        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+            uint256 inPoolNow = getBufferAmount();
+            if(withdrawals[lastSatisfiedWithdrawal + 1].amount <= inPoolNow){
+                emit EnoughToSatisfy(inPoolNow, totalWithdrawalAmount);
+            }
+        }
+
         console.log("-------------------------------------------------------------------------------");
     }
 
@@ -213,6 +240,7 @@ contract LiquidityBufferVaultForTests is
         console.log("In pool %s and requested", inPool / 10 ** 18, _amount / 10 ** 18);
         if (inPool > _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
             console.log("In pool anouth tokens and queue empty");
+            uint256 toUser;
 
             if (IERC20Upgradeable(_token) == DAI) {
                 curvePool.remove_liquidity_imbalance(
@@ -221,7 +249,8 @@ contract LiquidityBufferVaultForTests is
                     true
                 );
                 console.log("User gets", _amount / 10 ** 18, ERC20(_token).name());
-                DAI.safeTransfer(_user, _amount);
+                toUser = _amount;
+                DAI.safeTransfer(_user, toUser);
             }
             else if (IERC20Upgradeable(_token) == USDC) {
                 // We want to be safe agains arbitragers so at any withraw of USDT/USDC
@@ -229,7 +258,7 @@ contract LiquidityBufferVaultForTests is
                 // and passes this burned amount to get USDC/USDT
                 uint256 toBurn = curvePool.calc_token_amount([_amount, 0, 0], false);
                 uint256 amountIn6 = _amount / 10 ** 12;
-                uint256 toUser = curvePool.remove_liquidity_one_coin(
+                toUser = curvePool.remove_liquidity_one_coin(
                     toBurn, 
                     1, 
                     amountIn6 * (10000 - slippage) / 10000, 
@@ -240,7 +269,7 @@ contract LiquidityBufferVaultForTests is
             } else {    //      _token == USDT
                 uint256 toBurn = curvePool.calc_token_amount([_amount, 0, 0], false);
                 uint256 amountIn6 = _amount / 10 ** 12;
-                uint256 toUser = curvePool.remove_liquidity_one_coin(
+                toUser = curvePool.remove_liquidity_one_coin(
                     toBurn, 
                     2, 
                     amountIn6 * (10000 - slippage) / 10000, 
@@ -250,16 +279,18 @@ contract LiquidityBufferVaultForTests is
                 USDT.safeTransfer(_user, toUser);
             } 
             console.log("In pool was %s and left ", inPool / 10 ** 18, getBufferAmount() / 10 ** 18);
+            emit WithrawalSatisfied(_user, _token, toUser, 0);
         } else {    
             console.log("In pool not enough tokens or the queue is not empty");
+            lastWithdrawalRequest++;
             withdrawals[lastWithdrawalRequest] = Withdrawal({
                 user: _user,
                 token: _token,
                 amount: _amount
             });
             totalWithdrawalAmount += _amount;
-            lastWithdrawalRequest++;
             console.log("Waiting for withdrawing", totalWithdrawalAmount / 10 ** 18);
+            emit AddedToQueue(_user, _token, _amount, lastWithdrawalRequest);
         }
         console.log("----------------------------------+++++---------------------------------------");
     }
@@ -273,11 +304,12 @@ contract LiquidityBufferVaultForTests is
 
             uint256 inPool = getBufferAmount();
             while (lastSatisfiedWithdrawal != lastWithdrawalRequest) {
-                Withdrawal memory withdrawal = withdrawals[lastSatisfiedWithdrawal];
+                Withdrawal memory withdrawal = withdrawals[lastSatisfiedWithdrawal + 1];
                 console.log("********");
                 uint256 amount = withdrawal.amount;
                 console.log("In pool %s and requested", inPool / 10 ** 18, amount / 10 ** 18);
                 if (amount <= inPool) {
+                    uint256 toUser;
 
                     if (IERC20Upgradeable(withdrawal.token) == DAI) {
 
@@ -287,13 +319,14 @@ contract LiquidityBufferVaultForTests is
                             true
                         );
 
+                        toUser = amount;
                         console.log("User gets", amount / 10 ** 18, ERC20(withdrawal.token).name());
-                        DAI.safeTransfer(withdrawal.user, amount);
+                        DAI.safeTransfer(withdrawal.user, toUser);
                     }
                     else if (IERC20Upgradeable(withdrawal.token) == USDC) {
                         uint256 toBurn = curvePool.calc_token_amount([amount, 0, 0], false);
                         uint256 amountIn6 = amount / 10 ** 12;
-                        uint256 toUser = curvePool.remove_liquidity_one_coin(
+                        toUser = curvePool.remove_liquidity_one_coin(
                             toBurn, 
                             1, 
                             amountIn6 * (10000 - slippage) / 10000, 
@@ -305,7 +338,7 @@ contract LiquidityBufferVaultForTests is
                     else {       //      _token == USDT
                         uint256 toBurn = curvePool.calc_token_amount([amount, 0, 0], false);
                         uint256 amountIn6 = amount / 10 ** 12;
-                        uint256 toUser = curvePool.remove_liquidity_one_coin(
+                        toUser = curvePool.remove_liquidity_one_coin(
                             toBurn, 
                             2, 
                             amountIn6 * (10000 - slippage) / 10000, 
@@ -319,6 +352,14 @@ contract LiquidityBufferVaultForTests is
                     totalWithdrawalAmount -= amount;
                     console.log("In pool after withdrawal %s ", inPool / 10 ** 18);
                     lastSatisfiedWithdrawal++;
+
+                    emit WithrawalSatisfied(
+                        withdrawal.user, 
+                        withdrawal.token, 
+                        toUser, 
+                        lastSatisfiedWithdrawal
+                    );
+
                 } else {
                     console.log("Not enough tokens in pool to satisfy");
                     break;
@@ -353,7 +394,7 @@ contract LiquidityBufferVaultForTests is
     function setWallet(address newWallet)
     external
     onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newWallet.isContract(), "LiquidityBufferVault: not contract");
+        require(newWallet.isContract(), "Buffer: not contract");
 
         wallet = newWallet;
     }
@@ -372,7 +413,7 @@ contract LiquidityBufferVaultForTests is
         onlyRole(getRoleAdmin(role))
     {
         if(role == DEFAULT_ADMIN_ROLE){
-            require(account.isContract(), "LiquidityBufferVault: Not contract");
+            require(account.isContract(), "Buffer: Not contract");
         }
         _grantRole(role, account);
     }
@@ -384,11 +425,27 @@ contract LiquidityBufferVaultForTests is
         upgradeStatus = _status;
     }
 
+    function getWithdrawalPosition(uint256 _index) external view returns(uint256){
+        if((_index <= lastWithdrawalRequest ||_index > lastSatisfiedWithdrawal ) && _index != 0){
+            return _index - lastSatisfiedWithdrawal;
+        }
+        else{
+            return 0;
+        }
+    }
+
+    // function getUserActiveWithdrawals(address _user) external view returns(uint256[] memory indexes){
+    //     for(uint i = lastSatisfiedWithdrawal; i <= lastWithdrawalRequest; i++){
+    //         if(withdrawals[i].user == _user){
+    //             indexes.push(i);
+    //         }
+    //     }
+    // }
 
     function _authorizeUpgrade(address newImplementation)
     internal
     onlyRole(UPGRADER_ROLE)
     override {
-        require(upgradeStatus, "LiquidityBufferVault: Upgrade not allowed");
+        require(upgradeStatus, "Buffer: Upgrade not allowed");
     }
 }
