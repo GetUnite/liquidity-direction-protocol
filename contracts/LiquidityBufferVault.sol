@@ -36,6 +36,9 @@ contract LiquidityBufferVault is
     //flag for upgrades availability
     bool public upgradeStatus;
 
+    //flag for chainlink keepers that withdrawal can be satisfied 
+    bool public keepersTrigger;
+
     // size of the acceptable slippage with 2 decimals
     // 125 = 1.25%
     uint32 public slippage;
@@ -198,9 +201,10 @@ contract LiquidityBufferVault is
             }
         }
 
-        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+        if(lastWithdrawalRequest != lastSatisfiedWithdrawal && !keepersTrigger){
             uint256 inPoolNow = getBufferAmount();
             if(withdrawals[lastSatisfiedWithdrawal + 1].amount <= inPoolNow){
+                keepersTrigger = true;
                 emit EnoughToSatisfy(inPoolNow, totalWithdrawalAmount);
             }
         }
@@ -312,6 +316,7 @@ contract LiquidityBufferVault is
                     inPool -= amount;
                     totalWithdrawalAmount -= amount;
                     lastSatisfiedWithdrawal++;
+                    keepersTrigger = false;
                     
                     emit WithrawalSatisfied(
                         withdrawal.user, 
@@ -405,5 +410,6 @@ contract LiquidityBufferVault is
     onlyRole(UPGRADER_ROLE)
     override {
         require(upgradeStatus, "Buffer: Upgrade not allowed");
+        upgradeStatus = false;
     }
 }

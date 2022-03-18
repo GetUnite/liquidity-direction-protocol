@@ -20,6 +20,7 @@ function getRandomArbitrary(min: number, max: number) {
 describe("AlluoLp", function () {
     let signers: SignerWithAddress[];
     let whale: SignerWithAddress;
+    let curveLpHolder: SignerWithAddress;
 
     let alluoLpV0: UrgentAlluoLp;
     let alluoLpV1: AlluoLpUpgradable;
@@ -35,13 +36,20 @@ describe("AlluoLp", function () {
         signers = await ethers.getSigners();
         //We are forking Ethereum mainnet, please enable it in config
         const whaleAddress = "0x075e72a5eDf65F0A5f44699c7654C1a76941Ddc8";
+        const curveLpHolderAddress = "0xa0f2e2f7b3ab58e3e52b74f08d94ae52778d46df";
 
         await ethers.provider.send(
             'hardhat_impersonateAccount',
             [whaleAddress]
         );
 
+        await ethers.provider.send(
+            'hardhat_impersonateAccount',
+            [curveLpHolderAddress]
+        );
+
         whale = await ethers.getSigner(whaleAddress);
+        curveLpHolder = await ethers.getSigner(curveLpHolderAddress);
         dai = await ethers.getContractAt("IERC20", "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063");
         usdc = await ethers.getContractAt("IERC20", "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
         usdt = await ethers.getContractAt("IERC20", "0xc2132D05D31c914a87C6611C10748AEb04B58e8F");
@@ -64,6 +72,7 @@ describe("AlluoLp", function () {
     // AlluoLP v3 - automated deposit and withdrawal with liquidity buffer 
 
     beforeEach(async function () {
+        
         const AlluoLPv0 = await ethers.getContractFactory("UrgentAlluoLp") as UrgentAlluoLp__factory;
         const AlluoLPv1 = await ethers.getContractFactory("AlluoLpUpgradable") as AlluoLpUpgradable__factory;
         const AlluoLPv2= await ethers.getContractFactory("AlluoLpUpgradableMintable") as AlluoLpUpgradableMintable__factory;
@@ -131,8 +140,7 @@ describe("AlluoLp", function () {
 
     });
 
-
-    it("Random deposits and withdrawals", async function () {
+    it("Simulation with random deposits and withdrawals", async function () {
         console.log("long test takes some time");
         
         let numberOfDeposits = getRandomArbitrary(4, 5);
@@ -183,8 +191,63 @@ describe("AlluoLp", function () {
             i++;
         }
 
+        await curveLp.connect(curveLpHolder).transfer(buffer.address, parseEther("5000"));
+        console.log("BIG curveLp transfer");
+        
+        i = 0;
+        while (i <= 2){
+            await deposit(signers[1], dai, parseUnits((getRandomArbitrary(500, 10000)).toString(), 18))
+            await deposit(signers[2], usdc, parseUnits((getRandomArbitrary(500, 10000)).toString(), 6))
+            await deposit(signers[3], usdt, parseUnits((getRandomArbitrary(500, 10000)).toString(), 6))
+            i++;
+        }
     });
 
+    
+
+    it("Should check all core functions of buffer", async function () {
+        console.log("long test takes some time");
+
+        await deposit(signers[1], dai, parseUnits("2000", 18));
+        await deposit(signers[2], usdc, parseUnits("3000", 6));
+        await deposit(signers[3], usdt, parseUnits("5000", 6));
+
+        await alluoLpCurrent.connect(signers[1]).withdraw(usdt.address, parseEther("150"))
+        await alluoLpCurrent.connect(signers[2]).withdraw(usdc.address, parseEther("150"))
+        await alluoLpCurrent.connect(signers[3]).withdraw(dai.address, parseEther("150"))
+
+        await deposit(signers[1], dai, parseUnits("100", 18));
+        await deposit(signers[2], usdc, parseUnits("100", 6));
+        await deposit(signers[3], usdt, parseUnits("100", 6));
+        
+        console.log("BIG curveLp transfer");
+        await curveLp.connect(curveLpHolder).transfer(buffer.address, parseEther("300"));
+
+        await deposit(signers[1], dai, parseUnits("1000", 18));
+        await deposit(signers[2], usdc, parseUnits("1000", 6));
+        await deposit(signers[3], usdt, parseUnits("1000", 6));
+
+        await alluoLpCurrent.connect(signers[1]).withdraw(usdt.address, parseEther("900"))
+        await deposit(signers[2], usdc, parseUnits("100", 6));
+        await deposit(signers[2], usdt, parseUnits("900", 6));
+        await buffer.satisfyWithdrawals();
+        await buffer.satisfyWithdrawals();
+        await alluoLpCurrent.connect(signers[1]).withdraw(usdt.address, parseEther("600"))
+
+        await alluoLpCurrent.connect(signers[1]).withdraw(dai.address, parseEther("100"))
+        await alluoLpCurrent.connect(signers[2]).withdraw(usdc.address, parseEther("100"))
+        await alluoLpCurrent.connect(signers[3]).withdraw(usdt.address, parseEther("100"))
+        await buffer.satisfyWithdrawals();
+        await deposit(signers[2], usdt, parseUnits("300", 6));
+        await buffer.satisfyWithdrawals();
+
+    });
+
+    // it("Should check buffer admin functions", async function () {
+        
+    // });
+
+    
     it("Should allow deposit", async function () {
         // address that will get minted tokens
         const recipient = signers[1];
@@ -237,7 +300,7 @@ describe("AlluoLp", function () {
 
         const tx = multisig.executeCall(alluoLpCurrent.address, calldata);
 
-        expect(tx).to.be.revertedWith("AlluoLp: not contract");
+        expect(tx).to.be.revertedWith("AlluoLp: Not contract");
     });
 
     it("Should grant role that can be granted to anyone", async () => {
@@ -365,7 +428,7 @@ describe("AlluoLp", function () {
 
         const tx = multisig.executeCall(alluoLpCurrent.address, calldata);
 
-        await expect(tx).to.be.revertedWith("AlluoLp: not contract")
+        await expect(tx).to.be.revertedWith("AlluoLp: Not contract")
     })
 
     // it("Should add new deposit token and allow to deposit with it", async () => {

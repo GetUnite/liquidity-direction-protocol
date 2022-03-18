@@ -36,6 +36,9 @@ contract LiquidityBufferVaultForTests is
     //flag for upgrades availability
     bool public upgradeStatus;
 
+    //flag for chainlink keepers that withdrawal can be satisfied 
+    bool public keepersTrigger;
+
     // size of the acceptable slippage with 2 decimals
     // 125 = 1.25%
     uint32 public slippage;
@@ -219,9 +222,12 @@ contract LiquidityBufferVaultForTests is
             }
         } 
 
-        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+        if(lastWithdrawalRequest != lastSatisfiedWithdrawal && !keepersTrigger){
             uint256 inPoolNow = getBufferAmount();
             if(withdrawals[lastSatisfiedWithdrawal + 1].amount <= inPoolNow){
+                console.log("In buffer now enouth to satisfy user withdrawal, keepers triggered");
+                console.log("In pool now %s user need ", inPoolNow / 10 ** 18, withdrawals[lastSatisfiedWithdrawal + 1].amount / 10 ** 18);
+                keepersTrigger = true;
                 emit EnoughToSatisfy(inPoolNow, totalWithdrawalAmount);
             }
         }
@@ -352,6 +358,7 @@ contract LiquidityBufferVaultForTests is
                     totalWithdrawalAmount -= amount;
                     console.log("In pool after withdrawal %s ", inPool / 10 ** 18);
                     lastSatisfiedWithdrawal++;
+                    keepersTrigger = false;
 
                     emit WithrawalSatisfied(
                         withdrawal.user, 
@@ -365,6 +372,9 @@ contract LiquidityBufferVaultForTests is
                     break;
                 }
             }
+        }
+        else{
+            console.log("There was no withdrawals in queue");
         }
         console.log("-----------------------------------********-----------------------------------");
     }
@@ -447,5 +457,6 @@ contract LiquidityBufferVaultForTests is
     onlyRole(UPGRADER_ROLE)
     override {
         require(upgradeStatus, "Buffer: Upgrade not allowed");
+        upgradeStatus = false;
     }
 }
