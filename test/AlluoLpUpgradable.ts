@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
 import { ethers, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpUpgradable, AlluoLpUpgradable__factory, AlluoLpUpgradableMintable, AlluoLpUpgradableMintable__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory} from "../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpUpgradable, AlluoLpUpgradable__factory, AlluoLpUpgradableMintable, AlluoLpUpgradableMintable__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests} from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -246,6 +246,27 @@ describe("AlluoLp", function () {
     // it("Should check buffer admin functions", async function () {
         
     // });
+
+    it("Upgrading", async function () {
+        const Buffer = await ethers.getContractFactory("LiquidityBufferVaultForTests") as LiquidityBufferVaultForTests__factory;
+
+        let ABI = ["function grantRole(bytes32 role, address account)"];
+        let iface = new ethers.utils.Interface(ABI);
+        let calldata = iface.encodeFunctionData("grantRole", [await buffer.UPGRADER_ROLE(), signers[0].address]);
+
+        await multisig.executeCall(buffer.address, calldata);
+
+        ABI = ["function changeUpgradeStatus(bool _status)"];
+        iface = new ethers.utils.Interface(ABI);
+        calldata = iface.encodeFunctionData("changeUpgradeStatus", [true]);
+
+        await multisig.executeCall(buffer.address, calldata);
+        
+        let newBuffer = await upgrades.upgradeProxy(buffer.address, Buffer) as LiquidityBufferVaultForTests;
+
+        await expect(upgrades.upgradeProxy(buffer.address, Buffer)).to.be.revertedWith("Buffer: Upgrade not allowed");
+
+    });
 
     
     it("Should allow deposit", async function () {

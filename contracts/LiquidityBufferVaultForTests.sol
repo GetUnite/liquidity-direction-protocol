@@ -156,7 +156,6 @@ contract LiquidityBufferVaultForTests is
                     minAmountOut / 10 ** 12, 
                     true
                 );
-                console.log("min %s and real %s", minAmountOut / 10 ** 12 / 10 ** 4, toWallet / 10 ** 4);
                 console.log("All amount went directly to the wallet in usdc: %s with 2 decimals", toWallet / 10 ** 4);
                 USDC.safeTransfer(wallet, toWallet);
             }
@@ -216,7 +215,6 @@ contract LiquidityBufferVaultForTests is
                     _amount * (10000 - slippage) / 10000, 
                     true
                 );
-                console.log("min %s and real %s", _amount * (10000 - slippage) / 10000 / 10 ** 4, toWallet / 10 ** 4);
                 console.log("All amount went directly to the wallet in usdc: %s with 2 decimals", toWallet / 10 ** 4);
                 USDC.safeTransfer(wallet, toWallet);
             }
@@ -225,8 +223,7 @@ contract LiquidityBufferVaultForTests is
         if(lastWithdrawalRequest != lastSatisfiedWithdrawal && !keepersTrigger){
             uint256 inPoolNow = getBufferAmount();
             if(withdrawals[lastSatisfiedWithdrawal + 1].amount <= inPoolNow){
-                console.log("In buffer now enouth to satisfy user withdrawal, keepers triggered");
-                console.log("In pool now %s user need ", inPoolNow / 10 ** 18, withdrawals[lastSatisfiedWithdrawal + 1].amount / 10 ** 18);
+                console.log("Now in buffer enouth to satisfy user withdrawal, keepers triggered");
                 keepersTrigger = true;
                 emit EnoughToSatisfy(inPoolNow, totalWithdrawalAmount);
             }
@@ -295,7 +292,6 @@ contract LiquidityBufferVaultForTests is
                 amount: _amount
             });
             totalWithdrawalAmount += _amount;
-            console.log("Waiting for withdrawing", totalWithdrawalAmount / 10 ** 18);
             emit AddedToQueue(_user, _token, _amount, lastWithdrawalRequest);
         }
         console.log("----------------------------------+++++---------------------------------------");
@@ -388,7 +384,6 @@ contract LiquidityBufferVaultForTests is
     }
 
     function getExpectedBufferAmount(uint256 _newAmount) public view returns(uint256) {
-        console.log("Calculating persentage");
         return (_newAmount + ERC20(alluoLp).totalSupply()) * bufferPercentage / 10000 + totalWithdrawalAmount;
     }
 
