@@ -14,7 +14,7 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/se
 
 import {Exchange} from "alluo-exchange/contracts/Exchange.sol";
 
-contract AlluoLpV2UpgradableMintable is
+contract AlluoLpV2Upgradable is
     Initializable,
     PausableUpgradeable,
     ReentrancyGuardUpgradeable,
@@ -71,6 +71,13 @@ contract AlluoLpV2UpgradableMintable is
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
+    event DesiredTokenWithdrawn(
+        address indexed user,
+        address token,
+        uint256 amount
+    );
+    event InterestReinvested(address indexed user, uint256 amount);
+    event InterestPaid(address indexed user, address token, uint256 amount);
     event InterestChanged(uint8 oldInterest, uint8 newInterest);
     event NewWalletSet(address oldWallet, address newWallet);
     event ApyClaimed(address indexed user, uint256 apyAmount);
@@ -141,7 +148,11 @@ contract AlluoLpV2UpgradableMintable is
         }
     }
 
-    function _intrestAccured(address _address) internal whenNotPaused {}
+    /**
+     * @dev function to withdraw desired underlying
+     * @param _amount amount in 10*18
+     * @param _desiredToken supported desired token address
+     */
 
     function withdraw(uint256 _amount, address _desiredToken)
         external
@@ -155,24 +166,23 @@ contract AlluoLpV2UpgradableMintable is
         uint256 userBalance = balanceOf(msg.sender);
         require(
             userBalance != 0 && userBalance >= _amount,
-            "AlluoLpV2UpgradableMintable#withdraw:BALANCE_TO_LOW"
+            "AlluoLpV2Upgradable#withdraw:BALANCE_TO_LOW"
         );
-        update();
+        uint256 localDF = _localDF();
 
-        uint256 intrestAmount = (((DF * _amount) / userDF[msg.sender]) -
+        uint256 intrestAmount = (((localDF * _amount) / userDF[msg.sender]) -
             _amount);
 
-        uint256 realAmount = _amount + intrestAmount;
+        uint256 realAmountIn18 = _amount + intrestAmount;
 
         uint256 targetTokenDecimalsMult = 10 **
-            (AlluoERC20Upgradable(targetToken).decimals() - 18);
+            (18 - AlluoERC20Upgradable(targetToken).decimals());
 
-        uint256 targetTokenAmount = realAmount * targetTokenDecimalsMult;
+        uint256 targetTokenAmount = realAmountIn18 / targetTokenDecimalsMult;
 
         if (_desiredToken != targetToken) {
             uint256 desiredTokenDecimalsMult = 10 **
-                (AlluoERC20Upgradable(_desiredToken).decimals() -
-                    AlluoERC20Upgradable(targetToken).decimals());
+                (18 - AlluoERC20Upgradable(_desiredToken).decimals());
 
             IERC20Upgradeable(targetToken).safeTransferFrom(
                 wallet,
@@ -181,8 +191,8 @@ contract AlluoLpV2UpgradableMintable is
             );
 
             // subtract slippage and format to targetToken decimals
-            uint256 minOutput = (targetTokenAmount -
-                ((targetTokenAmount * slippageBPS) / 10000)) *
+            uint256 minOutput = (realAmountIn18 -
+                ((realAmountIn18 * slippageBPS) / 10000)) /
                 desiredTokenDecimalsMult;
 
             uint256 outputAmount = Exchange(exchangeAddress).exchange(
@@ -191,44 +201,52 @@ contract AlluoLpV2UpgradableMintable is
                 targetTokenAmount,
                 minOutput
             );
-
+            _burn(msg.sender, _amount);
             IERC20Upgradeable(_desiredToken).safeTransfer(
                 msg.sender,
                 outputAmount
             );
+            emit DesiredTokenWithdrawn(msg.sender, _desiredToken, outputAmount);
         } else {
-            IERC20Upgradeable(targetToken).safeTransferFrom(
+            _burn(msg.sender, _amount);
+            IERC20Upgradeable(_desiredToken).safeTransferFrom(
                 wallet,
                 msg.sender,
                 targetTokenAmount
             );
+            emit DesiredTokenWithdrawn(
+                msg.sender,
+                _desiredToken,
+                targetTokenAmount
+            );
         }
 
-        _burn(msg.sender, _amount);
-
-        emit BurnedForWithdraw(msg.sender, realAmount);
+        emit InterestPaid(msg.sender, _desiredToken, intrestAmount);
+        emit BurnedForWithdraw(msg.sender, _amount);
     }
 
-    function deposit(address _token, uint256 _amount)
+    function deposit(address _depositedToken, uint256 _amount)
         external
         whenNotPaused
         nonReentrant
     {
         require(
-            supportedTokens.contains(_token),
-            "AlluoLpV2UpgradableMintable#deposit:TOKEN_NOT_SUPPORTED"
+            supportedTokens.contains(_depositedToken),
+            "AlluoLpV2Upgradable#deposit:TOKEN_NOT_SUPPORTED"
         );
 
-        if (_token != targetToken) {
+        uint256 amountIn18 = _amount *
+            10**(18 - AlluoERC20Upgradable(_depositedToken).decimals());
+
+        if (_depositedToken != targetToken) {
             uint256 targetTokenDecimalsMult = 10 **
-                (AlluoERC20Upgradable(targetToken).decimals() -
-                    AlluoERC20Upgradable(_token).decimals());
-            // subtract slippage and format to targetToken decimals
-            uint256 minOutput = (_amount - ((_amount * slippageBPS) / 10000)) *
-                targetTokenDecimalsMult;
+                (18 - AlluoERC20Upgradable(targetToken).decimals());
+
+            uint256 minOutput = (amountIn18 -
+                ((amountIn18 * slippageBPS) / 10000)) / targetTokenDecimalsMult;
 
             uint256 outputAmount = Exchange(exchangeAddress).exchange(
-                _token,
+                _depositedToken,
                 targetToken,
                 _amount,
                 minOutput
@@ -242,22 +260,20 @@ contract AlluoLpV2UpgradableMintable is
             );
         }
 
-        uint256 amountIn18 = _amount *
-            10**(18 - AlluoERC20Upgradable(_token).decimals());
-
         uint256 userBalance = balanceOf(msg.sender);
-        update();
+        uint256 localDF = _localDF();
 
         if (userBalance > 0) {
-            uint256 intrestAmount = (((DF * userBalance) / userDF[msg.sender]) -
-                userBalance);
+            uint256 intrestAmount = (((localDF * userBalance) /
+                userDF[msg.sender]) - userBalance);
             _mint(msg.sender, amountIn18 + intrestAmount);
-            userDF[msg.sender] = DF;
-            emit Deposited(msg.sender, _token, amountIn18 + intrestAmount);
+            userDF[msg.sender] = localDF;
+            emit InterestReinvested(msg.sender, intrestAmount);
+            emit Deposited(msg.sender, _depositedToken, amountIn18);
         } else {
             _mint(msg.sender, amountIn18);
-            userDF[msg.sender] = DF;
-            emit Deposited(msg.sender, _token, amountIn18);
+            userDF[msg.sender] = localDF;
+            emit Deposited(msg.sender, _depositedToken, amountIn18);
         }
     }
 
@@ -266,7 +282,7 @@ contract AlluoLpV2UpgradableMintable is
         whenNotPaused
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        _mint(_user, _amount);
+        revert("AlluoLpV2Upgradable#mint: CAN_NOT_MINT_ARTIFICIAL_SUPPLY");
     }
 
     function changeTokenStatus(address _token, bool _status)
@@ -386,6 +402,17 @@ contract AlluoLpV2UpgradableMintable is
         }
     }
 
+    function _localDF() internal view returns (uint256) {
+        return
+            (block.timestamp - lastDFUpdate) >= updateTimeLimit
+                ? ((DF *
+                    (((interest *
+                        DENOMINATOR *
+                        (block.timestamp - lastDFUpdate)) / 31536000) +
+                        (100 * DENOMINATOR))) / DENOMINATOR) / 100
+                : DF;
+    }
+
     function getListSupportedTokens() public view returns (address[] memory) {
         return supportedTokens.values();
     }
@@ -393,11 +420,45 @@ contract AlluoLpV2UpgradableMintable is
     function _beforeTokenTransfer(
         address from,
         address to,
-        uint256 amount
+        uint256 _amount
     ) internal override {
-        // _claim(from);
-        // claim(to);
-        super._beforeTokenTransfer(from, to, amount);
+        uint256 localDF = _localDF();
+        uint256 intrestAmount = (((localDF * balanceOf(to)) / userDF[to]) -
+            balanceOf(to));
+        if (intrestAmount > 0) {
+            _mint(to, intrestAmount);
+            userDF[to] = localDF;
+            emit InterestReinvested(to, intrestAmount);
+        }
+
+        super._beforeTokenTransfer(from, to, _amount);
+    }
+
+    function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 _amount
+    ) internal override {
+        uint256 localDF = _localDF();
+        uint256 intrestAmount = (((localDF * _amount) / userDF[from]) -
+            _amount);
+
+        if (intrestAmount > 0) {
+            uint256 targetTokenDecimalsMult = 10 **
+                (18 - AlluoERC20Upgradable(targetToken).decimals());
+
+            uint256 targetTokenAmount = intrestAmount / targetTokenDecimalsMult;
+
+            IERC20Upgradeable(targetToken).safeTransferFrom(
+                wallet,
+                from,
+                targetTokenAmount
+            );
+
+            emit InterestPaid(from, targetToken, intrestAmount);
+        }
+
+        super._afterTokenTransfer(from, to, _amount);
     }
 
     function _authorizeUpgrade(address newImplementation)
