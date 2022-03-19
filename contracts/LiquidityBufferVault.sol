@@ -57,6 +57,8 @@ contract LiquidityBufferVault is
         address token;
         // amount to recieve
         uint256 amount;
+        // withdrawal time
+        uint256 time;
     }
 
     // list of withrawals in queue
@@ -85,14 +87,16 @@ contract LiquidityBufferVault is
         address indexed user, 
         address token, 
         uint256 amount, 
-        uint256 queueIndex
+        uint256 queueIndex,
+        uint256 satisfiedTime
     );
 
     event AddedToQueue(
         address indexed user, 
         address token, 
         uint256 amount,
-        uint256 queueIndex
+        uint256 queueIndex,
+        uint256 requestTime
     );
 
 
@@ -255,16 +259,18 @@ contract LiquidityBufferVault is
                 USDT.safeTransfer(_user, toUser);
             }
 
-            emit WithrawalSatisfied(_user, _token, toUser, 0);
+            emit WithrawalSatisfied(_user, _token, toUser, 0, block.timestamp);
         } else {
             lastWithdrawalRequest++;
+            uint256 timeNow = block.timestamp;
             withdrawals[lastWithdrawalRequest] = Withdrawal({
                 user: _user,
                 token: _token,
-                amount: _amount
+                amount: _amount,
+                time: timeNow
             });
             totalWithdrawalAmount += _amount;
-            emit AddedToQueue(_user, _token, _amount, lastWithdrawalRequest);
+            emit AddedToQueue(_user, _token, _amount, lastWithdrawalRequest, timeNow);
         }
     }
 
@@ -322,7 +328,8 @@ contract LiquidityBufferVault is
                         withdrawal.user, 
                         withdrawal.token, 
                         toUser, 
-                        lastSatisfiedWithdrawal
+                        lastSatisfiedWithdrawal,
+                        block.timestamp
                     );
 
                 } else {

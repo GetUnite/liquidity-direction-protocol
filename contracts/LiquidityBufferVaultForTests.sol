@@ -57,6 +57,8 @@ contract LiquidityBufferVaultForTests is
         address token;
         // amount to recieve
         uint256 amount;
+        // withdrawal time
+        uint256 time;
     }
 
     // list of withrawals in queue
@@ -85,14 +87,16 @@ contract LiquidityBufferVaultForTests is
         address indexed user, 
         address token, 
         uint256 amount, 
-        uint256 queueIndex
+        uint256 queueIndex,
+        uint256 satisfiedTime
     );
 
     event AddedToQueue(
         address indexed user, 
         address token, 
         uint256 amount,
-        uint256 queueIndex
+        uint256 queueIndex,
+        uint256 requestTime
     );
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -136,8 +140,7 @@ contract LiquidityBufferVaultForTests is
                     uint256 toWallet = inPool + _amount - shouldBeInPool;
 
                     uint256 toWalletIn6 = toWallet / 10 ** 12;
-                    console.log("To wallet wiil go %s ", toWallet / 10 ** 18);
-                    console.log("To buffer will go %s ", (_amount - toWallet) / 10 ** 18);
+                    console.log("To wallet wiil go %s and to buffer ", toWallet / 10 ** 18, (_amount - toWallet) / 10 ** 18);
                     curvePool.remove_liquidity_imbalance(
                         [0, toWalletIn6, 0], 
                         toWallet * (10000 + slippage) / 10000, 
@@ -168,13 +171,12 @@ contract LiquidityBufferVaultForTests is
 
                 if (shouldBeInPool < inPool + amountIn18) {
                     uint256 toPoolIn18 = shouldBeInPool - inPool;
-                    console.log("To buffer will go", toPoolIn18 / 10 ** 18);
+                    console.log("To buffer will go and to buffer", toPoolIn18 / 10 ** 18, (amountIn18 - toPoolIn18) / 10 ** 18);
                     curvePool.add_liquidity(
                         [0, toPoolIn18 / 10 ** 12, 0], 
                         0, 
                         true
                     );
-                    console.log("To wallet will go", (amountIn18 - toPoolIn18) / 10 ** 18);
                     USDC.safeTransfer(wallet, (amountIn18 - toPoolIn18) / 10 ** 12);
                 } else {
                     curvePool.add_liquidity([0, _amount, 0], 0, true);
@@ -196,8 +198,7 @@ contract LiquidityBufferVaultForTests is
                 if (shouldBeInPool < inPool + amountIn18) {
                     uint256 toWallet = inPool + amountIn18 - shouldBeInPool;
                     uint256 toWalletIn6 = toWallet / 10 ** 12;
-                    console.log("To wallet wiil go %s ", toWallet / 10 ** 18);
-                    console.log("To buffer will go %s ", (amountIn18 - toWallet) / 10 ** 18);
+                    console.log("To wallet wiil go %s and to buffer ", toWallet / 10 ** 18, (amountIn18 - toWallet) / 10 ** 18);
                     curvePool.remove_liquidity_imbalance(
                         [0, toWalletIn6, 0], 
                         toWallet * (10000 + slippage) / 10000, 
@@ -282,17 +283,19 @@ contract LiquidityBufferVaultForTests is
                 USDT.safeTransfer(_user, toUser);
             } 
             console.log("In pool was %s and left ", inPool / 10 ** 18, getBufferAmount() / 10 ** 18);
-            emit WithrawalSatisfied(_user, _token, toUser, 0);
+            emit WithrawalSatisfied(_user, _token, toUser, 0, block.timestamp);
         } else {    
             console.log("In pool not enough tokens or the queue is not empty");
             lastWithdrawalRequest++;
+            uint256 timeNow = block.timestamp;
             withdrawals[lastWithdrawalRequest] = Withdrawal({
                 user: _user,
                 token: _token,
-                amount: _amount
+                amount: _amount,
+                time: timeNow
             });
             totalWithdrawalAmount += _amount;
-            emit AddedToQueue(_user, _token, _amount, lastWithdrawalRequest);
+            emit AddedToQueue(_user, _token, _amount, lastWithdrawalRequest, timeNow);
         }
         console.log("----------------------------------+++++---------------------------------------");
     }
@@ -360,7 +363,8 @@ contract LiquidityBufferVaultForTests is
                         withdrawal.user, 
                         withdrawal.token, 
                         toUser, 
-                        lastSatisfiedWithdrawal
+                        lastSatisfiedWithdrawal,
+                        block.timestamp
                     );
 
                 } else {
