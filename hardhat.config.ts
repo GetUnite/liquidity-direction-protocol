@@ -1,3 +1,5 @@
+
+
 import * as dotenv from "dotenv";
 
 import { HardhatUserConfig } from "hardhat/config";
@@ -7,8 +9,7 @@ import "@typechain/hardhat";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
 import 'hardhat-contract-sizer'
-import './tasks'
-import '@openzeppelin/hardhat-upgrades';
+import "./tasks"
 
 dotenv.config();
 
@@ -27,9 +28,21 @@ const config: HardhatUserConfig = {
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
+      forking: {
+        enabled: process.env.FORKING_ENABLED == "true",
+        url: process.env.FORKING_URL as string,
+        blockNumber: 14397303
+      },
     },
     rinkeby: {
       url: process.env.RINKEBY_URL,
+      gasPrice: "auto",
+      accounts: {
+        mnemonic: process.env.MNEMONIC,
+      },
+    },
+    mainnet: {
+      url: process.env.MAINNET_URL,
       gasPrice: "auto",
       accounts: {
         mnemonic: process.env.MNEMONIC,
@@ -55,7 +68,7 @@ const config: HardhatUserConfig = {
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
-    }
+    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS == "true",
