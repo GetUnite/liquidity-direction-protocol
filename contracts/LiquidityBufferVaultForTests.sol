@@ -127,8 +127,7 @@ contract LiquidityBufferVaultForTests is
     // function checks how much in buffer now and hom much should be
     // fill buffer and send to wallet what left (conveting it to usdc)
     function deposit(address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
-        console.log("-------------------------------------------------------------------------------");
-        console.log("The beginning of distribution %s of %s to pool and wallet", _amount  / 10 ** ERC20(_token).decimals(), ERC20(_token).name());
+        console.log("\nThe beginning of distribution %s of %s to pool and wallet", _amount  / 10 ** ERC20(_token).decimals(), ERC20(_token).name());
 
         uint256 inPool = getBufferAmount();
         if (IERC20Upgradeable(_token) == DAI) {
@@ -171,7 +170,7 @@ contract LiquidityBufferVaultForTests is
 
                 if (shouldBeInPool < inPool + amountIn18) {
                     uint256 toPoolIn18 = shouldBeInPool - inPool;
-                    console.log("To buffer will go and to buffer", toPoolIn18 / 10 ** 18, (amountIn18 - toPoolIn18) / 10 ** 18);
+                    console.log("To buffer will go %s and to wallet", toPoolIn18 / 10 ** 18, (amountIn18 - toPoolIn18) / 10 ** 18);
                     curvePool.add_liquidity(
                         [0, toPoolIn18 / 10 ** 12, 0], 
                         0, 
@@ -230,16 +229,14 @@ contract LiquidityBufferVaultForTests is
             }
         }
 
-        console.log("-------------------------------------------------------------------------------");
     }
 
     // function checks is in buffer enoght tokens to satisfy withdraw
     // or is queue empty, if so sending chosen tokens
     // if not adding withdrawal in queue
     function withdraw(address _user, address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
-        console.log("----------------------------------+++++---------------------------------------");
 
-        console.log("User withdraws %s and wants to receive", _amount / 10 ** 18, ERC20(_token).name());
+        console.log("\nUser withdraws %s and wants to receive", _amount / 10 ** 18, ERC20(_token).name());
         uint256 inPool = getBufferAmount();
         console.log("In pool %s and requested", inPool / 10 ** 18, _amount / 10 ** 18);
         if (inPool > _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
@@ -297,22 +294,19 @@ contract LiquidityBufferVaultForTests is
             totalWithdrawalAmount += _amount;
             emit AddedToQueue(_user, _token, _amount, lastWithdrawalRequest, timeNow);
         }
-        console.log("----------------------------------+++++---------------------------------------");
     }
 
     // function for satisfaction withdrawals in queue
     // triggered by BE or chainlink keepers  
     function satisfyWithdrawals() external whenNotPaused {
-        console.log("-----------------------------------********-----------------------------------");
         if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
-            console.log("In queue %s user", lastWithdrawalRequest - lastSatisfiedWithdrawal);
+            console.log("\nIn queue %s user", lastWithdrawalRequest - lastSatisfiedWithdrawal);
 
             uint256 inPool = getBufferAmount();
             while (lastSatisfiedWithdrawal != lastWithdrawalRequest) {
                 Withdrawal memory withdrawal = withdrawals[lastSatisfiedWithdrawal + 1];
-                console.log("********");
                 uint256 amount = withdrawal.amount;
-                console.log("In pool %s and requested", inPool / 10 ** 18, amount / 10 ** 18);
+                console.log("\nIn pool %s and requested", inPool / 10 ** 18, amount / 10 ** 18);
                 if (amount <= inPool) {
                     uint256 toUser;
 
@@ -376,7 +370,6 @@ contract LiquidityBufferVaultForTests is
         else{
             console.log("There was no withdrawals in queue");
         }
-        console.log("-----------------------------------********-----------------------------------");
     }
 
     function setSlippage(uint32 _newSlippage) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -454,14 +447,30 @@ contract LiquidityBufferVaultForTests is
         return false;
     }
 
-    // function getUserActiveWithdrawals(address _user) external view returns(uint256[] memory indexes){
-    //     for(uint i = lastSatisfiedWithdrawal; i <= lastWithdrawalRequest; i++){
-    //         if(withdrawals[i].user == _user){
-    //             indexes.push(i);
-    //         }
-    //     }
-    // }
 
+    function getUserActiveWithdrawals(address _user) external view returns(uint256[] memory){
+        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+            uint256 userRequestAmount;
+            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
+                if(withdrawals[i].user == _user){
+                    userRequestAmount++;
+                }
+            }
+            uint256[] memory indexes = new uint256[](userRequestAmount);
+            uint256 counter;
+            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
+                if(withdrawals[i].user == _user){
+                    indexes[counter] = i;
+                    counter++;
+                }
+            }
+            return indexes;
+        }
+        uint256[] memory empty;
+        return empty;
+    }
+
+    
     function _authorizeUpgrade(address newImplementation)
     internal
     onlyRole(UPGRADER_ROLE)

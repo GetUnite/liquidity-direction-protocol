@@ -169,6 +169,9 @@ describe("AlluoLp", function () {
             await alluoLpCurrent.connect(signers[1]).withdraw(usdc.address, parseEther((getRandomArbitrary(100, 500)).toString()))
             await alluoLpCurrent.connect(signers[2]).withdraw(usdt.address, parseEther((getRandomArbitrary(100, 500)).toString()))
             await alluoLpCurrent.connect(signers[3]).withdraw(dai.address, parseEther((getRandomArbitrary(100, 500)).toString()))
+            // console.log(await buffer.getUserActiveWithdrawals(signers[1].address))
+            // console.log(await buffer.getUserActiveWithdrawals(signers[2].address))
+            // console.log(await buffer.getUserActiveWithdrawals(signers[3].address))
             i++;
         }
 

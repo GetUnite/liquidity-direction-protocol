@@ -414,13 +414,27 @@ contract LiquidityBufferVault is
         return false;
     }
 
-    // function getUserActiveWithdrawals(address _user) external view returns(uint256[] memory indexes){
-    //     for(uint i = lastSatisfiedWithdrawal; i <= lastWithdrawalRequest; i++){
-    //         if(withdrawals[i].user == _user){
-    //             indexes.push(i);
-    //         }
-    //     }
-    // }
+    function getUserActiveWithdrawals(address _user) external view returns(uint256[] memory){
+        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+            uint256 userRequestAmount;
+            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
+                if(withdrawals[i].user == _user){
+                    userRequestAmount++;
+                }
+            }
+            uint256[] memory indexes = new uint256[](userRequestAmount);
+            uint256 counter;
+            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
+                if(withdrawals[i].user == _user){
+                    indexes[counter] = i;
+                    counter++;
+                }
+            }
+            return indexes;
+        }
+        uint256[] memory empty;
+        return empty;
+    }
 
 
     function _authorizeUpgrade(address newImplementation)
