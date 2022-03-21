@@ -13,7 +13,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 
-contract LiquidityBufferVaultForMumbai is
+contract LiquidityBufferVaultForMumbaiNew is
     Initializable,
     PausableUpgradeable,
     AccessControlUpgradeable,
@@ -324,6 +324,18 @@ contract LiquidityBufferVaultForMumbai is
             return 0;
         }
     }
+
+    function isUserWaiting(address _user) external view returns(bool){
+        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
+                if(withdrawals[i].user == _user){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
 
     // function getUserActiveWithdrawals(address _user) external view returns(uint256[] memory indexes){
     //     for(uint i = lastSatisfiedWithdrawal; i <= lastWithdrawalRequest; i++){

@@ -443,6 +443,17 @@ contract LiquidityBufferVaultForTests is
         }
     }
 
+    function isUserWaiting(address _user) external view returns(bool){
+        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
+                if(withdrawals[i].user == _user){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     // function getUserActiveWithdrawals(address _user) external view returns(uint256[] memory indexes){
     //     for(uint i = lastSatisfiedWithdrawal; i <= lastWithdrawalRequest; i++){
     //         if(withdrawals[i].user == _user){
