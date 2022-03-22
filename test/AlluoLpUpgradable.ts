@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
 import { ethers, upgrades } from "hardhat";
 import { before } from "mocha";
-import { PseudoMultisigWallet, PseudoMultisigWallet__factory, TestERC20, TestERC20__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpUpgradable, AlluoLpUpgradable__factory } from "../typechain";
+import { PseudoMultisigWallet, PseudoMultisigWallet__factory, TestERC20, TestERC20__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpUpgradableMintable, AlluoLpUpgradableMintable__factory,  } from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -13,10 +13,10 @@ async function skipDays(d: number) {
     ethers.provider.send('evm_mine', []);
 }
 
-describe("AlluoLPUpgradable", function () {
+describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
     let signers: SignerWithAddress[];
 
-    let alluoLp: AlluoLpUpgradable;
+    let alluoLp: AlluoLpUpgradableMintable;
     let alluoLpOld: UrgentAlluoLp;
     let multisig: PseudoMultisigWallet;
     let token: TestERC20;
@@ -36,7 +36,7 @@ describe("AlluoLPUpgradable", function () {
     });
 
     beforeEach(async function () {
-        const AlluoLP = await ethers.getContractFactory("AlluoLpUpgradable") as AlluoLpUpgradable__factory;
+        const AlluoLP = await ethers.getContractFactory("AlluoLpUpgradableMintable") as AlluoLpUpgradableMintable__factory;
         const AlluoLPOld = await ethers.getContractFactory("UrgentAlluoLp") as UrgentAlluoLp__factory;
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
         const Token = await ethers.getContractFactory("TestERC20") as TestERC20__factory;
@@ -49,9 +49,16 @@ describe("AlluoLPUpgradable", function () {
             [multisig.address,
             [token.address]],
             {initializer: 'initialize', kind:'uups'}
-        ) as AlluoLpUpgradable;
+        ) as AlluoLpUpgradableMintable;
     });
-
+    it("Should be able to deposit when balance is zero", async function () {
+        const depositor = signers[1];
+        const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
+        expect(await alluoLp.balanceOf(depositor.address)).to.be.equal(0);
+        await token.approve(alluoLp.address, 999999999999999);
+        await alluoLp.deposit(token.address, amount);
+        expect(await alluoLp.getBalance(depositor.address)).equal(amount);
+    });
     it("Should create bridged tokens", async function () {
         // address that will get minted tokens
         const recipient = signers[1];
@@ -61,21 +68,20 @@ describe("AlluoLPUpgradable", function () {
         expect(await alluoLp.balanceOf(recipient.address)).to.be.equal(0);
 
         await mint(recipient, amount);
-
         expect(await alluoLp.balanceOf(recipient.address)).to.be.equal(amount);
     });
 
     // it("Should not deploy contract (attempt to put EOA as multisig wallet)", async function () {
     //     const eoa = signers[1];
 
-    //     const AlluoLP = await ethers.getContractFactory("AlluoLpUpgradable") as AlluoLpUpgradable__factory;
+    //     const AlluoLP = await ethers.getContractFactory("AlluoLpUpgradableMintable") as AlluoLpUpgradableMintable__factory;
 
     //     await expect(await upgrades.deployProxy(AlluoLP,
     //         [eoa.address,
     //         token.address],
     //         {initializer: 'initialize', kind:'uups'}
-    //     ) as AlluoLpUpgradable
-    //     ).to.be.revertedWith("AlluoLpUpgradable: not contract");
+    //     ) as AlluoLpUpgradableMintable
+    //     ).to.be.revertedWith("AlluoLpUpgradableMintable: not contract");
     // });
 
     it("Should allow user to burn tokens for withdrawal", async () => {
