@@ -2,7 +2,6 @@ import { ethers, upgrades } from "hardhat"
 
 async function main() {
 
-
   const AlluoOld = await ethers.getContractFactory("AlluoLpUpgradableMintable");
   const AlluoNew = await ethers.getContractFactory("AlluoLpV3");
 
@@ -10,7 +9,6 @@ async function main() {
 
   await upgrades.upgradeProxy('0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec', AlluoNew);
   console.log('AlluoLp upgraded');
-
 }
 
 main()

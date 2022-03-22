@@ -72,13 +72,9 @@ contract LiquidityBufferVault is
     uint256 public lastSatisfiedWithdrawal;
 
     // acceptable by alluoLp and curve tokens as deposit
-    IERC20Upgradeable public constant DAI =
-        IERC20Upgradeable(0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063);
-    IERC20Upgradeable public constant USDC =
-        IERC20Upgradeable(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174);
-    IERC20Upgradeable public constant USDT =
-        IERC20Upgradeable(0xc2132D05D31c914a87C6611C10748AEb04B58e8F);
-
+    IERC20Upgradeable public DAI;
+    IERC20Upgradeable public USDC;
+    ERC20Upgradeable public USDT;
 
     event EnoughToSatisfy(
         uint256 inPoolAfterDeposit, 
@@ -123,6 +119,13 @@ contract LiquidityBufferVault is
         alluoLp = _alluoLp;
 
         maxWaitingTime = 3600 * 23;
+    }
+
+    // allow curve pool to pull DAI, USDT and USDC from the buffer.
+    function approveAll() external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
+        DAI = IERC20Upgradeable(0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063);
+        USDC = IERC20Upgradeable(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174);
+        USDT = IERC20Upgradeable(0xc2132D05D31c914a87C6611C10748AEb04B58e8F);
 
         DAI.safeApprove(_curvePool, type(uint256).max);
         USDC.safeApprove(_curvePool, type(uint256).max);
