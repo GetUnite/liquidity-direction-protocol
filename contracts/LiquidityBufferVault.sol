@@ -74,7 +74,7 @@ contract LiquidityBufferVault is
     // acceptable by alluoLp and curve tokens as deposit
     IERC20Upgradeable public DAI;
     IERC20Upgradeable public USDC;
-    ERC20Upgradeable public USDT;
+    IERC20Upgradeable public USDT;
 
     event EnoughToSatisfy(
         uint256 inPoolAfterDeposit, 
@@ -127,9 +127,9 @@ contract LiquidityBufferVault is
         USDC = IERC20Upgradeable(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174);
         USDT = IERC20Upgradeable(0xc2132D05D31c914a87C6611C10748AEb04B58e8F);
 
-        DAI.safeApprove(_curvePool, type(uint256).max);
-        USDC.safeApprove(_curvePool, type(uint256).max);
-        USDT.safeApprove(_curvePool, type(uint256).max);
+        DAI.safeApprove(address(curvePool), type(uint256).max);
+        USDC.safeApprove(address(curvePool), type(uint256).max);
+        USDT.safeApprove(address(curvePool), type(uint256).max);
     }
 
     // function checks how much in buffer now and hom much should be
