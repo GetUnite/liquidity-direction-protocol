@@ -209,10 +209,8 @@ contract AlluoLpV3 is
     {
         require(newBuffer.isContract(), "AlluoLp: Not contract");
 
-        //address oldValue = wallet;
         liquidityBuffer = LiquidityBufferVault(newBuffer);
 
-        //emit NewWalletSet(oldValue, newWallet);
     }
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.11;
 
 import "./interfaces/ICurvePool.sol";
-import "hardhat/console.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -49,6 +48,9 @@ contract LiquidityBufferVault is
 
     // amount which needed to satisfy all users in withdrawal list
     uint256 public totalWithdrawalAmount;
+
+    // max waiting withdrawals time after which them should be satisfyed
+    uint256 public maxWaitingTime;
 
     struct Withdrawal {
         // address of user that did withdrawal
@@ -119,6 +121,8 @@ contract LiquidityBufferVault is
         slippage = 200;
         curvePool = ICurvePool(_curvePool);
         alluoLp = _alluoLp;
+
+        maxWaitingTime = 3600 * 23;
 
         DAI.safeApprove(_curvePool, type(uint256).max);
         USDC.safeApprove(_curvePool, type(uint256).max);
@@ -368,6 +372,36 @@ contract LiquidityBufferVault is
         wallet = newWallet;
     }
 
+    function setCurvePool(address newPool)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(newPool.isContract(), "Buffer: Not contract");
+
+        curvePool = ICurvePool(newPool);
+
+    }
+
+    function setAlluoLp(address newAlluoLp)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(newAlluoLp.isContract(), "Buffer: Not contract");
+        _grantRole(DEFAULT_ADMIN_ROLE, newAlluoLp);
+        _revokeRole(DEFAULT_ADMIN_ROLE, alluoLp);
+        alluoLp = newAlluoLp;
+    }
+
+    function setWaitingTime(address newAlluoLp)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(newAlluoLp.isContract(), "Buffer: Not contract");
+        _grantRole(DEFAULT_ADMIN_ROLE, newAlluoLp);
+        _revokeRole(DEFAULT_ADMIN_ROLE, alluoLp);
+        alluoLp = newAlluoLp;
+    }
+
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause();
     }
@@ -434,6 +468,37 @@ contract LiquidityBufferVault is
         }
         uint256[] memory empty;
         return empty;
+    }
+
+    function getCloseToLimitWithdrawals()external view returns(uint256[] memory, uint256 amount){
+        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+            uint256 counter;
+            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
+                if(withdrawals[i].time >= maxWaitingTime){
+                    amount += withdrawals[i].amount;
+                    counter++;
+                }
+            }
+            uint256[] memory indexes = new uint256[](counter);
+            if(counter !=0){
+                uint256 newCounter;
+                for(uint i = lastSatisfiedWithdrawal + 1; i <= lastSatisfiedWithdrawal + counter; i++){
+                    indexes[newCounter] = i;
+                    newCounter++;
+                }
+            }
+            return (indexes, amount);
+        }
+        uint256[] memory empty;
+        return (empty, 0);
+    }
+
+    function removeTokenByAddress(address _address, uint256 _amount)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(_address != address(0), "Invalid token address");
+        IERC20Upgradeable(_address).safeTransfer(msg.sender, _amount);
     }
 
 

@@ -50,6 +50,9 @@ contract LiquidityBufferVaultForTests is
     // amount which needed to satisfy all users in withdrawal list
     uint256 public totalWithdrawalAmount;
 
+    // max waiting withdrawals time after which them should be satisfyed
+    uint256 public maxWaitingTime;
+
     struct Withdrawal {
         // address of user that did withdrawal
         address user;
@@ -119,6 +122,8 @@ contract LiquidityBufferVaultForTests is
         curvePool = ICurvePool(_curvePool);
         alluoLp = _alluoLp;
 
+        maxWaitingTime = 3600 * 23;
+
         DAI.safeApprove(_curvePool, type(uint256).max);
         USDC.safeApprove(_curvePool, type(uint256).max);
         USDT.safeApprove(_curvePool, type(uint256).max);
@@ -147,9 +152,7 @@ contract LiquidityBufferVaultForTests is
                     );
                     USDC.safeTransfer(wallet, toWalletIn6);
                 }
-                else{
-                    console.log("All amount went directly to the pool, in pool now", getBufferAmount() / 10 ** 18);
-                }
+
             } else {
                 uint minAmountOut = _amount * (10000 - slippage) / 10000;
                 uint256 toWallet = curvePool.remove_liquidity_one_coin(
@@ -158,7 +161,6 @@ contract LiquidityBufferVaultForTests is
                     minAmountOut / 10 ** 12, 
                     true
                 );
-                console.log("All amount went directly to the wallet in usdc: %s with 2 decimals", toWallet / 10 ** 4);
                 USDC.safeTransfer(wallet, toWallet);
             }
         }
@@ -179,10 +181,8 @@ contract LiquidityBufferVaultForTests is
                     USDC.safeTransfer(wallet, (amountIn18 - toPoolIn18) / 10 ** 12);
                 } else {
                     curvePool.add_liquidity([0, _amount, 0], 0, true);
-                    console.log("All amount went directly to the pool, in pool now", getBufferAmount() / 10 ** 18);
                 }
             } else {
-                console.log("All amount went directly to the wallet:", _amount  / 10 ** 6);
                 USDC.safeTransfer(wallet, _amount);
             }
         }
@@ -205,9 +205,6 @@ contract LiquidityBufferVaultForTests is
                     );
                     USDC.safeTransfer(wallet, toWalletIn6);
                 }
-                else{
-                    console.log("All amount went directly to the pool, in pool now", getBufferAmount()/ 10 ** 18);
-                }
             } else {
                 uint256 toWallet = curvePool.remove_liquidity_one_coin(
                     lpAmount, 
@@ -215,7 +212,6 @@ contract LiquidityBufferVaultForTests is
                     _amount * (10000 - slippage) / 10000, 
                     true
                 );
-                console.log("All amount went directly to the wallet in usdc: %s with 2 decimals", toWallet / 10 ** 4);
                 USDC.safeTransfer(wallet, toWallet);
             }
         } 
@@ -223,7 +219,6 @@ contract LiquidityBufferVaultForTests is
         if(lastWithdrawalRequest != lastSatisfiedWithdrawal && !keepersTrigger){
             uint256 inPoolNow = getBufferAmount();
             if(withdrawals[lastSatisfiedWithdrawal + 1].amount <= inPoolNow){
-                console.log("Now in buffer enouth to satisfy user withdrawal, keepers triggered");
                 keepersTrigger = true;
                 emit EnoughToSatisfy(inPoolNow, totalWithdrawalAmount);
             }
@@ -468,6 +463,29 @@ contract LiquidityBufferVaultForTests is
         }
         uint256[] memory empty;
         return empty;
+    }
+
+    function getCloseToLimitWithdrawals()external view returns(uint256[] memory, uint256 amount){
+        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+            uint256 counter;
+            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
+                if(withdrawals[i].time >= maxWaitingTime){
+                    amount += withdrawals[i].amount;
+                    counter++;
+                }
+            }
+            uint256[] memory indexes = new uint256[](counter);
+            if(counter !=0){
+                uint256 newCounter;
+                for(uint i = lastSatisfiedWithdrawal + 1; i <= lastSatisfiedWithdrawal + counter; i++){
+                    indexes[newCounter] = i;
+                    newCounter++;
+                }
+            }
+            return (indexes, amount);
+        }
+        uint256[] memory empty;
+        return (empty, 0);
     }
 
     

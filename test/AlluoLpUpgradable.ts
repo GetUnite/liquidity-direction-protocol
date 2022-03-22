@@ -34,7 +34,7 @@ describe("AlluoLp", function () {
 
     before(async function () {
         signers = await ethers.getSigners();
-        //We are forking Ethereum mainnet, please enable it in config
+        //We are forking Polygon mainnet, please enable it in config
         const whaleAddress = "0x075e72a5eDf65F0A5f44699c7654C1a76941Ddc8";
         const curveLpHolderAddress = "0xa0f2e2f7b3ab58e3e52b74f08d94ae52778d46df";
 
@@ -55,9 +55,9 @@ describe("AlluoLp", function () {
         usdt = await ethers.getContractAt("IERC20", "0xc2132D05D31c914a87C6611C10748AEb04B58e8F");
         curveLp = await ethers.getContractAt("IERC20", "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171");
         
-        console.log("We are forking Ethereum mainnet");
+        console.log("We are forking Polygon mainnet");
         console.log("Checking DAI");
-        expect(await dai.balanceOf(whale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Ethereum");
+        expect(await dai.balanceOf(whale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Polygon");
         console.log("done");
 
         await signers[0].sendTransaction({
@@ -81,8 +81,8 @@ describe("AlluoLp", function () {
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
         //For tests we are using version of contract with hardhat console.log, to see all Txn
         //you can switch two next lines and turn off logs
-        const Buffer = await ethers.getContractFactory("LiquidityBufferVaultForTests") as LiquidityBufferVaultForTests__factory;
-        // const Buffer = await ethers.getContractFactory("LiquidityBufferVault") as LiquidityBufferVault__factory;
+        // const Buffer = await ethers.getContractFactory("LiquidityBufferVaultForTests") as LiquidityBufferVaultForTests__factory;
+        const Buffer = await ethers.getContractFactory("LiquidityBufferVault") as LiquidityBufferVault__factory;
         
         let curvePool = "0x445FE580eF8d70FF569aB36e80c647af338db351"
 
@@ -139,6 +139,7 @@ describe("AlluoLp", function () {
         await multisig.executeCall(alluoLpCurrent.address, calldata);
 
     });
+
 
     it("Simulation with random deposits and withdrawals", async function () {
         console.log("long test takes some time");
@@ -246,6 +247,7 @@ describe("AlluoLp", function () {
 
     });
 
+
     // it("Should check buffer admin functions", async function () {
         
     // });
@@ -270,6 +272,20 @@ describe("AlluoLp", function () {
         await expect(upgrades.upgradeProxy(buffer.address, Buffer)).to.be.revertedWith("Buffer: Upgrade not allowed");
 
     });
+
+
+    it("waiting list", async function () {
+        await deposit(signers[1], dai, parseUnits("2000", 18));
+        await deposit(signers[2], dai, parseUnits("2000", 18));
+        await deposit(signers[3], dai, parseUnits("2000", 18));
+        await alluoLpCurrent.connect(signers[1]).withdraw(usdt.address, parseEther("1000"))
+        await alluoLpCurrent.connect(signers[2]).withdraw(usdt.address, parseEther("1000"))
+        await alluoLpCurrent.connect(signers[3]).withdraw(usdt.address, parseEther("1000"))
+        await skipDays(1);
+        console.log(await buffer.getCloseToLimitWithdrawals());
+        
+    });
+
 
     
     it("Should allow deposit", async function () {
