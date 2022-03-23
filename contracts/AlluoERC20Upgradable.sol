@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20Metadat
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "hardhat/console.sol";
 /**
  * @dev Implementation of the {IERC20} interface.
  *
@@ -239,6 +240,7 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
         _beforeTokenTransfer(from, to, amount);
 
         uint256 fromBalance = _balances[from];
+
         require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
         unchecked {
             _balances[from] = fromBalance - amount;

@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
 import { ethers, upgrades } from "hardhat";
 import { before } from "mocha";
-import { PseudoMultisigWallet, PseudoMultisigWallet__factory, TestERC20, TestERC20__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpUpgradableMintable, AlluoLpUpgradableMintable__factory,  } from "../typechain";
+import { PseudoMultisigWallet, PseudoMultisigWallet__factory, TestERC20, TestERC20__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpUpgradableMintable, AlluoLpUpgradableMintable__factory,} from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -204,11 +204,16 @@ describe("AlluoV2: Allow transfers and accurate balances after transfers", funct
         twotenthamount = ethers.utils.parseUnits("2000.0", await alluoLp.decimals());
         await token.connect(depositor).approve(multisig.address, amount);
         await token.connect(depositor).approve(alluoLp.address, amount);
+        await token.connect(differentUser).approve(multisig.address, amount);
+        await token.connect(differentUser).approve(alluoLp.address, amount);
         await token.mint(depositor.address, amount);
         await token.mint(alluoLp.address, amount);
+        await token.mint(differentUser.address, amount);
+
     });
     it("Should be able to transfer LP tokens without compounding", async function() {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
+        expect(await alluoLp.balanceOf(depositor.address)).equal(tenthamount);
         await alluoLp.connect(depositor).transfer(differentUser.address, tenthamount);
         expect(await alluoLp.getBalance(depositor.address)).equal(0);
         expect(await alluoLp.getBalance(differentUser.address)).equal(tenthamount);
@@ -216,13 +221,41 @@ describe("AlluoV2: Allow transfers and accurate balances after transfers", funct
 
     it("Should be able to transfer LP tokens and compound balance correctly before transfer", async function() {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
-        const periods = 60;
+        const periods = 5;
         const periodIntervals = 7;
         for (let i=0; i< periods; i++) {
             await skipDays(periodIntervals);
         }
         await alluoLp.connect(depositor).transfer(differentUser.address, tenthamount);
-        expect(await alluoLp.getBalance(depositor.address)).greaterThan(0);
+        expect(Number(await alluoLp.getBalance(depositor.address))).greaterThan(0);
         expect(await alluoLp.getBalance(differentUser.address)).equal(tenthamount);
+    });
+
+    it("Should be able to transfer LP tokens and compound both sender and receivers balances correctly before transfer", async function() {
+        await alluoLp.connect(depositor).deposit(token.address, tenthamount);
+        await alluoLp.connect(differentUser).deposit(token.address, amount);
+        const periods = 5;
+        const periodIntervals = 7;
+        for (let i=0; i< periods; i++) {
+            await skipDays(periodIntervals);
+        }
+        await alluoLp.connect(depositor).transfer(differentUser.address, tenthamount);
+        expect(Number(await alluoLp.getBalance(depositor.address))).greaterThan(0);
+        expect(Number(await alluoLp.getBalance(differentUser.address))).greaterThan(Number(amount.add(tenthamount)));
+    })
+
+    it("Deposits balance and ERC20 balance should be identical after a transfer", async function() {
+        await alluoLp.connect(depositor).deposit(token.address, tenthamount);
+        await alluoLp.connect(differentUser).deposit(token.address, amount);
+        const periods = 5;
+        const periodIntervals = 7;
+        for (let i=0; i< periods; i++) {
+            await skipDays(periodIntervals);
+        }
+        await alluoLp.connect(depositor).transfer(differentUser.address, tenthamount);
+        console.log(await alluoLp.getBalance(depositor.address));
+        console.log(await alluoLp.balanceOf(depositor.address));
+        expect(await alluoLp.getBalance(depositor.address)).equal(await alluoLp.balanceOf(depositor.address));
+        expect(await alluoLp.getBalance(differentUser.address)).equal(await alluoLp.balanceOf(differentUser.address));
     })
 })

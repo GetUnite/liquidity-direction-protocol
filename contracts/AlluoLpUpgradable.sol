@@ -118,7 +118,7 @@ contract AlluoLpUpgradableMintable is
         require(supportedTokens.contains(_targetToken), "This token is not supported");
         uint compoundedBalance =_getCompoundedBalance(msg.sender);
         if (compoundedBalance - _amount > deposits[msg.sender].deposit) {
-            _mint(msg.sender, compoundedBalance - _amount);
+            _mint(msg.sender, compoundedBalance - deposits[msg.sender].deposit - _amount);
         } else {
             _burn(msg.sender, deposits[msg.sender].deposit + _amount- compoundedBalance );
         }
@@ -253,12 +253,16 @@ contract AlluoLpUpgradableMintable is
         uint256 amount
     ) internal override {
         uint compoundedBalance =_getCompoundedBalance(from);
-        if (compoundedBalance - amount > deposits[from].deposit) {
-            _mint(from, compoundedBalance - amount);
-        } else {
-            _burn(from, deposits[from].deposit + amount- compoundedBalance );
+        if (compoundedBalance > deposits[from].deposit) {
+            _mint(from, compoundedBalance - deposits[from].deposit);
         }
         deposits[from] = DepositData(compoundedBalance-amount, false, block.timestamp, epochs[epochs.length-1]);
+
+        uint toCompoundedBalance = _getCompoundedBalance(to);
+        if (toCompoundedBalance > deposits[to].deposit) {
+            _mint(to, toCompoundedBalance - deposits[to].deposit);
+        }
+        deposits[to] = DepositData(toCompoundedBalance + amount, false, block.timestamp, epochs[epochs.length-1]);
         super._beforeTokenTransfer(from, to, amount);
     }
 
