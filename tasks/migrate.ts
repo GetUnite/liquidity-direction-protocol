@@ -16,14 +16,14 @@ task("migrate", "migrates tokens from old contract")
         const multisig = await hre.ethers.getContractAt("PseudoMultisigWallet", "0x18B25e52Ac6B70BacAB3478D3AB872cAe0Ffb40F");
 
 
-        let list: string[] = ['0x4b948c0354c82f1dc3c510bfa93578540dab917d', 
-        '0x05639f2c210b196ed4d628795ed6abae37d5835c'];
+        let list: string[] = ['0x9c205edd78bd7ea0a940847f1f98d5822f126e67', 
+        '0x4b948c0354c82f1dc3c510bfa93578540dab917d', '0xc24444c91a370151bdb06a0c11da8b1006fe1bbe'];
 
         let ABI = ["function migrate(address _oldContract, address[] memory _users)"];
         let iface = new hre.ethers.utils.Interface(ABI);
-        const calldata = iface.encodeFunctionData("migrate", ["0xbe274A761baC428AF067B36CCaDDFEf209A22dc9", list]);
+        const calldata = iface.encodeFunctionData("migrate", ["0x8BB0660284eE22A11e9e511744d21A9e1E1b669E", list]);
 
-        await multisig.executeCall("0x8BB0660284eE22A11e9e511744d21A9e1E1b669E", calldata);
+        await multisig.executeCall("0x0e62Cfa467627DbccB47bb747b46f6631EF12d9D", calldata);
 
 
         console.log('migrate task Done!');

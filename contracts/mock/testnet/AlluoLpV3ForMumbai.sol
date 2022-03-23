@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "./AlluoERC20Upgradable.sol";
+import "../../AlluoERC20Upgradable.sol";
+import "./LiquidityBufferVaultForMumbai.sol";
+import "hardhat/console.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -11,7 +13,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
-contract AlluoLpUpgradableMintable is 
+contract AlluoLpV3ForMumbai is 
     Initializable, 
     PausableUpgradeable, 
     AlluoERC20Upgradable, 
@@ -53,6 +55,9 @@ contract AlluoLpUpgradableMintable is
     //flag for upgrades availability
     bool public upgradeStatus;
 
+    // contract that will distribute money between curve pool and wallet
+    LiquidityBufferVaultForMumbai public liquidityBuffer; 
+
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
     event InterestChanged(uint8 oldInterest, uint8 newInterest);
@@ -70,11 +75,8 @@ contract AlluoLpUpgradableMintable is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        require(_multiSigWallet.isContract(), "AlluoLpUpgradable: not contract");
-
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
-        _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         DF = 10**20;
         updateTimeLimit = 3600;
@@ -120,10 +122,14 @@ contract AlluoLpUpgradableMintable is
         }
         userDF[_address] = DF;
     }
+
     
-    function withdraw(uint256 _amount) external whenNotPaused {
+    function withdraw(address _token, uint256 _amount) external whenNotPaused {
+
+        require(supportedTokens.contains(_token), "this token is not supported");
         claim(msg.sender);
         _burn(msg.sender, _amount);
+        liquidityBuffer.withdraw(msg.sender, _token, _amount);
 
         emit BurnedForWithdraw(msg.sender, _amount);
     }
@@ -131,10 +137,12 @@ contract AlluoLpUpgradableMintable is
     function deposit(address _token, uint256 _amount) external whenNotPaused {
         require(supportedTokens.contains(_token), "this token is not supported");
         
-        IERC20Upgradeable(_token).safeTransferFrom(msg.sender, wallet, _amount);
+        IERC20Upgradeable(_token).safeTransferFrom(msg.sender, address(liquidityBuffer), _amount);
+        claim(msg.sender);
+
+        liquidityBuffer.deposit(_token, _amount);
 
         uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
-        claim(msg.sender);
         _mint(msg.sender, amountIn18);
 
         emit Deposited(msg.sender, _token, amountIn18);
@@ -157,7 +165,6 @@ contract AlluoLpUpgradableMintable is
         }
         emit DepositTokenStatusChanged(_token, _status);
     }
-
 
     function setInterest(uint8 _newInterest)
         public
@@ -184,12 +191,23 @@ contract AlluoLpUpgradableMintable is
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(newWallet.isContract(), "UrgentAlluoLp: not contract");
 
         address oldValue = wallet;
         wallet = newWallet;
 
         emit NewWalletSet(oldValue, newWallet);
+    }
+
+    function setLiquidityBuffer(address newBuffer)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(newBuffer.isContract(), "AlluoLp: not contract");
+
+        //address oldValue = wallet;
+        liquidityBuffer = LiquidityBufferVaultForMumbai(newBuffer);
+
+        //emit NewWalletSet(oldValue, newWallet);
     }
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -205,9 +223,7 @@ contract AlluoLpUpgradableMintable is
         override
         onlyRole(getRoleAdmin(role))
     {
-        if(role == DEFAULT_ADMIN_ROLE){
-            require(account.isContract(), "UrgentAlluoLp: not contract");
-        }
+
         _grantRole(role, account);
     }
 
@@ -255,6 +271,8 @@ contract AlluoLpUpgradableMintable is
         internal
         onlyRole(UPGRADER_ROLE)
         override
-        view
-    {require(upgradeStatus, "Upgrade not allowed");}
+    {
+        require(upgradeStatus, "AlluoLp: Upgrade not allowed");
+        upgradeStatus = false;
+    }
 }
