@@ -136,7 +136,7 @@ describe("AlluoLpV2: Withdraw, Deposit, Compounding features", function () {
         expect(await alluoLp.getBalance(depositor.address)).equal(totalBalance.sub(tenthamount));
     })
 
-    it("After calling deposit (with a compounding existing balance), ERC20 and deposit balance should be identical", async function() {
+    it("After fully withdrawing (with a compounding existing balance), ERC20 and deposit balance should be identical", async function() {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
         expect(await alluoLp.getBalance(depositor.address)).equal(tenthamount);
         const periods = 10;
@@ -144,7 +144,7 @@ describe("AlluoLpV2: Withdraw, Deposit, Compounding features", function () {
         for (let i=0; i< periods; i++) {
             await skipDays(periodIntervals);
         }
-        await alluoLp.connect(depositor).deposit(token.address, tenthamount);
+        await alluoLp.connect(depositor).withdraw(token.address, await alluoLp.getBalance(depositor.address));
         expect(await alluoLp.balanceOf(depositor.address)).equal(await alluoLp.getBalance(depositor.address))
     })
 
@@ -160,7 +160,7 @@ describe("AlluoLpV2: Withdraw, Deposit, Compounding features", function () {
         expect(await alluoLp.balanceOf(depositor.address)).equal(await alluoLp.getBalance(depositor.address))
     })
 
-    it("After fully withdrawing (with a compounding existing balance), ERC20 and deposit balance should be identical", async function() {
+    it("After calling deposit (with a compounding existing balance), ERC20 and deposit balance should be identical", async function() {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
         expect(await alluoLp.getBalance(depositor.address)).equal(tenthamount);
         const periods = 10;
@@ -168,10 +168,10 @@ describe("AlluoLpV2: Withdraw, Deposit, Compounding features", function () {
         for (let i=0; i< periods; i++) {
             await skipDays(periodIntervals);
         }
-        await alluoLp.connect(depositor).withdraw(token.address, await alluoLp.getBalance(depositor.address));
+        await alluoLp.connect(depositor).deposit(token.address, tenthamount);
         expect(await alluoLp.balanceOf(depositor.address)).equal(await alluoLp.getBalance(depositor.address))
     })
-
+    
     it("Should be able to deposit with multiple interest rate changes and get the balance at the end", async function() {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
         const periods = 10;
