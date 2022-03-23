@@ -41,6 +41,7 @@ contract AlluoLpUpgradableMintable is
     // x^365 = 8% APY
     //  x = 0.02108743983 % ==> Stored as 100021087439
     // Divide by interest factor to get 1.00021087439
+
     uint interestFactor;
     struct Epoch {
         uint number;
@@ -99,6 +100,13 @@ contract AlluoLpUpgradableMintable is
 
     }
 
+    /// @notice  Allows deposits and compounding old balances accurately upon additional deposits
+    /// @dev When called, stablecoin is transferred to multisig wallet. 
+    ///      If deposits are empty, simply add to deposit data + mint new tokens
+    ///      If there is an existing balance, compound the balance and mint new coins  accordingly
+    /// @param _token Deposit token address (eg. USDC)
+    /// @param _amount Amount (parsed 10**18) 
+
     function deposit(address _token, uint _amount) public whenNotPaused {
         require(supportedTokens.contains(_token), "This token is not supported");
         IERC20Upgradeable(_token).transferFrom(msg.sender, wallet, _amount);
@@ -114,6 +122,12 @@ contract AlluoLpUpgradableMintable is
         emit Deposited(msg.sender, _token, _amount);
     }
 
+    /// @notice  Withdraws accurately: Allows compounding on withdrawal and burns ERC20
+    /// @dev When called, immediately check for accurate compoundde balance. Then mint/burn accordingly to withdrawal amount
+    ///      Then adjust deposits array with updated balance and then safeTransfer to the caller.
+    /// @param _targetToken Stablecoin desired (eg. USDC)
+    /// @param _amount Amount (parsed 10**18) 
+
     function withdraw(address _targetToken, uint256 _amount ) external whenNotPaused {
         require(supportedTokens.contains(_targetToken), "This token is not supported");
         uint compoundedBalance =_getCompoundedBalance(msg.sender);
@@ -126,6 +140,15 @@ contract AlluoLpUpgradableMintable is
         IERC20Upgradeable(_targetToken).safeTransfer(msg.sender, _amount);
 
     }
+
+
+    /// @notice  Calculates accurate compounded balance (even across multiple rate changes)
+    /// @dev When called, if insufficient time has passed or never has deposited, return current amount. 
+    /// @dev Then call _getPeriodsPerEpoch to get accurate info of how many periods to compound at respective rates
+    ///      For example: 6 days at 5%, 30 days at 7%,  13 days at 3% --> in periodsPerEpoch
+    ///      Run loop to calculate final compouded depositValue
+    /// @param user User's address
+    /// @return depositValue Accurate compounded balance.
     function _getCompoundedBalance(address user) internal view returns (uint) {
         // Assume daily compounding:
         if (block.timestamp < deposits[user].timestamp + 1 days || deposits[user].timestamp == 0) {
@@ -142,6 +165,14 @@ contract AlluoLpUpgradableMintable is
         }
         return depositValue;
     }
+
+    /// @notice  Finds how many periods have passed under each interest rate change
+    /// @dev When called, it compares the current epoch to the epoch when depositdata was last updated
+    ///      Then it finds how many compounding periods have passed in each epoch
+    ///      For example: 6 days at 5%, 30 days at 7%,  13 days at 3% --> in _periodsPerEpoch
+    /// @param user User's address
+    /// @param numberofEpochs Current Epoch Number
+    /// @return _periodsPerEpoch Array of {Epoch, periods} where Epoch contains epoch data.
 
     function _getPeriodsPerEpoch(address user, uint numberofEpochs) internal view returns (PeriodsPerEpoch[] memory) {
         uint periods;
@@ -172,7 +203,10 @@ contract AlluoLpUpgradableMintable is
         _mint(_user, _amount);
     }
 
-
+    /// @notice  Sets the new interest rate and pushes a new epoch
+    /// @dev When called, it sets the new interest rate by pushing a new epoch
+    /// @param _newInterest New interest rate (100021087 = 0.021087% daily)
+  
     function setInterest(uint _newInterest)
         public
         onlyRole(DEFAULT_ADMIN_ROLE)
@@ -246,6 +280,9 @@ contract AlluoLpUpgradableMintable is
     function getListSupportedTokens() public view returns (address[] memory) {
         return supportedTokens.values();
     }
+
+    /// @notice  When any transfer is called, compounds balances appropriately and adjusts balances / mints
+    /// @dev When called, it simply updates both to and from balances, mints any difference.
 
     function _beforeTokenTransfer(
         address from,
