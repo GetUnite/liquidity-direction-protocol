@@ -73,8 +73,8 @@ contract AlluoLpV3 is
 
         interestRate = 100021087;
         interestRateFactor = 10**8;
-        interestIndexFactor = 10**10;
-        interestIndex = 10000000000;
+        interestIndexFactor = 10**18;
+        interestIndex = 10**18;
 
         lastInterestCompound = block.timestamp;
 
