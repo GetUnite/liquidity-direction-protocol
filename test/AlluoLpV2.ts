@@ -13,7 +13,7 @@ async function skipDays(d: number) {
     ethers.provider.send('evm_mine', []);
 }
 
-describe("AlluoLpV2", function () {
+describe("AlluoLpV2: Withdraw, Deposit, Compounding features", function () {
     let signers: SignerWithAddress[];
 
     let alluoLp: AlluoLpUpgradableMintable;
@@ -152,5 +152,77 @@ describe("AlluoLpV2", function () {
         console.log(await alluoLp.getBalance(depositor.address))
         console.log(Number(tenthamount)* 1.00021087**(periods*periodIntervals))
         expect(Number(await alluoLp.getBalance(depositor.address))).lessThan(Number(tenthamount)* 1.00021087**(periods*periodIntervals))
+    })
+})
+
+describe("AlluoV2: Allow transfers and accurate balances after transfers", function() {
+    let signers: SignerWithAddress[];
+
+    let alluoLp: AlluoLpUpgradableMintable;
+    let alluoLpOld: UrgentAlluoLp;
+    let multisig: PseudoMultisigWallet;
+    let token: TestERC20;
+    let depositor: SignerWithAddress;
+    let differentUser: SignerWithAddress;
+    let amount: BigNumber;
+    let tenthamount: BigNumber;
+    let twotenthamount: BigNumber;
+    let backendExecutor: SignerWithAddress;
+    let backendSigners: SignerWithAddress[];
+
+    before(async function () {
+        signers = await ethers.getSigners();
+
+        backendExecutor = signers[5];
+        backendSigners = [
+            signers[6],
+            signers[7],
+            signers[8]
+        ];
+    });
+
+    beforeEach(async function () {
+        const AlluoLP = await ethers.getContractFactory("AlluoLpUpgradableMintable") as AlluoLpUpgradableMintable__factory;
+        const AlluoLPOld = await ethers.getContractFactory("UrgentAlluoLp") as UrgentAlluoLp__factory;
+        const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
+        const Token = await ethers.getContractFactory("TestERC20") as TestERC20__factory;
+
+        multisig = await Multisig.deploy();
+        token = await Token.deploy("Test DAI", "TDAI", 18);
+        alluoLpOld = await AlluoLPOld.deploy(multisig.address, token.address);
+
+        alluoLp = await upgrades.deployProxy(AlluoLP,
+            [multisig.address,
+            [token.address]],
+            {initializer: 'initialize', kind:'uups'}
+        ) as AlluoLpUpgradableMintable;
+
+        depositor = signers[1];
+        differentUser = signers[2];
+        amount = ethers.utils.parseUnits("10000.0", await alluoLp.decimals());
+        tenthamount = ethers.utils.parseUnits("1000.0", await alluoLp.decimals());
+        twotenthamount = ethers.utils.parseUnits("2000.0", await alluoLp.decimals());
+        await token.connect(depositor).approve(multisig.address, amount);
+        await token.connect(depositor).approve(alluoLp.address, amount);
+        await token.mint(depositor.address, amount);
+        await token.mint(alluoLp.address, amount);
+    });
+    it("Should be able to transfer LP tokens without compounding", async function() {
+        await alluoLp.connect(depositor).deposit(token.address, tenthamount);
+        await alluoLp.connect(depositor).transfer(differentUser.address, tenthamount);
+        expect(await alluoLp.getBalance(depositor.address)).equal(0);
+        expect(await alluoLp.getBalance(differentUser.address)).equal(tenthamount);
+    });
+
+    it("Should be able to transfer LP tokens and compound balance correctly before transfer", async function() {
+        await alluoLp.connect(depositor).deposit(token.address, tenthamount);
+        const periods = 60;
+        const periodIntervals = 7;
+        for (let i=0; i< periods; i++) {
+            await skipDays(periodIntervals);
+        }
+        await alluoLp.connect(depositor).transfer(differentUser.address, tenthamount);
+        expect(await alluoLp.getBalance(depositor.address)).greaterThan(0);
+        expect(await alluoLp.getBalance(differentUser.address)).equal(tenthamount);
     })
 })

@@ -252,6 +252,13 @@ contract AlluoLpUpgradableMintable is
         address to,
         uint256 amount
     ) internal override {
+        uint compoundedBalance =_getCompoundedBalance(from);
+        if (compoundedBalance - amount > deposits[from].deposit) {
+            _mint(from, compoundedBalance - amount);
+        } else {
+            _burn(from, deposits[from].deposit + amount- compoundedBalance );
+        }
+        deposits[from] = DepositData(compoundedBalance-amount, false, block.timestamp, epochs[epochs.length-1]);
         super._beforeTokenTransfer(from, to, amount);
     }
 
