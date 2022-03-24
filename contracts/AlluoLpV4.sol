@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.11;
 
 import "./AlluoERC20Upgradable.sol";
 
@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 import "hardhat/console.sol";
-contract AlluoLpV3 is 
+contract AlluoLpV4 is 
     Initializable, 
     PausableUpgradeable, 
     AlluoERC20Upgradable, 
@@ -91,12 +91,9 @@ contract AlluoLpV3 is
     ///      Then update the index and set the lastInterestCompound date.
 
     function updateInterestIndex() public whenNotPaused {
-        if (block.timestamp >= lastInterestCompound + 1 days) {
-            uint compoundingPeriods = (block.timestamp - lastInterestCompound)/ 1 days;
-            interestIndex = _calculateCompoundedIndex(compoundingPeriods, interestIndex);
-            lastInterestCompound = block.timestamp;
-        }
-
+        uint compoundingPeriods = (block.timestamp - lastInterestCompound)/ 1 days;
+        interestIndex = _calculateCompoundedIndex(compoundingPeriods, interestIndex);
+        lastInterestCompound = block.timestamp;
     }
 
     /// @notice  Gas saving view loop to calculate compounding interest
@@ -145,13 +142,9 @@ contract AlluoLpV3 is
     /// @param _address address of user
 
     function getBalance(address _address) public view returns (uint256) {
-        if (block.timestamp >= lastInterestCompound + 1 days) {
-            uint compoundingPeriods = (block.timestamp - lastInterestCompound)/ 1 days;
-            uint _interestIndex = _calculateCompoundedIndex(compoundingPeriods, interestIndex);
-            return balanceOf(_address) * _interestIndex / interestIndexFactor;
-        } else {
-            return balanceOf(_address) * interestIndex / interestIndexFactor;
-        }
+        uint compoundingPeriods = (block.timestamp - lastInterestCompound)/ 1 days;
+        uint _interestIndex = _calculateCompoundedIndex(compoundingPeriods, interestIndex);
+        return balanceOf(_address) * _interestIndex / interestIndexFactor;
     }
 
     function mint(address _user, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
@@ -172,6 +165,18 @@ contract AlluoLpV3 is
         emit InterestChanged(oldValue, _newInterest);
     }
 
+    /// @notice Migrates balances from old AlluoLP contract 
+    /// @dev Matches old balances in the new contract
+    /// @param _oldContract Address of old contract
+    /// @param _users Array of all user addresses from old contract
+    function migrate(address _oldContract, address[] memory _users) external onlyRole(DEFAULT_ADMIN_ROLE){
+        updateInterestIndex();
+        for(uint i = 0; i < _users.length; i++){
+            uint256 oldBalanceIn18 = AlluoLpV4(_oldContract).getBalance(_users[i]) * 10**12;
+            uint adjustedAmount = oldBalanceIn18 * interestIndexFactor / interestIndex;
+            _mint(_users[i], adjustedAmount);
+        }
+    }
     function changeTokenStatus(address _token, bool _status) external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {

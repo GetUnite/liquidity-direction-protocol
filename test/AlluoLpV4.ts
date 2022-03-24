@@ -5,7 +5,7 @@ import { BigNumber, BigNumberish } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import { ethers, upgrades } from "hardhat";
 import { before } from "mocha";
-import { PseudoMultisigWallet, PseudoMultisigWallet__factory, TestERC20, TestERC20__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpV3, AlluoLpV3__factory} from "../typechain";
+import { PseudoMultisigWallet, PseudoMultisigWallet__factory, TestERC20, TestERC20__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpV4, AlluoLpV4__factory} from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -14,9 +14,10 @@ async function skipDays(d: number) {
     ethers.provider.send('evm_mine', []);
 }
 
-describe("AlluoLpV2: Withdraw, Deposit, Compounding features", function () {
+
+describe("AlluoLpV4: Withdraw, Deposit, Compounding features", function () {
     let signers: SignerWithAddress[];
-    let alluoLp: AlluoLpV3;
+    let alluoLp: AlluoLpV4;
     let alluoLpOld: UrgentAlluoLp;
     let multisig: PseudoMultisigWallet;
     let token: TestERC20;
@@ -30,7 +31,7 @@ describe("AlluoLpV2: Withdraw, Deposit, Compounding features", function () {
     });
 
     beforeEach(async function () {
-        const AlluoLP = await ethers.getContractFactory("AlluoLpV3") as AlluoLpV3__factory;
+        const AlluoLP = await ethers.getContractFactory("AlluoLpV4") as AlluoLpV4__factory;
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
         const Token = await ethers.getContractFactory("TestERC20") as TestERC20__factory;
 
@@ -42,7 +43,7 @@ describe("AlluoLpV2: Withdraw, Deposit, Compounding features", function () {
             [multisig.address,
             [token.address]],
             {initializer: 'initialize', kind:'uups'}
-        ) as AlluoLpV3;
+        ) as AlluoLpV4;
 
         depositor = signers[1];
         amount = ethers.utils.parseUnits("10000.0", await alluoLp.decimals());
@@ -125,6 +126,14 @@ describe("AlluoLpV2: Withdraw, Deposit, Compounding features", function () {
         // Convert to Number as bignumber has an infinitesimal rounding error. 
         // expect error: "14868800860799297001" to be equal 14868800860799297000
     })
+    it("Total return after 1 year should not exceed 8% (if set at 8%)", async function() {
+        await alluoLp.connect(depositor).deposit(token.address, tenthamount);
+        expect(await alluoLp.getBalance(depositor.address)).equal(tenthamount);
+        await skipDays(365);
+        const totalBalance = await alluoLp.getBalance(depositor.address);
+        expect(Number(totalBalance)).lessThanOrEqual(Number(tenthamount)*1.08);
+        // To address concerns from client. This implementation works :)
+    })
 
     
     it("Should be able to deposit with multiple interest rate changes and get the balance at the end", async function() {
@@ -143,4 +152,84 @@ describe("AlluoLpV2: Withdraw, Deposit, Compounding features", function () {
         }
         expect(Number(await alluoLp.getBalance(depositor.address))).lessThan(Number(tenthamount)* 1.00021087**(periods*periodIntervals))
     })
+
+    
 })
+describe('Migration', function (){
+    let signers: SignerWithAddress[];
+    let alluoLp: AlluoLpV4;
+    let alluoLpOld: UrgentAlluoLp;
+    let multisig: PseudoMultisigWallet;
+    let token: TestERC20;
+    let depositor: SignerWithAddress
+    let amount: BigNumber;
+    let tenthamount: BigNumber;
+    let twotenthamount: BigNumber;
+
+    before(async function () {
+        signers = await ethers.getSigners();
+    });
+
+    beforeEach(async function () {
+        const AlluoLP = await ethers.getContractFactory("AlluoLpV4") as AlluoLpV4__factory;
+        const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
+        const Token = await ethers.getContractFactory("TestERC20") as TestERC20__factory;
+        const AlluoLPOld = await ethers.getContractFactory("UrgentAlluoLp") as UrgentAlluoLp__factory;
+        multisig = await Multisig.deploy();
+        token = await Token.deploy("Test DAI", "TDAI", 18);
+
+        alluoLpOld = await AlluoLPOld.deploy(multisig.address, token.address);
+        alluoLp = await upgrades.deployProxy(AlluoLP,
+            [multisig.address,
+            [token.address]],
+            {initializer: 'initialize', kind:'uups'}
+        ) as AlluoLpV4;
+
+        depositor = signers[1];
+        amount = ethers.utils.parseUnits("10000.0", await alluoLp.decimals());
+        tenthamount = ethers.utils.parseUnits("1000.0", await alluoLp.decimals());
+        twotenthamount = ethers.utils.parseUnits("2000.0", await alluoLp.decimals());
+        await token.connect(depositor).approve(multisig.address, amount);
+        await token.connect(depositor).approve(alluoLp.address, amount);
+        await token.mint(depositor.address, amount);
+        await token.mint(alluoLp.address, amount);
+    });
+    it("Should migrate tokens from old contact", async function () {
+        // addresses that will get minted tokens
+        const recipient1 = signers[1];
+        const recipient2 = signers[2];
+        const recipient3 = signers[3];
+        // amounts of tokens to be minted, including decimals value of token
+        const amount1 = "100.0";
+        const amount2 = "135.3";
+        const amount3 = "2500.0";
+    
+        await mintToOld(recipient1, ethers.utils.parseUnits(amount1, await alluoLpOld.decimals()));
+        await mintToOld(recipient2, ethers.utils.parseUnits(amount2, await alluoLpOld.decimals()));
+        await mintToOld(recipient3, ethers.utils.parseUnits(amount3, await alluoLpOld.decimals()));
+
+        let ABI = ["function migrate(address _oldContract, address[] memory _users)"];
+        let iface = new ethers.utils.Interface(ABI);
+
+        const calldata = iface.encodeFunctionData("migrate", [alluoLpOld.address,
+            [recipient1.address,
+            recipient2.address,
+            recipient3.address
+        ]]);
+
+        await multisig.executeCall(alluoLp.address, calldata);
+
+        expect(await alluoLp.balanceOf(signers[1].address)).to.equal(parseUnits(amount1, await alluoLp.decimals()));
+        expect(await alluoLp.balanceOf(signers[2].address)).to.equal(parseUnits(amount2, await alluoLp.decimals()));
+        expect(await alluoLp.balanceOf(signers[3].address)).to.equal(parseUnits(amount3, await alluoLp.decimals()));
+
+    })
+    async function mintToOld(recipient: SignerWithAddress, amount: BigNumberish) {
+        await token.mint(recipient.address, amount);
+    
+        await token.connect(recipient).approve(alluoLpOld.address, amount);
+    
+        await alluoLpOld.connect(recipient).deposit(amount);
+    }
+})
+
