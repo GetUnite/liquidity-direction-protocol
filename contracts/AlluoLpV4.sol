@@ -2,6 +2,7 @@
 pragma solidity ^0.8.11;
 
 import "./AlluoERC20Upgradable.sol";
+import "./interestHelper/compound.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -11,12 +12,14 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 import "hardhat/console.sol";
+
 contract AlluoLpV4 is 
     Initializable, 
     PausableUpgradeable, 
     AlluoERC20Upgradable, 
     AccessControlUpgradeable, 
-    UUPSUpgradeable 
+    UUPSUpgradeable,
+    Interest
 {
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -36,12 +39,8 @@ contract AlluoLpV4 is
     //flag for upgrades availability
     bool public upgradeStatus;
 
-    // Interest is a 10^12 uint that is a daily APR
-    // x^365 = 8% APY
-    //  x = 0.02108743983 % ==> Stored as 100021087439
-    // Divide by interest factor to get 1.00021087439
+    // InterestRate = 10**27
     uint interestRate;
-    uint interestRateFactor;
     uint interestIndexFactor;
     uint interestIndex;
     uint lastInterestCompound;
@@ -71,8 +70,7 @@ contract AlluoLpV4 is
         updateTimeLimit = 3600;
         wallet = _multiSigWallet;
 
-        interestRate = 100021087;
-        interestRateFactor = 10**8;
+        interestRate = 100000000244041*10**13;
         interestIndexFactor = 10**18;
         interestIndex = 10**18;
 
@@ -91,23 +89,12 @@ contract AlluoLpV4 is
     ///      Then update the index and set the lastInterestCompound date.
 
     function updateInterestIndex() public whenNotPaused {
-        if (block.timestamp >= lastInterestCompound + 1 days) {
-            uint compoundingPeriods = (block.timestamp - lastInterestCompound)/ 1 days;
-            interestIndex = _calculateCompoundedIndex(compoundingPeriods, interestIndex);
+        if (block.timestamp >= lastInterestCompound + 60 seconds) {
+            interestIndex = chargeInterest(interestIndex, interestRate, lastInterestCompound);
             lastInterestCompound = block.timestamp;
         }
     }
 
-    /// @notice  Gas saving view loop to calculate compounding interest
-    /// @dev Just loops through and compounds the index.
-    /// @param _periods Number of compounding periods
-    /// @param _index Current InterestIndex.
-    function _calculateCompoundedIndex(uint _periods, uint _index) internal view returns (uint) {
-            for (uint i=0; i< _periods; i++) {
-                _index = _index * interestRate / interestRateFactor;
-            }
-            return _index;
-    }
     /// @notice  Allows deposits and compounding old balances accurately upon additional deposits
     /// @dev When called, stablecoin is transferred to multisig wallet. 
     ///      Updates the interest index
@@ -144,10 +131,10 @@ contract AlluoLpV4 is
     /// @param _address address of user
 
     function getBalance(address _address) public view returns (uint256) {
-        uint compoundingPeriods = (block.timestamp - lastInterestCompound)/ 1 days;
-        uint _interestIndex = _calculateCompoundedIndex(compoundingPeriods, interestIndex);
+        uint _interestIndex = chargeInterest(interestIndex, interestRate, lastInterestCompound);
         return balanceOf(_address) * _interestIndex / interestIndexFactor;
     }
+
 
     function mint(address _user, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
         _mint(_user, _amount);

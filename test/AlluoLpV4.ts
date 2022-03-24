@@ -14,7 +14,13 @@ async function skipDays(d: number) {
     ethers.provider.send('evm_mine', []);
 }
 
+function dayToMinutes(d: number) {
+    return d*24*60
+}
 
+function approx(b: BigNumber) {
+    return Number((Number(b)/10**18).toFixed(2));
+}
 describe("AlluoLpV4: Withdraw, Deposit, Compounding features", function () {
     let signers: SignerWithAddress[];
     let alluoLp: AlluoLpV4;
@@ -25,6 +31,7 @@ describe("AlluoLpV4: Withdraw, Deposit, Compounding features", function () {
     let amount: BigNumber;
     let tenthamount: BigNumber;
     let twotenthamount: BigNumber;
+    let interestRate: number; //8% APY in compounding every 60 seconds
 
     before(async function () {
         signers = await ethers.getSigners();
@@ -45,6 +52,7 @@ describe("AlluoLpV4: Withdraw, Deposit, Compounding features", function () {
             {initializer: 'initialize', kind:'uups'}
         ) as AlluoLpV4;
 
+        interestRate = 1.0000001464;
         depositor = signers[1];
         amount = ethers.utils.parseUnits("10000.0", await alluoLp.decimals());
         tenthamount = ethers.utils.parseUnits("1000.0", await alluoLp.decimals());
@@ -56,82 +64,67 @@ describe("AlluoLpV4: Withdraw, Deposit, Compounding features", function () {
     });
     it("Should be able to deposit when balance is zero", async function () {
         await alluoLp.connect(depositor).deposit(token.address, amount);
-        expect(await alluoLp.getBalance(depositor.address)).equal(amount)
+        expect(approx(await alluoLp.getBalance(depositor.address))).equal(approx(amount))
+        // This holds approximately because the actual contract compounds per second to give balance
     })
     it("Should be able to deposit when balance is not zero, with no compounding", async function () {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
-        expect(await alluoLp.getBalance(depositor.address)).equal(tenthamount)
+        expect(approx(await alluoLp.getBalance(depositor.address))).equal(approx(tenthamount))
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
-        expect(await alluoLp.getBalance(depositor.address)).equal(twotenthamount)
+        expect(approx(await alluoLp.getBalance(depositor.address))).equal(approx(twotenthamount))
     })
     it("Should be able to deposit and get compounded value without withdrawal", async function() {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
         const initialDeposit = Number(tenthamount)/ 10**18
-        const periods = 60;
-        const periodIntervals = 7;
-        for (let i=0; i< periods; i++) {
-            await skipDays(periodIntervals);
-    
-        }
-        const finalBal = Number(await alluoLp.getBalance(depositor.address))/10**18;
+        // 1 year
+        await skipDays(365)
+        const finalBal = approx(await alluoLp.getBalance(depositor.address));
         expect(finalBal).is.greaterThan(initialDeposit);
-        expect(finalBal.toFixed(4)).equal((initialDeposit*1.00021087**(periods*periodIntervals)).toFixed(4))
+        expect(finalBal).equal((initialDeposit*1.08))
     })
+
     it("Should be able to deposit when balance is not zero, and get compounded balance afterwards", async function() {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
-        const periods = 10;
-        const periodIntervals = 7;
-        for (let i=0; i< periods; i++) {
-            await skipDays(periodIntervals);
-        }
+        const daysSkipped = 0.3;
+        await skipDays(daysSkipped)
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
-        expect(Number(await alluoLp.balanceOf(depositor.address))).lessThan(Number(twotenthamount));
+        const compoundingPeriods = dayToMinutes(daysSkipped);
 
         const initialDeposit = Number(tenthamount)/ 10**18
-        const expectedFinalBal = (initialDeposit + Number((initialDeposit*1.00021087**(periods*periodIntervals)))).toFixed(5)
+        const expectedFinalBal = (initialDeposit + initialDeposit*interestRate**(compoundingPeriods)).toFixed(5)
 
         const finalBal = Number(await alluoLp.getBalance(depositor.address)) / 10**18;
-        expect((finalBal).toFixed(4)).equal(Number(expectedFinalBal).toFixed(4));
+        expect((finalBal).toFixed(2)).equal(Number(expectedFinalBal).toFixed(2));
     })
     it("Should be able to deposit and withdraw without compounding", async function() {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
-        expect(await alluoLp.getBalance(depositor.address)).equal(tenthamount);
         await alluoLp.connect(depositor).withdraw(token.address, tenthamount);
         expect(await alluoLp.getBalance(depositor.address)).equal(0);
     })
 
     it("Should be able to deposit, get compounding rewards, then withdraw all funds", async function() {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
-        const periods = 10;
-        const periodIntervals = 7;
-        for (let i=0; i< periods; i++) {
-            await skipDays(periodIntervals);
-        }
+        const daysSkipped = 25;
+        await skipDays(daysSkipped)
         const totalBalance = await alluoLp.getBalance(depositor.address);
         await alluoLp.connect(depositor).withdraw(token.address, totalBalance);
-        expect(await alluoLp.getBalance(depositor.address)).equal(0);
+        expect(approx(await alluoLp.getBalance(depositor.address))).equal(0);
+        // Use approx as there can be small dust remaining (10**-8 dollars)
     })
 
     it("Should be able to deposit, get compounding rewards, then withdraw partial funds", async function() {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
-        expect(await alluoLp.getBalance(depositor.address)).equal(tenthamount);
-        const periods = 10;
-        const periodIntervals = 7;
-        for (let i=0; i< periods; i++) {
-            await skipDays(periodIntervals);
-        }
+        const daysSkipped = 13;
+        await skipDays(daysSkipped)
         const totalBalance = await alluoLp.getBalance(depositor.address);
         await alluoLp.connect(depositor).withdraw(token.address, tenthamount);
-        expect(Number(await alluoLp.getBalance(depositor.address))).equal(Number(totalBalance.sub(tenthamount)));
-        // Convert to Number as bignumber has an infinitesimal rounding error. 
-        // expect error: "14868800860799297001" to be equal 14868800860799297000
+        expect(approx(await alluoLp.getBalance(depositor.address))).equal(approx(totalBalance.sub(tenthamount)));
     })
     it("Total return after 1 year should not exceed 8% (if set at 8%)", async function() {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
-        expect(await alluoLp.getBalance(depositor.address)).equal(tenthamount);
         await skipDays(365);
         const totalBalance = await alluoLp.getBalance(depositor.address);
-        expect(Number(totalBalance)).lessThanOrEqual(Number(tenthamount)*1.08);
+        expect(approx(totalBalance)).lessThanOrEqual(approx(tenthamount)*1.08);
         // To address concerns from client. This implementation works :)
     })
 
@@ -152,9 +145,8 @@ describe("AlluoLpV4: Withdraw, Deposit, Compounding features", function () {
         }
         expect(Number(await alluoLp.getBalance(depositor.address))).lessThan(Number(tenthamount)* 1.00021087**(periods*periodIntervals))
     })
-    it("Calling updateInterestIndex more than once a day should still return the correct amount ", async function() {
+    it("Calling updateInterestIndex more than once a minute should still return the correct amount ", async function() {
         await alluoLp.connect(depositor).deposit(token.address, tenthamount);
-        expect(await alluoLp.getBalance(depositor.address)).equal(tenthamount);
         const periods = 10;
         const periodIntervals = 7;
         for (let i=0; i< periods; i++) {
@@ -165,7 +157,7 @@ describe("AlluoLpV4: Withdraw, Deposit, Compounding features", function () {
         }
         const totalBalance = await alluoLp.getBalance(depositor.address);
         await alluoLp.connect(depositor).withdraw(token.address, tenthamount);
-        expect(Number(await alluoLp.getBalance(depositor.address))).equal(Number(totalBalance.sub(tenthamount)));
+        expect(approx(await alluoLp.getBalance(depositor.address))).equal(approx(totalBalance.sub(tenthamount)));
         // Convert to Number as bignumber has an infinitesimal rounding error. 
         // expect error: "14868800860799297001" to be equal 14868800860799297000
     })
