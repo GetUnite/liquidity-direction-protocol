@@ -134,7 +134,7 @@ contract AlluoLpV4 is
         uint adjustedAmount = _amount * interestIndexFactor / interestIndex;
         _burn(msg.sender, adjustedAmount);
         IERC20Upgradeable(_targetToken).safeTransfer(msg.sender, _amount);
-
+        emit BurnedForWithdraw(msg.sender, adjustedAmount);
     }
 
    
