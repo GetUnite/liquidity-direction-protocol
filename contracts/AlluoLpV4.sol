@@ -91,9 +91,11 @@ contract AlluoLpV4 is
     ///      Then update the index and set the lastInterestCompound date.
 
     function updateInterestIndex() public whenNotPaused {
-        uint compoundingPeriods = (block.timestamp - lastInterestCompound)/ 1 days;
-        interestIndex = _calculateCompoundedIndex(compoundingPeriods, interestIndex);
-        lastInterestCompound = block.timestamp;
+        if (block.timestamp >= lastInterestCompound + 1 days) {
+            uint compoundingPeriods = (block.timestamp - lastInterestCompound)/ 1 days;
+            interestIndex = _calculateCompoundedIndex(compoundingPeriods, interestIndex);
+            lastInterestCompound = block.timestamp;
+        }
     }
 
     /// @notice  Gas saving view loop to calculate compounding interest

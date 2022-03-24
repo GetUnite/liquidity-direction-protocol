@@ -152,7 +152,23 @@ describe("AlluoLpV4: Withdraw, Deposit, Compounding features", function () {
         }
         expect(Number(await alluoLp.getBalance(depositor.address))).lessThan(Number(tenthamount)* 1.00021087**(periods*periodIntervals))
     })
-
+    it("Calling updateInterestIndex more than once a day should still return the correct amount ", async function() {
+        await alluoLp.connect(depositor).deposit(token.address, tenthamount);
+        expect(await alluoLp.getBalance(depositor.address)).equal(tenthamount);
+        const periods = 10;
+        const periodIntervals = 7;
+        for (let i=0; i< periods; i++) {
+            await skipDays(periodIntervals);
+            await alluoLp.updateInterestIndex();
+            await alluoLp.updateInterestIndex();
+            await alluoLp.updateInterestIndex();
+        }
+        const totalBalance = await alluoLp.getBalance(depositor.address);
+        await alluoLp.connect(depositor).withdraw(token.address, tenthamount);
+        expect(Number(await alluoLp.getBalance(depositor.address))).equal(Number(totalBalance.sub(tenthamount)));
+        // Convert to Number as bignumber has an infinitesimal rounding error. 
+        // expect error: "14868800860799297001" to be equal 14868800860799297000
+    })
     
 })
 describe('Migration', function (){
