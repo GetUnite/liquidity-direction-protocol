@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "./interfaces/ICurvePool.sol";
+import "../../interfaces/ICurvePool.sol";
 import "hardhat/console.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -73,12 +73,9 @@ contract LiquidityBufferVaultForTests is
     uint256 public lastSatisfiedWithdrawal;
 
     // acceptable by alluoLp and curve tokens as deposit
-    IERC20Upgradeable public constant DAI =
-        IERC20Upgradeable(0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063);
-    IERC20Upgradeable public constant USDC =
-        IERC20Upgradeable(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174);
-    IERC20Upgradeable public constant USDT =
-        IERC20Upgradeable(0xc2132D05D31c914a87C6611C10748AEb04B58e8F);
+    IERC20Upgradeable public DAI;
+    IERC20Upgradeable public USDC;
+    IERC20Upgradeable public USDT;
 
 
     event EnoughToSatisfy(
@@ -110,7 +107,7 @@ contract LiquidityBufferVaultForTests is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        require(_multiSigWallet.isContract(), "Buffer: not contract");
+        require(_multiSigWallet.isContract(), "Buffer: Not contract");
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _alluoLp);
@@ -123,11 +120,19 @@ contract LiquidityBufferVaultForTests is
         alluoLp = _alluoLp;
 
         maxWaitingTime = 3600 * 23;
-
-        DAI.safeApprove(_curvePool, type(uint256).max);
-        USDC.safeApprove(_curvePool, type(uint256).max);
-        USDT.safeApprove(_curvePool, type(uint256).max);
     }
+
+    // allow curve pool to pull DAI, USDT and USDC from the buffer.
+    function approveAll() external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
+        DAI = IERC20Upgradeable(0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063);
+        USDC = IERC20Upgradeable(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174);
+        USDT = IERC20Upgradeable(0xc2132D05D31c914a87C6611C10748AEb04B58e8F);
+
+        DAI.safeApprove(address(curvePool), type(uint256).max);
+        USDC.safeApprove(address(curvePool), type(uint256).max);
+        USDT.safeApprove(address(curvePool), type(uint256).max);
+    }
+
 
     // function checks how much in buffer now and hom much should be
     // fill buffer and send to wallet what left (conveting it to usdc)
@@ -135,10 +140,11 @@ contract LiquidityBufferVaultForTests is
         console.log("\nThe beginning of distribution %s of %s to pool and wallet", _amount  / 10 ** ERC20(_token).decimals(), ERC20(_token).name());
 
         uint256 inPool = getBufferAmount();
+        console.log("In buffer now %s but should be ", inPool / 10 ** 18, getExpectedBufferAmount(_amount * 10 **(18 - ERC20(_token).decimals())) /10**18);
+
         if (IERC20Upgradeable(_token) == DAI) {
             uint256 lpAmount = curvePool.add_liquidity([_amount, 0, 0], 0, true);
             uint256 shouldBeInPool = getExpectedBufferAmount(_amount);
-            console.log("In buffer now %s but should be ", inPool / 10 ** 18, shouldBeInPool / 10 ** 18);
             if (inPool < shouldBeInPool) {
                 if (shouldBeInPool < inPool + _amount) {
                     uint256 toWallet = inPool + _amount - shouldBeInPool;
@@ -167,9 +173,7 @@ contract LiquidityBufferVaultForTests is
         else if (IERC20Upgradeable(_token) == USDC) {
             uint256 amountIn18 = _amount * 10 ** 12;
             uint256 shouldBeInPool = getExpectedBufferAmount(amountIn18);
-            console.log("In buffer now %s but should be ", inPool / 10 ** 18, shouldBeInPool / 10 ** 18);
             if (inPool < shouldBeInPool) {
-
                 if (shouldBeInPool < inPool + amountIn18) {
                     uint256 toPoolIn18 = shouldBeInPool - inPool;
                     console.log("To buffer will go %s and to wallet", toPoolIn18 / 10 ** 18, (amountIn18 - toPoolIn18) / 10 ** 18);
@@ -191,7 +195,6 @@ contract LiquidityBufferVaultForTests is
             uint256 amountIn18 = _amount * 10 ** 12;
             uint256 lpAmount = curvePool.add_liquidity([0, 0, _amount], 0, true);
             uint256 shouldBeInPool = getExpectedBufferAmount(amountIn18);
-            console.log("In buffer now %s but should be ", inPool / 10 ** 18, shouldBeInPool / 10 ** 18);
             if (inPool < shouldBeInPool) {
 
                 if (shouldBeInPool < inPool + amountIn18) {
@@ -344,7 +347,6 @@ contract LiquidityBufferVaultForTests is
                      
                     inPool -= amount;
                     totalWithdrawalAmount -= amount;
-                    console.log("In pool after withdrawal %s ", inPool / 10 ** 18);
                     lastSatisfiedWithdrawal++;
                     keepersTrigger = false;
 
@@ -357,14 +359,11 @@ contract LiquidityBufferVaultForTests is
                     );
 
                 } else {
-                    console.log("Not enough tokens in pool to satisfy");
                     break;
                 }
             }
         }
-        else{
-            console.log("There was no withdrawals in queue");
-        }
+
     }
 
     function setSlippage(uint32 _newSlippage) external onlyRole(DEFAULT_ADMIN_ROLE) {

@@ -9,7 +9,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import "alluo-strategies/contracts/ethereum/CurveConvex/UniversalCurveConvexStrategy.sol";
+import "../interfaces/IUniversalCurveConvexStrategy.sol";
+import "../interfaces/IExchange.sol";
 
 contract VoteExecutor is AccessControl {
     using SafeERC20 for IERC20;
@@ -152,7 +153,7 @@ contract VoteExecutor is AccessControl {
             // entering curve with all amount of pool tokens
             IERC20(entry.poolToken).safeTransfer(strategyDeployer, amount);
 
-            UniversalCurveConvexStrategy(strategyDeployer).deployToCurve(
+            IUniversalCurveConvexStrategy(strategyDeployer).deployToCurve(
                 arrAmounts,
                 arrTokens,
                 entry.poolSize,
@@ -162,7 +163,7 @@ contract VoteExecutor is AccessControl {
             // if convex pool was provided enteing convex with all lp from curve 
             if(entry.convexPoolAddress != address(0)){
                   
-                UniversalCurveConvexStrategy(strategyDeployer).deployToConvex(
+                IUniversalCurveConvexStrategy(strategyDeployer).deployToConvex(
                     entry.convexPoolAddress,
                     entry.convexPoold
                 );
@@ -276,12 +277,3 @@ contract VoteExecutor is AccessControl {
 
 }
 
-// interface for exchange
-interface IExchange{
-    function exchange(
-        address from,
-        address to,
-        uint256 amountIn,
-        uint256 minAmountOut
-    ) external payable returns (uint256);
-}
