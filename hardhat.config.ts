@@ -22,45 +22,45 @@ const config: HardhatUserConfig = {
       },
     },
   },
-  networks: {
-    hardhat: {
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-      forking: {
-        enabled: process.env.FORKING_ENABLED == "true",
-        url: process.env.FORKING_URL as string
-      }
-    },
-    rinkeby: {
-      url: process.env.RINKEBY_URL,
-      gasPrice: "auto",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-    },
-    goerli: {
-      url: process.env.GOERLI_URL,
-      gasPrice: "auto",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-    },
-    maticmainnet: {
-      url: process.env.POLYGON_URL,
-      gasPrice: "auto",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-    },
-    matictestnet: {
-      url: process.env.POLYGON_TESTNET_URL,
-      gasPrice: "auto",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-    }
-  },
+  // networks: {
+  //   hardhat: {
+  //     accounts: {
+  //       mnemonic: process.env.MNEMONIC,
+  //     },
+  //     forking: {
+  //       enabled: process.env.FORKING_ENABLED == "true",
+  //       url: process.env.FORKING_URL as string
+  //     }
+  //   },
+  //   rinkeby: {
+  //     url: process.env.RINKEBY_URL,
+  //     gasPrice: "auto",
+  //     accounts: {
+  //       mnemonic: process.env.MNEMONIC,
+  //     },
+  //   },
+  //   goerli: {
+  //     url: process.env.GOERLI_URL,
+  //     gasPrice: "auto",
+  //     accounts: {
+  //       mnemonic: process.env.MNEMONIC,
+  //     },
+  //   },
+  //   maticmainnet: {
+  //     url: process.env.POLYGON_URL,
+  //     gasPrice: "auto",
+  //     accounts: {
+  //       mnemonic: process.env.MNEMONIC,
+  //     },
+  //   },
+  //   matictestnet: {
+  //     url: process.env.POLYGON_TESTNET_URL,
+  //     gasPrice: "auto",
+  //     accounts: {
+  //       mnemonic: process.env.MNEMONIC,
+  //     },
+  //   }
+  // },
   gasReporter: {
     enabled: process.env.REPORT_GAS == "true",
     currency: "USD",
