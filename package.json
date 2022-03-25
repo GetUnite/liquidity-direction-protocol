@@ -19,8 +19,13 @@
     "@nomiclabs/hardhat-ethers": "^2.0.5",
     "@nomiclabs/hardhat-etherscan": "^2.1.8",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
+<<<<<<< HEAD
     "@openzeppelin/contracts": "^4.4.1",
     "@openzeppelin/hardhat-upgrades": "^1.16.0",
+=======
+    "@openzeppelin/contracts": "^4.5.0",
+    "@openzeppelin/hardhat-upgrades": "^1.14.0",
+>>>>>>> 3f2362a838231d3ee2a591ddd8c166d1bc28d8b0
     "@typechain/ethers-v5": "^7.2.0",
     "@typechain/hardhat": "^2.3.1",
     "@types/chai": "^4.3.0",
@@ -51,7 +56,8 @@
     "typescript": "^4.5.4"
   },
   "dependencies": {
-    "@openzeppelin/contracts-upgradeable": "^4.5.1",
-    "alluo-strategies": "github:GetAlluo/alluo-strategies"
+    "@openzeppelin/contracts-upgradeable": "^4.5.2",
+    "alluo-strategies": "github:GetAlluo/alluo-strategies",
+    "solc": "^0.8.13"
   }
 }
