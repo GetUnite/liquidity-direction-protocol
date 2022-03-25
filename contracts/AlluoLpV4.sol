@@ -108,7 +108,7 @@ contract AlluoLpV4 is
     }
 
     /// @notice  Updates the interestIndex
-    /// @dev If more than 1 day has passed, find number of periods and calculate correct index. 
+    /// @dev If more than the updateTimeLimit has passed, call chargeInterest from interestHelper to get correct index
     ///      Then update the index and set the lastInterestCompound date.
 
     function updateInterestIndex() public whenNotPaused {
@@ -118,10 +118,9 @@ contract AlluoLpV4 is
         }
     }
 
-    /// @notice  Allows deposits and compounding old balances accurately upon additional deposits
-    /// @dev When called, stablecoin is transferred to multisig wallet. 
-    ///      Updates the interest index
-    ///      Mints adjusted amount of tokens
+    /// @notice  Allows deposits and updates the index, then mints the new appropriate amount.
+    /// @dev When called, stable coin is sent to the wallet, then the index is updated
+    ///      so that the adjusted amount is accurate.
     /// @param _token Deposit token address (eg. USDC)
     /// @param _amount Amount (parsed 10**18) 
 
@@ -134,9 +133,9 @@ contract AlluoLpV4 is
         emit Deposited(msg.sender, _token, _amount);
     }
 
-    /// @notice  Withdraws accurately: Allows compounding on withdrawal and burns ERC20
-    /// @dev When called, immediately check for accurate compoundde balance. Then mint/burn accordingly to withdrawal amount
-    ///      Then adjust deposits array with updated balance and then safeTransfer to the caller.
+    /// @notice  Withdraws accuratel
+    /// @dev When called, immediately check for new interest index. Then find the adjusted amount in LP tokens
+    ///      Then burn appropriate amount of LP tokens to receive USDC/ stablecoin
     /// @param _targetToken Stablecoin desired (eg. USDC)
     /// @param _amount Amount (parsed 10**18) in stablecoins
 
@@ -159,8 +158,8 @@ contract AlluoLpV4 is
     }
 
     /// @notice  Sets the new interest rate 
-    /// @dev When called, it sets the new interest rate by after updating the index
-    /// @param _newInterest New interest rate (100021087 = 0.021087% daily)
+    /// @dev When called, it sets the new interest rate by after updating the index.
+    /// @param _newInterest New interest rate = interest per second (100000000244041*10**13 == 8% APY)
   
     function setInterest(uint _newInterest)
         public
