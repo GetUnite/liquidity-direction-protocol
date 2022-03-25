@@ -27,13 +27,10 @@ const config: HardhatUserConfig = {
   //     accounts: {
   //       mnemonic: process.env.MNEMONIC,
   //     },
-<<<<<<< HEAD
   //     forking: {
   //       enabled: process.env.FORKING_ENABLED == "true",
   //       url: process.env.FORKING_URL as string
   //     }
-=======
->>>>>>> 3f2362a838231d3ee2a591ddd8c166d1bc28d8b0
   //   },
   //   rinkeby: {
   //     url: process.env.RINKEBY_URL,
@@ -64,7 +61,6 @@ const config: HardhatUserConfig = {
   //     },
   //   }
   // },
-<<<<<<< HEAD
   gasReporter: {
     enabled: process.env.REPORT_GAS == "true",
     currency: "USD",
@@ -81,24 +77,6 @@ const config: HardhatUserConfig = {
     runOnCompile: process.env.CONTRACT_SIZER == "true",
     strict: false,
   }
-=======
-  // gasReporter: {
-  //   enabled: process.env.REPORT_GAS == "true",
-  //   currency: "USD",
-  // },
-  // etherscan: {
-  //   apiKey: process.env.ETHERSCAN_API_KEY,
-  // },
-  // mocha: {
-  //   timeout: 3600000,
-  // },
-  // contractSizer: {
-  //   alphaSort: false,
-  //   disambiguatePaths: false,
-  //   runOnCompile: process.env.CONTRACT_SIZER == "true",
-  //   strict: false,
-  // }
->>>>>>> 3f2362a838231d3ee2a591ddd8c166d1bc28d8b0
 };
 
 export default config;
