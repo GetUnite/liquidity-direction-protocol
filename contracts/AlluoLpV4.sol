@@ -129,7 +129,8 @@ contract AlluoLpV4 is
         require(supportedTokens.contains(_token), "This token is not supported");
         IERC20Upgradeable(_token).transferFrom(msg.sender, wallet, _amount);
         updateInterestIndex();
-        uint adjustedAmount = _amount * interestIndexFactor / interestIndex;
+        uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
+        uint adjustedAmount = amountIn18 * interestIndexFactor / interestIndex;
         _mint(msg.sender, adjustedAmount);
         emit Deposited(msg.sender, _token, _amount);
     }
@@ -143,14 +144,15 @@ contract AlluoLpV4 is
     function withdraw(address _targetToken, uint256 _amount ) external whenNotPaused {
         require(supportedTokens.contains(_targetToken), "This token is not supported");
         updateInterestIndex();
-        uint adjustedAmount = _amount * interestIndexFactor / interestIndex;
+        uint256 amountOut18 = _amount * 10**(18 - AlluoERC20Upgradable(_targetToken).decimals());
+        uint adjustedAmount = amountOut18 * interestIndexFactor / interestIndex;
         _burn(msg.sender, adjustedAmount);
         IERC20Upgradeable(_targetToken).safeTransfer(msg.sender, _amount);
         emit BurnedForWithdraw(msg.sender, adjustedAmount);
     }
 
    
-    /// @notice  Returns balance in USDC
+    /// @notice  Returns balance in USD
     /// @param _address address of user
 
     function getBalance(address _address) public view returns (uint256) {
