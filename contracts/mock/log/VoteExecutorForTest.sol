@@ -97,14 +97,8 @@ contract VoteExecutorForTest is AccessControl {
             uint256 actualAmount = IERC20(entry.entryToken).balanceOf(address(this)) * entryDecimalsMult;
 
             console.log("strategy deployment starts");
-            console.log("pool token");
-            console.log(ERC20(entry.poolToken).name());
-            console.log("entry token");
-            console.log(ERC20(entry.entryToken).name());
-            console.log("amount of entry token need");
-            console.log(amount);
-            console.log("amount of entry have");
-            console.log(actualAmount);
+            console.log("pool token: %s, entry token:", ERC20(entry.poolToken).name(), ERC20(entry.entryToken).name());
+            console.log("amount of entry token need: %s, and have ", amount, actualAmount);
             console.log("\n");
             
             // if entry token not enough contact should exchange other stablecoins
@@ -121,19 +115,15 @@ contract VoteExecutorForTest is AccessControl {
                         uint256 exchangeAmountOut = amountLeft / entryDecimalsMult;
 
                         console.log("1");
-                        console.log("exchanging");
-                        console.log(exchangeAmountIn);
-                        console.log(ERC20(helpToken).name());
-                        console.log("for");
-                        console.log(exchangeAmountOut);
-                        console.log(ERC20(entry.entryToken).name());
-                        console.log("---------------");
+                        console.log("exchanging %s of ", exchangeAmountIn, ERC20(helpToken).name());
+                        console.log("for %s of ", exchangeAmountOut, ERC20(entry.entryToken).name());
+
 
                         actualAmount += IExchange(exchangeAddress).exchange(
                             helpToken, 
                             entry.entryToken, 
                             exchangeAmountIn,
-                            exchangeAmountOut * (100 - slippage) / 100
+                            0
                         ) * entryDecimalsMult;
                         amountLeft = 0;
                     }
@@ -142,13 +132,8 @@ contract VoteExecutorForTest is AccessControl {
                         uint256 exchangeAmountOut = helpAmount / entryDecimalsMult;
 
                         console.log("2");
-                        console.log("exchanging");
-                        console.log(exchangeAmountIn);
-                        console.log(ERC20(helpToken).name());
-                        console.log("for");
-                        console.log(exchangeAmountOut);
-                        console.log(ERC20(entry.entryToken).name());
-                        console.log("---------------");
+                        console.log("exchanging %s of ", exchangeAmountIn, ERC20(helpToken).name());
+                        console.log("for %s of ", exchangeAmountOut, ERC20(entry.entryToken).name());
 
                         actualAmount += IExchange(exchangeAddress).exchange(
                             helpToken, 
@@ -165,12 +150,9 @@ contract VoteExecutorForTest is AccessControl {
             if(entry.entryToken != entry.poolToken){
 
                 console.log("3");
-                console.log("exchanging");
-                console.log(amount / entryDecimalsMult);
-                console.log(ERC20(entry.entryToken).name());
-                console.log("for");
-                console.log(ERC20(entry.poolToken).name());
-                console.log("---------------");
+
+                console.log("exchanging %s of ", amount / entryDecimalsMult, ERC20(entry.entryToken).name());
+                console.log("for %s", ERC20(entry.poolToken).name());
 
                 amount = IExchange(exchangeAddress).exchange(
                     entry.entryToken, 
@@ -178,6 +160,7 @@ contract VoteExecutorForTest is AccessControl {
                     amount / entryDecimalsMult,
                     0
                 );
+                console.log("amount received ", amount);
             }
             else{
                 amount = amount / poolDecimalsMult;
@@ -190,13 +173,8 @@ contract VoteExecutorForTest is AccessControl {
 
             // entering curve with all amount of pool tokens
             IERC20(entry.poolToken).safeTransfer(strategyDeployer, amount);
-            console.log("entering curve pool");
-            console.log(entry.curvePool);
-            console.log("with coin");
-            console.log(ERC20(entry.poolToken).name());
-            console.log("amount");
-            console.log(arrAmounts[entry.tokenIndexInCurve]);
-            console.log("\n");
+            console.log("entering curve pool: %s", entry.curvePool);
+            console.log("with %s of %s",arrAmounts[entry.tokenIndexInCurve], ERC20(entry.poolToken).name());
             IUniversalCurveConvexStrategy(strategyDeployer).deployToCurve(
                 arrAmounts,
                 arrTokens,
@@ -207,10 +185,7 @@ contract VoteExecutorForTest is AccessControl {
             // if convex pool was provided enteing convex with all lp from curve 
             if(entry.convexPoolAddress != address(0)){
                   
-                console.log("enteting convex pool");
-                console.log(entry.convexPoolAddress);
-                console.log("pool id");
-                console.log(entry.convexPoold);
+                console.log("enteting convex pool: %s with id: ", entry.convexPoolAddress, entry.convexPoold);
                 console.log("\n");     
                 IUniversalCurveConvexStrategy(strategyDeployer).deployToConvex(
                     entry.convexPoolAddress,
