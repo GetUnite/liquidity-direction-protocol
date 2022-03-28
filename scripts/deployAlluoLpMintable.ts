@@ -1,5 +1,4 @@
-
-  import { ethers, upgrades } from "hardhat"
+import { ethers, upgrades } from "hardhat"
 
 async function main() {
 

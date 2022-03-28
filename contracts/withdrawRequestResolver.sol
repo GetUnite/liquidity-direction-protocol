@@ -1,61 +1,38 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-
 import "../contracts/LiquidityBufferVault.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract Resolver is AccessControl {
-    using SafeERC20 for IERC20;
-    using EnumerableSet for EnumerableSet.AddressSet;
+contract WithdrawawlRequestResolver is AccessControl{
 
-    struct Withdrawal {
-        // address of user that did withdrawal
-        address user;
-        // address of token that user chose to receive
-        address token;
-        // amount to recieve
-        uint256 amount;
-        // withdrawal time
-        uint256 time;
+    address public liquidityBufferAddress;
+    address public pokeMe;
+
+    modifier onlyPokeMe() {
+        require(msg.sender == pokeMe, "Only PokeMe");
+        _;
     }
 
-    event RequestSatified(
-        uint256 timeSatisfied
-    );
-    
-    address public liquidityBufferAddress;
-
     //current liquidityBuffer on Polygon: 0xa248Ba96d72005114e6C941f299D315757877c0e
-    constructor(address _newAdmin, address _liquidityBuffer) public {
+    constructor(address _pokeMe, address _liquidityBuffer, address _newAdmin) public {
+        pokeMe = _pokeMe;
         _grantRole(DEFAULT_ADMIN_ROLE, _newAdmin);
         liquidityBufferAddress = _liquidityBuffer;
     }
     
     function checker()
         external
+        view
+        onlyPokeMe()
         returns (bool canExec, bytes memory execPayload)
     {
-        uint256 latestRequest = LiquidityBufferVault(liquidityBufferAddress).lastWithdrawalRequest();
-        uint256 latestProcessed = LiquidityBufferVault(liquidityBufferAddress).lastSatisfiedWithdrawal();
-
-        if( latestRequest != latestProcessed ){
-            (,,uint256 latestWithdrawalAmount,)  = LiquidityBufferVault(liquidityBufferAddress).withdrawals(latestProcessed);
-            if(LiquidityBufferVault(liquidityBufferAddress).getBufferAmount() > latestWithdrawalAmount){
-                LiquidityBufferVault(liquidityBufferAddress).satisfyWithdrawals();
-                emit RequestSatified(block.timestamp);
-            }
-        }
-
+        canExec = LiquidityBufferVault(liquidityBufferAddress).keepersTrigger();
+        execPayload = "0x";
+        return (canExec, execPayload);
     }
 
-    function changeLiquidityBuffer(address _liquidityBuffer) external {
-        liquidityBufferAddress = _liquidityBuffer;
+    function withdrawFunds() external onlyRole(DEFAULT_ADMIN_ROLE){
+        payable(msg.sender).transfer(address(this).balance);
     }
 }
