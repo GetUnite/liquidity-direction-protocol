@@ -27,10 +27,13 @@ const config: HardhatUserConfig = {
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
-      forking: {
-        enabled: process.env.FORKING_ENABLED == "true",
-        url: process.env.FORKING_URL as string
-      }
+    },
+    mainnet: {
+      url: process.env.MAINNET_URL,
+      gasPrice: "auto",
+      accounts: {
+        mnemonic: process.env.MNEMONIC,
+      },
     },
     rinkeby: {
       url: process.env.RINKEBY_URL,
@@ -46,21 +49,22 @@ const config: HardhatUserConfig = {
         mnemonic: process.env.MNEMONIC,
       },
     },
-    maticmainnet: {
+    polygon: {
       url: process.env.POLYGON_URL,
       gasPrice: 50000000000,
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
     },
-    matictestnet: {
-      url: process.env.POLYGON_TESTNET_URL,
+    mumbai: {
+      url: process.env.MUMBAI_URL,
       gasPrice: "auto",
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
     }
   },
+  
   gasReporter: {
     enabled: process.env.REPORT_GAS == "true",
     currency: "USD",
@@ -68,6 +72,10 @@ const config: HardhatUserConfig = {
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
   },
+  // etherscan: {
+  //   apiKey: process.env.POLYGONSCAN_API_KEY,
+  // },
+
   mocha: {
     timeout: 3600000,
   },

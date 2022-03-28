@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../../AlluoERC20Upgradable.sol";
+import "../../Farming/AlluoERC20Upgradable.sol";
 import "./LiquidityBufferVaultForMumbai.sol";
 import "hardhat/console.sol";
 
