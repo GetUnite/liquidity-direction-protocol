@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../contracts/LiquidityBufferVault.sol";
+import "../interfaces/ILiquidityBufferVault.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract WithdrawawlRequestResolver is AccessControl{
@@ -27,12 +27,17 @@ contract WithdrawawlRequestResolver is AccessControl{
         onlyPokeMe()
         returns (bool canExec, bytes memory execPayload)
     {
-        canExec = LiquidityBufferVault(liquidityBufferAddress).keepersTrigger();
+        canExec = ILiquidityBufferVault(liquidityBufferAddress).keepersTrigger();
         execPayload = "0x";
         return (canExec, execPayload);
     }
 
-    function withdrawFunds() external onlyRole(DEFAULT_ADMIN_ROLE){
+    function withdrawFunds() 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         payable(msg.sender).transfer(address(this).balance);
     }
+
+    function receiveFunds() public payable {}
 }
