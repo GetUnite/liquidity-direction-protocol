@@ -24,12 +24,11 @@ contract Resolver is AccessControl {
         uint256 amount;
         // withdrawal time
         uint256 time;
-    };
+    }
 
     event RequestSatified(
         uint256 timeSatisfied
     );
-
     
     address public liquidityBufferAddress;
 
@@ -47,10 +46,10 @@ contract Resolver is AccessControl {
         uint256 latestProcessed = LiquidityBufferVault(liquidityBufferAddress).lastSatisfiedWithdrawal();
 
         if( latestRequest != latestProcessed ){
-            Withdrawal latestWithdrawal = LiquidityBufferVault(liquidityBufferAddress).withdrawals(latestProcessed);
-            if(LiquidityBufferVault(liquidityBufferAddress).getBufferAmount() > latestWithdrawal.amount){
+            (,,uint256 latestWithdrawalAmount,)  = LiquidityBufferVault(liquidityBufferAddress).withdrawals(latestProcessed);
+            if(LiquidityBufferVault(liquidityBufferAddress).getBufferAmount() > latestWithdrawalAmount){
                 LiquidityBufferVault(liquidityBufferAddress).satisfyWithdrawals();
-                RequestSatified(block.timestamp);
+                emit RequestSatified(block.timestamp);
             }
         }
 

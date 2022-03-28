@@ -47,7 +47,7 @@ describe("AlluoLp", function () {
             'hardhat_impersonateAccount',
             [curveLpHolderAddress]
         );
-
+        
         whale = await ethers.getSigner(whaleAddress);
         curveLpHolder = await ethers.getSigner(curveLpHolderAddress);
         dai = await ethers.getContractAt("IERC20", "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063");
@@ -56,9 +56,7 @@ describe("AlluoLp", function () {
         curveLp = await ethers.getContractAt("IERC20", "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171");
         
         console.log("We are forking Polygon mainnet");
-        console.log("Checking DAI");
         expect(await dai.balanceOf(whale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Polygon");
-        console.log("done");
 
         await signers[0].sendTransaction({
             to: whale.address,
@@ -142,8 +140,6 @@ describe("AlluoLp", function () {
 
 
     it("Simulation with random deposits and withdrawals", async function () {
-        console.log("long test takes some time");
-        
         let numberOfDeposits = getRandomArbitrary(4, 5);
         let i = 0;
 
@@ -210,8 +206,6 @@ describe("AlluoLp", function () {
     
 
     it("Should check all core functions of buffer", async function () {
-        console.log("long test takes some time");
-
         await deposit(signers[1], dai, parseUnits("2000", 18));
         await deposit(signers[2], usdc, parseUnits("3000", 6));
         await deposit(signers[3], usdt, parseUnits("5000", 6));
