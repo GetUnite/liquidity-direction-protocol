@@ -1,5 +1,5 @@
-import './addDepositToken'
-import './migrate'
-import "./createEntry"
-import "./getPoolId"
-import "./grantRole"
+import './dev/addDepositToken'
+import "./dev/grantRole"
+import './dev/migrate'
+import "./voting/createEntry"
+import "./voting/getPoolId"
