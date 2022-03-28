@@ -227,10 +227,6 @@ describe("AlluoLp", function () {
     
 
     it("Should check all core functions of buffer", async function () {
-<<<<<<< HEAD
-=======
-
->>>>>>> master
         await deposit(signers[1], dai, parseUnits("2000", 18));
         await deposit(signers[2], usdc, parseUnits("3000", 6));
         await deposit(signers[3], usdt, parseUnits("5000", 6));
