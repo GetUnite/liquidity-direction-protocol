@@ -51,8 +51,6 @@
     "typescript": "^4.5.4"
   },
   "dependencies": {
-    "@openzeppelin/contracts-upgradeable": "^4.5.2",
-    "alluo-strategies": "github:GetAlluo/alluo-strategies",
-    "solc": "^0.8.13"
+    "@openzeppelin/contracts-upgradeable": "^4.5.1"
   }
 }

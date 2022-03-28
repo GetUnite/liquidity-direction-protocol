@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.11;
+import "hardhat/console.sol";
 
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -9,9 +10,10 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import "alluo-strategies/contracts/ethereum/CurveConvex/UniversalCurveConvexStrategy.sol";
+import "../../interfaces/IUniversalCurveConvexStrategy.sol";
+import "../../interfaces/IExchange.sol";
 
-contract VoteExecutor is AccessControl {
+contract VoteExecutorForTest is AccessControl {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -94,6 +96,11 @@ contract VoteExecutor is AccessControl {
 
             uint256 actualAmount = IERC20(entry.entryToken).balanceOf(address(this)) * entryDecimalsMult;
 
+            console.log("strategy deployment starts");
+            console.log("pool token: %s, entry token:", ERC20(entry.poolToken).name(), ERC20(entry.entryToken).name());
+            console.log("amount of entry token need: %s, and have ", amount, actualAmount);
+            console.log("\n");
+            
             // if entry token not enough contact should exchange other stablecoins
             if(actualAmount < amount){
                 uint256 amountLeft = amount - actualAmount;
@@ -107,11 +114,16 @@ contract VoteExecutor is AccessControl {
                         uint256 exchangeAmountIn = amountLeft / 10**(18 - ERC20(helpToken).decimals());
                         uint256 exchangeAmountOut = amountLeft / entryDecimalsMult;
 
-                          actualAmount += IExchange(exchangeAddress).exchange(
+                        console.log("1");
+                        console.log("exchanging %s of ", exchangeAmountIn, ERC20(helpToken).name());
+                        console.log("for %s of ", exchangeAmountOut, ERC20(entry.entryToken).name());
+
+
+                        actualAmount += IExchange(exchangeAddress).exchange(
                             helpToken, 
                             entry.entryToken, 
                             exchangeAmountIn,
-                            exchangeAmountOut * (100 - slippage) / 100
+                            0
                         ) * entryDecimalsMult;
                         amountLeft = 0;
                     }
@@ -119,7 +131,11 @@ contract VoteExecutor is AccessControl {
                         uint256 exchangeAmountIn = helpAmount / 10**(18 - ERC20(helpToken).decimals());
                         uint256 exchangeAmountOut = helpAmount / entryDecimalsMult;
 
-                       actualAmount += IExchange(exchangeAddress).exchange(
+                        console.log("2");
+                        console.log("exchanging %s of ", exchangeAmountIn, ERC20(helpToken).name());
+                        console.log("for %s of ", exchangeAmountOut, ERC20(entry.entryToken).name());
+
+                        actualAmount += IExchange(exchangeAddress).exchange(
                             helpToken, 
                             entry.entryToken, 
                             exchangeAmountIn,
@@ -133,12 +149,18 @@ contract VoteExecutor is AccessControl {
             // final exchange before curve if needed
             if(entry.entryToken != entry.poolToken){
 
+                console.log("3");
+
+                console.log("exchanging %s of ", amount / entryDecimalsMult, ERC20(entry.entryToken).name());
+                console.log("for %s", ERC20(entry.poolToken).name());
+
                 amount = IExchange(exchangeAddress).exchange(
                     entry.entryToken, 
                     entry.poolToken, 
                     amount / entryDecimalsMult,
                     0
                 );
+                console.log("amount received ", amount);
             }
             else{
                 amount = amount / poolDecimalsMult;
@@ -151,8 +173,9 @@ contract VoteExecutor is AccessControl {
 
             // entering curve with all amount of pool tokens
             IERC20(entry.poolToken).safeTransfer(strategyDeployer, amount);
-
-            UniversalCurveConvexStrategy(strategyDeployer).deployToCurve(
+            console.log("entering curve pool: %s", entry.curvePool);
+            console.log("with %s of %s",arrAmounts[entry.tokenIndexInCurve], ERC20(entry.poolToken).name());
+            IUniversalCurveConvexStrategy(strategyDeployer).deployToCurve(
                 arrAmounts,
                 arrTokens,
                 entry.poolSize,
@@ -162,7 +185,9 @@ contract VoteExecutor is AccessControl {
             // if convex pool was provided enteing convex with all lp from curve 
             if(entry.convexPoolAddress != address(0)){
                   
-                UniversalCurveConvexStrategy(strategyDeployer).deployToConvex(
+                console.log("enteting convex pool: %s with id: ", entry.convexPoolAddress, entry.convexPoold);
+                console.log("\n");     
+                IUniversalCurveConvexStrategy(strategyDeployer).deployToConvex(
                     entry.convexPoolAddress,
                     entry.convexPoold
                 );
@@ -187,7 +212,7 @@ contract VoteExecutor is AccessControl {
     /**
      * @dev function for getting list of entry tokens
      */
-    function getListEntryTokens() external view returns (address[] memory) {
+    function getListEntryTokens() public view returns (address[] memory) {
         return entryTokens.values();
     }
 
@@ -274,14 +299,4 @@ contract VoteExecutor is AccessControl {
         IERC20(_address).safeTransfer(msg.sender, _amount);
     }
 
-}
-
-// interface for exchange
-interface IExchange{
-    function exchange(
-        address from,
-        address to,
-        uint256 amountIn,
-        uint256 minAmountOut
-    ) external payable returns (uint256);
 }

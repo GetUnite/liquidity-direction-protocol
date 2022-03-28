@@ -2,7 +2,7 @@ import { parseEther, parseUnits } from "@ethersproject/units";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
-import { ethers, upgrades } from "hardhat";
+import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
 <<<<<<< HEAD
 import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpUpgradable, AlluoLpUpgradable__factory, AlluoLpUpgradableMintable, AlluoLpUpgradableMintable__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests} from "../typechain";
@@ -46,6 +46,21 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
     let curveLp: IERC20;
 
     before(async function () {
+
+
+
+        await network.provider.request({
+            method: "hardhat_reset",
+            params: [{
+                forking: {
+                    enabled: true,
+                    jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
+                    //you can fork from last block by commenting next line
+                    blockNumber: 26313740, 
+                },
+            },],
+        });
+
         signers = await ethers.getSigners();
         //We are forking Polygon mainnet, please enable it in config
         const whaleAddress = "0x075e72a5eDf65F0A5f44699c7654C1a76941Ddc8";
@@ -157,6 +172,12 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
 
         await multisig.executeCall(alluoLpCurrent.address, calldata);
 
+        ABI = ["function approveAll()"];
+        iface = new ethers.utils.Interface(ABI);
+        calldata = iface.encodeFunctionData("approveAll", []);
+
+        await multisig.executeCall(buffer.address, calldata);
+
     });
 
 =======
@@ -233,7 +254,7 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
         }
 
         await curveLp.connect(curveLpHolder).transfer(buffer.address, parseEther("5000"));
-        console.log("BIG curveLp transfer");
+        //console.log("BIG curveLp transfer");
         
         i = 0;
         while (i <= 2){
@@ -251,7 +272,6 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
     
 
     it("Should check all core functions of buffer", async function () {
-        console.log("long test takes some time");
 
         await deposit(signers[1], dai, parseUnits("2000", 18));
         await deposit(signers[2], usdc, parseUnits("3000", 6));
@@ -265,7 +285,7 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
         await deposit(signers[2], usdc, parseUnits("100", 6));
         await deposit(signers[3], usdt, parseUnits("100", 6));
         
-        console.log("BIG curveLp transfer");
+        //console.log("BIG curveLp transfer");
         await curveLp.connect(curveLpHolder).transfer(buffer.address, parseEther("300"));
 
         await deposit(signers[1], dai, parseUnits("1000", 18));
@@ -326,7 +346,7 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
     });
 
 
-    it("waiting list", async function () {
+    it("Should return right  info about waiting list", async function () {
         await deposit(signers[1], dai, parseUnits("2000", 18));
         await deposit(signers[2], dai, parseUnits("2000", 18));
         await deposit(signers[3], dai, parseUnits("2000", 18));
@@ -334,8 +354,7 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
         await alluoLpCurrent.connect(signers[2]).withdraw(usdt.address, parseEther("1000"))
         await alluoLpCurrent.connect(signers[3]).withdraw(usdt.address, parseEther("1000"))
         await skipDays(1);
-        console.log(await buffer.getCloseToLimitWithdrawals());
-        
+        //console.log(await buffer.getCloseToLimitWithdrawals());
     });
 
 
@@ -364,92 +383,6 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
             .withArgs(recipient.address, amount);
     });
 
-    it("Should allow admin to withdraw and burn tokens in bulk (all processed)", async () => {
-        const recipients = [
-            signers[1],
-            signers[2],
-            signers[3]
-        ];
-        const recepientAddresses = recipients.map((signer) => signer.address);
-        const amounts = [
-            ethers.utils.parseUnits("10.0", await alluoLp.decimals()),
-            ethers.utils.parseUnits("20.0", await alluoLp.decimals()),
-            ethers.utils.parseUnits("30.0", await alluoLp.decimals()),
-        ];
-
-        for (let index = 0; index < recipients.length; index++) {
-            await mint(recipients[index], amounts[index]);
-        }
-
-        let ABI = ["function withdrawBulk(uint256[] _amounts, address[] _users)"];
-        let iface = new ethers.utils.Interface(ABI);
-        const calldata = iface.encodeFunctionData("withdrawBulk", [amounts, recepientAddresses]);
-
-        await multisig.executeCall(alluoLp.address, calldata);
-
-        for (let index = 0; index < recipients.length; index++) {
-            const balance = await alluoLp.balanceOf(recipients[index].address);
-            expect(balance).to.be.equal(0);
-        }
-    });
-
-    it("Should not allow admin to withdraw and burn tokens in bulk (someone has not enough balance)", async () => {
-        const recipients = [
-            signers[1],
-            signers[2],
-            signers[3]
-        ];
-        const recepientAddresses = recipients.map((signer) => signer.address);
-        const amounts = [
-            ethers.utils.parseUnits("10.0", await alluoLp.decimals()),
-            ethers.utils.parseUnits("20.0", await alluoLp.decimals()),
-            ethers.utils.parseUnits("30.0", await alluoLp.decimals()),
-        ];
-        const malformedIndex = 1;
-        const malformedAmount = amounts[malformedIndex].sub(
-            ethers.utils.parseUnits("1.0", await alluoLp.decimals())
-        );
-
-        for (let index = 0; index < recipients.length; index++) {
-            if (index == malformedIndex) {
-                await mint(recipients[index], malformedAmount);
-                continue;
-            }
-            await mint(recipients[index], amounts[index]);
-        }
-
-        let ABI = ["function withdrawBulk(uint256[] _amounts, address[] _users)"];
-        let iface = new ethers.utils.Interface(ABI);
-        const calldata = iface.encodeFunctionData("withdrawBulk", [amounts, recepientAddresses]);
-
-        const tx = multisig.executeCall(alluoLp.address, calldata);
-
-        expect(tx).to.be.revertedWith("UrgentAlluoLp: not enough");
-    });
-
-    it("Should not allow to withdraw and burn tokens in bulk (caller without DEFAULT_ADMIN_ROLE)", async () => {
-        const recipients = [
-            signers[1],
-            signers[2],
-            signers[3]
-        ];
-        const recepientAddresses = recipients.map((signer) => signer.address);
-        const amounts = [
-            ethers.utils.parseUnits("10.0", await alluoLp.decimals()),
-            ethers.utils.parseUnits("20.0", await alluoLp.decimals()),
-            ethers.utils.parseUnits("30.0", await alluoLp.decimals()),
-        ];
-        const notAdmin = signers[4];
-        const role = await alluoLp.DEFAULT_ADMIN_ROLE();
-
-        for (let index = 0; index < recipients.length; index++) {
-            await mint(recipients[index], amounts[index]);
-        }
-
-        const tx = alluoLp.connect(notAdmin).withdrawBulk(amounts, recepientAddresses);
-        expect(tx).to.be
-            .revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
-    });
 
     it("Should grant role that can be granted only to contract", async () => {
         const role = await alluoLpCurrent.DEFAULT_ADMIN_ROLE();
