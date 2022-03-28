@@ -4,7 +4,7 @@ pragma solidity ^0.8.11;
 import "../interfaces/ILiquidityBufferVault.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract WithdrawawlRequestResolver is AccessControl{
+contract WithdrawalRequestResolver is AccessControl{
 
     address public liquidityBufferAddress;
     address public pokeMe;
