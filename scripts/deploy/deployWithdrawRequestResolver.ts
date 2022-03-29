@@ -1,9 +1,9 @@
 import { ethers} from "hardhat"
 
-const deploymentArguments = require('../verification/argumentsWithdrawalRequestResolver');
+const deploymentArguments = require('../verification/argumentsWithdrawalRequestResolver.ts');
 
 async function main() {
-    const WithdrawawlRequestResolver = await ethers.getContractFactory("WithdrawawlRequestResolver");
+    const WithdrawawlRequestResolver = await ethers.getContractFactory("WithdrawalRequestResolver");
 
     let withdrawawlRequestResolver = await WithdrawawlRequestResolver.deploy(deploymentArguments[0],deploymentArguments[1],deploymentArguments[2])
 
