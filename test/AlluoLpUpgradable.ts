@@ -4,11 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-<<<<<<< HEAD
 import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpUpgradable, AlluoLpUpgradable__factory, AlluoLpUpgradableMintable, AlluoLpUpgradableMintable__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests} from "../typechain";
-=======
-import { PseudoMultisigWallet, PseudoMultisigWallet__factory, TestERC20, TestERC20__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpUpgradableMintable, AlluoLpUpgradableMintable__factory,  } from "../typechain";
->>>>>>> 3f2362a838231d3ee2a591ddd8c166d1bc28d8b0
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -17,28 +13,19 @@ async function skipDays(d: number) {
     ethers.provider.send('evm_mine', []);
 }
 
-<<<<<<< HEAD
 function getRandomArbitrary(min: number, max: number) {
     return Math.floor(Math.random() * (max - min) + min);
   }
 
 describe("AlluoLp", function () {
-=======
-describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
->>>>>>> 3f2362a838231d3ee2a591ddd8c166d1bc28d8b0
     let signers: SignerWithAddress[];
     let whale: SignerWithAddress;
     let curveLpHolder: SignerWithAddress;
 
-<<<<<<< HEAD
     let alluoLpV0: UrgentAlluoLp;
     let alluoLpV1: AlluoLpUpgradable;
     let alluoLpV2: AlluoLpUpgradableMintable;
     let alluoLpCurrent: AlluoLpV3;
-=======
-    let alluoLp: AlluoLpUpgradableMintable;
-    let alluoLpOld: UrgentAlluoLp;
->>>>>>> 3f2362a838231d3ee2a591ddd8c166d1bc28d8b0
     let multisig: PseudoMultisigWallet;
     let buffer: LiquidityBufferVault;
 
@@ -75,7 +62,7 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
             'hardhat_impersonateAccount',
             [curveLpHolderAddress]
         );
-
+        
         whale = await ethers.getSigner(whaleAddress);
         curveLpHolder = await ethers.getSigner(curveLpHolderAddress);
         dai = await ethers.getContractAt("IERC20", "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063");
@@ -84,9 +71,7 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
         curveLp = await ethers.getContractAt("IERC20", "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171");
         
         console.log("We are forking Polygon mainnet");
-        console.log("Checking DAI");
         expect(await dai.balanceOf(whale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Polygon");
-        console.log("done");
 
         await signers[0].sendTransaction({
             to: whale.address,
@@ -100,17 +85,12 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
     // AlluoLP v3 - automated deposit and withdrawal with liquidity buffer 
 
     beforeEach(async function () {
-<<<<<<< HEAD
         
         const AlluoLPv0 = await ethers.getContractFactory("UrgentAlluoLp") as UrgentAlluoLp__factory;
         const AlluoLPv1 = await ethers.getContractFactory("AlluoLpUpgradable") as AlluoLpUpgradable__factory;
         const AlluoLPv2= await ethers.getContractFactory("AlluoLpUpgradableMintable") as AlluoLpUpgradableMintable__factory;
         const AlluoLPv3= await ethers.getContractFactory("AlluoLpV3") as AlluoLpV3__factory;
         //We are using this contract to simulate Gnosis multisig wallet
-=======
-        const AlluoLP = await ethers.getContractFactory("AlluoLpUpgradableMintable") as AlluoLpUpgradableMintable__factory;
-        const AlluoLPOld = await ethers.getContractFactory("UrgentAlluoLp") as UrgentAlluoLp__factory;
->>>>>>> 3f2362a838231d3ee2a591ddd8c166d1bc28d8b0
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
         //For tests we are using version of contract with hardhat console.log, to see all Txn
         //you can switch two next lines and turn off logs
@@ -129,7 +109,6 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
             usdc.address,
             usdt.address]],
             {initializer: 'initialize', kind:'uups'}
-<<<<<<< HEAD
         ) as AlluoLpUpgradable;
 
         //migration
@@ -180,27 +159,8 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
 
     });
 
-=======
-        ) as AlluoLpUpgradableMintable;
-    });
-    it("Should be able to deposit when balance is zero", async function () {
-        const depositor = signers[1];
-        const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
-        expect(await alluoLp.balanceOf(depositor.address)).to.be.equal(0);
-        await token.approve(alluoLp.address, 999999999999999);
-        await alluoLp.deposit(token.address, amount);
-        expect(await alluoLp.getBalance(depositor.address)).equal(amount);
-    });
-    it("Should create bridged tokens", async function () {
-        // address that will get minted tokens
-        const recipient = signers[1];
-        // amount of tokens to be minted, including decimals value of token
-        const amount = ethers.utils.parseUnits("10.0", await alluoLp.decimals());
->>>>>>> 3f2362a838231d3ee2a591ddd8c166d1bc28d8b0
 
     it("Simulation with random deposits and withdrawals", async function () {
-        console.log("long test takes some time");
-        
         let numberOfDeposits = getRandomArbitrary(4, 5);
         let i = 0;
 
@@ -233,7 +193,6 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
             i++;
         }
 
-<<<<<<< HEAD
         while (i <= numberOfDeposits){
             await deposit(signers[1], dai, parseUnits((getRandomArbitrary(500, 10000)).toString(), 18))
             await deposit(signers[2], usdc, parseUnits((getRandomArbitrary(500, 10000)).toString(), 6))
@@ -263,16 +222,11 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
             await deposit(signers[3], usdt, parseUnits((getRandomArbitrary(500, 10000)).toString(), 6))
             i++;
         }
-=======
-        await mint(recipient, amount);
-        expect(await alluoLp.balanceOf(recipient.address)).to.be.equal(amount);
->>>>>>> 3f2362a838231d3ee2a591ddd8c166d1bc28d8b0
     });
 
     
 
     it("Should check all core functions of buffer", async function () {
-
         await deposit(signers[1], dai, parseUnits("2000", 18));
         await deposit(signers[2], usdc, parseUnits("3000", 6));
         await deposit(signers[3], usdt, parseUnits("5000", 6));
@@ -308,20 +262,9 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
 
     });
 
-<<<<<<< HEAD
 
     // it("Should check buffer admin functions", async function () {
         
-=======
-    //     const AlluoLP = await ethers.getContractFactory("AlluoLpUpgradableMintable") as AlluoLpUpgradableMintable__factory;
-
-    //     await expect(await upgrades.deployProxy(AlluoLP,
-    //         [eoa.address,
-    //         token.address],
-    //         {initializer: 'initialize', kind:'uups'}
-    //     ) as AlluoLpUpgradableMintable
-    //     ).to.be.revertedWith("AlluoLpUpgradableMintable: not contract");
->>>>>>> 3f2362a838231d3ee2a591ddd8c166d1bc28d8b0
     // });
 
     it("Upgrading", async function () {
@@ -382,7 +325,6 @@ describe("AlluoLPUpgradableMinAlluoLpUpgradableMintable", function () {
             .to.emit(alluoLpCurrent, "BurnedForWithdraw")
             .withArgs(recipient.address, amount);
     });
-
 
     it("Should grant role that can be granted only to contract", async () => {
         const role = await alluoLpCurrent.DEFAULT_ADMIN_ROLE();
