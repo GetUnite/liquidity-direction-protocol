@@ -5,7 +5,7 @@ import { BigNumber, BigNumberish } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import { ethers, upgrades } from "hardhat";
 import { before } from "mocha";
-import { AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, PseudoMultisigWallet, PseudoMultisigWallet__factory, TestERC20, TestERC20__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpV4, AlluoLpV4__factory} from "../typechain";
+import { AlluoLpV3ForAlluoLpV4Test, AlluoLpV3ForAlluoLpV4Test__factory, LiquidityBufferVault, LiquidityBufferVault__factory, PseudoMultisigWallet, PseudoMultisigWallet__factory, TestERC20, TestERC20__factory, UrgentAlluoLp, UrgentAlluoLp__factory, AlluoLpV4, AlluoLpV4__factory} from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -250,7 +250,7 @@ describe("AlluoLpV4: Withdraw, Deposit, Compounding features", function () {
 describe('Migration', function (){
     let signers: SignerWithAddress[];
     let alluoLpCurrent: AlluoLpV4;
-    let alluoLpV3: AlluoLpV3;
+    let alluoLpV3: AlluoLpV3ForAlluoLpV4Test;
     let multisig: PseudoMultisigWallet;
     let token: TestERC20;
     let depositor: SignerWithAddress
@@ -269,7 +269,7 @@ describe('Migration', function (){
     beforeEach(async function () {
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
         const Token = await ethers.getContractFactory("TestERC20") as TestERC20__factory;
-        const AlluoLPV3 = await ethers.getContractFactory("AlluoLpV3") as AlluoLpV3__factory;
+        const AlluoLPV3 = await ethers.getContractFactory("AlluoLpV3ForAlluoLpV4Test") as AlluoLpV3ForAlluoLpV4Test__factory;
 
         multisig = await Multisig.deploy(true);
 
@@ -279,7 +279,7 @@ describe('Migration', function (){
             [multisig.address,
             [token.address]],
             {initializer: 'initialize', kind:'uups'}
-        ) as AlluoLpV3;
+        ) as AlluoLpV3ForAlluoLpV4Test;
 
         let ABI = ["function changeUpgradeStatus(bool _status)"];
         let iface = new ethers.utils.Interface(ABI);
