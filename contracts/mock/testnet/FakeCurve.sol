@@ -135,9 +135,6 @@ contract FakeCurve is
         _grantRole(role, account);
     }
 
-
-
-
     function _authorizeUpgrade(address newImplementation)
         internal
         onlyRole(UPGRADER_ROLE)
