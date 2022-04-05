@@ -103,7 +103,6 @@ describe("IbAlluo and Buffer", function () {
 
     beforeEach(async function () {
 
-        const AlluoLPv3 = await ethers.getContractFactory("AlluoLpV3") as AlluoLpV3__factory;
         const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
         //We are using this contract to simulate Gnosis multisig wallet
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
@@ -116,28 +115,14 @@ describe("IbAlluo and Buffer", function () {
 
         multisig = await Multisig.deploy(true);
 
-        alluoLpV3 = await upgrades.deployProxy(AlluoLPv3,
-            [multisig.address,
-            [dai.address,
-            usdc.address,
-            usdt.address]],
-            {initializer: 'initialize', kind:'uups'}
-        ) as AlluoLpV3;
-
         buffer = await upgrades.deployProxy(Buffer,
-            [multisig.address, alluoLpV3.address, curvePool],
+            [multisig.address, multisig.address, curvePool],
             {initializer: 'initialize', kind:'uups'}
         ) as LiquidityBufferVault;
 
-        let ABI = ["function setLiquidityBuffer(address newBuffer)"];
+        let ABI = ["function approveAll()"];
         let iface = new ethers.utils.Interface(ABI);
-        let calldata = iface.encodeFunctionData("setLiquidityBuffer", [buffer.address]);
-
-        await multisig.executeCall(alluoLpV3.address, calldata);
-
-        ABI = ["function approveAll()"];
-        iface = new ethers.utils.Interface(ABI);
-        calldata = iface.encodeFunctionData("approveAll", []);
+        let calldata = iface.encodeFunctionData("approveAll", []);
 
         await multisig.executeCall(buffer.address, calldata);
 
@@ -160,6 +145,7 @@ describe("IbAlluo and Buffer", function () {
     });
 
     describe('Buffer integration with IbAlluo', function () {
+
         it("Simulation with random deposits and withdrawals", async function () {
             let numberOfDeposits = getRandomArbitrary(4, 5);
             let i = 0;
@@ -217,8 +203,6 @@ describe("IbAlluo and Buffer", function () {
                 i++;
             }
         });
-    
-        
     
         it("Should check all core functions of buffer", async function () {
             await deposit(signers[1], dai, parseUnits("2000", 18));
@@ -306,6 +290,25 @@ describe("IbAlluo and Buffer", function () {
             expect(balance).to.equal(0);
         });
 
+        it("Should check all transferAssetValue functions ", async function () {
+            await deposit(signers[1], dai, parseUnits("1000", 18));
+            await ibAlluoCurrent.connect(signers[1]).transfer(signers[2].address, parseEther("100"))
+            await ibAlluoCurrent.connect(signers[1]).transfer(signers[3].address, parseEther("100"))
+            await skipDays(365);
+            await ibAlluoCurrent.connect(signers[2]).transferAssetValue(signers[1].address, parseEther("107.9"))
+
+            await ibAlluoCurrent.connect(signers[3]).approveAssetValue(signers[2].address, parseEther("108"))
+            await ibAlluoCurrent.connect(signers[2]).transferFromAssetValue(signers[3].address, signers[1].address, parseEther("107.9"))
+
+            let tokenBalance = await ibAlluoCurrent.balanceOf(signers[1].address);
+            expect(tokenBalance).to.be.gt(parseUnits("999", await ibAlluoCurrent.decimals()));
+            expect(tokenBalance).to.be.lt(parseUnits("1000", await ibAlluoCurrent.decimals()));
+
+            let valueBalance = await ibAlluoCurrent.getBalance(signers[1].address)
+            expect(valueBalance).to.be.gt(parseUnits("1079", await ibAlluoCurrent.decimals()));
+            expect(valueBalance).to.be.lt(parseUnits("1080", await ibAlluoCurrent.decimals()));
+        });
+        
         it('Should correctly calculate balances over time and various transfers', async function () {
 
             const amount = ethers.utils.parseUnits("100.0", await ibAlluoCurrent.decimals());
@@ -367,7 +370,7 @@ describe("IbAlluo and Buffer", function () {
             expect(balance).to.be.lt(parseUnits("105.76", await ibAlluoCurrent.decimals()));
             await ibAlluoCurrent.connect(signers[2]).withdraw(dai.address,balance);
 
-            balance = await ibAlluoCurrent.getBalanceForWithdrawal(signers[4].address);
+            balance = await ibAlluoCurrent.getBalanceForTransfer(signers[4].address);
             expect(balance).to.be.gt(parseUnits("307.66", await ibAlluoCurrent.decimals()));
             expect(balance).to.be.lt(parseUnits("307.67", await ibAlluoCurrent.decimals()));
             await ibAlluoCurrent.connect(signers[4]).withdraw(dai.address,balance);

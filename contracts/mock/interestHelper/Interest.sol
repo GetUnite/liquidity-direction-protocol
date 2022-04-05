@@ -11,7 +11,7 @@ contract Interest is Math {
     // @param lastUpdated When the interest rate was last updated
     // @param pie Total sum of all amounts accumulating under one interest rate, divided by that rate
     // @return The new accumulated rate, as well as the difference between the debt calculated with the old and new accumulated rates.
-    function compounding(uint chi, uint ratePerSecond, uint lastUpdated, uint pie) public view returns (uint, uint) {
+    function compounding(uint chi, uint ratePerSecond, uint lastUpdated, uint pie) private view returns (uint, uint) {
         require(block.timestamp >= lastUpdated, "tinlake-math/invalid-timestamp");
         require(chi != 0);
         // instead of a interestBearingAmount we use a accumulated interest rate index (chi)
@@ -24,7 +24,7 @@ contract Interest is Math {
     // @param ratePerSecond Interest rate accumulation per second in RAD(10ˆ27)
     // @param lastUpdated last time the interest has been charged
     // @return interestBearingAmount + interest
-    function changeRatio(uint interestBearingAmount, uint ratePerSecond, uint lastUpdated) public view returns (uint) {
+    function changeRatio(uint interestBearingAmount, uint ratePerSecond, uint lastUpdated) internal view returns (uint) {
         if (block.timestamp >= lastUpdated) {
             interestBearingAmount = _chargeInterest(interestBearingAmount, ratePerSecond, lastUpdated, block.timestamp);
         }
@@ -37,16 +37,16 @@ contract Interest is Math {
 
 
     // convert pie to debt/savings amount
-    function toAmount(uint chi, uint pie) public pure returns (uint) {
+    function toAmount(uint chi, uint pie) private pure returns (uint) {
         return rmul(pie, chi);
     }
 
     // convert debt/savings amount to pie
-    function toPie(uint chi, uint amount) public pure returns (uint) {
+    function toPie(uint chi, uint amount) private pure returns (uint) {
         return rdivup(amount, chi);
     }
 
-    function rpow(uint x, uint n, uint base) public pure returns (uint z) {
+    function rpow(uint x, uint n, uint base) private pure returns (uint z) {
         assembly {
             switch x case 0 {switch n case 0 {z := base} default {z := 0}}
             default {

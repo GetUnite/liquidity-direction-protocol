@@ -98,6 +98,61 @@ contract IbAlluo is
         emit NewWalletSet(address(0), wallet);
     }
 
+
+    /**
+     * @dev See {IERC20-approve} but it approves amount of tokens
+     *      which represents asset value 
+     *
+     * NOTE: If `amount` is the maximum `uint256`, the allowance is not updated on
+     * `transferFrom`. This is semantically equivalent to an infinite approval.
+     *
+     * NOTE: Because of constantly growing ratio between IbAlluo and asset value
+     *       we recommend to approve amount slightly more
+     */
+    function approveAssetValue(address spender, uint256 amount) public whenNotPaused returns (bool) {
+        address owner = _msgSender();
+        updateRatio();
+        uint256 adjustedAmount = amount * multiplier / growingRatio;
+        _approve(owner, spender, adjustedAmount);
+        return true;
+    }
+
+    /**
+     * @dev See {IERC20-transfer} but it transfers amount of tokens
+     *      which represents asset value 
+     */
+    function transferAssetValue(address to, uint256 amount) public whenNotPaused returns (bool) {
+        address owner = _msgSender();
+        updateRatio();
+        uint256 adjustedAmount = amount * multiplier / growingRatio;
+        _transfer(owner, to, adjustedAmount);
+        return true;
+    }
+
+    /**
+     * @dev See {IERC20-transferFrom} but it transfers amount of tokens
+     *      which represents asset value 
+     *
+     * Emits an {Approval} event indicating the updated allowance. This is not
+     * required by the EIP. See the note at the beginning of {ERC20}.
+     *
+     * NOTE: Does not update the allowance if the current allowance
+     * is the maximum `uint256`.
+     */
+    function transferFromAssetValue(
+        address from,
+        address to,
+        uint256 amount
+    ) public whenNotPaused returns (bool) {
+        address spender = _msgSender();
+        updateRatio();
+        uint256 adjustedAmount = amount * multiplier / growingRatio;
+        _spendAllowance(from, spender, adjustedAmount);
+        _transfer(from, to, adjustedAmount);
+        return true;
+    }
+
+
     /// @notice  Updates the growingRatio
     /// @dev If more than the updateTimeLimit has passed, call changeRatio from interestHelper to get correct index
     ///      Then update the index and set the lastInterestCompound date.
@@ -156,7 +211,7 @@ contract IbAlluo is
     /// @notice  Returns balance in USD with correct info from update
     /// @param _address address of user
 
-    function getBalanceForWithdrawal(address _address) public view returns (uint256) {
+    function getBalanceForTransfer(address _address) public view returns (uint256) {
 
         if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
             uint256 _growingRatio = changeRatio(growingRatio, interestPerSecond, lastInterestCompound);
