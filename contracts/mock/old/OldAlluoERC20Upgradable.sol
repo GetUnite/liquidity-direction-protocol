@@ -8,7 +8,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20Metadat
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "hardhat/console.sol";
 /**
  * @dev Implementation of the {IERC20} interface.
  *
@@ -34,7 +33,7 @@ import "hardhat/console.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IERC20-approve}.
  */
-contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgradeable, IERC20MetadataUpgradeable, PausableUpgradeable {
+contract OldAlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgradeable, IERC20MetadataUpgradeable, PausableUpgradeable {
     mapping(address => uint256) private _balances;
 
     mapping(address => mapping(address => uint256)) private _allowances;
@@ -240,7 +239,6 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
         _beforeTokenTransfer(from, to, amount);
 
         uint256 fromBalance = _balances[from];
-
         require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
         unchecked {
             _balances[from] = fromBalance - amount;
@@ -264,13 +262,9 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
     function _mint(address account, uint256 amount) internal virtual {
         require(account != address(0), "ERC20: mint to the zero address");
 
-        _beforeTokenTransfer(address(0), account, amount);
-
         _totalSupply += amount;
         _balances[account] += amount;
         emit Transfer(address(0), account, amount);
-
-        _afterTokenTransfer(address(0), account, amount);
     }
 
     /**
@@ -287,8 +281,6 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
     function _burn(address account, uint256 amount) internal virtual {
         require(account != address(0), "ERC20: burn from the zero address");
 
-        _beforeTokenTransfer(account, address(0), amount);
-
         uint256 accountBalance = _balances[account];
         require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
         unchecked {
@@ -297,8 +289,6 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
         _totalSupply -= amount;
 
         emit Transfer(account, address(0), amount);
-
-        _afterTokenTransfer(account, address(0), amount);
     }
 
     /**

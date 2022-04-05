@@ -22,11 +22,6 @@ contract TestERC20 is ERC20, ERC20Burnable, AccessControl {
             id := chainid()
         }
 
-        // solhint-disable-next-line reason-string
-        require(
-            id == 1337 || id == 31337,
-            "Do not deploy this contract on public networks!"
-        );
     }
 
 

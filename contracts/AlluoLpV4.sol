@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../../mock/old/OldAlluoERC20Upgradable.sol";
-import "./LiquidityBufferVaultForMumbai.sol";
+import "./Farming/AlluoERC20Upgradable.sol";
+import "./Farming/LiquidityBufferVault.sol";
 import "hardhat/console.sol";
+import "./interestHelper/compound.sol";
+
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -13,12 +15,13 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
-contract AlluoLpV3ForMumbai is 
+contract AlluoLpV4 is 
     Initializable, 
     PausableUpgradeable, 
-    OldAlluoERC20Upgradable, 
+    AlluoERC20Upgradable, 
     AccessControlUpgradeable, 
-    UUPSUpgradeable 
+    UUPSUpgradeable ,
+    Interest
 {
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -56,7 +59,14 @@ contract AlluoLpV3ForMumbai is
     bool public upgradeStatus;
 
     // contract that will distribute money between curve pool and wallet
-    LiquidityBufferVaultForMumbai public liquidityBuffer; 
+    LiquidityBufferVault public liquidityBuffer; 
+
+    // InterestRate = 10**27
+    uint interestRate;
+    uint interestIndexFactor;
+    uint interestIndex;
+    uint lastInterestCompound;
+    bool migrated;
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
@@ -65,7 +75,7 @@ contract AlluoLpV3ForMumbai is
     event ApyClaimed(address indexed user, uint256 apyAmount);
     event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
     event DepositTokenStatusChanged(address token, bool status);
-
+    event V4InterestChanged(uint oldInterest, uint newInterest);
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
@@ -75,82 +85,109 @@ contract AlluoLpV3ForMumbai is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
+        require(_multiSigWallet.isContract(), "AlluoLpUpgradable: not contract");
+
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
+        _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
-        DF = 10**20;
-        updateTimeLimit = 3600;
-        DENOMINATOR = 10**20;
-        interest = 8;
-
+        updateTimeLimit = 60;
         wallet = _multiSigWallet;
+
+        interestRate = 100000000244041*10**13;
+        interestIndexFactor = 10**18;
+        interestIndex = 10**18;
+        lastInterestCompound = block.timestamp;
 
         for(uint256 i = 0; i < _supportedTokens.length; i++){
             supportedTokens.add(_supportedTokens[i]);
         }
 
-        lastDFUpdate = block.timestamp;
-        update();
-
-        emit InterestChanged(0, interest);
         emit NewWalletSet(address(0), wallet);
 
     }
 
-    function update() public whenNotPaused {
-        uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
-        if (timeFromLastUpdate >= updateTimeLimit) {
-            DF =
-                ((DF *
-                    (((interest * DENOMINATOR * timeFromLastUpdate) / 31536000) +
-                        (100 * DENOMINATOR))) / DENOMINATOR) /
-                100;
-            lastDFUpdate = block.timestamp;
+    /// @notice  Updates the interestIndex
+    /// @dev If more than the updateTimeLimit has passed, call chargeInterest from interestHelper to get correct index
+    ///      Then update the index and set the lastInterestCompound date.
+
+    function updateInterestIndex() public whenNotPaused {
+        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
+            interestIndex = chargeInterest(interestIndex, interestRate, lastInterestCompound);
+            lastInterestCompound = block.timestamp;
         }
     }
 
-    function claim(address _address) public whenNotPaused {
-        update();
-        if (userDF[_address] != 0) {
-            uint256 userBalance = balanceOf(_address);
-            uint256 userNewBalance = ((DF * userBalance) / userDF[_address]);
-            uint256 newAmount = userNewBalance - userBalance;
-            if (newAmount != 0) {
-                _mint(_address, newAmount);
-                emit ApyClaimed(_address, newAmount);
-            }
-        }
-        userDF[_address] = DF;
+    /// @notice  Allows deposits and updates the index, then mints the new appropriate amount.
+    /// @dev When called, stable coin is sent to the wallet, then the index is updated
+    ///      so that the adjusted amount is accurate.
+    /// @param _token Deposit token address (eg. USDC)
+    /// @param _amount Amount (parsed 10**18) 
+
+    function deposit(address _token, uint _amount) public whenNotPaused {
+        require(supportedTokens.contains(_token), "This token is not supported");
+        IERC20Upgradeable(_token).transferFrom(msg.sender, wallet, _amount);
+        updateInterestIndex();
+        uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
+        uint adjustedAmount = amountIn18 * interestIndexFactor / interestIndex;
+        _mint(msg.sender, adjustedAmount);
+        emit Deposited(msg.sender, _token, _amount);
     }
 
-    
-    function withdraw(address _token, uint256 _amount) external whenNotPaused {
+    /// @notice  Withdraws accuratel
+    /// @dev When called, immediately check for new interest index. Then find the adjusted amount in LP tokens
+    ///      Then burn appropriate amount of LP tokens to receive USDC/ stablecoin
+    /// @param _targetToken Stablecoin desired (eg. USDC)
+    /// @param _amount Amount (parsed 10**18) in stablecoins
 
-        require(supportedTokens.contains(_token), "this token is not supported");
-        claim(msg.sender);
-        _burn(msg.sender, _amount);
-        liquidityBuffer.withdraw(msg.sender, _token, _amount);
-
-        emit BurnedForWithdraw(msg.sender, _amount);
+    function withdraw(address _targetToken, uint256 _amount ) external whenNotPaused {
+        require(supportedTokens.contains(_targetToken), "This token is not supported");
+        updateInterestIndex();
+        uint256 amountOut18 = _amount * 10**(18 - AlluoERC20Upgradable(_targetToken).decimals());
+        uint adjustedAmount = amountOut18 * interestIndexFactor / interestIndex;
+        _burn(msg.sender, adjustedAmount);
+        IERC20Upgradeable(_targetToken).safeTransfer(msg.sender, _amount);
+        emit BurnedForWithdraw(msg.sender, adjustedAmount);
     }
 
-    function deposit(address _token, uint256 _amount) external whenNotPaused {
-        require(supportedTokens.contains(_token), "this token is not supported");
-        
-        IERC20Upgradeable(_token).safeTransferFrom(msg.sender, address(liquidityBuffer), _amount);
-        claim(msg.sender);
+   
+    /// @notice  Returns balance in USD
+    /// @param _address address of user
 
-        liquidityBuffer.deposit(_token, _amount);
-
-        uint256 amountIn18 = _amount * 10**(18 - OldAlluoERC20Upgradable(_token).decimals());
-        _mint(msg.sender, amountIn18);
-
-        emit Deposited(msg.sender, _token, amountIn18);
+    function getBalance(address _address) public view returns (uint256) {
+        uint _interestIndex = chargeInterest(interestIndex, interestRate, lastInterestCompound);
+        return balanceOf(_address) * _interestIndex / interestIndexFactor;
     }
+
+    /// @notice  Sets the new interest rate 
+    /// @dev When called, it sets the new interest rate by after updating the index.
+    /// @param _newInterest New interest rate = interest per second (100000000244041*10**13 == 8% APY)
+  
+    function setInterest(uint _newInterest)
+        public
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        uint oldValue = interestIndex;
+        updateInterestIndex();
+        interestRate = _newInterest;
+        emit V4InterestChanged(oldValue, _newInterest);
+    }
+
+    /// @notice migrates by setting new interest variables.
+    /// @dev Only call this after all balances are claimed (before upgrade is initiated)
+    ///  So 1. Claim all balances --> 2. Upgrade the contract  3. Call migrate()
+
+    function migrate() external onlyRole(DEFAULT_ADMIN_ROLE){
+        require(!migrated, "Already migrated");
+        interestRate = 100000000244041*10**13;
+        interestIndexFactor = 10**18;
+        interestIndex = 10**18;
+        lastInterestCompound = block.timestamp;
+        migrated = true;
+    }
+
 
     function mint(address _user, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
-        
-        claim(_user);
         _mint(_user, _amount);
     }
 
@@ -164,17 +201,6 @@ contract AlluoLpV3ForMumbai is
             supportedTokens.remove(_token);
         }
         emit DepositTokenStatusChanged(_token, _status);
-    }
-
-    function setInterest(uint8 _newInterest)
-        public
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        update();
-        uint8 oldValue = interest;
-        interest = _newInterest;
-
-        emit InterestChanged(oldValue, _newInterest);
     }
 
     function setUpdateTimeLimit(uint256 _newLimit)
@@ -191,6 +217,7 @@ contract AlluoLpV3ForMumbai is
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
+        require(newWallet.isContract(), "AlluoLp: Not contract");
 
         address oldValue = wallet;
         wallet = newWallet;
@@ -202,12 +229,10 @@ contract AlluoLpV3ForMumbai is
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(newBuffer.isContract(), "AlluoLp: not contract");
+        require(newBuffer.isContract(), "AlluoLp: Not contract");
 
-        //address oldValue = wallet;
-        liquidityBuffer = LiquidityBufferVaultForMumbai(newBuffer);
+        liquidityBuffer = LiquidityBufferVault(newBuffer);
 
-        //emit NewWalletSet(oldValue, newWallet);
     }
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -223,7 +248,9 @@ contract AlluoLpV3ForMumbai is
         override
         onlyRole(getRoleAdmin(role))
     {
-
+        if(role == DEFAULT_ADMIN_ROLE){
+            require(account.isContract(), "AlluoLp: Not contract");
+        }
         _grantRole(role, account);
     }
 
@@ -232,25 +259,6 @@ contract AlluoLpV3ForMumbai is
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         upgradeStatus = _status;
-    }
-
-    function getBalance(address _address) public view returns (uint256) {
-        if (userDF[_address] != 0) {
-            uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
-            uint256 localDF;
-            if (timeFromLastUpdate >= updateTimeLimit) {
-                localDF =
-                    ((DF *
-                        (((interest * DENOMINATOR * timeFromLastUpdate) /
-                            31536000) + (100 * DENOMINATOR))) / DENOMINATOR) /
-                    100;
-            } else {
-                localDF = DF;
-            }
-            return ((localDF * balanceOf(_address)) / userDF[_address]);
-        } else {
-            return 0;
-        }
     }
 
     function getListSupportedTokens() public view returns (address[] memory) {
@@ -262,8 +270,6 @@ contract AlluoLpV3ForMumbai is
         address to,
         uint256 amount
     ) internal override {
-        claim(from);
-        claim(to);
         super._beforeTokenTransfer(from, to, amount);
     }
 

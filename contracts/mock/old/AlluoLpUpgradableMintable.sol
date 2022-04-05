@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.0;
 
-import "../../Farming/AlluoERC20Upgradable.sol";
+import "./OldAlluoERC20Upgradable.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -10,11 +10,11 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
-
+import "hardhat/console.sol";
 contract AlluoLpUpgradableMintable is 
     Initializable, 
     PausableUpgradeable, 
-    AlluoERC20Upgradable, 
+    OldAlluoERC20Upgradable, 
     AccessControlUpgradeable, 
     UUPSUpgradeable 
 {
@@ -24,40 +24,50 @@ contract AlluoLpUpgradableMintable is
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    // Debt factor: variable which grow after any action from user
-    // based on current interest rate and time from last update call
-    // this is a large number for a more accurate calculation
-    uint256 public DF;
-
-    // time of last DF update
-    uint256 public lastDFUpdate;
-
     // time limit for using update
     uint256 public updateTimeLimit;
-
-    // DF of user from last user action on contract
-    mapping(address => uint256) public userDF;
 
     // list of tokens from which deposit available
     EnumerableSetUpgradeable.AddressSet private supportedTokens;
 
-    // constant for percent calculation
-    uint256 public DENOMINATOR;
-
     // admin and reserves address
     address public wallet;
 
-    // current interest rate
-    uint8 public interest;
-    
     //flag for upgrades availability
     bool public upgradeStatus;
 
+    // Epoch contains timestamps that indicate interest rate regime changes.
+    // Interest is a 10^12 uint that is a daily APR
+    // x^365 = 8% APY
+    //  x = 0.02108743983 % ==> Stored as 100021087439
+    // Divide by interest factor to get 1.00021087439
+
+    uint interestFactor;
+    struct Epoch {
+        uint number;
+        uint interest;
+        uint timestamp;
+    }
+
+    struct DepositData {
+        uint deposit;
+        bool lock;
+        uint timestamp;
+        Epoch epoch;
+    }
+
+    struct PeriodsPerEpoch {
+        Epoch epoch;
+        uint periods;
+    }
+
+    mapping(address => DepositData) public deposits;
+    Epoch[] public epochs;
+
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
-    event InterestChanged(uint8 oldInterest, uint8 newInterest);
+    event InterestChanged(uint oldInterest, uint newInterest);
     event NewWalletSet(address oldWallet, address newWallet);
-    event ApyClaimed(address indexed user, uint256 apyAmount);
     event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
     event DepositTokenStatusChanged(address token, bool status);
 
@@ -76,74 +86,137 @@ contract AlluoLpUpgradableMintable is
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
         _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
-        DF = 10**20;
+        Epoch memory newEpoch = Epoch(0, 100021087, block.timestamp);
+        epochs.push(newEpoch);
         updateTimeLimit = 3600;
-        DENOMINATOR = 10**20;
-        interest = 8;
-
         wallet = _multiSigWallet;
+        interestFactor = 10**8;
 
         for(uint256 i = 0; i < _supportedTokens.length; i++){
             supportedTokens.add(_supportedTokens[i]);
         }
 
-        lastDFUpdate = block.timestamp;
-        update();
-
-        emit InterestChanged(0, interest);
         emit NewWalletSet(address(0), wallet);
 
     }
 
-    function update() public whenNotPaused {
-        uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
-        if (timeFromLastUpdate >= updateTimeLimit) {
-            DF =
-                ((DF *
-                    (((interest * DENOMINATOR * timeFromLastUpdate) / 31536000) +
-                        (100 * DENOMINATOR))) / DENOMINATOR) /
-                100;
-            lastDFUpdate = block.timestamp;
+    /// @notice  Allows deposits and compounding old balances accurately upon additional deposits
+    /// @dev When called, stablecoin is transferred to multisig wallet. 
+    ///      If deposits are empty, simply add to deposit data + mint new tokens
+    ///      If there is an existing balance, compound the balance and mint new coins  accordingly
+    /// @param _token Deposit token address (eg. USDC)
+    /// @param _amount Amount (parsed 10**18) 
+
+    function deposit(address _token, uint _amount) public whenNotPaused {
+        require(supportedTokens.contains(_token), "This token is not supported");
+        IERC20Upgradeable(_token).transferFrom(msg.sender, wallet, _amount);
+        if (deposits[msg.sender].deposit == 0) {
+            deposits[msg.sender] = DepositData(_amount, false, block.timestamp, epochs[epochs.length-1]);
+            _mint(msg.sender, _amount);
+        } else {
+            // Compound existing balance first, then set DepositData
+            uint compoundedBalance =_getCompoundedBalance(msg.sender);
+            _mint(msg.sender, compoundedBalance+_amount - deposits[msg.sender].deposit);
+            deposits[msg.sender] = DepositData(compoundedBalance+_amount, false, block.timestamp, epochs[epochs.length-1]);
         }
+        emit Deposited(msg.sender, _token, _amount);
     }
 
-    function claim(address _address) public whenNotPaused {
-        update();
-        if (userDF[_address] != 0) {
-            uint256 userBalance = balanceOf(_address);
-            uint256 userNewBalance = ((DF * userBalance) / userDF[_address]);
-            uint256 newAmount = userNewBalance - userBalance;
-            if (newAmount != 0) {
-                _mint(_address, newAmount);
-                emit ApyClaimed(_address, newAmount);
+    /// @notice  Withdraws accurately: Allows compounding on withdrawal and burns ERC20
+    /// @dev When called, immediately check for accurate compoundde balance. Then mint/burn accordingly to withdrawal amount
+    ///      Then adjust deposits array with updated balance and then safeTransfer to the caller.
+    /// @param _targetToken Stablecoin desired (eg. USDC)
+    /// @param _amount Amount (parsed 10**18) 
+
+    function withdraw(address _targetToken, uint256 _amount ) external whenNotPaused {
+        require(supportedTokens.contains(_targetToken), "This token is not supported");
+        uint compoundedBalance =_getCompoundedBalance(msg.sender);
+        if (compoundedBalance - _amount > deposits[msg.sender].deposit) {
+            _mint(msg.sender, compoundedBalance - deposits[msg.sender].deposit - _amount);
+        } else {
+            _burn(msg.sender, deposits[msg.sender].deposit + _amount- compoundedBalance );
+        }
+        deposits[msg.sender] = DepositData(compoundedBalance-_amount, false, block.timestamp, epochs[epochs.length-1]);
+        IERC20Upgradeable(_targetToken).safeTransfer(msg.sender, _amount);
+
+    }
+
+
+    /// @notice  Calculates accurate compounded balance (even across multiple rate changes)
+    /// @dev When called, if insufficient time has passed or never has deposited, return current amount. 
+    /// @dev Then call _getPeriodsPerEpoch to get accurate info of how many periods to compound at respective rates
+    ///      For example: 6 days at 5%, 30 days at 7%,  13 days at 3% --> in periodsPerEpoch
+    ///      Run loop to calculate final compouded depositValue
+    /// @param user User's address
+    /// @return depositValue Accurate compounded balance.
+    function _getCompoundedBalance(address user) internal view returns (uint) {
+        // Assume daily compounding:
+        if (block.timestamp < deposits[user].timestamp + 1 days || deposits[user].timestamp == 0) {
+            return deposits[user].deposit;
+        }
+        uint currentEpochNumber = epochs[epochs.length-1].number;
+        uint depositedEpochNumber = deposits[user].epoch.number;
+        uint depositValue = deposits[user].deposit;
+        PeriodsPerEpoch[] memory periodsPerEpoch =_getPeriodsPerEpoch(user, currentEpochNumber - depositedEpochNumber + 1);
+        for (uint i=0; i < periodsPerEpoch.length; i++) {
+            for (uint y=0; y< periodsPerEpoch[i].periods; y++) {
+                depositValue = depositValue * periodsPerEpoch[i].epoch.interest / interestFactor;
             }
         }
-        userDF[_address] = DF;
-    }
-    
-    function withdraw(uint256 _amount) external whenNotPaused {
-        claim(msg.sender);
-        _burn(msg.sender, _amount);
-
-        emit BurnedForWithdraw(msg.sender, _amount);
+        return depositValue;
     }
 
-    function deposit(address _token, uint256 _amount) external whenNotPaused {
-        require(supportedTokens.contains(_token), "this token is not supported");
-        
-        IERC20Upgradeable(_token).safeTransferFrom(msg.sender, wallet, _amount);
+    /// @notice  Finds how many periods have passed under each interest rate change
+    /// @dev When called, it compares the current epoch to the epoch when depositdata was last updated
+    ///      Then it finds how many compounding periods have passed in each epoch
+    ///      For example: 6 days at 5%, 30 days at 7%,  13 days at 3% --> in _periodsPerEpoch
+    /// @param user User's address
+    /// @param numberofEpochs Current Epoch Number
+    /// @return _periodsPerEpoch Array of {Epoch, periods} where Epoch contains epoch data.
 
-        uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
+    function _getPeriodsPerEpoch(address user, uint numberofEpochs) internal view returns (PeriodsPerEpoch[] memory) {
+        uint periods;
+        PeriodsPerEpoch[] memory _periodsPerEpoch = new PeriodsPerEpoch[](numberofEpochs);
+        for (uint i=0; i < numberofEpochs; i++) {
+            Epoch memory currentEpoch = epochs[deposits[user].epoch.number + i];
+            uint epochStartTime = currentEpoch.timestamp;
+            uint epochEndTime;
+            if (i == numberofEpochs -1) {
+                epochEndTime = block.timestamp;
+            } else {
+                epochEndTime = epochs[deposits[user].epoch.number + i+1].timestamp;
+            }
+            periods = (epochEndTime - epochStartTime) / 1 days;
+            PeriodsPerEpoch memory epochData = PeriodsPerEpoch(currentEpoch, periods);
+            _periodsPerEpoch[i] = epochData;
+        }
+        return _periodsPerEpoch;
+
+        uint256 amountIn18 = _amount * 10**(18 - OldAlluoERC20Upgradable(_token).decimals());
         claim(msg.sender);
         _mint(msg.sender, amountIn18);
 
-        emit Deposited(msg.sender, _token, amountIn18);
+    function getBalance(address _address) public view returns (uint256) {
+        return _getCompoundedBalance(_address);
     }
 
     function mint(address _user, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
-        
-        claim(_user);
+    
         _mint(_user, _amount);
+    }
+
+    /// @notice  Sets the new interest rate and pushes a new epoch
+    /// @dev When called, it sets the new interest rate by pushing a new epoch
+    /// @param _newInterest New interest rate (100021087 = 0.021087% daily)
+  
+    function setInterest(uint _newInterest)
+        public
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        uint oldValue = epochs[epochs.length-1].interest;
+        Epoch memory newEpoch = Epoch(epochs.length, _newInterest, block.timestamp);
+        epochs.push(newEpoch);
+        emit InterestChanged(oldValue, _newInterest);
     }
 
     function changeTokenStatus(address _token, bool _status) external
@@ -156,18 +229,6 @@ contract AlluoLpUpgradableMintable is
             supportedTokens.remove(_token);
         }
         emit DepositTokenStatusChanged(_token, _status);
-    }
-
-
-    function setInterest(uint8 _newInterest)
-        public
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        update();
-        uint8 oldValue = interest;
-        interest = _newInterest;
-
-        emit InterestChanged(oldValue, _newInterest);
     }
 
     function setUpdateTimeLimit(uint256 _newLimit)
@@ -218,36 +279,29 @@ contract AlluoLpUpgradableMintable is
         upgradeStatus = _status;
     }
 
-    function getBalance(address _address) public view returns (uint256) {
-        if (userDF[_address] != 0) {
-            uint256 timeFromLastUpdate = block.timestamp - lastDFUpdate;
-            uint256 localDF;
-            if (timeFromLastUpdate >= updateTimeLimit) {
-                localDF =
-                    ((DF *
-                        (((interest * DENOMINATOR * timeFromLastUpdate) /
-                            31536000) + (100 * DENOMINATOR))) / DENOMINATOR) /
-                    100;
-            } else {
-                localDF = DF;
-            }
-            return ((localDF * balanceOf(_address)) / userDF[_address]);
-        } else {
-            return 0;
-        }
-    }
-
     function getListSupportedTokens() public view returns (address[] memory) {
         return supportedTokens.values();
     }
+
+    /// @notice  When any transfer is called, compounds balances appropriately and adjusts balances / mints
+    /// @dev When called, it simply updates both to and from balances, mints any difference.
 
     function _beforeTokenTransfer(
         address from,
         address to,
         uint256 amount
     ) internal override {
-        claim(from);
-        claim(to);
+        uint compoundedBalance =_getCompoundedBalance(from);
+        if (compoundedBalance > deposits[from].deposit) {
+            _mint(from, compoundedBalance - deposits[from].deposit);
+        }
+        deposits[from] = DepositData(compoundedBalance-amount, false, block.timestamp, epochs[epochs.length-1]);
+
+        uint toCompoundedBalance = _getCompoundedBalance(to);
+        if (toCompoundedBalance > deposits[to].deposit) {
+            _mint(to, toCompoundedBalance - deposits[to].deposit);
+        }
+        deposits[to] = DepositData(toCompoundedBalance + amount, false, block.timestamp, epochs[epochs.length-1]);
         super._beforeTokenTransfer(from, to, amount);
     }
 

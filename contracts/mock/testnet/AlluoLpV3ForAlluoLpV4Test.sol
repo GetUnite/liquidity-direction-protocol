@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "./AlluoERC20Upgradable.sol";
-import "./LiquidityBufferVault.sol";
+import "../../Farming/AlluoERC20Upgradable.sol";
+import "../../Farming/LiquidityBufferVault.sol";
 import "hardhat/console.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -13,7 +13,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
-contract AlluoLpV3 is 
+contract AlluoLpV3ForAlluoLpV4Test is 
     Initializable, 
     PausableUpgradeable, 
     AlluoERC20Upgradable, 
@@ -133,7 +133,7 @@ contract AlluoLpV3 is
         IERC20Upgradeable(_token).safeTransferFrom(msg.sender, address(liquidityBuffer), _amount);
         claim(msg.sender);
 
-        liquidityBuffer.deposit(_token, _amount);
+        // liquidityBuffer.deposit(_token, _amount);
 
         uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
         _mint(msg.sender, amountIn18);
