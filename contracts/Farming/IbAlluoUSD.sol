@@ -61,6 +61,7 @@ contract IbAlluoUSD is
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
     event NewWalletSet(address oldWallet, address newWallet);
+    event NewBufferSet(address oldBuffer, address newBuffer);
     event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
     event DepositTokenStatusChanged(address token, bool status);
 
@@ -74,7 +75,7 @@ contract IbAlluoUSD is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(address _multiSigWallet, address _buffer, address[] memory _supportedTokens) public initializer {
+   function initialize(address _multiSigWallet, address _buffer, address[] memory _supportedTokens) public initializer {
         __ERC20_init("Interest Bearing Alluo USD", "IbAlluoUSD");
         __Pausable_init();
         __AccessControl_init();
@@ -96,6 +97,7 @@ contract IbAlluoUSD is
         liquidityBuffer = _buffer;
 
         emit NewWalletSet(address(0), wallet);
+        emit NewBufferSet(address(0), liquidityBuffer);
     }
 
 
@@ -168,7 +170,7 @@ contract IbAlluoUSD is
     /// @dev When called, stable coin is sent to the wallet, then the index is updated
     ///      so that the adjusted amount is accurate.
     /// @param _token Deposit token address (eg. USDC)
-    /// @param _amount Amount (parsed 10**18) 
+    /// @param _amount Amount (with token desimals) 
 
     function deposit(address _token, uint256 _amount) external {
         require(supportedTokens.contains(_token), "IbAlluo: Token not supported");
@@ -188,7 +190,7 @@ contract IbAlluoUSD is
     /// @dev When called, immediately check for new interest index. Then find the adjusted amount in LP tokens
     ///      Then burn appropriate amount of LP tokens to receive USDC/ stablecoin
     /// @param _targetToken Stablecoin desired (eg. USDC)
-    /// @param _amount Amount (parsed 10**18) in stablecoins
+    /// @param _amount Amount (parsed 10**18)
 
     function withdraw(address _targetToken, uint256 _amount ) external {
         require(supportedTokens.contains(_targetToken), "IbAlluo: Token not supported");
@@ -238,7 +240,7 @@ contract IbAlluoUSD is
         interestPerSecond = _newInterestPerSecond * 10**10;
         emit InterestChanged(oldAnnualValue, annualInterest, oldValuePerSecond, interestPerSecond);
     }
-
+    
     /// @notice migrates by minting balances.
 
     function migrateStep1(address _oldContract, address[] memory _users) external onlyRole(DEFAULT_ADMIN_ROLE){
@@ -260,7 +262,7 @@ contract IbAlluoUSD is
         annualInterest = 800;
         updateTimeLimit = 60;
     }
-
+    
     function changeTokenStatus(address _token, bool _status) external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
@@ -301,7 +303,9 @@ contract IbAlluoUSD is
     {
         require(newBuffer.isContract(), "IbAlluo: Not contract");
 
+        address oldValue = liquidityBuffer;
         liquidityBuffer = newBuffer;
+        emit NewBufferSet(oldValue, liquidityBuffer);
 
     }
 

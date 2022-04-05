@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../mock/old/OldAlluoERC20Upgradable.sol";
-import "./LiquidityBufferVault.sol";
-import "../mock/interestHelper/Interest.sol";
+import "./OldAlluoERC20Upgradable.sol";
+import "../../Farming/LiquidityBufferVault.sol";
+import "../interestHelper/Interest.sol";
 import "hardhat/console.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
