@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../../Farming/AlluoERC20Upgradable.sol";
+import "../../mock/old/OldAlluoERC20Upgradable.sol";
 import "./LiquidityBufferVaultForMumbai.sol";
 import "hardhat/console.sol";
 
@@ -16,7 +16,7 @@ import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeab
 contract AlluoLpV3ForMumbai is 
     Initializable, 
     PausableUpgradeable, 
-    AlluoERC20Upgradable, 
+    OldAlluoERC20Upgradable, 
     AccessControlUpgradeable, 
     UUPSUpgradeable 
 {
@@ -142,7 +142,7 @@ contract AlluoLpV3ForMumbai is
 
         liquidityBuffer.deposit(_token, _amount);
 
-        uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
+        uint256 amountIn18 = _amount * 10**(18 - OldAlluoERC20Upgradable(_token).decimals());
         _mint(msg.sender, amountIn18);
 
         emit Deposited(msg.sender, _token, amountIn18);

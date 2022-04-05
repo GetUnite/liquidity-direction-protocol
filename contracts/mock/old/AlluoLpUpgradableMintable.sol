@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../../Farming/AlluoERC20Upgradable.sol";
+import "./OldAlluoERC20Upgradable.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -14,7 +14,7 @@ import "hardhat/console.sol";
 contract AlluoLpUpgradableMintable is 
     Initializable, 
     PausableUpgradeable, 
-    AlluoERC20Upgradable, 
+    OldAlluoERC20Upgradable, 
     AccessControlUpgradeable, 
     UUPSUpgradeable 
 {
@@ -192,7 +192,9 @@ contract AlluoLpUpgradableMintable is
         }
         return _periodsPerEpoch;
 
-    }
+        uint256 amountIn18 = _amount * 10**(18 - OldAlluoERC20Upgradable(_token).decimals());
+        claim(msg.sender);
+        _mint(msg.sender, amountIn18);
 
     function getBalance(address _address) public view returns (uint256) {
         return _getCompoundedBalance(_address);
