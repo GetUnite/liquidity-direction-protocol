@@ -61,6 +61,7 @@ contract IbAlluo is
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
     event NewWalletSet(address oldWallet, address newWallet);
+    event NewBufferSet(address oldBuffer, address newBuffer);
     event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
     event DepositTokenStatusChanged(address token, bool status);
 
@@ -74,28 +75,43 @@ contract IbAlluo is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(address _multiSigWallet, address _buffer, address[] memory _supportedTokens) public initializer {
-        __ERC20_init("Interest Bearing Alluo USD", "IbAlluoUSD");
+    function initialize(
+        string memory _name, 
+        string memory _symbol, 
+        address _multiSigWallet, 
+        address _buffer,
+        address[] memory _supportedTokens,
+        uint256 _interestPerSecond,
+        uint256 _annualInterest
+    ) public initializer {
+        __ERC20_init(_name, _symbol);
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
         require(_multiSigWallet.isContract(), "IbAlluo: Not contract");
+        require(_buffer.isContract(), "IbAlluo: Not contract");
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
 
         for(uint256 i = 0; i < _supportedTokens.length; i++){
             supportedTokens.add(_supportedTokens[i]);
             emit DepositTokenStatusChanged(_supportedTokens[i], true);
         }
-        _pause();
+
+        interestPerSecond = _interestPerSecond*10**13;
+        annualInterest = _annualInterest;
+        multiplier = 10**18;
+        growingRatio = 10**18;
+        updateTimeLimit = 60;
+        lastInterestCompound = block.timestamp;
 
         wallet = _multiSigWallet;
         liquidityBuffer = _buffer;
 
         emit NewWalletSet(address(0), wallet);
+        emit NewBufferSet(address(0), liquidityBuffer);
     }
 
 
@@ -165,10 +181,10 @@ contract IbAlluo is
     }
 
     /// @notice  Allows deposits and updates the index, then mints the new appropriate amount.
-    /// @dev When called, stable coin is sent to the wallet, then the index is updated
+    /// @dev When called, asset token is sent to the wallet, then the index is updated
     ///      so that the adjusted amount is accurate.
-    /// @param _token Deposit token address (eg. USDC)
-    /// @param _amount Amount (parsed 10**18) 
+    /// @param _token Deposit token address
+    /// @param _amount Amount (with token desimals) 
 
     function deposit(address _token, uint256 _amount) external {
         require(supportedTokens.contains(_token), "IbAlluo: Token not supported");
@@ -185,10 +201,10 @@ contract IbAlluo is
     }
 
     /// @notice  Withdraws accuratel
-    /// @dev When called, immediately check for new interest index. Then find the adjusted amount in LP tokens
-    ///      Then burn appropriate amount of LP tokens to receive USDC/ stablecoin
-    /// @param _targetToken Stablecoin desired (eg. USDC)
-    /// @param _amount Amount (parsed 10**18) in stablecoins
+    /// @dev When called, immediately check for new interest index. Then find the adjusted amount in IbAlluo tokens
+    ///      Then burn appropriate amount of IbAlluo tokens to receive asset token
+    /// @param _targetToken Asset token
+    /// @param _amount Amount (parsed 10**18)
 
     function withdraw(address _targetToken, uint256 _amount ) external {
         require(supportedTokens.contains(_targetToken), "IbAlluo: Token not supported");
@@ -200,7 +216,7 @@ contract IbAlluo is
         emit BurnedForWithdraw(msg.sender, adjustedAmount);
     }
    
-    /// @notice  Returns balance in USD
+    /// @notice  Returns balance in asset value
     /// @param _address address of user
 
     function getBalance(address _address) public view returns (uint256) {
@@ -208,7 +224,7 @@ contract IbAlluo is
         return balanceOf(_address) * _growingRatio / multiplier;
     }
 
-    /// @notice  Returns balance in USD with correct info from update
+    /// @notice  Returns balance in asset value with correct info from update
     /// @param _address address of user
 
     function getBalanceForTransfer(address _address) public view returns (uint256) {
@@ -237,28 +253,6 @@ contract IbAlluo is
         annualInterest = _newAnnualInterest;
         interestPerSecond = _newInterestPerSecond * 10**10;
         emit InterestChanged(oldAnnualValue, annualInterest, oldValuePerSecond, interestPerSecond);
-    }
-
-    /// @notice migrates by minting balances.
-
-    function migrateStep1(address _oldContract, address[] memory _users) external onlyRole(DEFAULT_ADMIN_ROLE){
-        for(uint i = 0; i < _users.length; i++){
-            uint256 oldBalance = AlluoERC20Upgradable(_oldContract).balanceOf(_users[i]);
-            _mint(_users[i], oldBalance);
-        }
-    }
-
-    /// @notice migrates by setting new interest variables.
-
-    function migrateStep2() external onlyRole(DEFAULT_ADMIN_ROLE){
-        _unpause();
-        _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        interestPerSecond = 100000000244041*10**13;
-        multiplier = 10**18;
-        growingRatio = 10**18;
-        lastInterestCompound = block.timestamp;
-        annualInterest = 800;
-        updateTimeLimit = 60;
     }
 
     function changeTokenStatus(address _token, bool _status) external
@@ -301,7 +295,9 @@ contract IbAlluo is
     {
         require(newBuffer.isContract(), "IbAlluo: Not contract");
 
+        address oldValue = liquidityBuffer;
         liquidityBuffer = newBuffer;
+        emit NewBufferSet(oldValue, liquidityBuffer);
 
     }
 

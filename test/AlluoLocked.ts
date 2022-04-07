@@ -47,8 +47,8 @@ describe("Locking contract", function () {
         addr = await ethers.getSigners();
 
         Token = await ethers.getContractFactory("TestERC20") as ContractFactory;
-        lockingToken = await Token.deploy("Test Alluo", "TAL", 18) as TestERC20;
-        rewardToken = await Token.deploy("Test Reward Alluo", "TRAL", 18) as TestERC20;
+        lockingToken = await Token.deploy("Test Alluo", "TAL", 18, true) as TestERC20;
+        rewardToken = await Token.deploy("Test Reward Alluo", "TRAL", 18, true) as TestERC20;
 
         Multisig = await ethers.getContractFactory("PseudoMultisigWallet");
         multisig = await Multisig.deploy(true) as PseudoMultisigWallet;
