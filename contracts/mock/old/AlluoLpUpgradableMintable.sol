@@ -191,10 +191,10 @@ contract AlluoLpUpgradableMintable is
             _periodsPerEpoch[i] = epochData;
         }
         return _periodsPerEpoch;
-
-        uint256 amountIn18 = _amount * 10**(18 - OldAlluoERC20Upgradable(_token).decimals());
-        claim(msg.sender);
-        _mint(msg.sender, amountIn18);
+    }
+        // uint256 amountIn18 = _amount * 10**(18 - OldAlluoERC20Upgradable(_token).decimals());
+        // claim(msg.sender);
+        // _mint(msg.sender, amountIn18);
 
     function getBalance(address _address) public view returns (uint256) {
         return _getCompoundedBalance(_address);

@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
-
-import "../interfaces/ICurvePool.sol";
-
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
@@ -10,7 +7,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
+import "@openzeppelin/contracts/utils/Address.sol";
 
 contract LiquidityBufferVault is
     Initializable,
@@ -18,19 +15,14 @@ contract LiquidityBufferVault is
     AccessControlUpgradeable,
     UUPSUpgradeable 
 {
-    using AddressUpgradeable for address;
+    using Address for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
-
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     // admin and reserves address
     address public wallet;
-
     // address of main contract with which users will interact  
     address public alluoLp;
-
-    // AAVE curve pool
-    ICurvePool public curvePool;
 
     //flag for upgrades availability
     bool public upgradeStatus;
@@ -71,13 +63,9 @@ contract LiquidityBufferVault is
     // index of last satisfied withdrawal in queue
     uint256 public lastSatisfiedWithdrawal;
 
-    // acceptable by alluoLp and curve tokens as deposit
-    IERC20Upgradeable public DAI;
-    IERC20Upgradeable public USDC;
-    IERC20Upgradeable public USDT;
 
     event EnoughToSatisfy(
-        uint256 inPoolAfterDeposit, 
+        uint256 inBufferAfterDeposit, 
         uint256 totalAmountInWithdrawals
     );
 
@@ -97,11 +85,22 @@ contract LiquidityBufferVault is
         uint256 requestTime
     );
 
+    struct InputToken {
+        address tokenAddress;
+        uint32 swapProtocol;
+        address poolAddress;
+    }
+    mapping(address => InputToken) public inputTokenMapping;
+    mapping(uint32 => address) public adaptors;
+
+    bytes4 public tempSigHash = 0x6012856e;
+    //  This is the primary token the contract will convert all holdings to.
+    address public primaryToken;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(address _multiSigWallet, address _alluoLp, address _curvePool) public initializer {
+    function initialize(address _multiSigWallet, address _alluoLp) public initializer {
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -115,7 +114,7 @@ contract LiquidityBufferVault is
         wallet = _multiSigWallet;
         bufferPercentage = 500;
         slippage = 200;
-        curvePool = ICurvePool(_curvePool);
+
         alluoLp = _alluoLp;
 
         maxWaitingTime = 3600 * 23;
@@ -123,103 +122,113 @@ contract LiquidityBufferVault is
 
     // allow curve pool to pull DAI, USDT and USDC from the buffer.
     function approveAll() external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
-        DAI = IERC20Upgradeable(0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063);
-        USDC = IERC20Upgradeable(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174);
-        USDT = IERC20Upgradeable(0xc2132D05D31c914a87C6611C10748AEb04B58e8F);
+        // DAI = IERC20Upgradeable(0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063);
+        // USDC = IERC20Upgradeable(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174);
+        // USDT = IERC20Upgradeable(0xc2132D05D31c914a87C6611C10748AEb04B58e8F);
 
-        DAI.safeApprove(address(curvePool), type(uint256).max);
-        USDC.safeApprove(address(curvePool), type(uint256).max);
-        USDT.safeApprove(address(curvePool), type(uint256).max);
+        // DAI.safeApprove(address(curvePool), type(uint256).max);
+        // USDC.safeApprove(address(curvePool), type(uint256).max);
+        // USDT.safeApprove(address(curvePool), type(uint256).max);
+    }
+
+    function sendFundsToMultiSig(address _token, uint256 _amount) internal whenNotPaused {
+        IERC20Upgradeable(_token).transfer(wallet, _amount);
+    }
+
+    function enterAdaptorDelegateCall(
+        address _adaptor,
+        address _tokenFrom,
+        address _pool,
+        uint256 _amount
+        ) internal whenNotPaused returns (uint256) {
+        // These funds may/may not be liquidatable.
+        // Liquidatable example: Held in an LP somewhere on chain.
+        // Not liquidatable example: Funds are converted and withdrawn, then bridged.
+        bytes memory returnedData = _adaptor.functionDelegateCall(
+            // Change to enter pool sig hash
+            abi.encodeWithSelector(tempSigHash, _tokenFrom, _pool, _amount)
+        );
+        return abi.decode(returnedData, (uint256));
+    }
+    function convertTokenToPrimaryToken(
+        address _adaptor,
+        address _tokenFrom,
+        address _pool,
+        uint256 _amount
+    ) internal whenNotPaused returns (uint256) {
+        // If token input is not the primary token, convert it.
+        // These funds are immediately liquidatable as they are held in an LP.
+        // Or in a wallet. 
+        if (_tokenFrom != primaryToken) {
+            // Simply uses an adaptor to convert the input token to the primary token
+            bytes memory returnedData = _adaptor.functionDelegateCall(
+                // Change to "ConvertTokenToPrimaryTokenSigHash"
+                abi.encodeWithSelector(tempSigHash, _tokenFrom, _pool, _amount)
+            );
+            return abi.decode(returnedData, (uint256));
+        }
+        return 0;
+    }
+
+    function exitAdaptorDelegateCall(
+        address _adaptor,
+        address _tokenFrom,
+        address _pool,
+        uint256 _amount
+        ) internal whenNotPaused returns (uint256) {
+        // Liquidates a position to withdraw. Only works if funds are held on chain.
+        // If the funds have been moved to a different wallet that is inaccessible from the smart contract, it will not show here.
+
+        bytes memory returnedData = _adaptor.functionDelegateCall(
+            // Change to ""ExitPoolSigHash"
+            abi.encodeWithSelector(tempSigHash, _tokenFrom, _pool, _amount)
+        );
+        return abi.decode(returnedData, (uint256));
+    }
+
+    function exitAdaptorDelegateCallBalanceCheck (
+        address _adaptor,
+        address _tokenFrom,
+        address _pool
+        ) internal whenNotPaused returns (uint256) {
+        // This returns all the immediately liquidatable funds
+        // Liquidatable: All funds on chain
+        // Not liquidatable: Funds which have been bridged.
+        bytes memory returnedData = _adaptor.functionDelegateCall(
+            // Change to ""ExitPoolSigHashBalanceCheck"
+            abi.encodeWithSelector(tempSigHash, _tokenFrom, _pool)
+        );
+        return abi.decode(returnedData, (uint256));
     }
 
     // function checks how much in buffer now and hom much should be
     // fills buffer and sends to wallet what left (conveting it to usdc)
+    // @params _amount is  10**18
     function deposit(address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 inBuffer = getBufferAmount();
+        uint256 expectedBufferAmount = getExpectedBufferAmount(_amount);
+        InputToken memory currentToken = inputTokenMapping[_token];
+        address adaptor = adaptors[currentToken.swapProtocol];
+        require(adaptor != address(0), "Vault: adaptor invalid");
 
-        uint256 inPool = getBufferAmount();
-
-        if (IERC20Upgradeable(_token) == DAI) {
-            uint256 lpAmount = curvePool.add_liquidity([_amount, 0, 0], 0, true);
-            uint256 shouldBeInPool = getExpectedBufferAmount(_amount);
-            if (inPool < shouldBeInPool) {
-
-                if (shouldBeInPool < inPool + _amount) {
-                    uint256 toWallet = inPool + _amount - shouldBeInPool;
-                    uint256 toWalletIn6 = toWallet / 10 ** 12;
-                    
-                    curvePool.remove_liquidity_imbalance(
-                        [0, toWalletIn6, 0],
-                        toWallet * (10000 + slippage) / 10000,
-                        true
-                    );
-                    USDC.safeTransfer(wallet, toWalletIn6);
-                }
+        if (inBuffer < expectedBufferAmount) {
+            if (expectedBufferAmount < inBuffer + _amount) {
+                // Only deposit the amount exceeding the min buffer into the adaptor
+                // Convert/Keep remainder input tokens to primary token
+                uint256 toBeDeposited = inBuffer + _amount - expectedBufferAmount;
+                uint256 remainder = _amount - toBeDeposited;
+                enterAdaptorDelegateCall(adaptor, _token, currentToken.poolAddress, toBeDeposited);
+                convertTokenToPrimaryToken(adaptor, _token, currentToken.poolAddress, remainder);
             } else {
-                uint minAmountOut = _amount * (10000 - slippage) / 10000;
-
-                uint256 toWallet = curvePool.remove_liquidity_one_coin(
-                    lpAmount,
-                    1,
-                    minAmountOut / 10 ** 12,
-                    true
-                );
-                USDC.safeTransfer(wallet, toWallet);
+                // Else, if ,after the deposit, the buffer is not filled, just hold funds, but convert to primary token. (do nothing)
+                convertTokenToPrimaryToken(adaptor, _token, currentToken.poolAddress, _amount);
             }
-        } else if (IERC20Upgradeable(_token) == USDC) {
-            uint256 amountIn18 = _amount * 10 ** 12;
-            uint256 shouldBeInPool = getExpectedBufferAmount(amountIn18);
-            if (inPool < shouldBeInPool) {
-
-                if (shouldBeInPool < inPool + amountIn18) {
-                    uint256 toPoolIn18 = shouldBeInPool - inPool;
-                    curvePool.add_liquidity(
-                        [0, toPoolIn18 / 10 ** 12, 0],
-                        0,
-                        true
-                    );
-                    USDC.safeTransfer(wallet, (amountIn18 - toPoolIn18) / 10 ** 12);
-                } else {
-                    curvePool.add_liquidity([0, _amount, 0], 0, true);
-                }
-            } else {
-                USDC.safeTransfer(wallet, _amount);
-            }
-        } 
-        else {      //      _token == USDT
-            uint256 amountIn18 = _amount * 10 ** 12;
-            uint256 lpAmount = curvePool.add_liquidity([0, 0, _amount], 0, true);
-            uint256 shouldBeInPool = getExpectedBufferAmount(amountIn18);
-            if (inPool < shouldBeInPool) {
-
-                if (shouldBeInPool < inPool + amountIn18) {
-                    uint256 toWallet = inPool + amountIn18 - shouldBeInPool;
-                    uint256 toWalletIn6 = toWallet / 10 ** 12;
-                    curvePool.remove_liquidity_imbalance(
-                        [0, toWalletIn6, 0],
-                        toWallet * (10000 + slippage) / 10000,
-                        true
-                    );
-                    USDC.safeTransfer(wallet, toWalletIn6);
-                }
-            } else {
-                uint256 toWallet = curvePool.remove_liquidity_one_coin(
-                    lpAmount,
-                    1,
-                    _amount * (10000 - slippage) / 10000,
-                    true
-                );
-                USDC.safeTransfer(wallet, toWallet);
-            }
+          
+        } else {
+            // If there is sufficient funds in the buffer, immediately send all funds to adaptor
+            // Now do delegate call and deposit funds in a LP using an LP
+            enterAdaptorDelegateCall(adaptor,  _token, currentToken.poolAddress, _amount);
         }
-
-        if(lastWithdrawalRequest != lastSatisfiedWithdrawal && !keepersTrigger){
-            uint256 inPoolNow = getBufferAmount();
-            if(withdrawals[lastSatisfiedWithdrawal + 1].amount <= inPoolNow){
-                keepersTrigger = true;
-                emit EnoughToSatisfy(inPoolNow, totalWithdrawalAmount);
-            }
-        }
-
     }
 
 
@@ -227,47 +236,15 @@ contract LiquidityBufferVault is
     // or is queue empty, if so sending chosen tokens
     // if not adding withdrawal in queue
     function withdraw(address _user, address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
-
-        uint256 inPool = getBufferAmount();
-        if (inPool > _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
-            uint256 toUser;
-
-            if (IERC20Upgradeable(_token) == DAI) {
-                curvePool.remove_liquidity_imbalance(
-                    [_amount, 0, 0], 
-                    _amount * (10000 + slippage) / 10000, 
-                    true
-                );
-                toUser = _amount;
-                DAI.safeTransfer(_user, toUser);
-            } else if (IERC20Upgradeable(_token) == USDC) {
-                // We want to be save agains arbitragers so at any withraw of USDT/USDC
-                // contract checks how much will be burned curveLp by withrawing this amount in DAI
-                // and passes this burned amount to get USDC/USDT
-                uint256 toBurn = curvePool.calc_token_amount([_amount, 0, 0], false);
-                uint256 amountIn6 = _amount / 10 ** 12;
-                toUser = curvePool.remove_liquidity_one_coin(
-                    toBurn, 
-                    1, 
-                    amountIn6 * (10000 - slippage) / 10000, 
-                    true
-                );
-                USDC.safeTransfer(_user, toUser);
-            } else {    //      _token == USDT
-                
-                uint256 toBurn = curvePool.calc_token_amount([_amount, 0, 0], false);
-                uint256 amountIn6 = _amount / 10 ** 12;
-                toUser = curvePool.remove_liquidity_one_coin(
-                    toBurn, 
-                    2, 
-                    amountIn6 * (10000 - slippage) / 10000, 
-                    true
-                );
-                USDT.safeTransfer(_user, toUser);
-            }
-
-            emit WithrawalSatisfied(_user, _token, toUser, 0, block.timestamp);
+        uint256 inBuffer = getBufferAmount();
+        InputToken memory currentToken = inputTokenMapping[_token];
+        address adaptor = adaptors[currentToken.swapProtocol];
+        if (inBuffer > _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
+            // If there are enough funds to payout + all requests are satisfied,
+            exitAdaptorDelegateCall(adaptor, _token, currentToken.poolAddress, _amount);
+            emit WithrawalSatisfied(_user, _token, _amount, 0, block.timestamp);
         } else {
+            // Else, if there aren't enough funds, add to queue.
             lastWithdrawalRequest++;
             uint256 timeNow = block.timestamp;
             withdrawals[lastWithdrawalRequest] = Withdrawal({
@@ -285,48 +262,16 @@ contract LiquidityBufferVault is
     // triggered by BE or chainlink keepers  
     function satisfyWithdrawals() external whenNotPaused{
         if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
-
-            uint256 inPool = getBufferAmount();
+            uint256 inBuffer = getBufferAmount();
             while (lastSatisfiedWithdrawal != lastWithdrawalRequest) {
                 Withdrawal memory withdrawal = withdrawals[lastSatisfiedWithdrawal + 1];
                 uint256 amount = withdrawal.amount;
-                if (amount <= inPool) {
-                    
-                    uint256 toUser;
-
-                    if (IERC20Upgradeable(withdrawal.token) == DAI) {
-
-                        curvePool.remove_liquidity_imbalance(
-                            [amount, 0, 0], 
-                            amount * (10000 + slippage) / 10000, 
-                            true
-                        );
-                        toUser = amount;
-                        DAI.safeTransfer(withdrawal.user, toUser);
-                    } else if (IERC20Upgradeable(withdrawal.token) == USDC) {
-                        uint256 toBurn = curvePool.calc_token_amount([amount, 0, 0], false);
-                        uint256 amountIn6 = amount / 10 ** 12;
-                        toUser = curvePool.remove_liquidity_one_coin(
-                            toBurn, 
-                            1, 
-                            amountIn6 * (10000 - slippage) / 10000, 
-                            true
-                        );
-                        USDC.safeTransfer(withdrawal.user, toUser);
-                    } 
-                    else {     //      _token == USDT
-                        uint256 toBurn = curvePool.calc_token_amount([amount, 0, 0], false);
-                        uint256 amountIn6 = amount / 10 ** 12;
-                        toUser = curvePool.remove_liquidity_one_coin(
-                            toBurn, 
-                            2, 
-                            amountIn6 * (10000 - slippage) / 10000, 
-                            true
-                        );
-                        USDT.safeTransfer(withdrawal.user, toUser);
-                    }
-                    
-                    inPool -= amount;
+                if (amount <= inBuffer) {
+                    InputToken memory currentToken = inputTokenMapping[withdrawal.token];
+                    address adaptor = adaptors[currentToken.swapProtocol];
+                    exitAdaptorDelegateCall(adaptor, withdrawal.token, currentToken.poolAddress, amount);
+                   
+                    inBuffer -= amount;
                     totalWithdrawalAmount -= amount;
                     lastSatisfiedWithdrawal++;
                     keepersTrigger = false;
@@ -334,7 +279,7 @@ contract LiquidityBufferVault is
                     emit WithrawalSatisfied(
                         withdrawal.user, 
                         withdrawal.token, 
-                        toUser, 
+                        amount, 
                         lastSatisfiedWithdrawal,
                         block.timestamp
                     );
@@ -353,19 +298,78 @@ contract LiquidityBufferVault is
     function setBufferPersentage(uint32 _newPercentage) external onlyRole(DEFAULT_ADMIN_ROLE) {
         bufferPercentage = _newPercentage;
     }
-
+    
     function getExpectedBufferAmount(uint256 _newAmount) public view returns(uint256) {
-        return (_newAmount + ERC20(alluoLp).totalSupply()) * bufferPercentage / 10000 + totalWithdrawalAmount;
+        return (_newAmount + IERC20Upgradeable(alluoLp).totalSupply()) * bufferPercentage / 10000 + totalWithdrawalAmount;
     }
 
-    function getBufferAmount() public view returns(uint256) {
-        uint256 curveLp = IERC20(curvePool.lp_token()).balanceOf(address(this));
+    // This is a view function but incorrectly compiles due to the architecture of delegateCall.
+    function getBufferAmount() public  returns(uint256) {
+        // Returns what can immediately be liquidated
+        // If the adaptor has sent the funds to another chain, it will not show here.
+        // If the adaptor can withdraw/unstake immediately to withdraw, it is considered part of the buffer.
+        // Most times, investments will probably be cross chain and not only on chain. 
+        InputToken memory currentToken = inputTokenMapping[primaryToken];
+        address adaptor = adaptors[currentToken.swapProtocol];
+        return exitAdaptorDelegateCallBalanceCheck(adaptor, primaryToken, currentToken.poolAddress);
+    }
 
-        if(curveLp != 0){
-            return curvePool.calc_withdraw_one_coin(curveLp, 0);
+    /// @notice Register swap/lp token adaptors
+    /// @param protocolIds protocol id of adapter to add
+    function registerAdaptors(
+        address[] calldata _adaptors,
+        uint32[] calldata protocolIds
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 length = _adaptors.length;
+        require(length == protocolIds.length, "Buffer: length discrepancy");
+        for (uint256 i = 0; i < length; i++) {
+            adaptors[protocolIds[i]] = _adaptors[i];
         }
-        return 0;
     }
+
+    /// @notice Unregister swap/lp token adaptors
+    /// @param protocolIds protocol id of adapter to remove
+    function unregisterAdaptors(
+        uint32[] calldata protocolIds
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 length = protocolIds.length;
+        for (uint256 i = 0; i < length; i++) {
+            delete adaptors[protocolIds[i]];
+        }
+    }
+
+    /// @notice Register inputToken
+    /// @param protocolIds protocol id of adapter to add
+    function registerInputTokens(
+        address[] calldata inputTokenAdresses,
+        uint32[] calldata protocolIds,
+        address[] calldata poolAddresses
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 length = inputTokenAdresses.length;
+        require(length == protocolIds.length && length == poolAddresses.length, "Buffer: length discrepancy");
+        for (uint256 i = 0; i < length; i++) {
+            InputToken memory currentToken = InputToken(inputTokenAdresses[i], protocolIds[i], poolAddresses[i]);
+            inputTokenMapping[inputTokenAdresses[i]] = currentToken;
+        }
+    }
+
+    /// @notice Unregister swap/lp token adaptors
+    /// @param protocolIds protocol id of adapter to remove
+    function unregisterAdaptors(
+        uint32[] calldata protocolIds
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 length = protocolIds.length;
+        for (uint256 i = 0; i < length; i++) {
+            delete adaptors[protocolIds[i]];
+        }
+    }
+    //    struct InputToken {
+    //     address tokenAddress;
+    //     uint32 swapProtocol;
+    //     address poolAddress;
+    // }
+    // mapping(address => InputToken) public inputTokenMapping;
+
 
     function setWallet(address newWallet)
     external
@@ -375,27 +379,7 @@ contract LiquidityBufferVault is
         wallet = newWallet;
     }
 
-    function setCurvePool(address newPool)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        require(newPool.isContract(), "Buffer: Not contract");
-
-        curvePool = ICurvePool(newPool);
-
-    }
-
     function setAlluoLp(address newAlluoLp)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        require(newAlluoLp.isContract(), "Buffer: Not contract");
-        _grantRole(DEFAULT_ADMIN_ROLE, newAlluoLp);
-        _revokeRole(DEFAULT_ADMIN_ROLE, alluoLp);
-        alluoLp = newAlluoLp;
-    }
-
-    function setWaitingTime(address newAlluoLp)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
