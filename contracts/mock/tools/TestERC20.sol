@@ -29,7 +29,7 @@ contract TestERC20 is ERC20, ERC20Burnable, AccessControl {
         return realDecimals;
     }
 
-    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
+    function mint(address to, uint256 amount) public {
         _mint(to, amount);
     }
 }

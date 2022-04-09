@@ -9,12 +9,15 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-contract LiquidityBufferVault is
+import "hardhat/console.sol";
+
+contract LiquidityBufferVaultV2 is
     Initializable,
     PausableUpgradeable,
     AccessControlUpgradeable,
     UUPSUpgradeable 
 {
+    
     using Address for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -93,7 +96,7 @@ contract LiquidityBufferVault is
     mapping(address => InputToken) public inputTokenMapping;
     mapping(uint32 => address) public adaptors;
 
-    bytes4 public tempSigHash = 0x6012856e;
+    bytes4 public tempSigHash;
     //  This is the primary token the contract will convert all holdings to.
     address public primaryToken;
 
@@ -116,7 +119,7 @@ contract LiquidityBufferVault is
         slippage = 200;
 
         alluoLp = _alluoLp;
-
+        tempSigHash =  0x6012856e;
         maxWaitingTime = 3600 * 23;
     }
 
@@ -131,7 +134,7 @@ contract LiquidityBufferVault is
         // USDT.safeApprove(address(curvePool), type(uint256).max);
     }
 
-    function sendFundsToMultiSig(address _token, uint256 _amount) internal whenNotPaused {
+    function sendFundsToMultiSig(address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
         IERC20Upgradeable(_token).transfer(wallet, _amount);
     }
 
@@ -144,11 +147,17 @@ contract LiquidityBufferVault is
         // These funds may/may not be liquidatable.
         // Liquidatable example: Held in an LP somewhere on chain.
         // Not liquidatable example: Funds are converted and withdrawn, then bridged.
-        bytes memory returnedData = _adaptor.functionDelegateCall(
+
+        // Do nothing if address(0) = adaptor. This is the default code used for nothing.
+        if (_adaptor == address(0)) {
+            return _amount;
+        } else {
+            bytes memory returnedData = _adaptor.functionDelegateCall(
             // Change to enter pool sig hash
             abi.encodeWithSelector(tempSigHash, _tokenFrom, _pool, _amount)
-        );
-        return abi.decode(returnedData, (uint256));
+            );
+            return abi.decode(returnedData, (uint256));
+        }
     }
     function convertTokenToPrimaryToken(
         address _adaptor,
@@ -172,18 +181,23 @@ contract LiquidityBufferVault is
 
     function exitAdaptorDelegateCall(
         address _adaptor,
+        address _user,
         address _tokenFrom,
         address _pool,
         uint256 _amount
         ) internal whenNotPaused returns (uint256) {
         // Liquidates a position to withdraw. Only works if funds are held on chain.
         // If the funds have been moved to a different wallet that is inaccessible from the smart contract, it will not show here.
-
-        bytes memory returnedData = _adaptor.functionDelegateCall(
+        if (_adaptor == address(0)) {
+            IERC20Upgradeable(_tokenFrom).safeTransfer(_user, _amount);
+            return _amount;
+        } else {
+            bytes memory returnedData = _adaptor.functionDelegateCall(
             // Change to ""ExitPoolSigHash"
             abi.encodeWithSelector(tempSigHash, _tokenFrom, _pool, _amount)
-        );
-        return abi.decode(returnedData, (uint256));
+            );
+            return abi.decode(returnedData, (uint256));
+        }
     }
 
     function exitAdaptorDelegateCallBalanceCheck (
@@ -194,22 +208,26 @@ contract LiquidityBufferVault is
         // This returns all the immediately liquidatable funds
         // Liquidatable: All funds on chain
         // Not liquidatable: Funds which have been bridged.
+         if (_adaptor == address(0)) {
+            return IERC20Upgradeable(_tokenFrom).balanceOf(address(this));
+        } else {
         bytes memory returnedData = _adaptor.functionDelegateCall(
             // Change to ""ExitPoolSigHashBalanceCheck"
             abi.encodeWithSelector(tempSigHash, _tokenFrom, _pool)
         );
         return abi.decode(returnedData, (uint256));
+        }
     }
 
     // function checks how much in buffer now and hom much should be
     // fills buffer and sends to wallet what left (conveting it to usdc)
     // @params _amount is  10**18
-    function deposit(address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
+    function deposit(address _user, address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 inBuffer = getBufferAmount();
         uint256 expectedBufferAmount = getExpectedBufferAmount(_amount);
+        IERC20Upgradeable(_token).safeTransferFrom(_user, address(this), _amount);
         InputToken memory currentToken = inputTokenMapping[_token];
         address adaptor = adaptors[currentToken.swapProtocol];
-        require(adaptor != address(0), "Vault: adaptor invalid");
 
         if (inBuffer < expectedBufferAmount) {
             if (expectedBufferAmount < inBuffer + _amount) {
@@ -239,9 +257,9 @@ contract LiquidityBufferVault is
         uint256 inBuffer = getBufferAmount();
         InputToken memory currentToken = inputTokenMapping[_token];
         address adaptor = adaptors[currentToken.swapProtocol];
-        if (inBuffer > _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
+        if (inBuffer >= _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
             // If there are enough funds to payout + all requests are satisfied,
-            exitAdaptorDelegateCall(adaptor, _token, currentToken.poolAddress, _amount);
+            exitAdaptorDelegateCall(adaptor, _user, _token, currentToken.poolAddress, _amount);
             emit WithrawalSatisfied(_user, _token, _amount, 0, block.timestamp);
         } else {
             // Else, if there aren't enough funds, add to queue.
@@ -269,7 +287,7 @@ contract LiquidityBufferVault is
                 if (amount <= inBuffer) {
                     InputToken memory currentToken = inputTokenMapping[withdrawal.token];
                     address adaptor = adaptors[currentToken.swapProtocol];
-                    exitAdaptorDelegateCall(adaptor, withdrawal.token, currentToken.poolAddress, amount);
+                    exitAdaptorDelegateCall(adaptor, withdrawal.user, withdrawal.token, currentToken.poolAddress, amount);
                    
                     inBuffer -= amount;
                     totalWithdrawalAmount -= amount;
@@ -338,38 +356,35 @@ contract LiquidityBufferVault is
         }
     }
 
-    /// @notice Register inputToken
+    /// @notice Register valid input tokens
     /// @param protocolIds protocol id of adapter to add
     function registerInputTokens(
-        address[] calldata inputTokenAdresses,
+        address[] calldata inputTokenAddresses,
         uint32[] calldata protocolIds,
         address[] calldata poolAddresses
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        uint256 length = inputTokenAdresses.length;
+        uint256 length = inputTokenAddresses.length;
         require(length == protocolIds.length && length == poolAddresses.length, "Buffer: length discrepancy");
         for (uint256 i = 0; i < length; i++) {
-            InputToken memory currentToken = InputToken(inputTokenAdresses[i], protocolIds[i], poolAddresses[i]);
-            inputTokenMapping[inputTokenAdresses[i]] = currentToken;
+            InputToken memory currentToken = InputToken(inputTokenAddresses[i], protocolIds[i], poolAddresses[i]);
+            inputTokenMapping[inputTokenAddresses[i]] = currentToken;
         }
     }
 
     /// @notice Unregister swap/lp token adaptors
-    /// @param protocolIds protocol id of adapter to remove
-    function unregisterAdaptors(
-        uint32[] calldata protocolIds
+    /// @param inputTokenAddresses Address of token to remove from mapping;
+    function unregisterInputTokens(
+        address[] calldata inputTokenAddresses
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        uint256 length = protocolIds.length;
+        uint256 length = inputTokenAddresses.length;
         for (uint256 i = 0; i < length; i++) {
-            delete adaptors[protocolIds[i]];
+            delete inputTokenMapping[inputTokenAddresses[i]];
         }
     }
-    //    struct InputToken {
-    //     address tokenAddress;
-    //     uint32 swapProtocol;
-    //     address poolAddress;
-    // }
-    // mapping(address => InputToken) public inputTokenMapping;
 
+    function setPrimaryToken(address newPrimaryToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        primaryToken = newPrimaryToken;
+    }
 
     function setWallet(address newWallet)
     external
@@ -385,7 +400,9 @@ contract LiquidityBufferVault is
     {
         require(newAlluoLp.isContract(), "Buffer: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, newAlluoLp);
-        _revokeRole(DEFAULT_ADMIN_ROLE, alluoLp);
+        if (alluoLp != wallet) {
+            _revokeRole(DEFAULT_ADMIN_ROLE, alluoLp);
+        }
         alluoLp = newAlluoLp;
     }
 
@@ -479,15 +496,6 @@ contract LiquidityBufferVault is
         uint256[] memory empty;
         return (empty, 0);
     }
-
-    function removeTokenByAddress(address _address, uint256 _amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        require(_address != address(0), "Invalid token address");
-        IERC20Upgradeable(_address).safeTransfer(msg.sender, _amount);
-    }
-
 
     function _authorizeUpgrade(address newImplementation)
     internal
