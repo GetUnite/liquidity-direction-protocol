@@ -1,7 +1,9 @@
+import { TransactionReceipt } from "@ethersproject/abstract-provider";
 import { parseEther, parseUnits } from "@ethersproject/units";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { BigNumberish, BytesLike } from "ethers";
+import { BigNumber, BigNumberish, BytesLike } from "ethers";
+import { Interface } from "ethers/lib/utils";
 import { ethers, upgrades, } from "hardhat";
 import { before, Test } from "mocha";
 import { IERC20, TestERC20, TestERC20__factory, PseudoMultisigWallet, PseudoMultisigWallet__factory, LiquidityBufferVault, LiquidityBufferVault__factory, IbAlluo, IbAlluo__factory, LiquidityBufferVaultV2, LiquidityBufferVaultV2__factory } from "../typechain";
@@ -95,80 +97,283 @@ describe("IbAlluo and Buffer for WETH", function () {
         await ibAlluoCurrent.migrateStep2();
     });
 
-    describe('Buffer integration with IbAlluo', function () {
-        it ("Depositing wETH should increase balance of liquidity buffer exactly", async function () {
-            await deposit(signers[1], wETH, parseEther('1'));
-            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("1"))
-        })
+    // describe('Buffer integration with IbAlluo', function () {
+    //     it ("Depositing wETH should increase balance of liquidity buffer exactly", async function () {
+    //         await deposit(signers[1], wETH, parseEther('1'));
+    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("1"))
+    //     })
 
-        it ("Depositing then withdrawing wETH should leave liquidity buffer with 0", async function () {
-            await deposit(signers[1], wETH, parseEther('1'));
-            await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("1"));
-            expect(await wETH.balanceOf(buffer.address)).equal(0)
-        })
-        it ("Multiple deposits should increase the balance of liquidity buffer exactly", async function () {
-            await deposit(signers[1], wETH, parseEther('1'));
-            await deposit(signers[2], wETH, parseEther('5'));
-            await deposit(signers[3], wETH, parseEther('10'));
-            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("16"))
-        })
+    //     it ("Depositing then withdrawing wETH should leave liquidity buffer with 0", async function () {
+    //         await deposit(signers[1], wETH, parseEther('1'));
+    //         await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("1"));
+    //         expect(await wETH.balanceOf(buffer.address)).equal(0)
+    //     })
+    //     it ("Multiple deposits should increase the balance of liquidity buffer exactly", async function () {
+    //         await deposit(signers[1], wETH, parseEther('1'));
+    //         await deposit(signers[2], wETH, parseEther('5'));
+    //         await deposit(signers[3], wETH, parseEther('10'));
+    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("16"))
+    //     })
 
-        it ("Multiple deposits and withdraws exactly should leave buffer with 0", async function () {
-            await deposit(signers[1], wETH, parseEther('1'));
-            await deposit(signers[2], wETH, parseEther('5'));
-            await deposit(signers[3], wETH, parseEther('10'));
-            await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("1"));
-            await ibAlluoCurrent.connect(signers[2]).withdraw(wETH.address, parseEther("5"));
-            await ibAlluoCurrent.connect(signers[3]).withdraw(wETH.address, parseEther("10"));
+    //     it ("Multiple deposits and withdraws exactly should leave buffer with 0", async function () {
+    //         await deposit(signers[1], wETH, parseEther('1'));
+    //         await deposit(signers[2], wETH, parseEther('5'));
+    //         await deposit(signers[3], wETH, parseEther('10'));
+    //         await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("1"));
+    //         await ibAlluoCurrent.connect(signers[2]).withdraw(wETH.address, parseEther("5"));
+    //         await ibAlluoCurrent.connect(signers[3]).withdraw(wETH.address, parseEther("10"));
 
-            expect(await wETH.balanceOf(buffer.address)).equal(0)
-        })
+    //         expect(await wETH.balanceOf(buffer.address)).equal(0)
+    //     })
    
-    });
+    // });
 
-    describe('Buffer Deposit: Test all if statements', function () {
-        it ("If inBuffer<expectedBufferAmount && expectedBufferAmount < inBuffer + _amount", async function () {
-            // Initially, buffer = 0
-            // When wEth comes in, goes into double if statements
-            // Then funds are removed.
-            // New deposit is added (exceeding 5% of 107).
-            await deposit(signers[2], wETH, parseEther('100'));
-            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("100"))
+    // describe('Buffer Deposit: Test all if statements', function () {
+    //     it ("If inBuffer<expectedBufferAmount && expectedBufferAmount < inBuffer + _amount", async function () {
+    //         // Initially, buffer = 0
+    //         // When wEth comes in, goes into double if statements
+    //         // Then funds are removed.
+    //         // New deposit is added (exceeding 5% of 107).
+    //         await deposit(signers[2], wETH, parseEther('100'));
+    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("100"))
 
-            sendFundsToMultiSig(wETH, parseEther("100"));
-            await deposit(signers[1], wETH, parseEther('7'));
-            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("7"))
+    //         sendFundsToMultiSig(wETH, parseEther("100"));
+    //         await deposit(signers[1], wETH, parseEther('7'));
+    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("7"))
 
 
-        })
+    //     })
 
-        it ("If inBuffer<expectedBufferAmount && expectedBufferAmount > inBuffer + _amount", async function () {
-            // Initially, buffer = 0
-            // When wEth comes in, goes into double if statements
-            // Then funds are removed. Only 3 left.
-            // New deposit is added of 1. Total eth in contract is 4.
-            // This is below the expectedBuffer amount, so it just is held (enterAdaptorDelegateCall not carried out);
-            await deposit(signers[2], wETH, parseEther('100'));
-            sendFundsToMultiSig(wETH, parseEther("97"));
-            await deposit(signers[1], wETH, parseEther('1'));
-            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("4"))
+    //     it ("If inBuffer<expectedBufferAmount && expectedBufferAmount > inBuffer + _amount", async function () {
+    //         // Initially, buffer = 0
+    //         // When wEth comes in, goes into double if statements
+    //         // Then funds are removed. Only 3 left.
+    //         // New deposit is added of 1. Total eth in contract is 4.
+    //         // This is below the expectedBuffer amount, so it just is held (enterAdaptorDelegateCall not carried out);
+    //         await deposit(signers[2], wETH, parseEther('100'));
+    //         sendFundsToMultiSig(wETH, parseEther("97"));
+    //         await deposit(signers[1], wETH, parseEther('1'));
+    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("4"))
 
-        })
-        it ("If inBuffer>expectedBufferAmount ", async function () {
-            // Initially, buffer = 0
-            // When wEth comes in, goes into double if statements
-            // 5% withheld for buffer. 95 is sent to adaptor (but adaptor just holds) ==> total eth is 100
-            // New deposit is added of 100. TOtal eth = 200. Only 10 eth is expected in buffer.
-            // Therefore, sends all 100 eth to adaptor. But here it just  holds.
-            await deposit(signers[2], wETH, parseEther('100'));
-            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("100"))
-            await deposit(signers[2], wETH, parseEther('100'));
-            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("200"))
-        })
+    //     })
+    //     it ("If inBuffer>expectedBufferAmount ", async function () {
+    //         // Initially, buffer = 0
+    //         // When wEth comes in, goes into double if statements
+    //         // 5% withheld for buffer. 95 is sent to adaptor (but adaptor just holds) ==> total eth is 100
+    //         // New deposit is added of 100. TOtal eth = 200. Only 10 eth is expected in buffer.
+    //         // Therefore, sends all 100 eth to adaptor. But here it just  holds.
+    //         await deposit(signers[2], wETH, parseEther('100'));
+    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("100"))
+    //         await deposit(signers[2], wETH, parseEther('100'));
+    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("200"))
+    //     })
        
    
-    });
+    // });
    
+    describe('Buffer Withdraw: Test all if statements', function () {
+        it ("If inBuffer >= _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal", async function () {
+            // Initially, buffer = 0
+            // When wEth comes in, buffer = 100.
+            // When withdrawn, directly remove funds from buffer.
+            await deposit(signers[1], wETH, parseEther('100'));
+            // await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("50"))
+            await expect(await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("48")))
+            .to.emit(buffer, "WithdrawalSatisfied").withArgs(
+                signers[1].address, wETH.address, parseEther("48"), 0, (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
+            )
+            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("52"))
+
+
+        })
+
+        it ("If inBuffer < _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal", async function () {
+            // Add to queue, then do nothing.
+            // Initially, buffer = 0. Then admin removes all ETH.
+            // Balance is now 0 ETH.
+            // When withdrawn, increment withdrawalRequest and emit addedtoqueue event.
+            await deposit(signers[1], wETH, parseEther('100'));
+            sendFundsToMultiSig(wETH, parseEther("100"));
+            let previousRequestIndex : BigNumber= await buffer.lastWithdrawalRequest();
+            let previousWithdrawalSum : BigNumber= await buffer.totalWithdrawalAmount();
+
+            await expect(await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("48")))
+            .to.emit(buffer, "AddedToQueue").withArgs(
+                signers[1].address, wETH.address, parseEther("48"), previousRequestIndex.add(1), (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
+            )
+
+            expect(await buffer.lastWithdrawalRequest()).equal(previousRequestIndex.add(1))
+            expect(await buffer.totalWithdrawalAmount()).equal(previousWithdrawalSum.add(parseEther("48")))
+
+
+        })
+        it ("If inBuffer < _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal THEN do satisfyWithdrawals after there is sufficient ETH", async function () {
+            // Add to queue, then do nothing.
+            // Initially, buffer = 0. Then admin removes all ETH.
+            // Balance is now 0 ETH.
+            // When withdrawn, increment withdrawalRequest and emit addedtoqueue event.
+            await deposit(signers[1], wETH, parseEther('100'));
+            sendFundsToMultiSig(wETH, parseEther("100"));
+            let previousRequestIndex : BigNumber= await buffer.lastWithdrawalRequest();
+            let previousWithdrawalSum : BigNumber= await buffer.totalWithdrawalAmount();
+
+            await expect(await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("48")))
+            .to.emit(buffer, "AddedToQueue").withArgs(
+                signers[1].address, wETH.address, parseEther("48"), previousRequestIndex.add(1), (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
+            )
+
+            expect(await buffer.lastWithdrawalRequest()).equal(previousRequestIndex.add(1))
+            expect(await buffer.totalWithdrawalAmount()).equal(previousWithdrawalSum.add(parseEther("48")))
+
+            // Someone deposits and now there are sufficient funds to satisfy the withdrawal.
+            await deposit(signers[2], wETH, parseEther('100'));
+            previousRequestIndex = await buffer.lastWithdrawalRequest();
+            let previousSatisfiedIndex = await buffer.lastSatisfiedWithdrawal();
+            previousWithdrawalSum = await buffer.totalWithdrawalAmount();
+
+            // We can't use this snippet here because block.timestamp is off by very small amounts!
+            // So work around it.
+
+            // await expect(buffer.satisfyWithdrawals())
+            // .to.emit(buffer, "WithdrawalSatisfied").withArgs(
+            //     signers[1].address, wETH.address, parseEther("48"), previousSatisfiedIndex.add(1), (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
+            // )
+            const tx = await buffer.satisfyWithdrawals();
+            const receipt = await ethers.provider.getTransactionReceipt(tx.hash);
+            const interface1 = new ethers.utils.Interface(["event WithdrawalSatisfied(address indexed user, address token, uint256 amount, uint256 queueIndex, uint256 satisfiedTime)"]);
+            const event = fetchLastEmittedEvent(receipt, interface1, "WithdrawalSatisfied");
+            expect(event.user).equal(signers[1].address);
+            expect(event.token).equal(wETH.address);
+            expect(event.amount).equal(parseEther("48"));
+            expect(event.queueIndex).equal(previousSatisfiedIndex.add(1))
+
+            expect(await buffer.totalWithdrawalAmount()).equal(previousWithdrawalSum.sub(parseEther("48")));
+            expect(await wETH.balanceOf(signers[1].address)).equal(parseEther("48"));
+
+
+        })
+        it ("If inBuffer >= _amount && lastWithdrawalRequest != lastSatisfiedWithdrawal ", async function () {
+            // Add to queue, then start satisfyWithdrawals();
+            await deposit(signers[1], wETH, parseEther('100'));
+            await deposit(signers[2], wETH, parseEther('50'));
+
+            sendFundsToMultiSig(wETH, parseEther("100"));
+            let previousRequestIndex : BigNumber= await buffer.lastWithdrawalRequest();
+            let previousWithdrawalSum : BigNumber= await buffer.totalWithdrawalAmount();
+
+            // Now, when signer1 tries to withdraw 60, there is only 50, so he is added to the queue.
+            // Then, when signer 2 tries to withdraw 40, there is sufficient funds, but it should reject him and 
+            // check if signer 1 can be satisfied. 
+            // Signer 1 cannot be satisfied so once funds are added, call satisfyWithdrawals and it should payout signer 1 ONLY
+
+            await expect(await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("60")))
+            .to.emit(buffer, "AddedToQueue").withArgs(
+                signers[1].address, wETH.address, parseEther("60"), previousRequestIndex.add(1), (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
+            )
+
+
+            
+            // This should do NOTHING! Insufficient funds to payout signer 1
+            await buffer.satisfyWithdrawals();
+
+            await expect(await ibAlluoCurrent.connect(signers[2]).withdraw(wETH.address, parseEther("40")))
+            .to.emit(buffer, "AddedToQueue").withArgs(
+                signers[2].address, wETH.address, parseEther("40"), previousRequestIndex.add(2), (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
+            )
+
+            // This should do NOTHING! Insufficient funds to payout signer 1
+            await buffer.satisfyWithdrawals();
+
+            expect(await buffer.lastSatisfiedWithdrawal()).equal(0);
+
+            // Now signer 3 deposits enough for signer1 to withdraw, but not including signer 2
+            // Signer 1: 60, Signer 2: 40. 
+            // Total balance = 50 + 30 (new SIgner 3)
+            await deposit(signers[3], wETH, parseEther('30'));
+
+            const tx3 = await buffer.satisfyWithdrawals();
+            const receipt3 = await ethers.provider.getTransactionReceipt(tx3.hash);
+            const interface3 = new ethers.utils.Interface(["event WithdrawalSatisfied(address indexed user, address token, uint256 amount, uint256 queueIndex, uint256 satisfiedTime)"]);
+            const event3 = fetchLastEmittedEvent(receipt3, interface3, "WithdrawalSatisfied");
+            expect(event3.user).equal(signers[1].address);
+            expect(event3.token).equal(wETH.address);
+            expect(event3.amount).equal(parseEther("60"));
+            expect(event3.queueIndex).equal(1)
+
+            expect(await wETH.balanceOf(signers[1].address)).equal(parseEther("60"));
+            expect(await wETH.balanceOf(signers[2].address)).equal(parseEther("0"));
+            // When there is another deposit that allows signer 2 to withdraw, then he can.
+            await deposit(signers[3], wETH, parseEther('30'));
+
+            const tx4 = await buffer.satisfyWithdrawals();
+            const receipt4 = await ethers.provider.getTransactionReceipt(tx4.hash);
+            const interface4 = new ethers.utils.Interface(["event WithdrawalSatisfied(address indexed user, address token, uint256 amount, uint256 queueIndex, uint256 satisfiedTime)"]);
+            const event4 = fetchLastEmittedEvent(receipt4, interface4, "WithdrawalSatisfied");
+
+            expect(event4.user).equal(signers[2].address);
+            expect(event4.token).equal(wETH.address);
+            expect(event4.amount).equal(parseEther("40"));
+            expect(event4.queueIndex).equal(2)
+
+            expect(await wETH.balanceOf(signers[2].address)).equal(parseEther("40"));
+            // Expect that there are now ithdrawal requests outstanding.
+            expect(await buffer.totalWithdrawalAmount()).equal(0);
+            expect(await buffer.lastWithdrawalRequest()).equal(await buffer.lastSatisfiedWithdrawal());
+        })
+        it ("If inBuffer < _amount && lastWithdrawalRequest != lastSatisfiedWithdrawal ", async function () {
+            // Add to queue, then start satisfyWithdrawals();
+            await deposit(signers[1], wETH, parseEther('100'));
+            await deposit(signers[2], wETH, parseEther('50'));
+
+            sendFundsToMultiSig(wETH, parseEther("150"));
+            let previousRequestIndex : BigNumber= await buffer.lastWithdrawalRequest();
+            let previousWithdrawalSum : BigNumber= await buffer.totalWithdrawalAmount();
+
+            // Now, when signer1 tries to withdraw 60, there are no funds, so he is added to the queue.
+            // Then, when signer 2 tries to withdraw 40, there are no funds, so added to queue.
+            // Signer 1 cannot be satisfied so once funds are added, call satisfyWithdrawals and it should payout signer 1 ONLY
+
+            await expect(await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("60")))
+            .to.emit(buffer, "AddedToQueue").withArgs(
+                signers[1].address, wETH.address, parseEther("60"), previousRequestIndex.add(1), (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
+            )
+
+            // This should do NOTHING! Insufficient funds to payout signer 1
+            await buffer.satisfyWithdrawals();
+
+            await expect(await ibAlluoCurrent.connect(signers[2]).withdraw(wETH.address, parseEther("40")))
+            .to.emit(buffer, "AddedToQueue").withArgs(
+                signers[2].address, wETH.address, parseEther("40"), previousRequestIndex.add(2), (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
+            )
+
+            // This should do NOTHING! Insufficient funds to payout signer 1
+            await buffer.satisfyWithdrawals();
+
+            expect(await buffer.lastSatisfiedWithdrawal()).equal(0);
+
+            // Now signer 3 deposits enough for both signers to withdraw.
+            // Signer 1: 60, Signer 2: 40. 
+            // Total balance = 0 + 100 (new SIgner 3)
+            await deposit(signers[3], wETH, parseEther('100'));
+
+            const tx3 = await buffer.satisfyWithdrawals();
+
+            expect(await wETH.balanceOf(signers[1].address)).equal(parseEther("60"));
+            expect(await wETH.balanceOf(signers[2].address)).equal(parseEther("40"));
+            expect(await wETH.balanceOf(buffer.address)).equal(0);
+            expect(await buffer.totalWithdrawalAmount()).equal(0);
+            expect(await buffer.lastWithdrawalRequest()).equal(await buffer.lastSatisfiedWithdrawal());
+        })
+   
+    });
+
+
+    // Get the last event emitted for satisfyWithdrawals() (which is the one we're interested in)
+    function fetchLastEmittedEvent(receipt : TransactionReceipt, interface1: Interface, eventName: string) {
+        const data = receipt.logs[receipt.logs.length-1].data;
+        const topics = receipt.logs[receipt.logs.length-1].topics;
+        return interface1.decodeEventLog(eventName, data, topics);
+    } 
     async function deposit(recipient: SignerWithAddress, token: TestERC20, amount: BigNumberish) {
         await token.mint(recipient.address, amount);
         await token.connect(recipient).approve(ibAlluoCurrent.address, amount);

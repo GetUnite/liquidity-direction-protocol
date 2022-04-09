@@ -58,7 +58,7 @@ contract LiquidityBufferVaultV2 is
         uint256 time;
     }
 
-    // list of withrawals in queue
+    // list of Withdrawals in queue
     mapping(uint256 => Withdrawal) public withdrawals;
 
     // index of last withdrawal in queue
@@ -72,7 +72,7 @@ contract LiquidityBufferVaultV2 is
         uint256 totalAmountInWithdrawals
     );
 
-    event WithrawalSatisfied(
+    event WithdrawalSatisfied(
         address indexed user, 
         address token, 
         uint256 amount, 
@@ -260,7 +260,7 @@ contract LiquidityBufferVaultV2 is
         if (inBuffer >= _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
             // If there are enough funds to payout + all requests are satisfied,
             exitAdaptorDelegateCall(adaptor, _user, _token, currentToken.poolAddress, _amount);
-            emit WithrawalSatisfied(_user, _token, _amount, 0, block.timestamp);
+            emit WithdrawalSatisfied(_user, _token, _amount, 0, block.timestamp);
         } else {
             // Else, if there aren't enough funds, add to queue.
             lastWithdrawalRequest++;
@@ -294,7 +294,7 @@ contract LiquidityBufferVaultV2 is
                     lastSatisfiedWithdrawal++;
                     keepersTrigger = false;
                     
-                    emit WithrawalSatisfied(
+                    emit WithdrawalSatisfied(
                         withdrawal.user, 
                         withdrawal.token, 
                         amount, 
