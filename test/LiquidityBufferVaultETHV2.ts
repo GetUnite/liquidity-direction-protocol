@@ -6,7 +6,7 @@ import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import { ethers, upgrades, } from "hardhat";
 import { before, Test } from "mocha";
-import { IERC20, TestERC20, TestERC20__factory, PseudoMultisigWallet, PseudoMultisigWallet__factory, LiquidityBufferVault, LiquidityBufferVault__factory, IbAlluo, IbAlluo__factory, LiquidityBufferVaultV2, LiquidityBufferVaultV2__factory } from "../typechain";
+import { LiquidityBufferUSDAdaptor, LiquidityBufferUSDAdaptor__factory, TestERC20, TestERC20__factory, PseudoMultisigWallet, PseudoMultisigWallet__factory, LiquidityBufferVault, LiquidityBufferVault__factory, IbAlluoV2, IbAlluoV2__factory, LiquidityBufferVaultV2, LiquidityBufferVaultV2__factory } from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -43,7 +43,7 @@ describe("IbAlluo and Buffer for WETH", function () {
     let whale: SignerWithAddress;
     let curveLpHolder: SignerWithAddress;
 
-    let ibAlluoCurrent: IbAlluo;
+    let ibAlluoCurrent: IbAlluoV2;
     let multisig: PseudoMultisigWallet;
     let buffer: LiquidityBufferVaultV2;
 
@@ -56,7 +56,7 @@ describe("IbAlluo and Buffer for WETH", function () {
 
 
     beforeEach(async function () {
-        const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
+        const IbAlluo = await ethers.getContractFactory("IbAlluoV2") as IbAlluoV2__factory;
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
    
         const Buffer = await ethers.getContractFactory("LiquidityBufferVaultV2") as LiquidityBufferVaultV2__factory;
@@ -75,7 +75,7 @@ describe("IbAlluo and Buffer for WETH", function () {
             buffer.address,
             [wETH.address]],
             {initializer: 'initialize', kind:'uups'}
-        ) as IbAlluo;
+        ) as IbAlluoV2;
 
 
         let ABI = ["function setAlluoLp(address newAlluoLp)"];
@@ -88,88 +88,84 @@ describe("IbAlluo and Buffer for WETH", function () {
         calldata = iface.encodeFunctionData("setPrimaryToken", [wETH.address]);
         await multisig.executeCall(buffer.address, calldata);
 
-        ABI = ["function setPrimaryToken(address newPrimaryToken)"];
-        iface = new ethers.utils.Interface(ABI);
-        calldata = iface.encodeFunctionData("setPrimaryToken", [wETH.address]);
-        await multisig.executeCall(buffer.address, calldata);
 
         expect(await ibAlluoCurrent.liquidityBuffer()).equal(buffer.address);
         await ibAlluoCurrent.migrateStep2();
     });
 
-    // describe('Buffer integration with IbAlluo', function () {
-    //     it ("Depositing wETH should increase balance of liquidity buffer exactly", async function () {
-    //         await deposit(signers[1], wETH, parseEther('1'));
-    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("1"))
-    //     })
+    describe('Buffer integration with IbAlluo', function () {
+        it ("Depositing wETH should increase balance of liquidity buffer exactly", async function () {
+            await deposit(signers[1], wETH, parseEther('1'));
+            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("1"))
+        })
 
-    //     it ("Depositing then withdrawing wETH should leave liquidity buffer with 0", async function () {
-    //         await deposit(signers[1], wETH, parseEther('1'));
-    //         await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("1"));
-    //         expect(await wETH.balanceOf(buffer.address)).equal(0)
-    //     })
-    //     it ("Multiple deposits should increase the balance of liquidity buffer exactly", async function () {
-    //         await deposit(signers[1], wETH, parseEther('1'));
-    //         await deposit(signers[2], wETH, parseEther('5'));
-    //         await deposit(signers[3], wETH, parseEther('10'));
-    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("16"))
-    //     })
+        it ("Depositing then withdrawing wETH should leave liquidity buffer with 0", async function () {
+            await deposit(signers[1], wETH, parseEther('1'));
+            await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("1"));
+            expect(await wETH.balanceOf(buffer.address)).equal(0)
+        })
+        it ("Multiple deposits should increase the balance of liquidity buffer exactly", async function () {
+            await deposit(signers[1], wETH, parseEther('1'));
+            await deposit(signers[2], wETH, parseEther('5'));
+            await deposit(signers[3], wETH, parseEther('10'));
+            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("16"))
+        })
 
-    //     it ("Multiple deposits and withdraws exactly should leave buffer with 0", async function () {
-    //         await deposit(signers[1], wETH, parseEther('1'));
-    //         await deposit(signers[2], wETH, parseEther('5'));
-    //         await deposit(signers[3], wETH, parseEther('10'));
-    //         await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("1"));
-    //         await ibAlluoCurrent.connect(signers[2]).withdraw(wETH.address, parseEther("5"));
-    //         await ibAlluoCurrent.connect(signers[3]).withdraw(wETH.address, parseEther("10"));
+        it ("Multiple deposits and withdraws exactly should leave buffer with 0", async function () {
+            await deposit(signers[1], wETH, parseEther('1'));
+            await deposit(signers[2], wETH, parseEther('5'));
+            await deposit(signers[3], wETH, parseEther('10'));
+            await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("1"));
+            await ibAlluoCurrent.connect(signers[2]).withdraw(wETH.address, parseEther("5"));
+            await ibAlluoCurrent.connect(signers[3]).withdraw(wETH.address, parseEther("10"));
 
-    //         expect(await wETH.balanceOf(buffer.address)).equal(0)
-    //     })
+            expect(await wETH.balanceOf(buffer.address)).equal(0)
+        })
    
-    // });
+    });
 
-    // describe('Buffer Deposit: Test all if statements', function () {
-    //     it ("If inBuffer<expectedBufferAmount && expectedBufferAmount < inBuffer + _amount", async function () {
-    //         // Initially, buffer = 0
-    //         // When wEth comes in, goes into double if statements
-    //         // Then funds are removed.
-    //         // New deposit is added (exceeding 5% of 107).
-    //         await deposit(signers[2], wETH, parseEther('100'));
-    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("100"))
+    describe('Buffer Deposit: Test all if statements', function () {
+        it ("If inBuffer<expectedBufferAmount && expectedBufferAmount < inBuffer + _amount", async function () {
+            // Initially, buffer = 0
+            // When wEth comes in, goes into double if statements
+            // Then funds are removed.
+            // New deposit is added (exceeding 5% of 107).
+            await deposit(signers[2], wETH, parseEther('100'));
+            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("100"))
 
-    //         sendFundsToMultiSig(wETH, parseEther("100"));
-    //         await deposit(signers[1], wETH, parseEther('7'));
-    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("7"))
+            sendFundsToMultiSig(wETH, parseEther("100"));
+            await deposit(signers[1], wETH, parseEther('7'));
+            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("7"))
 
 
-    //     })
+        })
 
-    //     it ("If inBuffer<expectedBufferAmount && expectedBufferAmount > inBuffer + _amount", async function () {
-    //         // Initially, buffer = 0
-    //         // When wEth comes in, goes into double if statements
-    //         // Then funds are removed. Only 3 left.
-    //         // New deposit is added of 1. Total eth in contract is 4.
-    //         // This is below the expectedBuffer amount, so it just is held (enterAdaptorDelegateCall not carried out);
-    //         await deposit(signers[2], wETH, parseEther('100'));
-    //         sendFundsToMultiSig(wETH, parseEther("97"));
-    //         await deposit(signers[1], wETH, parseEther('1'));
-    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("4"))
+        it ("If inBuffer<expectedBufferAmount && expectedBufferAmount > inBuffer + _amount", async function () {
+            // Initially, buffer = 0
+            // When wEth comes in, goes into double if statements
+            // Then funds are removed. Only 3 left.
+            // New deposit is added of 1. Total eth in contract is 4.
+            // This is below the expectedBuffer amount, so it just is held (enterAdaptorDelegateCall not carried out);
+            await deposit(signers[2], wETH, parseEther('100'));
+            sendFundsToMultiSig(wETH, parseEther("97"));
+            await deposit(signers[1], wETH, parseEther('1'));
+            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("4"))
 
-    //     })
-    //     it ("If inBuffer>expectedBufferAmount ", async function () {
-    //         // Initially, buffer = 0
-    //         // When wEth comes in, goes into double if statements
-    //         // 5% withheld for buffer. 95 is sent to adaptor (but adaptor just holds) ==> total eth is 100
-    //         // New deposit is added of 100. TOtal eth = 200. Only 10 eth is expected in buffer.
-    //         // Therefore, sends all 100 eth to adaptor. But here it just  holds.
-    //         await deposit(signers[2], wETH, parseEther('100'));
-    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("100"))
-    //         await deposit(signers[2], wETH, parseEther('100'));
-    //         expect(await wETH.balanceOf(buffer.address)).equal(parseEther("200"))
-    //     })
+        })
+        it ("If inBuffer>expectedBufferAmount ", async function () {
+            // Initially, buffer = 0
+            // When wEth comes in, goes into double if statements
+            // 5% withheld for buffer. 95 is sent to adaptor (but adaptor just holds) ==> total eth is 100
+            // New deposit is added of 100. TOtal eth = 200. Only 10 eth is expected in buffer.
+            // Therefore, sends all 100 eth to adaptor. But here it just  holds.
+            await deposit(signers[2], wETH, parseEther('100'));
+            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("100"))
+            await deposit(signers[2], wETH, parseEther('100'));
+            expect(await wETH.balanceOf(buffer.address)).equal(parseEther("200"))
+        })
        
    
-    // });
+    });
    
     describe('Buffer Withdraw: Test all if statements', function () {
         it ("If inBuffer >= _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal", async function () {

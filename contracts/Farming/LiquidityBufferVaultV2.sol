@@ -24,6 +24,11 @@ contract LiquidityBufferVaultV2 is
 
     // admin and reserves address
     address public wallet;
+
+    // size of the acceptable slippage with 2 decimals
+    // 125 = 1.25%
+    uint32 public slippage;
+
     // address of main contract with which users will interact  
     address public alluoLp;
 
@@ -32,10 +37,6 @@ contract LiquidityBufferVaultV2 is
 
     //flag for chainlink keepers that withdrawal can be satisfied 
     bool public keepersTrigger;
-
-    // size of the acceptable slippage with 2 decimals
-    // 125 = 1.25%
-    uint32 public slippage;
 
     // percent of total alluoLp value which will go to curve pool
     // 525 = 5.25%
@@ -153,8 +154,8 @@ contract LiquidityBufferVaultV2 is
             return _amount;
         } else {
             bytes memory returnedData = _adaptor.functionDelegateCall(
-            // Change to enter pool sig hash
-            abi.encodeWithSelector(tempSigHash, _tokenFrom, _pool, _amount)
+            abi.encodeWithSignature("enterAdaptor(address,address,address,uint256,address,uint256)", 
+            _tokenFrom, primaryToken,wallet , _amount, _pool, slippage)
             );
             return abi.decode(returnedData, (uint256));
         }
@@ -168,15 +169,16 @@ contract LiquidityBufferVaultV2 is
         // If token input is not the primary token, convert it.
         // These funds are immediately liquidatable as they are held in an LP.
         // Or in a wallet. 
-        if (_tokenFrom != primaryToken) {
-            // Simply uses an adaptor to convert the input token to the primary token
+        // Simply uses an adaptor to convert the input token to the primary token
+        if (_adaptor == address(0)) {
+            return _amount;
+        } else {
             bytes memory returnedData = _adaptor.functionDelegateCall(
-                // Change to "ConvertTokenToPrimaryTokenSigHash"
-                abi.encodeWithSelector(tempSigHash, _tokenFrom, _pool, _amount)
+                abi.encodeWithSignature("convertTokenToPrimaryToken(address,uint256,address)",
+                _tokenFrom, _amount, _pool)
             );
             return abi.decode(returnedData, (uint256));
         }
-        return 0;
     }
 
     function exitAdaptorDelegateCall(
@@ -193,8 +195,8 @@ contract LiquidityBufferVaultV2 is
             return _amount;
         } else {
             bytes memory returnedData = _adaptor.functionDelegateCall(
-            // Change to ""ExitPoolSigHash"
-            abi.encodeWithSelector(tempSigHash, _tokenFrom, _pool, _amount)
+                abi.encodeWithSignature("exitAdaptor(address,address,address,address,uint256,address,uint256)",
+                _user, _tokenFrom, primaryToken, wallet, _amount, _pool, slippage )
             );
             return abi.decode(returnedData, (uint256));
         }
@@ -211,12 +213,23 @@ contract LiquidityBufferVaultV2 is
          if (_adaptor == address(0)) {
             return IERC20Upgradeable(_tokenFrom).balanceOf(address(this));
         } else {
-        bytes memory returnedData = _adaptor.functionDelegateCall(
-            // Change to ""ExitPoolSigHashBalanceCheck"
-            abi.encodeWithSelector(tempSigHash, _tokenFrom, _pool)
-        );
-        return abi.decode(returnedData, (uint256));
+            bytes memory returnedData = _adaptor.functionDelegateCall(
+                abi.encodeWithSignature("exitAdaptorGetBalance(address)",
+                _pool)
+            );
+            return abi.decode(returnedData, (uint256));
         }
+    }
+// onlyRole(DEFAULT_ADMIN_ROLE)
+    function approveAllDelegateCall (
+        address _adaptor,
+        address _pool) external whenNotPaused returns (uint256) {
+         if (_adaptor != address(0)) {
+            bytes memory returnedData = _adaptor.functionDelegateCall(
+                abi.encodeWithSignature("approveAll(address)", _pool)
+            );
+            return abi.decode(returnedData, (uint256));
+        } 
     }
 
     // function checks how much in buffer now and hom much should be
