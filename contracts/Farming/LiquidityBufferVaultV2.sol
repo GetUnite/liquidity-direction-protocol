@@ -97,7 +97,6 @@ contract LiquidityBufferVaultV2 is
     mapping(address => InputToken) public inputTokenMapping;
     mapping(uint32 => address) public adaptors;
 
-    bytes4 public tempSigHash;
     //  This is the primary token the contract will convert all holdings to.
     address public primaryToken;
 
@@ -120,19 +119,7 @@ contract LiquidityBufferVaultV2 is
         slippage = 200;
 
         alluoLp = _alluoLp;
-        tempSigHash =  0x6012856e;
         maxWaitingTime = 3600 * 23;
-    }
-
-    // allow curve pool to pull DAI, USDT and USDC from the buffer.
-    function approveAll() external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
-        // DAI = IERC20Upgradeable(0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063);
-        // USDC = IERC20Upgradeable(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174);
-        // USDT = IERC20Upgradeable(0xc2132D05D31c914a87C6611C10748AEb04B58e8F);
-
-        // DAI.safeApprove(address(curvePool), type(uint256).max);
-        // USDC.safeApprove(address(curvePool), type(uint256).max);
-        // USDT.safeApprove(address(curvePool), type(uint256).max);
     }
 
     function sendFundsToMultiSig(address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
@@ -154,8 +141,8 @@ contract LiquidityBufferVaultV2 is
             return _amount;
         } else {
             bytes memory returnedData = _adaptor.functionDelegateCall(
-            abi.encodeWithSignature("enterAdaptor(address,address,address,uint256,address,uint256)", 
-            _tokenFrom, primaryToken,wallet , _amount, _pool, slippage)
+                abi.encodeWithSelector(bytes4(keccak256(bytes("enterAdaptor(address,address,address,uint256,address,uint256)"))),
+                _tokenFrom, primaryToken, wallet , _amount, _pool, slippage)
             );
             return abi.decode(returnedData, (uint256));
         }
@@ -174,7 +161,7 @@ contract LiquidityBufferVaultV2 is
             return _amount;
         } else {
             bytes memory returnedData = _adaptor.functionDelegateCall(
-                abi.encodeWithSignature("convertTokenToPrimaryToken(address,uint256,address)",
+                abi.encodeWithSelector(bytes4(keccak256(bytes("convertTokenToPrimaryToken(address,uint256,address)"))),
                 _tokenFrom, _amount, _pool)
             );
             return abi.decode(returnedData, (uint256));
@@ -195,7 +182,7 @@ contract LiquidityBufferVaultV2 is
             return _amount;
         } else {
             bytes memory returnedData = _adaptor.functionDelegateCall(
-                abi.encodeWithSignature("exitAdaptor(address,address,address,address,uint256,address,uint256)",
+                abi.encodeWithSelector(bytes4(keccak256(bytes("exitAdaptor(address,address,address,address,uint256,address,uint256)"))),
                 _user, _tokenFrom, primaryToken, wallet, _amount, _pool, slippage )
             );
             return abi.decode(returnedData, (uint256));
@@ -214,21 +201,21 @@ contract LiquidityBufferVaultV2 is
             return IERC20Upgradeable(_tokenFrom).balanceOf(address(this));
         } else {
             bytes memory returnedData = _adaptor.functionDelegateCall(
-                abi.encodeWithSignature("exitAdaptorGetBalance(address)",
+                abi.encodeWithSelector(bytes4(keccak256(bytes("exitAdaptorGetBalance(address)"))),
                 _pool)
             );
             return abi.decode(returnedData, (uint256));
         }
     }
-// onlyRole(DEFAULT_ADMIN_ROLE)
+// onlyRole(DEFAULT_ADMIN_ROLE)\
+// whenNotPaused
     function approveAllDelegateCall (
         address _adaptor,
-        address _pool) external whenNotPaused returns (uint256) {
+        address _pool) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
          if (_adaptor != address(0)) {
             bytes memory returnedData = _adaptor.functionDelegateCall(
-                abi.encodeWithSignature("approveAll(address)", _pool)
+                abi.encodeWithSelector(bytes4(keccak256(bytes("AdaptorApproveAll(address)"))), _pool)
             );
-            return abi.decode(returnedData, (uint256));
         } 
     }
 

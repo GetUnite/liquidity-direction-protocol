@@ -4,38 +4,38 @@ pragma solidity ^0.8.11;
 import "../interfaces/ICurvePool.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
-
 contract LiquidityBufferUSDAdaptor {
     function enterAdaptor(address _token, address _primaryToken, address _wallet, uint256 _amount, address _pool, uint256 slippage) external returns (uint256) {
-        if (_token == 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063) {
-            uint256 lpAmount = ICurvePool(_pool).add_liquidity([_amount, 0, 0], 0, true);
-            uint256 toWallet6 = ICurvePool(_pool).remove_liquidity_one_coin(
-                    lpAmount,
-                    1,
-                    _amount * (10000 - slippage) / 10000,
-                    true
-                );
-            IERC20Upgradeable(_primaryToken).transfer(_wallet, toWallet6);
-            return toWallet6;
-        }
+        return 0;
+        // if (_token == 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063) {
+        //     uint256 lpAmount = ICurvePool(_pool).add_liquidity([_amount, 0, 0], 0, true);
+        //     uint256 toWallet6 = ICurvePool(_pool).remove_liquidity_one_coin(
+        //             lpAmount,
+        //             1,
+        //             _amount * (10000 - slippage) / 10000,
+        //             true
+        //         );
+        //     IERC20Upgradeable(_primaryToken).transfer(_wallet, toWallet6);
+        //     return toWallet6;
+        // }
 
-        else if (_token == 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174) {
-            uint256 toWallet6 = _amount / 10**12;
-            IERC20Upgradeable(_primaryToken).transfer(_wallet, toWallet6);
-            return toWallet6;
-        }
+        // else if (_token == 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174) {
+        //     uint256 toWallet6 = _amount / 10**12;
+        //     IERC20Upgradeable(_primaryToken).transfer(_wallet, toWallet6);
+        //     return toWallet6;
+        // }
 
-        else if (_token == 0xc2132D05D31c914a87C6611C10748AEb04B58e8F) {
-            uint256 lpAmount = ICurvePool(_pool).add_liquidity([0, 0, _amount], 0, true);
-            uint256 toWallet6 = ICurvePool(_pool).remove_liquidity_one_coin(
-                    lpAmount,
-                    1,
-                    _amount * (10000 - slippage) / 10000,
-                    true
-                );
-            IERC20Upgradeable(_primaryToken).transfer(_wallet, toWallet6);
-            return toWallet6;
-        }
+        // else if (_token == 0xc2132D05D31c914a87C6611C10748AEb04B58e8F) {
+        //     uint256 lpAmount = ICurvePool(_pool).add_liquidity([0, 0, _amount], 0, true);
+        //     uint256 toWallet6 = ICurvePool(_pool).remove_liquidity_one_coin(
+        //             lpAmount,
+        //             1,
+        //             _amount * (10000 - slippage) / 10000,
+        //             true
+        //         );
+        //     IERC20Upgradeable(_primaryToken).transfer(_wallet, toWallet6);
+        //     return toWallet6;
+        // }
     }
 
     function exitAdaptor(address _user, address _token, address _primaryToken, address _wallet, uint256 _amount, address _pool, uint256 slippage ) external returns (uint256) {
@@ -80,7 +80,9 @@ contract LiquidityBufferUSDAdaptor {
     }
 
     function exitAdaptorGetBalance(address _pool) external view returns (uint256) {
-        uint256 curveLp = IERC20Upgradeable(ICurvePool(_pool).lp_token()).balanceOf(address(this));
+        // uint256 curveLp = IERC20Upgradeable(ICurvePool(_pool).lp_token()).balanceOf(address(this));
+        uint256 curveLp = IERC20Upgradeable(0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171).balanceOf((address(this)));
+        // uint256 curveLp = 0;
         if(curveLp != 0){
             return ICurvePool(_pool).calc_withdraw_one_coin(curveLp, 0);
         }
@@ -106,7 +108,7 @@ contract LiquidityBufferUSDAdaptor {
         }
     }
 
-    function approveAll(address _pool) external {
+    function AdaptorApproveAll(address _pool) external {
         IERC20Upgradeable(0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063).approve(_pool, type(uint256).max);
         IERC20Upgradeable(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174).approve(_pool, type(uint256).max);
         IERC20Upgradeable(0xc2132D05D31c914a87C6611C10748AEb04B58e8F).approve(_pool, type(uint256).max);

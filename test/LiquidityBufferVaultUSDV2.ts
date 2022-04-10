@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { LiquidityBufferUSDAdaptor, LiquidityBufferUSDAdaptor__factory, IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests,  IbAlluo, IbAlluo__factory, IbAlluoV2, LiquidityBufferVaultV2, IbAlluoV2__factory, LiquidityBufferVaultV2__factory} from "../typechain";
+import { TestERC20, TestERC20__factory, LiquidityBufferUSDAdaptor, LiquidityBufferUSDAdaptor__factory, IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests,  IbAlluo, IbAlluo__factory, IbAlluoV2, LiquidityBufferVaultV2, IbAlluoV2__factory, LiquidityBufferVaultV2__factory} from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -103,6 +103,7 @@ describe("IbAlluo and Buffer", function () {
         const Adaptor = await ethers.getContractFactory("LiquidityBufferUSDAdaptor") as LiquidityBufferUSDAdaptor__factory;
         const Buffer = await ethers.getContractFactory("LiquidityBufferVaultV2") as LiquidityBufferVaultV2__factory;
         
+        const TestERC20Fac = await ethers.getContractFactory("TestERC20") as TestERC20__factory;
         let curvePool = "0x445FE580eF8d70FF569aB36e80c647af338db351"
 
         multisig = await Multisig.deploy(true);
@@ -141,27 +142,29 @@ describe("IbAlluo and Buffer", function () {
 
         ABI = ["function registerInputTokens(address[] calldata inputTokenAddresses, uint32[] calldata protocolIds, address[] calldata poolAddresses)"];
         iface = new ethers.utils.Interface(ABI);
-        calldata = iface.encodeFunctionData("registerInputTokens", [[dai.address, usdc.address, usdt.address], [0,0,0], [ZERO_ADDRESS,ZERO_ADDRESS,ZERO_ADDRESS]] );
+        calldata = iface.encodeFunctionData("registerInputTokens", [[dai.address, usdc.address, usdt.address], [0,0,0], [curvePool, curvePool, curvePool]] );
         await multisig.executeCall(buffer.address, calldata);
 
         ABI = ["function registerAdaptors(address[] calldata _adaptors, uint32[] calldata protocolIds)"];
         iface = new ethers.utils.Interface(ABI);
         calldata = iface.encodeFunctionData("registerAdaptors", [[adaptor.address], [0]]);
         await multisig.executeCall(buffer.address, calldata);
-        console.log("this is the adaptor address", adaptor.address);
 
-        // ABI = ["function approveAllDelegateCall (address _adaptor, address _pool)"];
-        // iface = new ethers.utils.Interface(ABI);
-        // calldata = iface.encodeFunctionData("approveAllDelegateCall", [adaptor.address, curvePool]);
-        // await multisig.executeCall(buffer.address, calldata);
-        await buffer.approveAllDelegateCall(adaptor.address, curvePool)
+        ABI = ["function approveAllDelegateCall (address _adaptor, address _pool)"];
+        iface = new ethers.utils.Interface(ABI);
+        calldata = iface.encodeFunctionData("approveAllDelegateCall", [adaptor.address, curvePool]);
+        await multisig.executeCall(buffer.address, calldata);
+
     });
 
     describe('USD Adaptor with IBAlluo + LiquidityBuffer', function () {
 
         it("Depositing dai should increase the balance of the liquidity buffer", async function () {
-            // await deposit(signers[0], dai, parseEther("100"));
-            // console.log(await buffer.getBufferAmount());
+            await deposit(signers[0], dai, parseEther("100"));
+            await ibAlluoCurrent.connect(signers[0]).withdraw(dai.address, parseEther("50"));
+            await deposit(signers[1], dai, parseEther("100"));
+            await buffer.satisfyWithdrawals();
+            expect(await dai.balanceOf(signers[0].address)).equal(parseEther("50"))
             // If delegatecall worked, we should have max approvals
             console.log(await dai.allowance(buffer.address, "0x445FE580eF8d70FF569aB36e80c647af338db351"))
         })
@@ -171,6 +174,8 @@ describe("IbAlluo and Buffer", function () {
         await token.connect(whale).transfer(recipient.address, amount);
 
         await token.connect(recipient).approve(ibAlluoCurrent.address, amount);
+        await token.connect(recipient).approve(buffer.address, amount);
+
         
         await ibAlluoCurrent.connect(recipient).deposit(token.address, amount);
     }
