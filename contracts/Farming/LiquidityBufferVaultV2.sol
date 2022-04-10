@@ -271,9 +271,13 @@ contract LiquidityBufferVaultV2 is
                 // Inputs to adaptor _amount = 10**18! Make sure to convert.
                 enterAdaptorDelegateCall(adaptor, _token, currentToken.poolAddress, toBeDeposited);
                 convertTokenToPrimaryToken(adaptor, _token, currentToken.poolAddress, remainder);
+                satisfyWithdrawals();
             } else {
                 // Else, if ,after the deposit, the buffer is not filled, just hold funds, but convert to primary token. (do nothing)
+                // This includes if outstanding withdrawals exist. Therefore, convert and satisfyWithdrawals() to confirm.
                 convertTokenToPrimaryToken(adaptor, _token, currentToken.poolAddress, _amount);
+                satisfyWithdrawals();
+
             }
           
         } else {
@@ -326,7 +330,7 @@ contract LiquidityBufferVaultV2 is
         // Expected buffer amount = 
         //  (newDeposit + totalSupply ibAlluo * index) * bufferPercentage + outstanding withdrawals
         // This is in 10**18.
-        return (_newAmount + IERC20Upgradeable(alluoLp).totalSupply()* IbAlluoV2(alluoLp).growingRatio()) * bufferPercentage / 10000 + totalWithdrawalAmount;
+        return (_newAmount + IERC20Upgradeable(alluoLp).totalSupply()* IbAlluoV2(alluoLp).growingRatio()/10**18) * bufferPercentage / 10000 + totalWithdrawalAmount;
     }
 
     // This is a view function but incorrectly compiles due to the architecture of delegateCall.

@@ -6,7 +6,7 @@ import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import { ethers, upgrades, } from "hardhat";
 import { before, Test } from "mocha";
-import { LiquidityBufferUSDAdaptor, LiquidityBufferUSDAdaptor__factory, TestERC20, TestERC20__factory, PseudoMultisigWallet, PseudoMultisigWallet__factory, LiquidityBufferVault, LiquidityBufferVault__factory, IbAlluoV2, IbAlluoV2__factory, LiquidityBufferVaultV2, LiquidityBufferVaultV2__factory } from "../typechain";
+import { LiquidityBufferUSDAdaptor, LiquidityBufferUSDAdaptor__factory, TestERC20, TestERC20__factory, PseudoMultisigWallet, PseudoMultisigWallet__factory, LiquidityBufferVault, LiquidityBufferVault__factory, IbAlluoV2, IbAlluoV2__factory, LiquidityBufferVaultV2, LiquidityBufferVaultV2__factory } from "../../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 

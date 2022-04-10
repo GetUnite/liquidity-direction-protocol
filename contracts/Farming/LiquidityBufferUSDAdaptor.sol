@@ -13,8 +13,7 @@ contract LiquidityBufferUSDAdaptor {
             uint256 toWallet6 = ICurvePool(_pool).remove_liquidity_one_coin(
                     lpAmount,
                     1,
-                    // _amount * (10000 - slippage) / 10000,
-                    0,
+                    _amount/10**12 * (10000 - slippage) / 10000,
                     true
                 );
             IERC20Upgradeable(_primaryToken).transfer(_wallet, toWallet6);
@@ -31,8 +30,7 @@ contract LiquidityBufferUSDAdaptor {
             uint256 toWallet6 = ICurvePool(_pool).remove_liquidity_one_coin(
                     lpAmount,
                     1,
-                    // _amount * (10000 - slippage) / 10000,
-                    0,
+                    _amount/10**12 * (10000 - slippage) / 10000,
                     true
                 );
             IERC20Upgradeable(_primaryToken).transfer(_wallet, toWallet6);
@@ -59,7 +57,7 @@ contract LiquidityBufferUSDAdaptor {
             uint256 toUser = ICurvePool(_pool).remove_liquidity_one_coin(
                     toBurn, 
                     1, 
-                    _amount * (10000 - slippage) / 10000, 
+                    _amount/10**12 * (10000 - slippage) / 10000, 
                     true
                 );
             // toUser is already in 10**6
@@ -72,7 +70,7 @@ contract LiquidityBufferUSDAdaptor {
             uint256 toUser = ICurvePool(_pool).remove_liquidity_one_coin(
                     toBurn, 
                     2, 
-                    _amount * (10000 - slippage) / 10000, 
+                    _amount/10**12 * (10000 - slippage) / 10000, 
                     true
                 );
             // ToUser is already in 10**6.
@@ -82,13 +80,10 @@ contract LiquidityBufferUSDAdaptor {
     }
 
     function exitAdaptorGetBalance(address _pool) external view returns (uint256) {
-        // uint256 curveLp = IERC20Upgradeable(ICurvePool(_pool).lp_token()).balanceOf(address(this));
         uint256 curveLp = IERC20Upgradeable(0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171).balanceOf((address(this)));
-        // uint256 curveLp = 0;
         if(curveLp != 0){
             // Returns in 10**18
             uint256 value = ICurvePool(_pool).calc_withdraw_one_coin(curveLp, 0);
-            console.log(value);
             return value;
         }
         return 0;

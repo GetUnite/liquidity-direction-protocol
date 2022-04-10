@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests,  IbAlluo, IbAlluo__factory, IbAlluoV2, LiquidityBufferVaultV2, LiquidityBufferUSDAdaptor, IbAlluoV2__factory, LiquidityBufferVaultV2__factory, LiquidityBufferUSDAdaptor__factory} from "../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests,  IbAlluo, IbAlluo__factory, IbAlluoV2, LiquidityBufferVaultV2, LiquidityBufferUSDAdaptor, IbAlluoV2__factory, LiquidityBufferVaultV2__factory, LiquidityBufferUSDAdaptor__factory} from "../../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 

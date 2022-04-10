@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { TestERC20, TestERC20__factory, LiquidityBufferUSDAdaptor, LiquidityBufferUSDAdaptor__factory, IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests,  IbAlluo, IbAlluo__factory, IbAlluoV2, LiquidityBufferVaultV2, IbAlluoV2__factory, LiquidityBufferVaultV2__factory} from "../typechain";
+import { TestERC20, TestERC20__factory, LiquidityBufferUSDAdaptor, LiquidityBufferUSDAdaptor__factory, IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests,  IbAlluo, IbAlluo__factory, IbAlluoV2, LiquidityBufferVaultV2, IbAlluoV2__factory, LiquidityBufferVaultV2__factory} from "../../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -157,17 +157,96 @@ describe("IbAlluo and Buffer", function () {
 
     });
 
-    describe('USD Adaptor with IBAlluo + LiquidityBuffer', function () {
+    describe('USD Adaptor with IbAlluoV2: Test cases', function () {
 
-        it("Depositing dai should increase the balance of the liquidity buffer", async function () {
+        it("Depositing 100 DAI and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
             await deposit(signers[0], dai, parseEther("100"));
             await ibAlluoCurrent.connect(signers[0]).withdraw(dai.address, parseEther("50"));
-            await deposit(signers[1], dai, parseEther("100"));
-            await buffer.satisfyWithdrawals();
-            expect(await dai.balanceOf(signers[0].address)).equal(parseEther("50"))
-            // If delegatecall worked, we should have max approvals
-            console.log(await dai.allowance(buffer.address, "0x445FE580eF8d70FF569aB36e80c647af338db351"))
+            expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
+
         })
+        it("Depositing 100 DAI, attempt to withdraw 50 and then only get paid after there is a deposit", async function () {
+            await deposit(signers[0], dai, parseEther("100"));
+            await ibAlluoCurrent.connect(signers[0]).withdraw(dai.address, parseEther("50"));
+            expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
+            
+            await deposit(signers[1], dai, parseEther("100"));
+            expect(await dai.balanceOf(signers[0].address)).equal(parseEther("50"))
+        })
+
+        it("Depositing 100 USDC and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
+            await deposit(signers[0], usdc, parseUnits("100", 6));
+            await ibAlluoCurrent.connect(signers[0]).withdraw(usdc.address, parseUnits("100", 6));
+            expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
+        })
+        it("Depositing 100 USDC, attempt to withdraw 50 and then only get paid after there is a deposit", async function () {
+            await deposit(signers[0], usdc, parseUnits("100", 6));
+            await ibAlluoCurrent.connect(signers[0]).withdraw(usdc.address, parseUnits("100", 6));
+            expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
+            
+            await deposit(signers[1], usdc, parseUnits("100", 6));
+            expect(Number(await usdc.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("99", 6)))
+        })
+
+        it("Depositing 100 USDT and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
+            await deposit(signers[0], usdt, parseUnits("100", 6));
+            await ibAlluoCurrent.connect(signers[0]).withdraw(usdt.address, parseUnits("100", 6));
+            expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
+        })
+        it("Depositing 100 USDT, attempt to withdraw 50 and then only get paid after there is a deposit", async function () {
+            await deposit(signers[0], usdt, parseUnits("100", 6));
+            await ibAlluoCurrent.connect(signers[0]).withdraw(usdt.address, parseUnits("100", 6));
+            expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
+            
+            await deposit(signers[1], usdt, parseUnits("100", 6));
+            expect(Number(await usdt.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("99", 6)))
+        })
+
+        it("The balance of the multisig wallet should increase with deposits.", async function () {
+                let walletBalance = await usdc.balanceOf(multisig.address);
+
+                await deposit(signers[0], dai, parseEther("100"));
+                expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+                walletBalance = await usdc.balanceOf(multisig.address);
+
+
+                await deposit(signers[0], usdc, parseUnits("100", 6));
+                expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+                walletBalance = await usdc.balanceOf(multisig.address);
+
+                await deposit(signers[0], usdt, parseUnits("100", 6));
+                expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+                walletBalance = await usdc.balanceOf(multisig.address);
+
+                await deposit(signers[0], dai, parseEther("100"));
+                expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+                walletBalance = await usdc.balanceOf(multisig.address);
+
+
+                await deposit(signers[0], usdc, parseUnits("100", 6));
+                expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+                walletBalance = await usdc.balanceOf(multisig.address);
+
+                await deposit(signers[0], usdt, parseUnits("100", 6));
+                expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+                walletBalance = await usdc.balanceOf(multisig.address);
+
+                await deposit(signers[0], dai, parseEther("100"));
+                expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+                walletBalance = await usdc.balanceOf(multisig.address);
+
+
+                await deposit(signers[0], usdc, parseUnits("100", 6));
+                expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+                walletBalance = await usdc.balanceOf(multisig.address);
+
+                await deposit(signers[0], usdt, parseUnits("100", 6));
+                expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+                walletBalance = await usdc.balanceOf(multisig.address);
+
+                console.log("Final multisig balance:", walletBalance);
+    
+            })
     })
 
     async function deposit(recipient: SignerWithAddress, token: IERC20, amount: BigNumberish) {
