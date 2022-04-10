@@ -156,7 +156,6 @@ describe("IbAlluo and Buffer", function () {
         await multisig.executeCall(buffer.address, calldata);
 
     });
-
     describe('USD Adaptor with IbAlluoV2: Test cases', function () {
 
         it("Depositing 100 DAI and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
@@ -247,6 +246,53 @@ describe("IbAlluo and Buffer", function () {
                 console.log("Final multisig balance:", walletBalance);
     
             })
+        it("Attemping to withdraw more than allowed causes revert.", async function () {
+            let walletBalance = await usdc.balanceOf(multisig.address);
+            await deposit(signers[1], usdc, parseUnits("100", 6));
+            expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+            await expect(ibAlluoCurrent.connect(signers[1]).withdraw(usdc.address, parseUnits("50", 18))).to.be.revertedWith('ERC20: burn amount exceeds balance')
+            })
+
+            
+    })
+    describe('Mass deposits and withdrawal test cases', function () {
+        it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
+            let walletBalance = await usdc.balanceOf(multisig.address);
+
+            await deposit(signers[0], dai, parseEther("100"));
+            expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+            walletBalance = await usdc.balanceOf(multisig.address);
+
+
+            await deposit(signers[1], usdc, parseUnits("100", 6));
+            expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+            walletBalance = await usdc.balanceOf(multisig.address);
+
+            await deposit(signers[2], usdt, parseUnits("100", 6));
+            expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+            walletBalance = await usdc.balanceOf(multisig.address);
+
+            await ibAlluoCurrent.connect(signers[0]).withdraw(dai.address, parseEther("50"));
+            expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
+            await ibAlluoCurrent.connect(signers[1]).withdraw(usdc.address, parseUnits("50", 6));
+            expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
+            await ibAlluoCurrent.connect(signers[2]).withdraw(usdt.address,parseUnits("50", 6));
+            expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
+    
+            expect(await buffer.totalWithdrawalAmount()).equal(parseEther("150"))
+            // When there are deposits, should pay everyone back.
+            await deposit(signers[2], usdt, parseUnits("1000", 6));
+            expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
+
+            expect(Number(await dai.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
+            expect(Number(await usdc.balanceOf(signers[1].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
+            expect(Number(await usdt.balanceOf(signers[2].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
+
+
+
+            })
+
+            
     })
 
     async function deposit(recipient: SignerWithAddress, token: IERC20, amount: BigNumberish) {

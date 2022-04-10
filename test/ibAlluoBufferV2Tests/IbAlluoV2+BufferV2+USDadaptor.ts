@@ -183,19 +183,19 @@ describe("IbAlluo and Buffer", function () {
             let numberOfWithdrawals = getRandomArbitrary(3, 4);
 
             while (i <= numberOfWithdrawals / 3) {
-                await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseEther((getRandomArbitrary(100, 500)).toString()))
-                await ibAlluoCurrent.connect(signers[2]).withdraw(dai.address, parseEther((getRandomArbitrary(100, 500)).toString()))
-                await ibAlluoCurrent.connect(signers[3]).withdraw(usdc.address, parseEther((getRandomArbitrary(100, 500)).toString()))
+                await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseUnits((getRandomArbitrary(100, 500)).toString(), 6))
+                await ibAlluoCurrent.connect(signers[2]).withdraw(dai.address,  parseUnits((getRandomArbitrary(100, 500)).toString(), 18))
+                await ibAlluoCurrent.connect(signers[3]).withdraw(usdc.address,  parseUnits((getRandomArbitrary(100, 500)).toString(), 6))
                 i++;
             }
             //console.log("BIG deposit and withdrawal");
             await deposit(signers[0], dai, parseUnits("4000", 18))
-            await ibAlluoCurrent.connect(signers[0]).withdraw(usdc.address, parseEther("4000"))
+            await ibAlluoCurrent.connect(signers[0]).withdraw(usdc.address, parseUnits("4000", 6))
     
             while (i <= numberOfWithdrawals) {
-                await ibAlluoCurrent.connect(signers[1]).withdraw(usdc.address, parseEther((getRandomArbitrary(100, 500)).toString()))
-                await ibAlluoCurrent.connect(signers[2]).withdraw(usdt.address, parseEther((getRandomArbitrary(100, 500)).toString()))
-                await ibAlluoCurrent.connect(signers[3]).withdraw(dai.address, parseEther((getRandomArbitrary(100, 500)).toString()))
+                await ibAlluoCurrent.connect(signers[1]).withdraw(usdc.address, parseUnits((getRandomArbitrary(100, 500)).toString(), 6))
+                await ibAlluoCurrent.connect(signers[2]).withdraw(usdt.address, parseUnits((getRandomArbitrary(100, 500)).toString(), 6))
+                await ibAlluoCurrent.connect(signers[3]).withdraw(dai.address,  parseUnits((getRandomArbitrary(100, 500)).toString(), 18))
                 i++;
             }
     
@@ -234,8 +234,8 @@ describe("IbAlluo and Buffer", function () {
             await deposit(signers[2], usdc, parseUnits("3000", 6));
             await deposit(signers[3], usdt, parseUnits("5000", 6));
     
-            await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseEther("150"))
-            await ibAlluoCurrent.connect(signers[2]).withdraw(usdc.address, parseEther("150"))
+            await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address,  parseUnits("150", 6))
+            await ibAlluoCurrent.connect(signers[2]).withdraw(usdc.address, parseUnits("150", 6))
             await ibAlluoCurrent.connect(signers[3]).withdraw(dai.address, parseEther("150"))
     
             await deposit(signers[1], dai, parseUnits("100", 18));
@@ -248,16 +248,16 @@ describe("IbAlluo and Buffer", function () {
             await deposit(signers[2], usdc, parseUnits("1000", 6));
             await deposit(signers[3], usdt, parseUnits("1000", 6));
     
-            await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseEther("900"))
+            await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseUnits("900", 6))
             await deposit(signers[2], usdc, parseUnits("100", 6));
             await deposit(signers[2], usdt, parseUnits("900", 6));
             await buffer.satisfyWithdrawals();
             await buffer.satisfyWithdrawals();
-            await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseEther("600"))
+            await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseUnits("600", 6))
     
             await ibAlluoCurrent.connect(signers[1]).withdraw(dai.address, parseEther("100"))
-            await ibAlluoCurrent.connect(signers[2]).withdraw(usdc.address, parseEther("100"))
-            await ibAlluoCurrent.connect(signers[3]).withdraw(usdt.address, parseEther("100"))
+            await ibAlluoCurrent.connect(signers[2]).withdraw(usdc.address, parseUnits("100", 6))
+            await ibAlluoCurrent.connect(signers[3]).withdraw(usdt.address, parseUnits("100", 6))
             await buffer.satisfyWithdrawals();
             await deposit(signers[2], usdt, parseUnits("300", 6));
             await buffer.satisfyWithdrawals();

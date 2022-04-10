@@ -171,13 +171,12 @@ contract IbAlluoV2 is
     /// @dev When called, stable coin is sent to the wallet, then the index is updated
     ///      so that the adjusted amount is accurate.
     /// @param _token Deposit token address (eg. USDC)
-    /// @param _amount Amount (parsed 10**18) 
+    /// @param _amount Amount in stablecoins (eg. 10**18 for Dai, 10**6 for USDT/USDC)
 
     function deposit(address _token, uint256 _amount) external {
         require(supportedTokens.contains(_token), "IbAlluo: Token not supported");
         updateRatio();
         LiquidityBufferVaultV2(liquidityBuffer).deposit(msg.sender, _token, _amount);
-
         uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = amountIn18 * multiplier / growingRatio;
         _mint(msg.sender, adjustedAmount);
@@ -188,14 +187,15 @@ contract IbAlluoV2 is
     /// @dev When called, immediately check for new interest index. Then find the adjusted amount in LP tokens
     ///      Then burn appropriate amount of LP tokens to receive USDC/ stablecoin
     /// @param _targetToken Stablecoin desired (eg. USDC)
-    /// @param _amount Amount (parsed 10**18) in stablecoins
+    /// @param _amount Amount in stablecoins (eg. 10**18 for Dai, 10**6 for USDT/USDC)
 
     function withdraw(address _targetToken, uint256 _amount ) external {
         require(supportedTokens.contains(_targetToken), "IbAlluo: Token not supported");
         updateRatio();
-        uint256 adjustedAmount = _amount * multiplier / growingRatio;
-        _burn(msg.sender, adjustedAmount);
         LiquidityBufferVaultV2(liquidityBuffer).withdraw(msg.sender, _targetToken, _amount);
+        uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_targetToken).decimals());
+        uint256 adjustedAmount = amountIn18 * multiplier / growingRatio;
+        _burn(msg.sender, adjustedAmount);
         emit BurnedForWithdraw(msg.sender, adjustedAmount);
     }
    

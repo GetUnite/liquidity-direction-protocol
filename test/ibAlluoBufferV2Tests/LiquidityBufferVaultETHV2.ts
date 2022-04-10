@@ -212,12 +212,8 @@ describe("IbAlluo and Buffer for WETH", function () {
             sendFundsToMultiSig(wETH, parseEther("100"));
             let previousRequestIndex : BigNumber= await buffer.lastWithdrawalRequest();
             let previousWithdrawalSum : BigNumber= await buffer.totalWithdrawalAmount();
-
-            await expect(await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("48")))
-            .to.emit(buffer, "AddedToQueue").withArgs(
-                signers[1].address, wETH.address, parseEther("48"), previousRequestIndex.add(1), (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
-            )
-
+            await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("48"))
+       
             expect(await buffer.lastWithdrawalRequest()).equal(previousRequestIndex.add(1))
             expect(await buffer.totalWithdrawalAmount()).equal(previousWithdrawalSum.add(parseEther("48")))
 
@@ -235,15 +231,9 @@ describe("IbAlluo and Buffer for WETH", function () {
             //     signers[1].address, wETH.address, parseEther("48"), previousSatisfiedIndex.add(1), (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
             // )
             const tx = await buffer.satisfyWithdrawals();
-            const receipt = await ethers.provider.getTransactionReceipt(tx.hash);
-            const interface1 = new ethers.utils.Interface(["event WithdrawalSatisfied(address indexed user, address token, uint256 amount, uint256 queueIndex, uint256 satisfiedTime)"]);
-            const event = fetchLastEmittedEvent(receipt, interface1, "WithdrawalSatisfied");
-            expect(event.user).equal(signers[1].address);
-            expect(event.token).equal(wETH.address);
-            expect(event.amount).equal(parseEther("48"));
-            expect(event.queueIndex).equal(previousSatisfiedIndex.add(1))
+            // The line above should do nothing as when deposits come in, there are automatic checks.
 
-            expect(await buffer.totalWithdrawalAmount()).equal(previousWithdrawalSum.sub(parseEther("48")));
+            expect(await buffer.totalWithdrawalAmount()).equal(0);
             expect(await wETH.balanceOf(signers[1].address)).equal(parseEther("48"));
 
 
@@ -261,22 +251,12 @@ describe("IbAlluo and Buffer for WETH", function () {
             // Then, when signer 2 tries to withdraw 40, there is sufficient funds, but it should reject him and 
             // check if signer 1 can be satisfied. 
             // Signer 1 cannot be satisfied so once funds are added, call satisfyWithdrawals and it should payout signer 1 ONLY
-
-            await expect(await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("60")))
-            .to.emit(buffer, "AddedToQueue").withArgs(
-                signers[1].address, wETH.address, parseEther("60"), previousRequestIndex.add(1), (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
-            )
-
-
-            
+            await ibAlluoCurrent.connect(signers[1]).withdraw(wETH.address, parseEther("60"))
+           
             // This should do NOTHING! Insufficient funds to payout signer 1
             await buffer.satisfyWithdrawals();
-
-            await expect(await ibAlluoCurrent.connect(signers[2]).withdraw(wETH.address, parseEther("40")))
-            .to.emit(buffer, "AddedToQueue").withArgs(
-                signers[2].address, wETH.address, parseEther("40"), previousRequestIndex.add(2), (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
-            )
-
+            await ibAlluoCurrent.connect(signers[2]).withdraw(wETH.address, parseEther("40"))
+            
             // This should do NOTHING! Insufficient funds to payout signer 1
             await buffer.satisfyWithdrawals();
 
@@ -286,30 +266,18 @@ describe("IbAlluo and Buffer for WETH", function () {
             // Signer 1: 60, Signer 2: 40. 
             // Total balance = 50 + 30 (new SIgner 3)
             await deposit(signers[3], wETH, parseEther('30'));
-
+            // Technically, this line below does nothing because deposit already checks.
+            // However, here for visual purposes.
             const tx3 = await buffer.satisfyWithdrawals();
-            const receipt3 = await ethers.provider.getTransactionReceipt(tx3.hash);
-            const interface3 = new ethers.utils.Interface(["event WithdrawalSatisfied(address indexed user, address token, uint256 amount, uint256 queueIndex, uint256 satisfiedTime)"]);
-            const event3 = fetchLastEmittedEvent(receipt3, interface3, "WithdrawalSatisfied");
-            expect(event3.user).equal(signers[1].address);
-            expect(event3.token).equal(wETH.address);
-            expect(event3.amount).equal(parseEther("60"));
-            expect(event3.queueIndex).equal(1)
+          
 
             expect(await wETH.balanceOf(signers[1].address)).equal(parseEther("60"));
             expect(await wETH.balanceOf(signers[2].address)).equal(parseEther("0"));
             // When there is another deposit that allows signer 2 to withdraw, then he can.
             await deposit(signers[3], wETH, parseEther('30'));
-
+            // Technically, this line below does nothing because deposit already checks.
+            // However, here for visual purposes.
             const tx4 = await buffer.satisfyWithdrawals();
-            const receipt4 = await ethers.provider.getTransactionReceipt(tx4.hash);
-            const interface4 = new ethers.utils.Interface(["event WithdrawalSatisfied(address indexed user, address token, uint256 amount, uint256 queueIndex, uint256 satisfiedTime)"]);
-            const event4 = fetchLastEmittedEvent(receipt4, interface4, "WithdrawalSatisfied");
-
-            expect(event4.user).equal(signers[2].address);
-            expect(event4.token).equal(wETH.address);
-            expect(event4.amount).equal(parseEther("40"));
-            expect(event4.queueIndex).equal(2)
 
             expect(await wETH.balanceOf(signers[2].address)).equal(parseEther("40"));
             // Expect that there are now ithdrawal requests outstanding.
