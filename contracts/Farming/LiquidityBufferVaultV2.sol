@@ -8,7 +8,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-
+import "./IbAlluoV2.sol";
 import "hardhat/console.sol";
 
 contract LiquidityBufferVaultV2 is
@@ -204,11 +204,10 @@ contract LiquidityBufferVaultV2 is
                 abi.encodeWithSelector(bytes4(keccak256(bytes("exitAdaptorGetBalance(address)"))),
                 _pool)
             );
-            return abi.decode(returnedData, (uint256));
+            return abi.decode(returnedData, (uint256)); 
         }
     }
-// onlyRole(DEFAULT_ADMIN_ROLE)\
-// whenNotPaused
+
     function approveAllDelegateCall (
         address _adaptor,
         address _pool) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
@@ -218,14 +217,48 @@ contract LiquidityBufferVaultV2 is
             );
         } 
     }
+// function for satisfaction withdrawals in queue
+    // triggered by BE or chainlink keepers  
+    function satisfyWithdrawals() public whenNotPaused{
+        if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
+            uint256 inBuffer = getBufferAmount();
+            while (lastSatisfiedWithdrawal != lastWithdrawalRequest) {
+                Withdrawal memory withdrawal = withdrawals[lastSatisfiedWithdrawal + 1];
+                uint256 amount = withdrawal.amount;
+                if (amount <= inBuffer) {
+                    InputToken memory currentToken = inputTokenMapping[withdrawal.token];
+                    address adaptor = adaptors[currentToken.swapProtocol];
+                    // Amount is in 10**18
+                    exitAdaptorDelegateCall(adaptor, withdrawal.user, withdrawal.token, currentToken.poolAddress, amount);
+                    inBuffer -= amount;
+                    totalWithdrawalAmount -= amount;
+                    lastSatisfiedWithdrawal++;
+                    keepersTrigger = false;
+                    
+                    emit WithdrawalSatisfied(
+                        withdrawal.user, 
+                        withdrawal.token, 
+                        amount, 
+                        lastSatisfiedWithdrawal,
+                        block.timestamp
+                    );
+
+                } else {
+                    break;
+                }
+            }
+        }
+    }
 
     // function checks how much in buffer now and hom much should be
     // fills buffer and sends to wallet what left (conveting it to usdc)
     // @params _amount is  10**18
     function deposit(address _user, address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 inBuffer = getBufferAmount();
-        uint256 expectedBufferAmount = getExpectedBufferAmount(_amount);
         IERC20Upgradeable(_token).safeTransferFrom(_user, address(this), _amount);
+        // Convert amount to 10**18 as getExpectedBufferAmount requires 10**18 input
+        _amount = _amount * 10** (18 - ERC20(_token).decimals());
+        uint256 expectedBufferAmount = getExpectedBufferAmount(_amount);
         InputToken memory currentToken = inputTokenMapping[_token];
         address adaptor = adaptors[currentToken.swapProtocol];
 
@@ -235,6 +268,7 @@ contract LiquidityBufferVaultV2 is
                 // Convert/Keep remainder input tokens to primary token
                 uint256 toBeDeposited = inBuffer + _amount - expectedBufferAmount;
                 uint256 remainder = _amount - toBeDeposited;
+                // Inputs to adaptor _amount = 10**18! Make sure to convert.
                 enterAdaptorDelegateCall(adaptor, _token, currentToken.poolAddress, toBeDeposited);
                 convertTokenToPrimaryToken(adaptor, _token, currentToken.poolAddress, remainder);
             } else {
@@ -257,8 +291,11 @@ contract LiquidityBufferVaultV2 is
         uint256 inBuffer = getBufferAmount();
         InputToken memory currentToken = inputTokenMapping[_token];
         address adaptor = adaptors[currentToken.swapProtocol];
+        // Convert amount to 10**18 as we require consistency in coin decimals.
+        _amount = _amount * 10** (18 - ERC20(_token).decimals());
         if (inBuffer >= _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
             // If there are enough funds to payout + all requests are satisfied,
+            // Amount is in 10**18! Make sure to convert in adaptor.
             exitAdaptorDelegateCall(adaptor, _user, _token, currentToken.poolAddress, _amount);
             emit WithdrawalSatisfied(_user, _token, _amount, 0, block.timestamp);
         } else {
@@ -276,39 +313,7 @@ contract LiquidityBufferVaultV2 is
         }
     }
 
-    // function for satisfaction withdrawals in queue
-    // triggered by BE or chainlink keepers  
-    function satisfyWithdrawals() external whenNotPaused{
-        if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
-            uint256 inBuffer = getBufferAmount();
-            while (lastSatisfiedWithdrawal != lastWithdrawalRequest) {
-                Withdrawal memory withdrawal = withdrawals[lastSatisfiedWithdrawal + 1];
-                uint256 amount = withdrawal.amount;
-                if (amount <= inBuffer) {
-                    InputToken memory currentToken = inputTokenMapping[withdrawal.token];
-                    address adaptor = adaptors[currentToken.swapProtocol];
-                    exitAdaptorDelegateCall(adaptor, withdrawal.user, withdrawal.token, currentToken.poolAddress, amount);
-                   
-                    inBuffer -= amount;
-                    totalWithdrawalAmount -= amount;
-                    lastSatisfiedWithdrawal++;
-                    keepersTrigger = false;
-                    
-                    emit WithdrawalSatisfied(
-                        withdrawal.user, 
-                        withdrawal.token, 
-                        amount, 
-                        lastSatisfiedWithdrawal,
-                        block.timestamp
-                    );
-
-                } else {
-                    break;
-                }
-            }
-        }
-    }
-
+    
     function setSlippage(uint32 _newSlippage) external onlyRole(DEFAULT_ADMIN_ROLE) {
         slippage = _newSlippage;
     }
@@ -318,7 +323,10 @@ contract LiquidityBufferVaultV2 is
     }
     
     function getExpectedBufferAmount(uint256 _newAmount) public view returns(uint256) {
-        return (_newAmount + IERC20Upgradeable(alluoLp).totalSupply()) * bufferPercentage / 10000 + totalWithdrawalAmount;
+        // Expected buffer amount = 
+        //  (newDeposit + totalSupply ibAlluo * index) * bufferPercentage + outstanding withdrawals
+        // This is in 10**18.
+        return (_newAmount + IERC20Upgradeable(alluoLp).totalSupply()* IbAlluoV2(alluoLp).growingRatio()) * bufferPercentage / 10000 + totalWithdrawalAmount;
     }
 
     // This is a view function but incorrectly compiles due to the architecture of delegateCall.
@@ -327,6 +335,7 @@ contract LiquidityBufferVaultV2 is
         // If the adaptor has sent the funds to another chain, it will not show here.
         // If the adaptor can withdraw/unstake immediately to withdraw, it is considered part of the buffer.
         // Most times, investments will probably be cross chain and not only on chain. 
+        // This is in 10**18 usually. Returned from the adaptor.
         InputToken memory currentToken = inputTokenMapping[primaryToken];
         address adaptor = adaptors[currentToken.swapProtocol];
         return exitAdaptorDelegateCallBalanceCheck(adaptor, primaryToken, currentToken.poolAddress);
