@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests,  IbAlluo, IbAlluo__factory} from "../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests,  IbAlluoUSD, IbAlluoUSD__factory} from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -36,13 +36,12 @@ async function  prepareCallData(type: string, parameters: any[]) : Promise<Bytes
 }
 
 
-describe("IbAlluo and Buffer", function () {
+describe("IbAlluoUSD and Buffer", function () {
     let signers: SignerWithAddress[];
     let whale: SignerWithAddress;
     let curveLpHolder: SignerWithAddress;
 
-    let alluoLpV3: AlluoLpV3;
-    let ibAlluoCurrent: IbAlluo;
+    let ibAlluoCurrent: IbAlluoUSD;
     let multisig: PseudoMultisigWallet;
     let buffer: LiquidityBufferVault;
 
@@ -103,7 +102,7 @@ describe("IbAlluo and Buffer", function () {
 
     beforeEach(async function () {
 
-        const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
+        const IbAlluo = await ethers.getContractFactory("IbAlluoUSD") as IbAlluoUSD__factory;
         //We are using this contract to simulate Gnosis multisig wallet
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
         //For tests we are using version of contract with hardhat console.log, to see all Txn
@@ -133,7 +132,7 @@ describe("IbAlluo and Buffer", function () {
             usdc.address,
             usdt.address]],
             {initializer: 'initialize', kind:'uups'}
-        ) as IbAlluo;
+        ) as IbAlluoUSD;
 
         ABI = ["function setAlluoLp(address newAlluoLp)"];
         iface = new ethers.utils.Interface(ABI);

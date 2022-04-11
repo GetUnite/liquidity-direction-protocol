@@ -6,16 +6,16 @@ async function main() {
   let buffer = "buffer";
   let supprotedTokens = ["usdc","dai", "usdt"];
 
-  const IbAlluo = await ethers.getContractFactory("IbAlluo");
+  const IbAlluoUsd = await ethers.getContractFactory("IbAlluoUSD");
 
-  let ibAlluo = await upgrades.deployProxy(IbAlluo,
+  let ibAlluoUsd = await upgrades.deployProxy(IbAlluoUsd,
         [gnosisAddress,
          buffer,
         supprotedTokens],
         {initializer: 'initialize', kind:'uups'}
   );
 
-  console.log("IbAlluo deployed to:", ibAlluo.address);
+  console.log("IbAlluoUsd deployed to:", ibAlluoUsd.address);
 }
 
 main()

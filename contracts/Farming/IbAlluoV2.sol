@@ -4,7 +4,7 @@ pragma solidity ^0.8.11;
 import "./AlluoERC20Upgradable.sol";
 import "../interfaces/ILiquidityBufferVault.sol";
 import "../mock/interestHelper/Interest.sol";
-import "./LiquidityBufferVaultV2.sol";
+
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
@@ -75,7 +75,7 @@ contract IbAlluoV2 is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(address _multiSigWallet, address _buffer, address[] memory _supportedTokens) public initializer {
+   function initialize(address _multiSigWallet, address _buffer, address[] memory _supportedTokens) public initializer {
         __ERC20_init("Interest Bearing Alluo USD", "IbAlluoUSD");
         __Pausable_init();
         __AccessControl_init();
@@ -98,7 +98,6 @@ contract IbAlluoV2 is
 
         emit NewWalletSet(address(0), wallet);
         emit NewBufferSet(address(0), liquidityBuffer);
-
     }
 
 
@@ -167,7 +166,7 @@ contract IbAlluoV2 is
         }
     }
 
-    /// @notice  Allows deposits and updates the index, then mints the new appropriate amount.
+   /// @notice  Allows deposits and updates the index, then mints the new appropriate amount.
     /// @dev When called, stable coin is sent to the wallet, then the index is updated
     ///      so that the adjusted amount is accurate.
     /// @param _token Deposit token address (eg. USDC)
@@ -176,7 +175,7 @@ contract IbAlluoV2 is
     function deposit(address _token, uint256 _amount) external {
         require(supportedTokens.contains(_token), "IbAlluo: Token not supported");
         updateRatio();
-        LiquidityBufferVaultV2(liquidityBuffer).deposit(msg.sender, _token, _amount);
+        ILiquidityBufferVault(liquidityBuffer).deposit(msg.sender, _token, _amount);
         uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = amountIn18 * multiplier / growingRatio;
         _mint(msg.sender, adjustedAmount);
@@ -192,12 +191,13 @@ contract IbAlluoV2 is
     function withdraw(address _targetToken, uint256 _amount ) external {
         require(supportedTokens.contains(_targetToken), "IbAlluo: Token not supported");
         updateRatio();
-        LiquidityBufferVaultV2(liquidityBuffer).withdraw(msg.sender, _targetToken, _amount);
+        ILiquidityBufferVault(liquidityBuffer).withdraw(msg.sender, _targetToken, _amount);
         uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_targetToken).decimals());
         uint256 adjustedAmount = amountIn18 * multiplier / growingRatio;
         _burn(msg.sender, adjustedAmount);
         emit BurnedForWithdraw(msg.sender, adjustedAmount);
     }
+   
    
     /// @notice  Returns balance in USD
     /// @param _address address of user
@@ -237,7 +237,7 @@ contract IbAlluoV2 is
         interestPerSecond = _newInterestPerSecond * 10**10;
         emit InterestChanged(oldAnnualValue, annualInterest, oldValuePerSecond, interestPerSecond);
     }
-
+    
     /// @notice migrates by minting balances.
 
     function migrateStep1(address _oldContract, address[] memory _users) external onlyRole(DEFAULT_ADMIN_ROLE){
@@ -259,7 +259,7 @@ contract IbAlluoV2 is
         annualInterest = 800;
         updateTimeLimit = 60;
     }
-
+    
     function changeTokenStatus(address _token, bool _status) external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
@@ -300,7 +300,9 @@ contract IbAlluoV2 is
     {
         require(newBuffer.isContract(), "IbAlluo: Not contract");
 
+        address oldValue = liquidityBuffer;
         liquidityBuffer = newBuffer;
+        emit NewBufferSet(oldValue, liquidityBuffer);
 
     }
 

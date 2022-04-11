@@ -75,23 +75,37 @@ contract IbAlluo is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-   function initialize(address _multiSigWallet, address _buffer, address[] memory _supportedTokens) public initializer {
-        __ERC20_init("Interest Bearing Alluo USD", "IbAlluoUSD");
+    function initialize(
+        string memory _name, 
+        string memory _symbol, 
+        address _multiSigWallet, 
+        address _buffer,
+        address[] memory _supportedTokens,
+        uint256 _interestPerSecond,
+        uint256 _annualInterest
+    ) public initializer {
+        __ERC20_init(_name, _symbol);
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
         require(_multiSigWallet.isContract(), "IbAlluo: Not contract");
+        require(_buffer.isContract(), "IbAlluo: Not contract");
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
 
         for(uint256 i = 0; i < _supportedTokens.length; i++){
             supportedTokens.add(_supportedTokens[i]);
             emit DepositTokenStatusChanged(_supportedTokens[i], true);
         }
-        _pause();
+
+        interestPerSecond = _interestPerSecond*10**13;
+        annualInterest = _annualInterest;
+        multiplier = 10**18;
+        growingRatio = 10**18;
+        updateTimeLimit = 60;
+        lastInterestCompound = block.timestamp;
 
         wallet = _multiSigWallet;
         liquidityBuffer = _buffer;
@@ -167,9 +181,9 @@ contract IbAlluo is
     }
 
     /// @notice  Allows deposits and updates the index, then mints the new appropriate amount.
-    /// @dev When called, stable coin is sent to the wallet, then the index is updated
+    /// @dev When called, asset token is sent to the wallet, then the index is updated
     ///      so that the adjusted amount is accurate.
-    /// @param _token Deposit token address (eg. USDC)
+    /// @param _token Deposit token address
     /// @param _amount Amount (with token desimals) 
 
     function deposit(address _token, uint256 _amount) external {
@@ -187,9 +201,9 @@ contract IbAlluo is
     }
 
     /// @notice  Withdraws accuratel
-    /// @dev When called, immediately check for new interest index. Then find the adjusted amount in LP tokens
-    ///      Then burn appropriate amount of LP tokens to receive USDC/ stablecoin
-    /// @param _targetToken Stablecoin desired (eg. USDC)
+    /// @dev When called, immediately check for new interest index. Then find the adjusted amount in IbAlluo tokens
+    ///      Then burn appropriate amount of IbAlluo tokens to receive asset token
+    /// @param _targetToken Asset token
     /// @param _amount Amount (parsed 10**18)
 
     function withdraw(address _targetToken, uint256 _amount ) external {
@@ -202,7 +216,7 @@ contract IbAlluo is
         emit BurnedForWithdraw(msg.sender, adjustedAmount);
     }
    
-    /// @notice  Returns balance in USD
+    /// @notice  Returns balance in asset value
     /// @param _address address of user
 
     function getBalance(address _address) public view returns (uint256) {
@@ -210,7 +224,7 @@ contract IbAlluo is
         return balanceOf(_address) * _growingRatio / multiplier;
     }
 
-    /// @notice  Returns balance in USD with correct info from update
+    /// @notice  Returns balance in asset value with correct info from update
     /// @param _address address of user
 
     function getBalanceForTransfer(address _address) public view returns (uint256) {
