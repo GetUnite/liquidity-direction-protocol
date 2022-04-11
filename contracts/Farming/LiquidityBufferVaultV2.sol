@@ -122,21 +122,30 @@ contract LiquidityBufferVaultV2 is
         maxWaitingTime = 3600 * 23;
     }
 
+    /** @notice Allow multisig wallet to take out funds. This is when there is no adaptor/pool used.
+     ** @param _token Address of the token input
+     ** @param _amount Amount of tokens (correct decimals, 10**18 DAI, 10**6 USDC)
+     */
     function sendFundsToMultiSig(address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
         IERC20Upgradeable(_token).transfer(wallet, _amount);
     }
 
+
+    /** @notice Deposits tokens into an LP using the adaptor.
+    * @dev If there is no adaptor, do nothing.
+    **     Otherwise, delegateCall the adaptor .
+    * NOTE: Input _amount is 10**18. Make sure to standardise it for the token in the adaptor contract (10**18 DAI, 10**6 USDC/USDT)
+    ** @param _adaptor Address of the adaptor used
+    ** @param _tokenFrom Address of the token.
+    ** @param _pool Address of liquidity pool to be used.
+    ** @param _amount Amount of tokens in 10**18
+    */
     function enterAdaptorDelegateCall(
         address _adaptor,
         address _tokenFrom,
         address _pool,
         uint256 _amount
         ) internal whenNotPaused returns (uint256) {
-        // These funds may/may not be liquidatable.
-        // Liquidatable example: Held in an LP somewhere on chain.
-        // Not liquidatable example: Funds are converted and withdrawn, then bridged.
-
-        // Do nothing if address(0) = adaptor. This is the default code used for nothing.
         if (_adaptor == address(0)) {
             return _amount;
         } else {
@@ -147,16 +156,22 @@ contract LiquidityBufferVaultV2 is
             return abi.decode(returnedData, (uint256));
         }
     }
+
+    /** @notice Converts tokens to main tokens using the adaptor. 
+    * @dev If there is no adaptor, do nothing.
+    **     Otherwise, delegateCall the adaptor .
+    * NOTE: Input _amount is 10**18. Make sure to standardise it for the token in the adaptor contract (10**18 DAI, 10**6 USDC/USDT)
+    ** @param _adaptor Address of the adaptor used
+    ** @param _tokenFrom Address of the token.
+    ** @param _pool Address of liquidity pool to be used.
+    ** @param _amount Amount of tokens in 10**18
+    */
     function convertTokenToPrimaryToken(
         address _adaptor,
         address _tokenFrom,
         address _pool,
         uint256 _amount
     ) internal whenNotPaused returns (uint256) {
-        // If token input is not the primary token, convert it.
-        // These funds are immediately liquidatable as they are held in an LP.
-        // Or in a wallet. 
-        // Simply uses an adaptor to convert the input token to the primary token
         if (_adaptor == address(0)) {
             return _amount;
         } else {
@@ -168,6 +183,16 @@ contract LiquidityBufferVaultV2 is
         }
     }
 
+    /** @notice Removes tokens from LP using the adaptor.
+    * @dev If there is no adaptor, do nothing.
+    **     Otherwise, delegateCall the adaptor .
+    * NOTE: Input _amount is 10**18. Make sure to standardise it for the token in the adaptor contract (10**18 DAI, 10**6 USDC/USDT)
+    ** @param _adaptor Address of the adaptor used
+    ** @param _user Address of the user (msg.sender)
+    ** @param _tokenFrom Address of the token.
+    ** @param _pool Address of liquidity pool to be used.
+    ** @param _amount Amount of tokens in 10**18
+    */
     function exitAdaptorDelegateCall(
         address _adaptor,
         address _user,
@@ -175,8 +200,6 @@ contract LiquidityBufferVaultV2 is
         address _pool,
         uint256 _amount
         ) internal whenNotPaused returns (uint256) {
-        // Liquidates a position to withdraw. Only works if funds are held on chain.
-        // If the funds have been moved to a different wallet that is inaccessible from the smart contract, it will not show here.
         if (_adaptor == address(0)) {
             IERC20Upgradeable(_tokenFrom).safeTransfer(_user, _amount);
             return _amount;
@@ -189,6 +212,14 @@ contract LiquidityBufferVaultV2 is
         }
     }
 
+
+    /** @notice DelegateCalls the adaptor to check liquid balance.
+    * @dev If there is no adaptor, funds are being held on the contract so just .balanceOf
+    **     Otherwise, delegateCall the adaptor .
+    ** @param _adaptor Address of the adaptor used
+    ** @param _tokenFrom Address of the token.
+    ** @param _pool Address of liquidity pool to be used.
+    */
     function exitAdaptorDelegateCallBalanceCheck (
         address _adaptor,
         address _tokenFrom,
@@ -208,6 +239,11 @@ contract LiquidityBufferVaultV2 is
         }
     }
 
+    /** @notice DelegateCalls the adaptor to ERC approve the different tokens.
+    * @dev Only delegateCall if the adaptor is active.
+    ** @param _adaptor Address of the adaptor used
+    ** @param _pool Address of liquidity pool to be used.
+    */
     function approveAllDelegateCall (
         address _adaptor,
         address _pool) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
@@ -217,8 +253,11 @@ contract LiquidityBufferVaultV2 is
             );
         } 
     }
-// function for satisfaction withdrawals in queue
-    // triggered by BE or chainlink keepers  
+
+    /** @notice Check withdrawal queue and satsify all withdrawals possible.
+    * @dev Checks if there are outstanding withdrawal and if there are, loops around until there are not enough funds to satisfy anymore 
+    **     or until all withdrawals ar satisfied.
+    */
     function satisfyWithdrawals() public whenNotPaused{
         if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
             uint256 inBuffer = getBufferAmount();
@@ -250,13 +289,15 @@ contract LiquidityBufferVaultV2 is
         }
     }
 
-    // function checks how much in buffer now and hom much should be
-    // fills buffer and sends to wallet what left (conveting it to usdc)
-    // @params _amount is  10**18
+    /** @notice Called by ibAlluo, deposits tokens into the buffer.
+    * @dev Deposits funds, checks whether buffer is filled or insufficient, and then acts accordingly.
+    ** @param _user Address of depositor (msg.sender)
+    ** @param _token Address of token (USDC, DAI, USDT...)
+    ** @param _amount Amount of tokens in correct deimals (10**18 for DAI, 10**6 for USDT)
+    */
     function deposit(address _user, address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 inBuffer = getBufferAmount();
         IERC20Upgradeable(_token).safeTransferFrom(_user, address(this), _amount);
-        // Convert amount to 10**18 as getExpectedBufferAmount requires 10**18 input
         _amount = _amount * 10** (18 - ERC20(_token).decimals());
         uint256 expectedBufferAmount = getExpectedBufferAmount(_amount);
         InputToken memory currentToken = inputTokenMapping[_token];
@@ -268,15 +309,16 @@ contract LiquidityBufferVaultV2 is
                 // Convert/Keep remainder input tokens to primary token
                 uint256 toBeDeposited = inBuffer + _amount - expectedBufferAmount;
                 uint256 remainder = _amount - toBeDeposited;
-                // Inputs to adaptor _amount = 10**18! Make sure to convert.
                 enterAdaptorDelegateCall(adaptor, _token, currentToken.poolAddress, toBeDeposited);
                 convertTokenToPrimaryToken(adaptor, _token, currentToken.poolAddress, remainder);
-                satisfyWithdrawals();
+                // This can be costly for users. Use gelato instead to call satisfyWithdrawals();
+                // satisfyWithdrawals();
             } else {
                 // Else, if ,after the deposit, the buffer is not filled, just hold funds, but convert to primary token. (do nothing)
                 // This includes if outstanding withdrawals exist. Therefore, convert and satisfyWithdrawals() to confirm.
                 convertTokenToPrimaryToken(adaptor, _token, currentToken.poolAddress, _amount);
-                satisfyWithdrawals();
+                // This can be costly for users. Use gelato instead to call satisfyWithdrawals();
+                // satisfyWithdrawals();
 
             }
           
@@ -288,9 +330,13 @@ contract LiquidityBufferVaultV2 is
     }
 
 
-    // function checks is in buffer enoght tokens to satisfy withdraw
-    // or is queue empty, if so sending chosen tokens
-    // if not adding withdrawal in queue
+
+    /** @notice Called by ibAlluo, withdraws otkens form the buffer.
+    * @dev Attempt to withdraw. If there are insufficient funds, you are added to the queue.
+    ** @param _user Address of depositor (msg.sender)
+    ** @param _token Address of token (USDC, DAI, USDT...)
+    ** @param _amount Amount of tokens in correct deimals (10**18 for DAI, 10**6 for USDT)
+    */
     function withdraw(address _user, address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
         uint256 inBuffer = getBufferAmount();
         InputToken memory currentToken = inputTokenMapping[_token];
@@ -299,7 +345,6 @@ contract LiquidityBufferVaultV2 is
         _amount = _amount * 10** (18 - ERC20(_token).decimals());
         if (inBuffer >= _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
             // If there are enough funds to payout + all requests are satisfied,
-            // Amount is in 10**18! Make sure to convert in adaptor.
             exitAdaptorDelegateCall(adaptor, _user, _token, currentToken.poolAddress, _amount);
             emit WithdrawalSatisfied(_user, _token, _amount, 0, block.timestamp);
         } else {
@@ -335,18 +380,17 @@ contract LiquidityBufferVaultV2 is
 
     // This is a view function but incorrectly compiles due to the architecture of delegateCall.
     function getBufferAmount() public  returns(uint256) {
-        // Returns what can immediately be liquidated
-        // If the adaptor has sent the funds to another chain, it will not show here.
-        // If the adaptor can withdraw/unstake immediately to withdraw, it is considered part of the buffer.
-        // Most times, investments will probably be cross chain and not only on chain. 
-        // This is in 10**18 usually. Returned from the adaptor.
         InputToken memory currentToken = inputTokenMapping[primaryToken];
         address adaptor = adaptors[currentToken.swapProtocol];
         return exitAdaptorDelegateCallBalanceCheck(adaptor, primaryToken, currentToken.poolAddress);
     }
 
-    /// @notice Register swap/lp token adaptors
-    /// @param protocolIds protocol id of adapter to add
+
+    /** @notice Called by admin to register new adaptors.
+    ** @param _adaptors Array of adaptor addresses
+    ** @param protocolIds Array of protocol id (these are not addresses! Ex. 0 = Uniswap adaptor, 1 = Curve adaptor... 
+    **                     InputToken.swapProtocol points to this index and InputToken.,poolAddress gives the actual pool address
+    */
     function registerAdaptors(
         address[] calldata _adaptors,
         uint32[] calldata protocolIds
@@ -358,8 +402,10 @@ contract LiquidityBufferVaultV2 is
         }
     }
 
-    /// @notice Unregister swap/lp token adaptors
-    /// @param protocolIds protocol id of adapter to remove
+    /** @notice Called by admin to unregister adaptors.
+    ** @param protocolIds Array of protocol id (these are not addresses! Ex. 0 = Uniswap adaptor, 1 = Curve adaptor... 
+    **                     InputToken.swapProtocol points to this index and InputToken.,poolAddress gives the actual pool address
+    */
     function unregisterAdaptors(
         uint32[] calldata protocolIds
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -369,8 +415,12 @@ contract LiquidityBufferVaultV2 is
         }
     }
 
-    /// @notice Register valid input tokens
-    /// @param protocolIds protocol id of adapter to add
+    /** @notice Called by admin to register data for input tokens. (Ex. USDC, DAI, USDT )
+    ** @param inputTokenAddresses Array of input token addresses (address for USDC, DAI, USDT...)
+    ** @param protocolIds Array of protocol id (these are not addresses! Ex. 0 = Uniswap adaptor, 1 = Curve adaptor... 
+    **                     InputToken.swapProtocol points to this index and InputToken.,poolAddress gives the actual pool address
+    ** @param poolAddresses Array of the liquidity pool addresses used to swap.
+    */
     function registerInputTokens(
         address[] calldata inputTokenAddresses,
         uint32[] calldata protocolIds,
@@ -384,8 +434,9 @@ contract LiquidityBufferVaultV2 is
         }
     }
 
-    /// @notice Unregister swap/lp token adaptors
-    /// @param inputTokenAddresses Address of token to remove from mapping;
+    /** @notice Called by admin to unregister inputToken data.
+    ** @param inputTokenAddresses Array of input token addresses (address for USDC, DAI, USDT...)
+    */
     function unregisterInputTokens(
         address[] calldata inputTokenAddresses
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -395,6 +446,9 @@ contract LiquidityBufferVaultV2 is
         }
     }
 
+    /** @notice Called by admin to set the main token that funds are held in.
+    ** @param newPrimaryToken Address of the token. Ex. Main token for USD buffer is USDC.
+    */
     function setPrimaryToken(address newPrimaryToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
         primaryToken = newPrimaryToken;
     }

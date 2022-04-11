@@ -7,6 +7,16 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "hardhat/console.sol";
 
 contract LiquidityBufferUSDAdaptor {
+    /** @notice DelegateCalled by buffer to send tokens to be deposited into the multisig wallet.
+     * @dev For each token, sends to the curve pool to withdraw in USDC, then it is deposited to the multisig wallet
+     * NOTE: Input _amount is 10**18. Make sure to standardise it for the token (10**18 DAI, 10**6 USDC/USDT)
+     ** @param _token Address of the token input
+     ** @param _primaryToken Address of the primary Token to be sent to the wallet (USDC here)
+     ** @param _wallet Address of the multisig wallet 
+     ** @param _amount Amount of tokens in 10**18
+     ** @param _pool Address of liquidity pool to be used.
+     ** @param slippage Slippage specified from Liquidity buffer
+     */
     function enterAdaptor(address _token, address _primaryToken, address _wallet, uint256 _amount, address _pool, uint256 slippage) external returns (uint256) {
         if (_token == 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063) {
             uint256 lpAmount = ICurvePool(_pool).add_liquidity([_amount, 0, 0], 0, true);
@@ -38,6 +48,17 @@ contract LiquidityBufferUSDAdaptor {
         }
     }
 
+    /** @notice DelegateCalled by buffer to send tokens to withdraw 
+    * @dev Removes the token form the curve pool and tranfers it to the user directly.
+    * NOTE: Input _amount is 10**18. Make sure to standardise it for the token (10**18 DAI, 10**6 USDC/USDT)
+    ** @param _user Address of the user (msg.sender)
+    ** @param _token Address of the token input
+    ** @param _primaryToken Address of the primary Token to be sent to the wallet (USDC here)
+    ** @param _wallet Address of the multisig wallet 
+    ** @param _amount Amount of tokens in 10**18
+    ** @param _pool Address of liquidity pool to be used.
+    ** @param slippage Slippage specified from Liquidity buffer
+    */
     function exitAdaptor(address _user, address _token, address _primaryToken, address _wallet, uint256 _amount, address _pool, uint256 slippage ) external returns (uint256) {
          if (_token == 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063) {
             ICurvePool(_pool).remove_liquidity_imbalance(
@@ -79,6 +100,10 @@ contract LiquidityBufferUSDAdaptor {
         }
     }
 
+    /** @notice DelegateCalled by the liquidityBuffer to check how much USD can be liquidated
+     * @dev Here it calls it in DAI and returns value 10**18.
+     ** @param _pool Address of liquidity pool to be used.
+    */
     function exitAdaptorGetBalance(address _pool) external view returns (uint256) {
         uint256 curveLp = IERC20Upgradeable(0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171).balanceOf((address(this)));
         if(curveLp != 0){
@@ -89,6 +114,13 @@ contract LiquidityBufferUSDAdaptor {
         return 0;
     }
 
+    /** @notice DelegateCalled by buffer to deposit into curvePool, ready for any withdrawals (this acts as a buffer)
+    * @dev For each token, add liquidty to curve pool.
+    * NOTE: Input _amount is 10**18. Make sure to standardise it for the token (10**18 DAI, 10**6 USDC/USDT)
+    ** @param _token Address of the token input
+    ** @param _amount Amount of tokens in 10**18
+    ** @param _pool Address of liquidity pool to be used.
+    */
     function convertTokenToPrimaryToken(address _token, uint256 _amount, address _pool) external returns (uint256) {
         // While you could withdraw immediately in terms of _primaryToken, just keep inside curve pool.
         if (_token == 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063) {
@@ -108,6 +140,10 @@ contract LiquidityBufferUSDAdaptor {
         }
     }
 
+    /** @notice DelegateCalled by buffer to CurvePool to make transactions.
+    ** @dev Approves USDC, DAI, USDT
+    ** @param _pool Address of liquidity pool to be used.
+    */
     function AdaptorApproveAll(address _pool) external {
         IERC20Upgradeable(0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063).approve(_pool, type(uint256).max);
         IERC20Upgradeable(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174).approve(_pool, type(uint256).max);

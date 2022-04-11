@@ -170,6 +170,7 @@ describe("IbAlluo and Buffer", function () {
             expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
             
             await deposit(signers[1], dai, parseEther("100"));
+            await buffer.satisfyWithdrawals();
             expect(await dai.balanceOf(signers[0].address)).equal(parseEther("50"))
         })
 
@@ -184,6 +185,7 @@ describe("IbAlluo and Buffer", function () {
             expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
             
             await deposit(signers[1], usdc, parseUnits("100", 6));
+            await buffer.satisfyWithdrawals();
             expect(Number(await usdc.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("99", 6)))
         })
 
@@ -198,6 +200,7 @@ describe("IbAlluo and Buffer", function () {
             expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
             
             await deposit(signers[1], usdt, parseUnits("100", 6));
+            await buffer.satisfyWithdrawals();
             expect(Number(await usdt.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("99", 6)))
         })
 
@@ -282,6 +285,7 @@ describe("IbAlluo and Buffer", function () {
             expect(await buffer.totalWithdrawalAmount()).equal(parseEther("150"))
             // When there are deposits, should pay everyone back.
             await deposit(signers[2], usdt, parseUnits("1000", 6));
+            await buffer.satisfyWithdrawals();
             expect(Number(await usdc.balanceOf(multisig.address))).greaterThan(Number(walletBalance))
 
             expect(Number(await dai.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
