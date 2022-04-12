@@ -62,7 +62,7 @@ describe("IbAlluo and Buffer for WETH", function () {
         const Buffer = await ethers.getContractFactory("LiquidityBufferVaultV2") as LiquidityBufferVaultV2__factory;
         const WETH = await ethers.getContractFactory("TestERC20") as TestERC20__factory;
 
-        wETH = await WETH.connect(signers[0]).deploy("WETH", "WETH", 18)
+        wETH = await WETH.connect(signers[0]).deploy("WETH", "WETH", 18, true)
         multisig = await Multisig.deploy(true);
         await upgrades.silenceWarnings();
         buffer = await upgrades.deployProxy(Buffer,

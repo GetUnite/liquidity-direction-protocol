@@ -2,7 +2,7 @@
 pragma solidity ^0.8.11;
 
 import "./AlluoERC20Upgradable.sol";
-import "../interfaces/ILiquidityBufferVault.sol";
+import "../interfaces/ILiquidityBufferVaultV2.sol";
 import "../mock/interestHelper/Interest.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -175,7 +175,7 @@ contract IbAlluoV2 is
     function deposit(address _token, uint256 _amount) external {
         require(supportedTokens.contains(_token), "IbAlluo: Token not supported");
         updateRatio();
-        ILiquidityBufferVault(liquidityBuffer).deposit(msg.sender, _token, _amount);
+        ILiquidityBufferVaultV2(liquidityBuffer).deposit(msg.sender, _token, _amount);
         uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = amountIn18 * multiplier / growingRatio;
         _mint(msg.sender, adjustedAmount);
@@ -194,7 +194,7 @@ contract IbAlluoV2 is
         uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_targetToken).decimals());
         uint256 adjustedAmount = amountIn18 * multiplier / growingRatio;
         _burn(msg.sender, adjustedAmount);
-        ILiquidityBufferVault(liquidityBuffer).withdraw(msg.sender, _targetToken, _amount);
+        ILiquidityBufferVaultV2(liquidityBuffer).withdraw(msg.sender, _targetToken, _amount);
         emit BurnedForWithdraw(msg.sender, adjustedAmount);
     }
    
