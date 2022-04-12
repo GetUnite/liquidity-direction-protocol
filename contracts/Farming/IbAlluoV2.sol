@@ -191,10 +191,10 @@ contract IbAlluoV2 is
     function withdraw(address _targetToken, uint256 _amount ) external {
         require(supportedTokens.contains(_targetToken), "IbAlluo: Token not supported");
         updateRatio();
-        ILiquidityBufferVault(liquidityBuffer).withdraw(msg.sender, _targetToken, _amount);
         uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_targetToken).decimals());
         uint256 adjustedAmount = amountIn18 * multiplier / growingRatio;
         _burn(msg.sender, adjustedAmount);
+        ILiquidityBufferVault(liquidityBuffer).withdraw(msg.sender, _targetToken, _amount);
         emit BurnedForWithdraw(msg.sender, adjustedAmount);
     }
    
