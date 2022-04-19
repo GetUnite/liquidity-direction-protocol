@@ -224,6 +224,11 @@ contract IbAlluoUSD is
         }
     }
 
+    function totalAssetSupply() public view returns (uint256) {
+        uint256 _growingRatio = changeRatio(growingRatio, interestPerSecond, lastInterestCompound);
+        return totalSupply() * _growingRatio / multiplier;
+    }
+
     /// @notice  Sets the new interest rate 
     /// @dev When called, it sets the new interest rate after updating the index.
     /// @param _newAnnualInterest New annual interest rate with 2 decimals 850 == 8.50%
@@ -255,7 +260,7 @@ contract IbAlluoUSD is
     function migrateStep2() external onlyRole(DEFAULT_ADMIN_ROLE){
         _unpause();
         _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        interestPerSecond = 100000000470636749*10**10;
+        interestPerSecond = 100000000470636740*10**10;
         multiplier = 10**18;
         growingRatio = 10**18;
         lastInterestCompound = block.timestamp;

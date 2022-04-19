@@ -348,6 +348,11 @@ describe("IbAlluoUSD and Buffer", function () {
             await ibAlluoCurrent.connect(signers[1]).transfer(signers[2].address, parseEther("100"))
             await ibAlluoCurrent.connect(signers[1]).transfer(signers[3].address, parseEther("100"))
             await skipDays(365);
+            
+            let totalAsset = await ibAlluoCurrent.totalAssetSupply()            
+            expect(totalAsset).to.be.gt(parseUnits("1159", await ibAlluoCurrent.decimals()));
+            expect(totalAsset).to.be.lt(parseUnits("1160.1", await ibAlluoCurrent.decimals()));
+
             await ibAlluoCurrent.connect(signers[2]).transferAssetValue(signers[1].address, parseEther("115.9"))
 
             await ibAlluoCurrent.connect(signers[3]).approveAssetValue(signers[2].address, parseEther("116"))
