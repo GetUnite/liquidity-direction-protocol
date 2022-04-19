@@ -224,6 +224,11 @@ contract IbAlluoUSD is
         }
     }
 
+    function totalAssetSupply() public view returns (uint256) {
+        uint256 _growingRatio = changeRatio(growingRatio, interestPerSecond, lastInterestCompound);
+        return totalSupply() * _growingRatio / multiplier;
+    }
+
     /// @notice  Sets the new interest rate 
     /// @dev When called, it sets the new interest rate after updating the index.
     /// @param _newAnnualInterest New annual interest rate with 2 decimals 850 == 8.50%
@@ -255,14 +260,24 @@ contract IbAlluoUSD is
     function migrateStep2() external onlyRole(DEFAULT_ADMIN_ROLE){
         _unpause();
         _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        interestPerSecond = 100000000244041*10**13;
+        interestPerSecond = 100000000470636740*10**10;
         multiplier = 10**18;
         growingRatio = 10**18;
         lastInterestCompound = block.timestamp;
-        annualInterest = 800;
+        annualInterest = 1600;
         updateTimeLimit = 60;
+        emit UpdateTimeLimitSet(0, updateTimeLimit);
+        emit InterestChanged(0, annualInterest, 0, interestPerSecond);
     }
-    
+
+    function mint(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE){
+        _mint(account, amount);
+    }
+
+    function burn(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE){
+        _burn(account, amount);
+    }
+
     function changeTokenStatus(address _token, bool _status) external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
