@@ -205,14 +205,24 @@ contract IbAlluo is
     /// @param _targetToken Asset token
     /// @param _amount Amount (parsed 10**18)
 
-    function withdraw(address _targetToken, uint256 _amount ) external {
+    function withdrawTo(address _recipient, address _targetToken, uint256 _amount ) public {
         require(supportedTokens.contains(_targetToken), "IbAlluo: Token not supported");
         updateRatio();
         uint256 adjustedAmount = _amount * multiplier / growingRatio;
         _burn(msg.sender, adjustedAmount);
 
-        ILiquidityBufferVault(liquidityBuffer).withdraw(msg.sender, _targetToken, _amount);
+        ILiquidityBufferVault(liquidityBuffer).withdraw(_recipient, _targetToken, _amount);
         emit BurnedForWithdraw(msg.sender, adjustedAmount);
+    }
+
+    /// @notice  Withdraws accuratel
+    /// @dev When called, immediately check for new interest index. Then find the adjusted amount in IbAlluo tokens
+    ///      Then burn appropriate amount of IbAlluo tokens to receive asset token
+    /// @param _targetToken Asset token
+    /// @param _amount Amount (parsed 10**18)
+
+    function withdraw(address _targetToken, uint256 _amount ) external {
+        withdrawTo(msg.sender, _targetToken, _amount);
     }
    
     /// @notice  Returns balance in asset value

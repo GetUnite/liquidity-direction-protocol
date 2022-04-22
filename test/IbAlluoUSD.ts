@@ -367,6 +367,15 @@ describe("IbAlluoUSD and Buffer", function () {
             expect(valueBalance).to.be.lt(parseUnits("1160", await ibAlluoCurrent.decimals()));
         });
         
+        it("Should withdraw from caller to recipient", async function () {
+            await deposit(signers[1], dai, parseUnits("3000", 18));
+
+            await ibAlluoCurrent.connect(signers[1]).withdrawTo(signers[2].address, dai.address, parseEther("100"))
+            let tokenBalance = await dai.balanceOf(signers[2].address);
+            expect(tokenBalance).to.be.gt(parseUnits("100", 18));
+            
+        });
+
         it('Should correctly calculate balances over time and various transfers', async function () {
 
             //changing interest
