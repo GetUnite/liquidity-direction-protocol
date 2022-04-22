@@ -789,7 +789,7 @@
     "@types/sinon-chai" "^3.2.3"
     "@types/web3" "1.0.19"
 
-"@openzeppelin/contracts-upgradeable@^4.5.1", "@openzeppelin/contracts-upgradeable@^4.5.2":
+"@openzeppelin/contracts-upgradeable@^4.5.1":
   "integrity" "sha512-xgWZYaPlrEOQo3cBj97Ufiuv79SPd8Brh4GcFYhPgb6WvAq4ppz8dWKL6h+jLAK01rUqMRp/TS9AdXgAeNvCLA=="
   "resolved" "https://registry.npmjs.org/@openzeppelin/contracts-upgradeable/-/contracts-upgradeable-4.5.2.tgz"
   "version" "4.5.2"
@@ -1458,11 +1458,9 @@
     "require-from-string" "^2.0.2"
     "uri-js" "^4.2.2"
 
-"alluo-strategies@github:GetAlluo/alluo-strategies#standard-strategies":
-  "resolved" "git+ssh://git@github.com/GetAlluo/alluo-strategies.git#dccf93f5ae639715dd8bfcab02809c9d17a781aa"
+"alluo-strategies@github:GetAlluo/alluo-strategies#master":
+  "resolved" "git+ssh://git@github.com/GetAlluo/alluo-strategies.git#0b5e8379b74e54d51c044fed19ea7c6a95f284ea"
   "version" "1.0.0"
-  dependencies:
-    "@openzeppelin/contracts-upgradeable" "^4.5.2"
 
 "amdefine@>=0.0.4":
   "integrity" "sha1-SlKCrBZHKek2Gbz9OtFR+BfOkfU="

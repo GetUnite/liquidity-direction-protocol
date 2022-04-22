@@ -114,6 +114,16 @@ contract IbAlluo is
         emit NewBufferSet(address(0), liquidityBuffer);
     }
 
+    /// @notice  Updates the growingRatio
+    /// @dev If more than the updateTimeLimit has passed, call changeRatio from interestHelper to get correct index
+    ///      Then update the index and set the lastInterestCompound date.
+
+    function updateRatio() public whenNotPaused {
+        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
+            growingRatio = changeRatio(growingRatio, interestPerSecond, lastInterestCompound);
+            lastInterestCompound = block.timestamp;
+        }
+    }
 
     /**
      * @dev See {IERC20-approve} but it approves amount of tokens
@@ -168,17 +178,6 @@ contract IbAlluo is
         return true;
     }
 
-
-    /// @notice  Updates the growingRatio
-    /// @dev If more than the updateTimeLimit has passed, call changeRatio from interestHelper to get correct index
-    ///      Then update the index and set the lastInterestCompound date.
-
-    function updateRatio() public whenNotPaused {
-        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
-            growingRatio = changeRatio(growingRatio, interestPerSecond, lastInterestCompound);
-            lastInterestCompound = block.timestamp;
-        }
-    }
 
     /// @notice  Allows deposits and updates the index, then mints the new appropriate amount.
     /// @dev When called, asset token is sent to the wallet, then the index is updated
@@ -236,6 +235,28 @@ contract IbAlluo is
         else{
             return balanceOf(_address) * growingRatio / multiplier;
         }
+    }
+
+
+    /// @notice  Returns total supply in asset value
+    
+    function totalAssetSupply() public view returns (uint256) {
+        uint256 _growingRatio = changeRatio(growingRatio, interestPerSecond, lastInterestCompound);
+        return totalSupply() * _growingRatio / multiplier;
+    }
+
+
+    function getListSupportedTokens() public view returns (address[] memory) {
+        return supportedTokens.values();
+    }
+
+
+    function mint(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE){
+        _mint(account, amount);
+    }
+
+    function burn(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE){
+        _burn(account, amount);
     }
 
     /// @notice  Sets the new interest rate 
@@ -298,7 +319,14 @@ contract IbAlluo is
         address oldValue = liquidityBuffer;
         liquidityBuffer = newBuffer;
         emit NewBufferSet(oldValue, liquidityBuffer);
+    }
 
+
+    function changeUpgradeStatus(bool _status)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        upgradeStatus = _status;
     }
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -318,17 +346,6 @@ contract IbAlluo is
             require(account.isContract(), "IbAlluo: Not contract");
         }
         _grantRole(role, account);
-    }
-
-    function changeUpgradeStatus(bool _status)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        upgradeStatus = _status;
-    }
-
-    function getListSupportedTokens() public view returns (address[] memory) {
-        return supportedTokens.values();
     }
 
     function _beforeTokenTransfer(
