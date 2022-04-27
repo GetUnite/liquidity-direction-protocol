@@ -105,6 +105,11 @@ describe("Locking contract", function () {
         await lockingToken.connect(addr[3]).approve(locker.address, parseEther("3500"));
         await lockingToken.connect(addr[4]).approve(locker.address, parseEther("35000"));
     });
+
+    afterEach(async () => {
+        expect(await lockingToken.balanceOf(locker.address)).to.be.equal(0);
+    })
+
     describe("Basic functionality", function () {
 
         it("Should return info about vlAlluo", async function () {
@@ -168,15 +173,17 @@ describe("Locking contract", function () {
         it("Should allow unlock specified amount", async function () {
             await shiftToStart();
 
-            await locker.connect(addr[1]).lock(parseEther("1000"));
+            await lockingToken.connect(addr[1]).transfer(addr[9].address, parseEther("2500"))
+            await lockingToken.connect(addr[9]).approve(locker.address, parseEther("2500"))
+
+            await locker.connect(addr[9]).lock(parseEther("1000"));
             await skipDays(7);
 
-            await locker.connect(addr[1]).unlock(parseEther("500"));
+            await locker.connect(addr[9]).unlock(parseEther("500"));
 
             await skipDays(6);
-            await locker.connect(addr[1]).withdraw();
-            expect(await lockingToken.balanceOf(addr[1].address)).to.equal(parseEther("2000"));
-
+            await locker.connect(addr[9]).withdraw();
+            expect(await lockingToken.balanceOf(addr[9].address)).to.equal(parseEther("2000"));
         });
 
         it("Should allow to unlock and claim at the same time", async function () {
@@ -458,7 +465,8 @@ describe("Locking contract", function () {
         });
 
     });
-    describe("Admin functions and pause", function () {
+
+    describe("Admin functions and pause", async () => {
         it("Should not allow interaction with the contract on pause", async function () {
             await shiftToStart();
 
@@ -492,4 +500,21 @@ describe("Locking contract", function () {
         });
     });
 
+    describe("Mainnet upgrade", async () => {
+        it("Should check if upgrade is good", async () => {
+            const oldLocker = await ethers.getContractAt("AlluoLocked", "0x34618270647971a3203579380b61De79ecC474D1");
+            const NewLocker = await ethers.getContractFactory("AlluoLockedNew");
+
+            await oldLocker.connect(admin).grantRole(await oldLocker.UPGRADER_ROLE(), addr[0].address);
+            await oldLocker.connect(admin).changeUpgradeStatus(true);
+
+            const newLocker = await upgrades.upgradeProxy(oldLocker, NewLocker) as AlluoLockedNew;
+
+            if (await lockingToken.balanceOf(newLocker.address))
+                console.log("Alluo balance on locker detected.");
+            await newLocker.connect(admin).initializeBalancerVersion();
+
+            expect(await lockingToken.balanceOf(newLocker.address)).to.be.equal(0);
+        })
+    });
 });
