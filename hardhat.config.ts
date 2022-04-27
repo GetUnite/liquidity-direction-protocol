@@ -24,10 +24,11 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
+      chainId: 1,
       forking: {
         enabled: process.env.FORKING_ENABLED == "true",
         url: process.env.MAINNET_FORKING_URL as string,
-        blockNumber: 14487893
+        blockNumber: 14663600
       }
     },
     mainnet: {
@@ -66,7 +67,7 @@ const config: HardhatUserConfig = {
       },
     }
   },
-  
+
   gasReporter: {
     enabled: process.env.REPORT_GAS == "true",
     currency: "USD",
