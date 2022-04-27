@@ -10,23 +10,33 @@ import { getHolders } from "../../scripts/dev/getHolders";
 task("mintNew", "mint tokens on new version")
     .setAction(async function (taskArgs, hre) {
 
-        const network = hre.network.name;
+    const network = hre.network.name;
 
-        console.log(network);
+    console.log(network);
 
-        const ibAlluo = await hre.ethers.getContractAt("IbAlluoUSD", "address");
-        let alluoLp = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec"
+    const ibAlluo = await hre.ethers.getContractAt("IbAlluoUSD", "address");
+    let alluoLp = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec"
 
-        let holders: string[] = await getHolders(hre)
+    let holders: string[] = await getHolders(hre)
 
-        const middleIndex = Math.ceil(holders.length / 2);
+    var holdersInChunks = await chunkArray(holders, 15);
 
-        const firstHalf = holders.splice(0, middleIndex);   
-        const secondHalf = holders.splice(-middleIndex);
+    for(let i = 0; i < holdersInChunks.length; i++){
+        await ibAlluo.migrateStep1(alluoLp, holdersInChunks[i])
+    }
 
-        await ibAlluo.migrateStep1(alluoLp, firstHalf)
+    console.log('mintNew task Done!');
+});
 
-        await ibAlluo.migrateStep1(alluoLp, secondHalf)
+async function chunkArray(myArray: any[], chunk_size: number){
 
-        console.log('mintNew task Done!');
-    });
+    let tempArray = [];
+    
+    for (let index = 0; index < myArray.length; index += chunk_size) {
+        let myChunk = myArray.slice(index, index+chunk_size);
+
+        tempArray.push(myChunk);
+    }
+
+    return tempArray;
+}
