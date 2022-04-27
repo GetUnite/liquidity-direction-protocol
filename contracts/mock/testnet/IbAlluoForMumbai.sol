@@ -61,9 +61,9 @@ contract IbAlluoForMumbai is
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
     event NewWalletSet(address oldWallet, address newWallet);
+    event NewBufferSet(address oldBuffer, address newBuffer);
     event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
     event DepositTokenStatusChanged(address token, bool status);
-
     event InterestChanged(
         uint256 oldYearInterest, 
         uint256 newYearInterest,
@@ -94,6 +94,17 @@ contract IbAlluoForMumbai is
         emit NewWalletSet(address(0), wallet);
     }
 
+
+    /// @notice  Updates the growingRatio
+    /// @dev If more than the updateTimeLimit has passed, call changeRatio from interestHelper to get correct index
+    ///      Then update the index and set the lastInterestCompound date.
+
+    function updateRatio() public whenNotPaused {
+        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
+            growingRatio = changeRatio(growingRatio, interestPerSecond, lastInterestCompound);
+            lastInterestCompound = block.timestamp;
+        }
+    }
 
     /**
      * @dev See {IERC20-approve} but it approves amount of tokens
@@ -148,23 +159,11 @@ contract IbAlluoForMumbai is
         return true;
     }
 
-
-    /// @notice  Updates the growingRatio
-    /// @dev If more than the updateTimeLimit has passed, call changeRatio from interestHelper to get correct index
-    ///      Then update the index and set the lastInterestCompound date.
-
-    function updateRatio() public whenNotPaused {
-        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
-            growingRatio = changeRatio(growingRatio, interestPerSecond, lastInterestCompound);
-            lastInterestCompound = block.timestamp;
-        }
-    }
-
     /// @notice  Allows deposits and updates the index, then mints the new appropriate amount.
     /// @dev When called, stable coin is sent to the wallet, then the index is updated
     ///      so that the adjusted amount is accurate.
     /// @param _token Deposit token address (eg. USDC)
-    /// @param _amount Amount (parsed 10**18) 
+    /// @param _amount Amount (with token desimals) 
 
     function deposit(address _token, uint256 _amount) external {
         require(supportedTokens.contains(_token), "IbAlluo: Token not supported");
@@ -181,19 +180,29 @@ contract IbAlluoForMumbai is
     }
 
     /// @notice  Withdraws accuratel
-    /// @dev When called, immediately check for new interest index. Then find the adjusted amount in LP tokens
-    ///      Then burn appropriate amount of LP tokens to receive USDC/ stablecoin
+    /// @dev When called, immediately check for new interest index. Then find the adjusted amount in IbAlluo tokens
+    ///      Then burn appropriate amount of IbAlluo tokens to receive stablecoin
     /// @param _targetToken Stablecoin desired (eg. USDC)
-    /// @param _amount Amount (parsed 10**18) in stablecoins
+    /// @param _amount Amount (parsed 10**18)
 
-    function withdraw(address _targetToken, uint256 _amount ) external {
+    function withdrawTo(address _recipient, address _targetToken, uint256 _amount ) public {
         require(supportedTokens.contains(_targetToken), "IbAlluo: Token not supported");
         updateRatio();
         uint256 adjustedAmount = _amount * multiplier / growingRatio;
         _burn(msg.sender, adjustedAmount);
 
-        LiquidityBufferVaultForMumbai(liquidityBuffer).withdraw(msg.sender, _targetToken, _amount);
+        LiquidityBufferVaultForMumbai(liquidityBuffer).withdraw(_recipient, _targetToken, _amount);
         emit BurnedForWithdraw(msg.sender, adjustedAmount);
+    }
+
+    /// @notice  Withdraws accuratel
+    /// @dev When called, immediately check for new interest index. Then find the adjusted amount in IbAlluo tokens
+    ///      Then burn appropriate amount of IbAlluo tokens to receive stablecoin
+    /// @param _targetToken Stablecoin desired (eg. USDC)
+    /// @param _amount Amount (parsed 10**18)
+
+    function withdraw(address _targetToken, uint256 _amount ) external {
+        withdrawTo(msg.sender, _targetToken, _amount);
     }
    
     /// @notice  Returns balance in USD
@@ -218,10 +227,29 @@ contract IbAlluoForMumbai is
         }
     }
 
+    /// @notice  Returns total supply in USD value
+    
+    function totalAssetSupply() public view returns (uint256) {
+        uint256 _growingRatio = changeRatio(growingRatio, interestPerSecond, lastInterestCompound);
+        return totalSupply() * _growingRatio / multiplier;
+    }
+
+    function getListSupportedTokens() public view returns (address[] memory) {
+        return supportedTokens.values();
+    }
+
+    function mint(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE){
+        _mint(account, amount);
+    }
+
+    function burn(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE){
+        _burn(account, amount);
+    }
+
     /// @notice  Sets the new interest rate 
     /// @dev When called, it sets the new interest rate after updating the index.
     /// @param _newAnnualInterest New annual interest rate with 2 decimals 850 == 8.50%
-    /// @param _newInterestPerSecond New interest rate = interest per second (100000000244041*10**13 == 8% APY)
+    /// @param _newInterestPerSecond New interest rate = interest per second (100000000244041000*10**10 == 8% APY)
   
     function setInterest(uint256 _newAnnualInterest, uint256 _newInterestPerSecond)
         public
@@ -233,27 +261,6 @@ contract IbAlluoForMumbai is
         annualInterest = _newAnnualInterest;
         interestPerSecond = _newInterestPerSecond * 10**10;
         emit InterestChanged(oldAnnualValue, annualInterest, oldValuePerSecond, interestPerSecond);
-    }
-
-    /// @notice migrates by minting balances.
-
-    function migrateStep1(address _oldContract, address[] memory _users) external onlyRole(DEFAULT_ADMIN_ROLE){
-        for(uint i = 0; i < _users.length; i++){
-            uint256 oldBalance = AlluoERC20Upgradable(_oldContract).balanceOf(_users[i]);
-            _mint(_users[i], oldBalance);
-        }
-    }
-
-    /// @notice migrates by setting new interest variables.
-
-    function migrateStep2() external onlyRole(DEFAULT_ADMIN_ROLE){
-        _unpause();
-        interestPerSecond = 100000000244041*10**13;
-        multiplier = 10**18;
-        growingRatio = 10**18;
-        lastInterestCompound = block.timestamp;
-        annualInterest = 800;
-        updateTimeLimit = 60;
     }
 
     function changeTokenStatus(address _token, bool _status) external
@@ -296,8 +303,16 @@ contract IbAlluoForMumbai is
     {
         require(newBuffer.isContract(), "IbAlluo: Not contract");
 
+        address oldValue = liquidityBuffer;
         liquidityBuffer = newBuffer;
+        emit NewBufferSet(oldValue, liquidityBuffer);
+    }
 
+    function changeUpgradeStatus(bool _status)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        upgradeStatus = _status;
     }
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -319,15 +334,28 @@ contract IbAlluoForMumbai is
         _grantRole(role, account);
     }
 
-    function changeUpgradeStatus(bool _status)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        upgradeStatus = _status;
+    /// @notice migrates by minting balances.
+
+    function migrateStep1(address _oldContract, address[] memory _users) external onlyRole(DEFAULT_ADMIN_ROLE){
+        for(uint i = 0; i < _users.length; i++){
+            uint256 oldBalance = AlluoERC20Upgradable(_oldContract).balanceOf(_users[i]);
+            _mint(_users[i], oldBalance);
+        }
     }
 
-    function getListSupportedTokens() public view returns (address[] memory) {
-        return supportedTokens.values();
+    /// @notice migrates by setting new interest variables.
+
+    function migrateStep2() external onlyRole(DEFAULT_ADMIN_ROLE){
+        _unpause();
+        _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        interestPerSecond = 100000000470636740*10**10;
+        multiplier = 10**18;
+        growingRatio = 10**18;
+        lastInterestCompound = block.timestamp;
+        annualInterest = 1600;
+        updateTimeLimit = 60;
+        emit UpdateTimeLimitSet(0, updateTimeLimit);
+        emit InterestChanged(0, annualInterest, 0, interestPerSecond);
     }
 
     function _beforeTokenTransfer(
@@ -347,3 +375,4 @@ contract IbAlluoForMumbai is
         upgradeStatus = false;
     }
 }
+
