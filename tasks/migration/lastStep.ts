@@ -14,7 +14,7 @@ task("last", "mint tokens on new version")
 
         console.log(network);
 
-        const ibAlluo = await hre.ethers.getContractAt("IbAlluoUSD", "address");
+        const ibAlluo = await hre.ethers.getContractAt("IbAlluoUSD", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
 
         await ibAlluo.migrateStep2()
 
