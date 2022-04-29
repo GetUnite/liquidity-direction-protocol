@@ -17,20 +17,39 @@ task("mintNew", "mint tokens on new version")
     console.log(network);
 
     const ibAlluo = await hre.ethers.getContractAt("IbAlluoUSD", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
-    let alluoLp = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec"
+    const alluolp = await hre.ethers.getContractAt("AlluoLpV6", "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec");
 
     let holders: string[] = await getHolders(hre)
 
     var holdersInChunks = await chunkArray(holders, 90);
 
     for(let i = 0; i < holdersInChunks.length; i++){
-        let txn = await ibAlluo.migrateStep1(alluoLp, holdersInChunks[i])
-        await write(`\nChunk #${i} with hash: ` + txn.hash + "\n[")
+        let txn = await ibAlluo.migrateStep1(alluolp.address, holdersInChunks[i])
+
+        await writeMinting(`\nChunk #${i} with hash: ` + txn.hash + "\n[")
+
         for(let g = 0; g < holdersInChunks[i].length; g++){
-            write(`\"${holdersInChunks[i][g]}\",`)
+            writeMinting(`\"${holdersInChunks[i][g]}\",`)
         }
-        await write(`]`)
+
+        await writeMinting(`]`)
     }
+
+    //in case some txn failed
+    //part I
+    // let list: string[] = []
+
+    // await ibAlluo.migrateStep1(alluolp.address, list)
+
+    // again?
+    //part II
+
+    // for(let i = 0; i < list.length; i++){
+    //     let balance = await alluolp.balanceOf(list[i])
+    //     await ibAlluo.mint(list[i], balance)
+    //     console.log(list[i]);
+    // }
+
 
     console.log('mintNew task Done!');
 });
@@ -45,10 +64,11 @@ async function chunkArray(myArray: any[], chunk_size: number){
         tempArray.push(myChunk);
     }
 
+    console.log("Amount of chunks: " + tempArray.length);
     return tempArray;
 }
 
-async function write(line: string){
+async function writeMinting(line: string){
 
     writeFileSync(join(__dirname, "./migration.txt"), line + "\n",{
         flag: "a+",

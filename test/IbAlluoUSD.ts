@@ -3,7 +3,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests,  IbAlluoUSD, IbAlluoUSD__factory, AlluoLpV5} from "../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests,  IbAlluoUSD, IbAlluoUSD__factory, AlluoLpV5, AlluoLpV6} from "../typechain";
 import { writeFileSync } from 'fs';
 import { join } from "path";
 
@@ -42,7 +42,6 @@ async function getHolders() : Promise<string[]>{
     const deploymentBlock = 25009106
     // console.log(Number("0x1a2874d"));
     
-
     let balances: { [address: string] : BigNumber } = {};
 
     const events1 = await ethers.provider.getLogs({
@@ -98,6 +97,51 @@ async function getHolders() : Promise<string[]>{
     return fullList;
 }
 
+
+async function migrationStep1(ibAlluoCurrent: any) {
+    const alluolp = await ethers.getContractAt("AlluoLpV6", "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec") as AlluoLpV6;
+
+    let holders = await getHolders();
+
+    let holdersInChunks = await chunkArray(holders, 90);
+
+    for(let i = 0; i < holdersInChunks.length; i++){
+        let txn = await alluolp.claimAll(holdersInChunks[i])
+        await writeClaiming(`\nChunk #${i} with hash: ` + txn.hash + "\n[")
+        for(let g = 0; g < holdersInChunks[i].length; g++){
+            writeClaiming(`\"${holdersInChunks[i][g]}\",`)
+        }
+        await writeClaiming(`]`)
+    }
+
+    holders = await getHolders();
+
+    holdersInChunks = await chunkArray(holders, 90);
+
+    for(let i = 0; i < holdersInChunks.length; i++){
+        let txn = await ibAlluoCurrent.migrateStep1(alluolp.address, holdersInChunks[i])
+        await writeMinting(`\nChunk #${i} with hash: ` + txn.hash + "\n[")
+        for(let g = 0; g < holdersInChunks[i].length; g++){
+            writeMinting(`\"${holdersInChunks[i][g]}\",`)
+        }
+        await writeMinting(`]`)
+    }
+}
+
+async function writeMinting(line: string){
+
+    writeFileSync(join(__dirname, "./migration.txt"), line + "\n",{
+        flag: "a+",
+    });
+}
+
+async function writeClaiming(line: string){
+
+    writeFileSync(join(__dirname, "./claiming.txt"), line + "\n",{
+        flag: "a+",
+    });
+}
+
 async function chunkArray(myArray: any[], chunk_size: number){
 
     let tempArray = [];
@@ -108,38 +152,8 @@ async function chunkArray(myArray: any[], chunk_size: number){
         tempArray.push(myChunk);
     }
 
+    console.log("Amount of chunks: " + tempArray.length);
     return tempArray;
-}
-
-async function migrationStep1(ibAlluoCurrent: any) {
-    const alluolp = await ethers.getContractAt("AlluoLpV5", "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec") as AlluoLpV5;
-    let holders = await getHolders();
-
-    for(let i = 0; i < holders.length; i++){
-        await alluolp.claim(holders[i])
-        console.log(`claimed for ${holders[i]}`);
-        
-    }
-
-    holders = await getHolders();
-
-    var holdersInChunks = await chunkArray(holders, 90);
-
-    for(let i = 0; i < holdersInChunks.length; i++){
-        let txn = await ibAlluoCurrent.migrateStep1(alluolp.address, holdersInChunks[i])
-        await write(`\nChunk #${i} with hash: ` + txn.hash + "\n[")
-        for(let g = 0; g < holdersInChunks[i].length; g++){
-            write(`\"${holdersInChunks[i][g]}\",`)
-        }
-        await write(`]`)
-    }
-}
-
-async function write(line: string){
-
-    writeFileSync(join(__dirname, "./migration.txt"), line + "\n",{
-        flag: "a+",
-    });
 }
 
 describe("IbAlluoUSD and Buffer", function () {
@@ -164,7 +178,7 @@ describe("IbAlluoUSD and Buffer", function () {
                     enabled: true,
                     jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
                     //you can fork from last block by commenting next line
-                    blockNumber: 27682194, 
+                    blockNumber: 27718275, 
                 },
             },],
         });
