@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../../Farming/AlluoERC20Upgradable.sol";
+import "./OldAlluoERC20Upgradable.sol";
 import "../../Farming/LiquidityBufferVault.sol";
 import "hardhat/console.sol";
 
@@ -13,10 +13,10 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
-contract AlluoLpV3ForAlluoLpV4Test is 
+contract AlluoLpV5 is 
     Initializable, 
     PausableUpgradeable, 
-    AlluoERC20Upgradable, 
+    OldAlluoERC20Upgradable, 
     AccessControlUpgradeable, 
     UUPSUpgradeable 
 {
@@ -133,9 +133,9 @@ contract AlluoLpV3ForAlluoLpV4Test is
         IERC20Upgradeable(_token).safeTransferFrom(msg.sender, address(liquidityBuffer), _amount);
         claim(msg.sender);
 
-        // liquidityBuffer.deposit(_token, _amount);
+        liquidityBuffer.deposit(_token, _amount);
 
-        uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
+        uint256 amountIn18 = _amount * 10**(18 - OldAlluoERC20Upgradable(_token).decimals());
         _mint(msg.sender, amountIn18);
 
         emit Deposited(msg.sender, _token, amountIn18);
@@ -260,6 +260,11 @@ contract AlluoLpV3ForAlluoLpV4Test is
 
     function getListSupportedTokens() public view returns (address[] memory) {
         return supportedTokens.values();
+    }
+
+    function burn(address user, uint256 amount) public onlyRole(DEFAULT_ADMIN_ROLE){
+        claim(user);
+        _burn(user, amount);
     }
 
     function _beforeTokenTransfer(

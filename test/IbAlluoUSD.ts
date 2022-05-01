@@ -3,10 +3,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
-import { before } from "mocha";
 import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests,  IbAlluoUSD, IbAlluoUSD__factory} from "../typechain";
-
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 async function skipDays(d: number) {
     ethers.provider.send('evm_increaseTime', [d * 86400]);
@@ -35,6 +32,46 @@ async function  prepareCallData(type: string, parameters: any[]) : Promise<Bytes
     }
 }
 
+async function getHolders() : Promise<string[]>{
+
+    let tokenAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec"
+    let deploymentBlock = 25009106
+
+    const token = await ethers.getContractAt("IERC20", tokenAddress);
+    
+    const events = await ethers.provider.getLogs({
+        fromBlock: deploymentBlock,
+        toBlock: "latest",
+        address: tokenAddress,
+        topics: ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]  
+                    //keccak256("Transfer(address,address,uint256)")
+    })        
+
+    const decoder = new ethers.utils.AbiCoder;
+
+    let fullList: string[] = [];
+    let onlyCurrentHoldersList: string[] = [];
+
+    for(let i = 0; i < events.length; i++){
+        let addressTo = (decoder.decode(["address"], events[i].topics[2])).toString();
+
+        if(!fullList.includes(addressTo) && addressTo != ethers.constants.AddressZero){
+            fullList.push(addressTo)
+        }
+    }
+
+    for(let i = 0; i < fullList.length; i++){
+        let balance = await token.balanceOf(fullList[i]);
+
+        if(balance > BigNumber.from(0)){
+            onlyCurrentHoldersList.push(fullList[i])
+        }
+    }
+
+    //console.log(onlyCurrentHoldersList);
+    return onlyCurrentHoldersList
+}
+
 
 describe("IbAlluoUSD and Buffer", function () {
     let signers: SignerWithAddress[];
@@ -58,14 +95,14 @@ describe("IbAlluoUSD and Buffer", function () {
                     enabled: true,
                     jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
                     //you can fork from last block by commenting next line
-                    blockNumber: 26313740, 
+                    blockNumber: 27279634, 
                 },
             },],
         });
 
         signers = await ethers.getSigners();
         const whaleAddress = "0x075e72a5eDf65F0A5f44699c7654C1a76941Ddc8";
-        const curveLpHolderAddress = "0xa0f2e2f7b3ab58e3e52b74f08d94ae52778d46df";
+        const curveLpHolderAddress = "0xba0c565110f65d181b9ff1d8a9f787b52857bb0c";
 
         await ethers.provider.send(
             'hardhat_impersonateAccount',
@@ -140,6 +177,22 @@ describe("IbAlluoUSD and Buffer", function () {
 
         await multisig.executeCall(buffer.address, calldata);
 
+        // const alluolp = await ethers.getContractAt("AlluoLpV3", "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec");
+        // let holders = await getHolders();
+
+        // const middleIndex = Math.ceil(holders.length / 2);
+
+        // const firstHalf = holders.splice(0, middleIndex);   
+        // const secondHalf = holders.splice(-middleIndex);
+
+        // console.log(firstHalf);  
+        // console.log(secondHalf); 
+        // console.log(holders);       
+        
+        // let txn1 = await ibAlluoCurrent.migrateStep1(alluolp.address, firstHalf)
+        // let txn2 = await ibAlluoCurrent.migrateStep1(alluolp.address, secondHalf)
+
+
         await ibAlluoCurrent.migrateStep2();
     });
 
@@ -204,6 +257,7 @@ describe("IbAlluoUSD and Buffer", function () {
         });
     
         it("Should check all core functions of buffer", async function () {
+            
             await deposit(signers[1], dai, parseUnits("2000", 18));
             await deposit(signers[2], usdc, parseUnits("3000", 6));
             await deposit(signers[3], usdt, parseUnits("5000", 6));
@@ -254,8 +308,8 @@ describe("IbAlluoUSD and Buffer", function () {
             //view function that returns balance with APY
             let balance = await ibAlluoCurrent.getBalance(signers[3].address);
             //console.log(balance.toString());
-            expect(balance).to.be.gt(parseUnits("107.9", await ibAlluoCurrent.decimals()));
-            expect(balance).to.be.lt(parseUnits("108.1", await ibAlluoCurrent.decimals()));
+            expect(balance).to.be.gt(parseUnits("115.9", await ibAlluoCurrent.decimals()));
+            expect(balance).to.be.lt(parseUnits("116.1", await ibAlluoCurrent.decimals()));
         });
         
         it('Should not change growingRatio more than once a minute', async function () {
@@ -278,8 +332,8 @@ describe("IbAlluoUSD and Buffer", function () {
             let newDF = ibAlluoCurrent.growingRatio().toString;
             expect(oldDF).to.equal(newDF)
             balance = await ibAlluoCurrent.getBalance(signers[3].address);
-            expect(balance).to.be.gt(parseUnits("107.9", await ibAlluoCurrent.decimals()));
-            expect(balance).to.be.lt(parseUnits("108.1", await ibAlluoCurrent.decimals()));
+            expect(balance).to.be.gt(parseUnits("115.9", await ibAlluoCurrent.decimals()));
+            expect(balance).to.be.lt(parseUnits("116.1", await ibAlluoCurrent.decimals()));
         });
 
         it('getBalance should return zero if user dont have tokens', async function () {
@@ -294,21 +348,45 @@ describe("IbAlluoUSD and Buffer", function () {
             await ibAlluoCurrent.connect(signers[1]).transfer(signers[2].address, parseEther("100"))
             await ibAlluoCurrent.connect(signers[1]).transfer(signers[3].address, parseEther("100"))
             await skipDays(365);
-            await ibAlluoCurrent.connect(signers[2]).transferAssetValue(signers[1].address, parseEther("107.9"))
+            
+            let totalAsset = await ibAlluoCurrent.totalAssetSupply()            
+            expect(totalAsset).to.be.gt(parseUnits("1159", await ibAlluoCurrent.decimals()));
+            expect(totalAsset).to.be.lt(parseUnits("1160.1", await ibAlluoCurrent.decimals()));
 
-            await ibAlluoCurrent.connect(signers[3]).approveAssetValue(signers[2].address, parseEther("108"))
-            await ibAlluoCurrent.connect(signers[2]).transferFromAssetValue(signers[3].address, signers[1].address, parseEther("107.9"))
+            await ibAlluoCurrent.connect(signers[2]).transferAssetValue(signers[1].address, parseEther("115.9"))
+
+            await ibAlluoCurrent.connect(signers[3]).approveAssetValue(signers[2].address, parseEther("116"))
+            await ibAlluoCurrent.connect(signers[2]).transferFromAssetValue(signers[3].address, signers[1].address, parseEther("115.9"))
 
             let tokenBalance = await ibAlluoCurrent.balanceOf(signers[1].address);
             expect(tokenBalance).to.be.gt(parseUnits("999", await ibAlluoCurrent.decimals()));
             expect(tokenBalance).to.be.lt(parseUnits("1000", await ibAlluoCurrent.decimals()));
 
             let valueBalance = await ibAlluoCurrent.getBalance(signers[1].address)
-            expect(valueBalance).to.be.gt(parseUnits("1079", await ibAlluoCurrent.decimals()));
-            expect(valueBalance).to.be.lt(parseUnits("1080", await ibAlluoCurrent.decimals()));
+            expect(valueBalance).to.be.gt(parseUnits("1159", await ibAlluoCurrent.decimals()));
+            expect(valueBalance).to.be.lt(parseUnits("1160", await ibAlluoCurrent.decimals()));
         });
         
+        it("Should withdraw from caller to recipient", async function () {
+            await deposit(signers[1], dai, parseUnits("3000", 18));
+
+            await ibAlluoCurrent.connect(signers[1]).withdrawTo(signers[2].address, dai.address, parseEther("100"))
+            let tokenBalance = await dai.balanceOf(signers[2].address);
+            expect(tokenBalance).to.be.gt(parseUnits("100", 18));
+            
+        });
+
         it('Should correctly calculate balances over time and various transfers', async function () {
+
+            //changing interest
+            let newAnnualInterest = 800;
+            let newInterestPerSecond = BigNumber.from("100000000244041000");
+                                                    
+            let ABI = ["function setInterest(uint256 _newAnnualInterest, uint256 _newInterestPerSecond)"];
+            let iface = new ethers.utils.Interface(ABI);
+            let calldata = iface.encodeFunctionData("setInterest", [newAnnualInterest, newInterestPerSecond]);
+
+            await multisig.executeCall(ibAlluoCurrent.address, calldata);
 
             const amount = ethers.utils.parseUnits("100.0", await ibAlluoCurrent.decimals());
 
@@ -344,12 +422,12 @@ describe("IbAlluoUSD and Buffer", function () {
             await ibAlluoCurrent.connect(signers[3]).withdraw(dai.address, balance);
 
             //changing interest
-            const newAnnualInterest = 500;
-            const newInterestPerSecond = parseUnits("100000000154712595", 0);
+            newAnnualInterest = 500;
+            newInterestPerSecond = BigNumber.from("100000000154712595");
                                                       
-            let ABI = ["function setInterest(uint256 _newAnnualInterest, uint256 _newInterestPerSecond)"];
-            let iface = new ethers.utils.Interface(ABI);
-            const calldata = iface.encodeFunctionData("setInterest", [newAnnualInterest, newInterestPerSecond]);
+            ABI = ["function setInterest(uint256 _newAnnualInterest, uint256 _newInterestPerSecond)"];
+            iface = new ethers.utils.Interface(ABI);
+            calldata = iface.encodeFunctionData("setInterest", [newAnnualInterest, newInterestPerSecond]);
 
             await multisig.executeCall(ibAlluoCurrent.address, calldata);
 
@@ -386,12 +464,12 @@ describe("IbAlluoUSD and Buffer", function () {
             await skipDays(365);
 
             let balance = await ibAlluoCurrent.getBalance(signers[3].address);
-            expect(balance).to.be.gt(parseUnits("107.9", await ibAlluoCurrent.decimals()));
-            expect(balance).to.be.lt(parseUnits("108.1", await ibAlluoCurrent.decimals()));
+            expect(balance).to.be.gt(parseUnits("115.9", await ibAlluoCurrent.decimals()));
+            expect(balance).to.be.lt(parseUnits("116.1", await ibAlluoCurrent.decimals()));
 
             //changing interest
             const newAnnualInterest = 0;
-            const newInterestPerSecond = parseUnits("100000000000000000", 0);
+            const newInterestPerSecond = BigNumber.from("100000000000000000");
                                                       
             let ABI = ["function setInterest(uint256 _newAnnualInterest, uint256 _newInterestPerSecond)"];
             let iface = new ethers.utils.Interface(ABI);
@@ -403,7 +481,7 @@ describe("IbAlluoUSD and Buffer", function () {
 
             //balance is the same
             let newBalance = await ibAlluoCurrent.getBalance(signers[3].address);
-            expect(newBalance).to.be.lt(parseUnits("108", await ibAlluoCurrent.decimals()));
+            expect(newBalance).to.be.lt(parseUnits("116.1", await ibAlluoCurrent.decimals()));
         });
     });
 
@@ -433,7 +511,7 @@ describe("IbAlluoUSD and Buffer", function () {
             describe("Should fail when", function () {
 
                 it('transfer to zero address', async function () {
-                    await expect(ibAlluoCurrent.transfer(ZERO_ADDRESS, parseEther('100'))
+                    await expect(ibAlluoCurrent.transfer(ethers.constants.AddressZero, parseEther('100'))
                     ).to.be.revertedWith("ERC20: transfer to the zero address");
                 });
 
@@ -471,7 +549,7 @@ describe("IbAlluoUSD and Buffer", function () {
                 expect(balance).to.equal(parseEther('50'));
             });
             it("Not approving becouse of zero address", async function () {
-                await expect(ibAlluoCurrent.approve(ZERO_ADDRESS, parseEther('100'))
+                await expect(ibAlluoCurrent.approve(ethers.constants.AddressZero, parseEther('100'))
                 ).to.be.revertedWith("ERC20: approve to the zero address");
             });
 
@@ -569,9 +647,9 @@ describe("IbAlluoUSD and Buffer", function () {
     });
 
     it("Should set new interest", async () => {
-        const newAnnualInterest = 1600;
-        const newInterestPerSecond = parseUnits("100000000470636749", 0);
-        const realNewInterestPerSecond = parseUnits("1000000004706367490000000000", 0);
+        const newAnnualInterest = 800;
+        const newInterestPerSecond = BigNumber.from("100000000154712595");
+        const realNewInterestPerSecond = BigNumber.from("1000000001547125950000000000");
         
         const oldAnnualInterest = await ibAlluoCurrent.annualInterest();
         const oldInterestPerSecond = await ibAlluoCurrent.interestPerSecond();
@@ -595,7 +673,7 @@ describe("IbAlluoUSD and Buffer", function () {
 
     it("Should not set new interest (caller without DEFAULT_ADMIN_ROLE)", async () => {
         const newAnnualInterest = 1600;
-        const newInterestPerSecond = parseUnits("100000000470636749", 0);
+        const newInterestPerSecond = BigNumber.from("100000000470636749");
         const role = await ibAlluoCurrent.DEFAULT_ADMIN_ROLE();
         const notAdmin = signers[1];
 

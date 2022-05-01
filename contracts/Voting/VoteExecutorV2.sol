@@ -1,70 +1,94 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.11;
 
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import "../interfaces/IUniversalCurveConvexStrategy.sol";
+import "../interfaces/IAlluoStrategy.sol";
 import "../interfaces/IExchange.sol";
 
-contract VoteExecutor is AccessControl {
-    using SafeERC20 for IERC20;
-    using EnumerableSet for EnumerableSet.AddressSet;
+contract VoteExecutorV2 is 
+    Initializable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable
+{
+    using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
+    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
+
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     struct Entry{
         // Percentage of the total contract balance
         // that goes to the exact strategy
-        uint8 weight;
+        // with 2 desimals, so 6753 == 67.53% 
+        uint256 weight;
+        // strategy that distributes money to a specific pool
+        address strategyAddress;
         // Preferred token for which most exchanges will be made
         address entryToken;
-        // Address of the pool on curve
-        address curvePool;
         // Token with which we enter the pool
         address poolToken;
-        // How many tokens pool contains
-        uint8 poolSize;
-        // PoolToken index in pool
-        uint8 tokenIndexInCurve;
-        // Address of the pool on convex
-        // zero address if not exist
-        address convexPoolAddress;
-        // special pool id on convex
-        uint256 convexPoold;
+        //
+        bytes data;
     }
 
-    // List of supported tokens as entry
-    EnumerableSet.AddressSet private entryTokens;
+    struct EntryData{
+        // strategy that distributes money to a specific pool
+        address strategyAddress;
+        //
+        bytes data;
+    }
 
-    // Address of the contract that distributes
-    // tokens to the right curve/convex pools 
-    address public strategyDeployer;
+    EntryData[] public executedEntries;
+
+    // flag for upgrades availability
+    bool public upgradeStatus;
+
+    // List of supported tokens as entry
+    EnumerableSetUpgradeable.AddressSet private entryTokens;
+
+    mapping(address => bool) public activeStrategies;
+
     // Address of the contract responsible for each exchange
     address public exchangeAddress;
-    // Acceptable slippage for stablecoin exchange 
-    uint32 public slippage = 2;
 
+    // Acceptable slippage for stablecoin exchange 
+    // with 2 decimals, so 200 == 2%
+    uint32 public slippage;
+
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() initializer {}
+    
     /**
-     * @dev Contract constructor
-     * @param _newAdmin gnosis address
-     * @param _strategy strategy address
+     * @dev Contract initializer
+     * @param _gnosis gnosis address
      * @param _exchange exchange address
      * @param _startEntryTokens list of supported entry tokens from the beginning
      */
-    constructor(address _newAdmin, address _strategy, address _exchange, address[] memory _startEntryTokens)
-    {
-        strategyDeployer = _strategy;
+    function initialize(
+        address _gnosis, 
+        address _exchange, 
+        address[] memory _startEntryTokens
+    ) public initializer {
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+
         exchangeAddress = _exchange;
+
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         for(uint256 i = 0; i < _startEntryTokens.length; i++){
             changeEntryTokenStatus(_startEntryTokens[i], true);
         }
         _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(DEFAULT_ADMIN_ROLE, _newAdmin);
+
+        _grantRole(DEFAULT_ADMIN_ROLE, _gnosis);
+
+        slippage = 200;
     }
 
     /**
@@ -73,12 +97,14 @@ contract VoteExecutor is AccessControl {
      * @param _entries full info about entry
      */
     function execute(Entry[] memory _entries) external onlyRole(DEFAULT_ADMIN_ROLE){
-        uint8 totalWeight;
+        uint256 totalWeight;
         for(uint256 i = 0; i < _entries.length; i++){
             totalWeight += _entries[i].weight;
-            require(entryTokens.contains(_entries[i].entryToken), "There is no such entry token");
+            require(entryTokens.contains(_entries[i].entryToken), "!such entry token");
+            require(activeStrategies[_entries[i].strategyAddress], "!such strategy");
         }
-        require(totalWeight <= 100, "Total weight more then 100");
+
+        require(totalWeight <= 10000, ">100");
 
         uint256 totalBalance = getTotalBalance();
 
@@ -86,17 +112,18 @@ contract VoteExecutor is AccessControl {
 
             Entry memory entry = _entries[i];
 
-            uint256 amount = entry.weight * totalBalance / 100;
+            uint256 amount = entry.weight * totalBalance / 10000;
 
             // Stablecoins have different decimals, so we need to have one base
             // (18 decimals) for calculation at each step
-            uint256 entryDecimalsMult = 10**(18 - ERC20(entry.entryToken).decimals());
-            uint256 poolDecimalsMult = 10**(18 - ERC20(entry.poolToken).decimals());
+            uint256 entryDecimalsMult = 10**(18 - IERC20MetadataUpgradeable(entry.entryToken).decimals());
+            uint256 poolDecimalsMult = 10**(18 - IERC20MetadataUpgradeable(entry.poolToken).decimals());
 
-            uint256 actualAmount = IERC20(entry.entryToken).balanceOf(address(this)) * entryDecimalsMult;
+            uint256 actualAmount = IERC20MetadataUpgradeable(entry.entryToken).balanceOf(address(this)) * entryDecimalsMult;
 
             // if entry token not enough contact should exchange other stablecoins
             if(actualAmount < amount){
+
                 uint256 amountLeft = amount - actualAmount;
 
                 uint256 maxLoop = entryTokens.length();
@@ -105,33 +132,33 @@ contract VoteExecutor is AccessControl {
                     (address helpToken, uint256 helpAmount) = findBiggest(entry.entryToken);
                     if(amountLeft <= helpAmount){
 
-                        uint256 exchangeAmountIn = amountLeft / 10**(18 - ERC20(helpToken).decimals());
+                        uint256 exchangeAmountIn = amountLeft / 10**(18 - IERC20MetadataUpgradeable(helpToken).decimals());
                         uint256 exchangeAmountOut = amountLeft / entryDecimalsMult;
 
                           actualAmount += IExchange(exchangeAddress).exchange(
                             helpToken, 
                             entry.entryToken, 
                             exchangeAmountIn,
-                            exchangeAmountOut * (100 - slippage) / 100
+                            exchangeAmountOut * (10000 - slippage) / 10000
                         ) * entryDecimalsMult;
                         amountLeft = 0;
                     }
                     else{
-                        uint256 exchangeAmountIn = helpAmount / 10**(18 - ERC20(helpToken).decimals());
+                        uint256 exchangeAmountIn = helpAmount / 10**(18 - IERC20MetadataUpgradeable(helpToken).decimals());
                         uint256 exchangeAmountOut = helpAmount / entryDecimalsMult;
 
                        actualAmount += IExchange(exchangeAddress).exchange(
                             helpToken, 
                             entry.entryToken, 
                             exchangeAmountIn,
-                            exchangeAmountOut * (100 - slippage) / 100
+                            exchangeAmountOut * (10000 - slippage) / 10000
                         ) * entryDecimalsMult;
                         amountLeft -= helpAmount;
                     }
                 }
                 amount = actualAmount;
             }
-            // final exchange before curve if needed
+            // final exchange before strategy if needed
             if(entry.entryToken != entry.poolToken){
 
                 amount = IExchange(exchangeAddress).exchange(
@@ -144,32 +171,48 @@ contract VoteExecutor is AccessControl {
             else{
                 amount = amount / poolDecimalsMult;
             }
-            uint256[4] memory arrAmounts;
-            arrAmounts[entry.tokenIndexInCurve] = amount;
-            
-            IERC20[4] memory arrTokens;
-            arrTokens[entry.tokenIndexInCurve] = IERC20(entry.poolToken);
 
-            // entering curve with all amount of pool tokens
-            IERC20(entry.poolToken).safeTransfer(strategyDeployer, amount);
+            IERC20MetadataUpgradeable(entry.poolToken).safeTransfer(entry.strategyAddress, amount);
 
-            IUniversalCurveConvexStrategy(strategyDeployer).deployToCurve(
-                arrAmounts,
-                arrTokens,
-                entry.poolSize,
-                entry.curvePool
-            );
+            bytes memory exitData = IAlluoStrategy(entry.strategyAddress).invest(entry.data, amount);
 
-            // if convex pool was provided enteing convex with all lp from curve 
-            if(entry.convexPoolAddress != address(0)){
-                  
-                IUniversalCurveConvexStrategy(strategyDeployer).deployToConvex(
-                    entry.convexPoolAddress,
-                    entry.convexPoold
-                );
-            }
+            executedEntries.push(EntryData({
+                strategyAddress: entry.strategyAddress,
+                data: exitData
+            }));
         }
     }
+
+    function exitStrategyFully(
+        uint256 entryId,
+        uint256 unwindPercent,
+        address outputCoin,
+        address receiver,
+        bool swapRewards
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IAlluoStrategy(executedEntries[entryId].strategyAddress).exitAll(
+            executedEntries[entryId].data,
+            unwindPercent,
+            outputCoin,
+            receiver,
+            swapRewards
+        );
+    }
+
+    function exitStrategyRewards(
+        uint256 entryId,
+        address outputCoin,
+        address receiver,
+        bool swapRewards
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IAlluoStrategy(executedEntries[entryId].strategyAddress).exitOnlyRewards(
+            executedEntries[entryId].data,
+            outputCoin,
+            receiver,
+            swapRewards
+        );
+    }
+
 
     /**
      * @dev function for calculating the total balance in USD
@@ -181,7 +224,8 @@ contract VoteExecutor is AccessControl {
         returns(uint256 totalBalance)
     {
         for(uint256 i = 0; i < entryTokens.length(); i++){
-            totalBalance += IERC20(entryTokens.at(i)).balanceOf(address(this)) * 10**(18 - ERC20(entryTokens.at(i)).decimals()); 
+            totalBalance += IERC20MetadataUpgradeable(entryTokens.at(i)).balanceOf(address(this)) * 
+            10**(18 - IERC20MetadataUpgradeable(entryTokens.at(i)).decimals()); 
         }
     }
 
@@ -203,12 +247,24 @@ contract VoteExecutor is AccessControl {
     ) public onlyRole(DEFAULT_ADMIN_ROLE){
         if(_status){
             entryTokens.add(_tokenAddress);
-            IERC20(_tokenAddress).safeApprove(exchangeAddress, type(uint256).max);
+            IERC20MetadataUpgradeable(_tokenAddress).safeApprove(exchangeAddress, type(uint256).max);
         }
         else{
             entryTokens.remove(_tokenAddress);
-            IERC20(_tokenAddress).safeApprove(exchangeAddress, 0);
+            IERC20MetadataUpgradeable(_tokenAddress).safeApprove(exchangeAddress, 0);
         }
+    }
+
+    /**
+     * @dev admin function for changing strategy status
+     * @param _strategyAddress address of strategy
+     * @param _status will be strategy available or not
+     */
+    function changeStrategyStatus(
+        address _strategyAddress,
+        bool _status
+    ) public onlyRole(DEFAULT_ADMIN_ROLE){
+        activeStrategies[_strategyAddress] = _status;
     }
 
     /**
@@ -221,16 +277,6 @@ contract VoteExecutor is AccessControl {
         slippage = _slippage;
     }
 
-    /**
-     * @dev admin function for adding/changing strategy address
-     * @param _strategyAddress new strategy address
-     */
-    function addStrategy(
-        address _strategyAddress
-    ) external onlyRole(DEFAULT_ADMIN_ROLE){
-        strategyDeployer = _strategyAddress;
-    }
-    
     /**
      * @dev admin function for adding/changing exchange address
      * @param _exchangeAddress new exchange address
@@ -253,7 +299,8 @@ contract VoteExecutor is AccessControl {
 
             if(entryTokens.at(i) != _entry){
                 address token = entryTokens.at(i);
-                uint256 newAmount = IERC20(token).balanceOf(address(this)) * 10**(18 - ERC20(token).decimals());
+                uint256 newAmount = IERC20MetadataUpgradeable(token).balanceOf(address(this)) * 
+                10**(18 - IERC20MetadataUpgradeable(token).decimals());
                 if(amount_ < newAmount){
                     amount_ = newAmount;
                     token_ = token;
@@ -271,8 +318,17 @@ contract VoteExecutor is AccessControl {
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(_address != address(0), "Invalid token address");
-        IERC20(_address).safeTransfer(msg.sender, _amount);
+        require(_address != address(0), "Wrong address");
+        IERC20MetadataUpgradeable(_address).safeTransfer(msg.sender, _amount);
+    }
+
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        onlyRole(UPGRADER_ROLE)
+        override
+    {
+        require(upgradeStatus, "Upgrade !allowed");
+        upgradeStatus = false;
     }
 
 }

@@ -6,11 +6,11 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import "../interfaces/IVoteExecutor.sol";
-import "../interfaces/ICvxBaseRewardPool.sol";
-import "../interfaces/ICvxBooster.sol";
-import "../interfaces/IEntry.sol";
-import "../interfaces/IUniversalCurveConvexStrategy.sol";
+import "alluo-strategies/contracts/ethereum/CurveConvex/interfaces/ICvxBooster.sol";
+
+import "../../interfaces/IVoteExecutor.sol";
+import "../../interfaces/IEntry.sol";
+import "../../interfaces/IUniversalCurveConvexStrategy.sol";
 
 import "hardhat/console.sol";
 
