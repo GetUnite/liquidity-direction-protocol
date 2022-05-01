@@ -102,6 +102,7 @@ contract LiquidityBufferVaultV3 is
     mapping(uint256 => AdapterInfo) public AdapterIdsToAdapterInfo;
     mapping(address => uint256) public inputTokenToAdapterId;
     uint256[] public AdapterIds;
+    address[] public TokenAddresses;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -284,12 +285,13 @@ contract LiquidityBufferVaultV3 is
     function getBufferAmount() public view returns(uint256) {
         uint256 bufferAmount;
         
-        for (uint256 i = 0; i < AdapterIds.length; i++) {
-            if (AdapterIds[i] == type(uint256).max) {
-                
-                // bufferAmount += IERC20(0x).balanceOf(address(this));
+        for (uint256 i = 0; i < TokenAddresses.length; i++) {
+            address _tokenAddress = TokenAddresses[i];
+            uint256 _adapterId = inputTokenToAdapterId[_tokenAddress];
+            if (_adapterId == type(uint256).max) {
+                bufferAmount += IERC20(_tokenAddress).balanceOf(address(this));
             } else {
-                address Adapter = AdapterIdsToAdapterInfo[AdapterIds[i]].AdapterAddress;
+                address Adapter = AdapterIdsToAdapterInfo[_adapterId].AdapterAddress;
                 uint256 _AdapterAmount = IAdapter(Adapter).getAdapterAmount();
                 bufferAmount += _AdapterAmount;
             }
@@ -337,6 +339,7 @@ contract LiquidityBufferVaultV3 is
         uint256 _AdapterId
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         inputTokenToAdapterId[_token] = _AdapterId;
+        TokenAddresses.push(_token);
     }
     
    
