@@ -6,7 +6,7 @@ import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import { ethers, upgrades, } from "hardhat";
 import { before, Test } from "mocha";
-import { LiquidityBufferUSDAdaptor, LiquidityBufferUSDAdaptor__factory, TestERC20, TestERC20__factory, PseudoMultisigWallet, PseudoMultisigWallet__factory, LiquidityBufferVault, LiquidityBufferVault__factory, IbAlluoV2, IbAlluoV2__factory, LiquidityBufferVaultV2, LiquidityBufferVaultV2__factory } from "../../typechain";
+import { LiquidityBufferUSDAdaptor, LiquidityBufferUSDAdaptor__factory, TestERC20, TestERC20__factory, PseudoMultisigWallet, PseudoMultisigWallet__factory, LiquidityBufferVault, LiquidityBufferVault__factory, IbAlluoV2, IbAlluoV2__factory, LiquidityBufferVaultV2, LiquidityBufferVaultV2__factory, IbAlluoUSD, LiquidityBufferVaultV3, IbAlluoUSD__factory, LiquidityBufferVaultV3__factory } from "../../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -43,9 +43,10 @@ describe("IbAlluo and Buffer for WETH", function () {
     let whale: SignerWithAddress;
     let curveLpHolder: SignerWithAddress;
 
-    let ibAlluoCurrent: IbAlluoV2;
+    let ibAlluoCurrent: IbAlluoUSD;
     let multisig: PseudoMultisigWallet;
-    let buffer: LiquidityBufferVaultV2;
+    let buffer: LiquidityBufferVaultV3;
+
 
     let wETH: TestERC20;
 
@@ -56,10 +57,13 @@ describe("IbAlluo and Buffer for WETH", function () {
 
 
     beforeEach(async function () {
-        const IbAlluo = await ethers.getContractFactory("IbAlluoV2") as IbAlluoV2__factory;
+        const IbAlluo = await ethers.getContractFactory("IbAlluoUSD") as IbAlluoUSD__factory;
+        //We are using this contract to simulate Gnosis multisig wallet
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
-   
-        const Buffer = await ethers.getContractFactory("LiquidityBufferVaultV2") as LiquidityBufferVaultV2__factory;
+        //For tests we are using version of contract with hardhat console.log, to see all Txn
+        //you can switch two next lines and turn off logs
+        // const Buffer = await ethers.getContractFactory("LiquidityBufferVaultForTests") as LiquidityBufferVaultForTests__factory;
+        const Buffer = await ethers.getContractFactory("LiquidityBufferVaultV3") as LiquidityBufferVaultV3__factory;
         const WETH = await ethers.getContractFactory("TestERC20") as TestERC20__factory;
 
         wETH = await WETH.connect(signers[0]).deploy("WETH", "WETH", 18, true)
@@ -68,29 +72,38 @@ describe("IbAlluo and Buffer for WETH", function () {
         buffer = await upgrades.deployProxy(Buffer,
             [multisig.address, multisig.address,],
             {initializer: 'initialize', kind:'uups',unsafeAllow: ['delegatecall']},
-        ) as LiquidityBufferVaultV2;
+        ) as LiquidityBufferVaultV3;
 
         ibAlluoCurrent = await upgrades.deployProxy(IbAlluo,
             [multisig.address,
             buffer.address,
             [wETH.address]],
             {initializer: 'initialize', kind:'uups'}
-        ) as IbAlluoV2;
+        ) as IbAlluoUSD;
 
 
+      
         let ABI = ["function setAlluoLp(address newAlluoLp)"];
         let iface = new ethers.utils.Interface(ABI);
         let calldata = iface.encodeFunctionData("setAlluoLp", [ibAlluoCurrent.address]);
         await multisig.executeCall(buffer.address, calldata);
 
-        ABI = ["function setPrimaryToken(address newPrimaryToken)"];
-        iface = new ethers.utils.Interface(ABI);
-        calldata = iface.encodeFunctionData("setPrimaryToken", [wETH.address]);
-        await multisig.executeCall(buffer.address, calldata);
-
 
         expect(await ibAlluoCurrent.liquidityBuffer()).equal(buffer.address);
         await ibAlluoCurrent.migrateStep2();
+
+
+
+
+        let tokenArray = [wETH.address]
+        tokenArray.forEach( async token => {
+
+            ABI = ["function setTokenToAdapter (address _token, uint256 _AdapterId)"];
+            iface = new ethers.utils.Interface(ABI);
+            calldata = iface.encodeFunctionData("setTokenToAdapter", [token, ethers.constants.MaxUint256] );
+            await multisig.executeCall(buffer.address, calldata);
+        })
+
     });
 
     describe('Buffer integration with IbAlluo', function () {
