@@ -147,8 +147,8 @@ contract LiquidityBufferVaultV3 is
                 if (withdrawal.amount <= inBuffer) {
                     uint256 _AdapterId = inputTokenToAdapterId[withdrawal.token];
                     // Amount is in 10**18
-                    uint256 _amountCorrectDecimals = withdrawal.amount / 10 ** (18 - ERC20(withdrawal.token).decimals());
-                    _withdraw(_AdapterId, withdrawal.user, withdrawal.token, _amountCorrectDecimals);
+                    // uint256 _amountCorrectDecimals = withdrawal.amount / 10 ** (18 - ERC20(withdrawal.token).decimals());
+                    _withdraw(_AdapterId, withdrawal.user, withdrawal.token, withdrawal.amount);
     
                     inBuffer -= withdrawal.amount;
                     totalWithdrawalAmount -= withdrawal.amount;
@@ -162,7 +162,6 @@ contract LiquidityBufferVaultV3 is
                         lastSatisfiedWithdrawal,
                         block.timestamp
                     );
-
                 } else {
                     break;
                 }
@@ -187,12 +186,13 @@ contract LiquidityBufferVaultV3 is
             if (expectedBufferAmount < inBuffer + _amount18) {
                 // Only deposit the amount exceeding the min buffer into the Adapter
                 // Convert/Keep remainder input tokens to primary token
-                uint256 toBeDeposited = inBuffer + _amount - expectedBufferAmount;
-                uint256 _leaveInPool = _amount - toBeDeposited;
+                uint256 toBeDeposited = inBuffer + _amount18- expectedBufferAmount;
+                uint256 _leaveInPool = _amount18 - toBeDeposited;
                 if (_AdapterId != type(uint256).max) {
                     AdapterInfo memory _AdapterInfo = AdapterIdsToAdapterInfo[_AdapterId];
                     address Adapter = _AdapterInfo.AdapterAddress;
-                    IAdapter(Adapter).deposit(_token, _amount, _leaveInPool);
+                    IERC20(_token).transfer(Adapter, _amount);
+                    IAdapter(Adapter).deposit(_token, _amount18, _leaveInPool);
                 }
                 // Else, if Adapter is not active, just hold in the liquidity buffer.
 
@@ -203,7 +203,8 @@ contract LiquidityBufferVaultV3 is
                 if (_AdapterId != type(uint256).max) {
                     AdapterInfo memory _AdapterInfo = AdapterIdsToAdapterInfo[_AdapterId];
                     address Adapter = _AdapterInfo.AdapterAddress;
-                    IAdapter(Adapter).deposit(_token, _amount, _amount);
+                    IERC20(_token).transfer(Adapter, _amount);
+                    IAdapter(Adapter).deposit(_token, _amount18, _amount18);
                 }
                 // Else, if Adapter is not active, just hold in the liquidity buffer.
             }
@@ -214,7 +215,8 @@ contract LiquidityBufferVaultV3 is
             if (_AdapterId != type(uint256).max) {
                 AdapterInfo memory _AdapterInfo = AdapterIdsToAdapterInfo[_AdapterId];
                 address Adapter = _AdapterInfo.AdapterAddress;
-                IAdapter(Adapter).deposit(_token, _amount, 0);
+                IERC20(_token).transfer(Adapter, _amount);
+                IAdapter(Adapter).deposit(_token, _amount18, 0);
             }
         }
     }
@@ -284,18 +286,24 @@ contract LiquidityBufferVaultV3 is
 
     function getBufferAmount() public view returns(uint256) {
         uint256 bufferAmount;
+
+        for (uint256 i = 0; i < AdapterIds.length; i++) {
+            uint256 _adapterId = AdapterIds[i];
+            address Adapter = AdapterIdsToAdapterInfo[_adapterId].AdapterAddress;
+            uint256 _AdapterAmount = IAdapter(Adapter).getAdapterAmount();
+            bufferAmount += _AdapterAmount;
+        }
         
         for (uint256 i = 0; i < TokenAddresses.length; i++) {
             address _tokenAddress = TokenAddresses[i];
             uint256 _adapterId = inputTokenToAdapterId[_tokenAddress];
+   
             if (_adapterId == type(uint256).max) {
                 bufferAmount += IERC20(_tokenAddress).balanceOf(address(this));
-            } else {
-                address Adapter = AdapterIdsToAdapterInfo[_adapterId].AdapterAddress;
-                uint256 _AdapterAmount = IAdapter(Adapter).getAdapterAmount();
-                bufferAmount += _AdapterAmount;
-            }
+            } 
+
         }
+        
         return bufferAmount;
     }
 

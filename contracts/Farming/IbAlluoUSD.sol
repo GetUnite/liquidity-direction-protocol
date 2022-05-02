@@ -353,15 +353,16 @@ contract IbAlluoUSD is
     function migrateStep2() external onlyRole(DEFAULT_ADMIN_ROLE){
         _unpause();
         _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        interestPerSecond = 100000000470636740*10**10;
+        interestPerSecond = 100000000244041*10**13;
         multiplier = 10**18;
         growingRatio = 10**18;
         lastInterestCompound = block.timestamp;
-        annualInterest = 1600;
+        annualInterest = 800;
         updateTimeLimit = 60;
         emit UpdateTimeLimitSet(0, updateTimeLimit);
         emit InterestChanged(0, annualInterest, 0, interestPerSecond);
     }
+
 
     function _beforeTokenTransfer(
         address from,

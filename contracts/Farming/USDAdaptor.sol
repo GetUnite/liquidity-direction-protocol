@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 import "hardhat/console.sol";
 
-contract LiquidityBufferUSDAdaptor is AccessControl {
+contract USDAdaptor is AccessControl {
     using Address for address;
 
     address public Wallet;
@@ -32,39 +32,41 @@ contract LiquidityBufferUSDAdaptor is AccessControl {
         Wallet = newWallet;
     }
 
+    // amounts are in 10**18
     function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         if (_token == DAI) {
-            uint256 lpAmount = ICurvePool(curvePool).add_liquidity([_fullAmount, 0, 0], 0, true);
-            uint256 toWallet6 = ICurvePool(curvePool).remove_liquidity_one_coin(
-                    lpAmount,
-                    1,
-                    toSend * (10000 - slippage) / 10000,
-                    true
-                );
-            IERC20Upgradeable(USDC).transfer(Wallet, toWallet6);
+            uint256 lpAmount = ICurvePoolUSD(curvePool).add_liquidity([_fullAmount, 0, 0], 0, true);
+            if (toSend != 0) {
+                uint256 lpTokensBurned = ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
+                    [0, toSend / 10**12,0], 
+                    lpAmount, 
+                    true);
+                IERC20Upgradeable(USDC).transfer(Wallet, toSend / 10**12);
+            }
         }
 
         else if (_token == USDC) {
-            ICurvePool(curvePool).add_liquidity([0, _leaveInPool, 0], 0, true);
-            IERC20Upgradeable(USDC).transfer(Wallet, toSend);
+            IERC20Upgradeable(USDC).transfer(Wallet, toSend / 10**12);
+            uint256 lpTokensBurned = ICurvePoolUSD(curvePool).add_liquidity([0, _leaveInPool/ 10**12, 0], 0, true);
+
         }
 
         else if (_token == USDT) {
-            uint256 lpAmount = ICurvePool(curvePool).add_liquidity([0, 0, _fullAmount], 0, true);
-            uint256 toWallet6 = ICurvePool(curvePool).remove_liquidity_one_coin(
-                    lpAmount,
-                    1,
-                    toSend * (10000 - slippage) / 10000,
-                    true
-                );
-            IERC20Upgradeable(USDC).transfer(Wallet, toWallet6);
+            uint256 lpAmount = ICurvePoolUSD(curvePool).add_liquidity([0, 0, _fullAmount / 10**12], 0, true);
+            if (toSend != 0) {
+                uint256 lpTokensBurned = ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
+                                [0, toSend / 10**12,0], 
+                                lpAmount, 
+                                true);
+                IERC20Upgradeable(USDC).transfer(Wallet, toSend / 10**12);
+            }
         }
     } 
   
     function withdraw (address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
           if (_token == DAI) {
-            ICurvePool(curvePool).remove_liquidity_imbalance(
+            ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
                     [_amount, 0, 0], 
                     _amount * (10000 + slippage) / 10000, 
                     true
@@ -76,8 +78,8 @@ contract LiquidityBufferUSDAdaptor is AccessControl {
             // We want to be save agains arbitragers so at any withraw of USDT/USDC
             // contract checks how much will be burned curveLp by withrawing this amount in DAI
             // and passes this burned amount to get USDC/USDT
-            uint256 toBurn = ICurvePool(curvePool).calc_token_amount([_amount, 0, 0], false);
-            uint256 toUser = ICurvePool(curvePool).remove_liquidity_one_coin(
+            uint256 toBurn = ICurvePoolUSD(curvePool).calc_token_amount([_amount, 0, 0], false);
+            uint256 toUser = ICurvePoolUSD(curvePool).remove_liquidity_one_coin(
                     toBurn, 
                     1, 
                     _amount/10**12 * (10000 - slippage) / 10000, 
@@ -88,8 +90,8 @@ contract LiquidityBufferUSDAdaptor is AccessControl {
         }
 
         else if (_token == USDT) {
-            uint256 toBurn = ICurvePool(curvePool).calc_token_amount([_amount, 0, 0], false);
-            uint256 toUser = ICurvePool(curvePool).remove_liquidity_one_coin(
+            uint256 toBurn = ICurvePoolUSD(curvePool).calc_token_amount([_amount, 0, 0], false);
+            uint256 toUser = ICurvePoolUSD(curvePool).remove_liquidity_one_coin(
                     toBurn, 
                     2, 
                     _amount/10**12 * (10000 - slippage) / 10000, 
@@ -100,12 +102,17 @@ contract LiquidityBufferUSDAdaptor is AccessControl {
         }
     }
 
-
+    function AdaptorApproveAll() external {
+        IERC20Upgradeable(DAI).approve(curvePool, type(uint256).max);
+        IERC20Upgradeable(USDC).approve(curvePool, type(uint256).max);
+        IERC20Upgradeable(USDT).approve(curvePool, type(uint256).max);
+        IERC20Upgradeable(0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171).approve(curvePool, type(uint256).max);
+    }
     function getAdapterAmount () external view returns ( uint256 ) {
         uint256 curveLp = IERC20Upgradeable(0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171).balanceOf((address(this)));
         if(curveLp != 0){
             // Returns in 10**18
-            uint256 value = ICurvePool(curvePool).calc_withdraw_one_coin(curveLp, 0);
+            uint256 value = ICurvePoolUSD(curvePool).calc_withdraw_one_coin(curveLp, 0);
             return value;
         } else {
             return 0;

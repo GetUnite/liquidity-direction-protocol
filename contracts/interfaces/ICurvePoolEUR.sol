@@ -3,7 +3,7 @@ pragma solidity 0.8.11;
 
 // Generated from pool contract ABI (https://polygonscan.com/address/0x89d065572136814230A55DdEeDDEC9DF34EB0B76#code)
 // and interface generator (https://bia.is/tools/abi2solidity/)
-interface ICurvePool {
+interface ICurvePoolEUR {
     function A() external view returns (uint256);
 
     function A_precise() external view returns (uint256);

@@ -1,10 +1,10 @@
 import { parseEther, parseUnits } from "@ethersproject/units";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { BigNumber, BigNumberish, BytesLike } from "ethers";
+import { BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, AlluoLpV3__factory, LiquidityBufferVault, LiquidityBufferVault__factory, LiquidityBufferVaultForTests__factory, LiquidityBufferVaultForTests,  IbAlluo, IbAlluo__factory, IbAlluoV2, LiquidityBufferVaultV2, LiquidityBufferUSDAdaptor, IbAlluoV2__factory, LiquidityBufferVaultV2__factory, LiquidityBufferUSDAdaptor__factory} from "../../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory , AlluoLpV3, IbAlluoV2, LiquidityBufferVaultV2, LiquidityBufferUSDAdaptor, IbAlluoV2__factory, LiquidityBufferVaultV2__factory, LiquidityBufferUSDAdaptor__factory, USDAdaptor, USDAdaptor__factory, EURAdaptor, EURAdaptor__factory, LiquidityBufferVaultV3, LiquidityBufferVaultV3__factory, IbAlluoUSD, IbAlluoUSD__factory} from "../../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -42,14 +42,14 @@ describe("IbAlluo and Buffer", function () {
     let curveLpHolder: SignerWithAddress;
 
     let alluoLpV3: AlluoLpV3;
-    let ibAlluoCurrent: IbAlluoV2;
+    let ibAlluoCurrent: IbAlluoUSD;
     let multisig: PseudoMultisigWallet;
-    let buffer: LiquidityBufferVaultV2;
+    let buffer: LiquidityBufferVaultV3;
 
     let dai: IERC20, usdc: IERC20, usdt: IERC20;
     let curveLp: IERC20;
 
-    let adaptor: LiquidityBufferUSDAdaptor;
+    let adaptor: USDAdaptor;
     before(async function () {
 
         //We are forking Polygon mainnet, please set Alchemy key in .env
@@ -104,14 +104,14 @@ describe("IbAlluo and Buffer", function () {
 
     beforeEach(async function () {
 
-        const IbAlluo = await ethers.getContractFactory("IbAlluoV2") as IbAlluoV2__factory;
+        const IbAlluo = await ethers.getContractFactory("IbAlluoUSD") as IbAlluoUSD__factory;
         //We are using this contract to simulate Gnosis multisig wallet
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
         //For tests we are using version of contract with hardhat console.log, to see all Txn
         //you can switch two next lines and turn off logs
         // const Buffer = await ethers.getContractFactory("LiquidityBufferVaultForTests") as LiquidityBufferVaultForTests__factory;
-        const Buffer = await ethers.getContractFactory("LiquidityBufferVaultV2") as LiquidityBufferVaultV2__factory;
-        const Adaptor = await ethers.getContractFactory("LiquidityBufferUSDAdaptor") as LiquidityBufferUSDAdaptor__factory;
+        const Buffer = await ethers.getContractFactory("LiquidityBufferVaultV3") as LiquidityBufferVaultV3__factory;
+        const Adaptor = await ethers.getContractFactory("USDAdaptor") as USDAdaptor__factory;
 
         let curvePool = "0x445FE580eF8d70FF569aB36e80c647af338db351"
 
@@ -121,7 +121,7 @@ describe("IbAlluo and Buffer", function () {
         buffer = await upgrades.deployProxy(Buffer,
             [multisig.address, multisig.address,],
             {initializer: 'initialize', kind:'uups',unsafeAllow: ['delegatecall']},
-        ) as LiquidityBufferVaultV2;
+        ) as LiquidityBufferVaultV3;
 
         ibAlluoCurrent = await upgrades.deployProxy(IbAlluo,
             [multisig.address,
@@ -130,10 +130,10 @@ describe("IbAlluo and Buffer", function () {
             usdc.address,
             usdt.address]],
             {initializer: 'initialize', kind:'uups'}
-        ) as IbAlluoV2;
+        ) as IbAlluoUSD;
 
 
-        adaptor = await Adaptor.deploy();
+        adaptor = await Adaptor.deploy(multisig.address, buffer.address);
         // Necessary info for adaptor:
         // multisig.address, curvePool, dai.address, usdc.address, usdt.address
 
@@ -142,29 +142,33 @@ describe("IbAlluo and Buffer", function () {
         let calldata = iface.encodeFunctionData("setAlluoLp", [ibAlluoCurrent.address]);
         await multisig.executeCall(buffer.address, calldata);
 
-        ABI = ["function setPrimaryToken(address newPrimaryToken)"];
-        iface = new ethers.utils.Interface(ABI);
-        calldata = iface.encodeFunctionData("setPrimaryToken", [usdc.address]);
-        await multisig.executeCall(buffer.address, calldata);
-
 
         expect(await ibAlluoCurrent.liquidityBuffer()).equal(buffer.address);
         await ibAlluoCurrent.migrateStep2();
 
-        ABI = ["function registerInputTokens(address[] calldata inputTokenAddresses, uint32[] calldata protocolIds, address[] calldata poolAddresses)"];
+
+
+        ABI = ["function registerAdapter(string calldata _name, address _AdapterAddress, uint256 _percentage, bool _status, address _ibAlluo, uint256 _AdapterId)"];
         iface = new ethers.utils.Interface(ABI);
-        calldata = iface.encodeFunctionData("registerInputTokens", [[dai.address, usdc.address, usdt.address], [0,0,0], [curvePool, curvePool, curvePool]] );
+        calldata = iface.encodeFunctionData("registerAdapter", ["CurvePool", adaptor.address, 0, true, ibAlluoCurrent.address, 1]);
         await multisig.executeCall(buffer.address, calldata);
 
-        ABI = ["function registerAdaptors(address[] calldata _adaptors, uint32[] calldata protocolIds)"];
-        iface = new ethers.utils.Interface(ABI);
-        calldata = iface.encodeFunctionData("registerAdaptors", [[adaptor.address], [0]]);
-        await multisig.executeCall(buffer.address, calldata);
 
-        ABI = ["function approveAllDelegateCall (address _adaptor, address _pool)"];
+        ABI = ["function setSlippage ( uint32 _newSlippage )"];
         iface = new ethers.utils.Interface(ABI);
-        calldata = iface.encodeFunctionData("approveAllDelegateCall", [adaptor.address, curvePool]);
-        await multisig.executeCall(buffer.address, calldata);
+        calldata = iface.encodeFunctionData("setSlippage", [300] );
+        await multisig.executeCall(adaptor.address, calldata);
+
+
+        let tokenArray = [dai.address, usdc.address, usdt.address];
+        tokenArray.forEach( async token => {
+
+            ABI = ["function setTokenToAdapter (address _token, uint256 _AdapterId)"];
+            iface = new ethers.utils.Interface(ABI);
+            calldata = iface.encodeFunctionData("setTokenToAdapter", [token, 1] );
+            await multisig.executeCall(buffer.address, calldata);
+        })
+        await adaptor.AdaptorApproveAll();
     });
 
     describe('Buffer integration with IbAlluo', function () {
@@ -183,18 +187,20 @@ describe("IbAlluo and Buffer", function () {
             let numberOfWithdrawals = getRandomArbitrary(3, 4);
 
             while (i <= numberOfWithdrawals / 3) {
-                await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseUnits((getRandomArbitrary(100, 500)).toString(), 6))
+                await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseUnits((getRandomArbitrary(100, 500)).toString(), 18))
                 await ibAlluoCurrent.connect(signers[2]).withdraw(dai.address,  parseUnits((getRandomArbitrary(100, 500)).toString(), 18))
-                await ibAlluoCurrent.connect(signers[3]).withdraw(usdc.address,  parseUnits((getRandomArbitrary(100, 500)).toString(), 6))
+                await ibAlluoCurrent.connect(signers[3]).withdraw(usdc.address,  parseUnits((getRandomArbitrary(100, 500)).toString(), 18))
                 i++;
             }
+            
             //console.log("BIG deposit and withdrawal");
             await deposit(signers[0], dai, parseUnits("4000", 18))
-            await ibAlluoCurrent.connect(signers[0]).withdraw(usdc.address, parseUnits("4000", 6))
+
+            await ibAlluoCurrent.connect(signers[0]).withdraw(usdc.address, parseUnits("4000", 18))
     
             while (i <= numberOfWithdrawals) {
-                await ibAlluoCurrent.connect(signers[1]).withdraw(usdc.address, parseUnits((getRandomArbitrary(100, 500)).toString(), 6))
-                await ibAlluoCurrent.connect(signers[2]).withdraw(usdt.address, parseUnits((getRandomArbitrary(100, 500)).toString(), 6))
+                await ibAlluoCurrent.connect(signers[1]).withdraw(usdc.address, parseUnits((getRandomArbitrary(100, 500)).toString(), 18))
+                await ibAlluoCurrent.connect(signers[2]).withdraw(usdt.address, parseUnits((getRandomArbitrary(100, 500)).toString(), 18))
                 await ibAlluoCurrent.connect(signers[3]).withdraw(dai.address,  parseUnits((getRandomArbitrary(100, 500)).toString(), 18))
                 i++;
             }
@@ -233,31 +239,32 @@ describe("IbAlluo and Buffer", function () {
             await deposit(signers[1], dai, parseUnits("2000", 18));
             await deposit(signers[2], usdc, parseUnits("3000", 6));
             await deposit(signers[3], usdt, parseUnits("5000", 6));
-    
-            await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address,  parseUnits("150", 6))
-            await ibAlluoCurrent.connect(signers[2]).withdraw(usdc.address, parseUnits("150", 6))
+
+            await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address,  parseUnits("150", 18))
+            await ibAlluoCurrent.connect(signers[2]).withdraw(usdc.address, parseUnits("150", 18))
             await ibAlluoCurrent.connect(signers[3]).withdraw(dai.address, parseEther("150"))
-    
+
+
             await deposit(signers[1], dai, parseUnits("100", 18));
             await deposit(signers[2], usdc, parseUnits("100", 6));
             await deposit(signers[3], usdt, parseUnits("100", 6));
-            
+
             await curveLp.connect(curveLpHolder).transfer(buffer.address, parseEther("300"));
-    
+
             await deposit(signers[1], dai, parseUnits("1000", 18));
             await deposit(signers[2], usdc, parseUnits("1000", 6));
             await deposit(signers[3], usdt, parseUnits("1000", 6));
-    
-            await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseUnits("900", 6))
+
+            await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseUnits("900", 18))
             await deposit(signers[2], usdc, parseUnits("100", 6));
             await deposit(signers[2], usdt, parseUnits("900", 6));
             await buffer.satisfyWithdrawals();
             await buffer.satisfyWithdrawals();
-            await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseUnits("600", 6))
+            await ibAlluoCurrent.connect(signers[1]).withdraw(usdt.address, parseUnits("600", 18))
     
             await ibAlluoCurrent.connect(signers[1]).withdraw(dai.address, parseEther("100"))
-            await ibAlluoCurrent.connect(signers[2]).withdraw(usdc.address, parseUnits("100", 6))
-            await ibAlluoCurrent.connect(signers[3]).withdraw(usdt.address, parseUnits("100", 6))
+            await ibAlluoCurrent.connect(signers[2]).withdraw(usdc.address, parseUnits("100", 18))
+            await ibAlluoCurrent.connect(signers[3]).withdraw(usdt.address, parseUnits("100", 18))
             await buffer.satisfyWithdrawals();
             await deposit(signers[2], usdt, parseUnits("300", 6));
             await buffer.satisfyWithdrawals();
@@ -747,7 +754,7 @@ describe("IbAlluo and Buffer", function () {
     async function deposit(recipient: SignerWithAddress, token: IERC20, amount: BigNumberish) {
         await token.connect(whale).transfer(recipient.address, amount);
 
-        await token.connect(recipient).approve(buffer.address, amount);
+        await token.connect(recipient).approve(ibAlluoCurrent.address, amount);
         
         await ibAlluoCurrent.connect(recipient).deposit(token.address, amount);
     }

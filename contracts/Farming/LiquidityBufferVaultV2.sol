@@ -208,6 +208,7 @@ contract LiquidityBufferVaultV2 is
                 abi.encodeWithSelector(bytes4(keccak256(bytes("exitAdaptor(address,address,address,address,uint256,address,uint256)"))),
                 _user, _tokenFrom, primaryToken, wallet, _amount, _pool, slippage )
             );
+            console.log("POOL", _pool);
             return abi.decode(returnedData, (uint256));
         }
     }
