@@ -7,11 +7,7 @@ import { parseEther } from "@ethersproject/units";
 import { keccak256 } from "ethers/lib/utils";
 import { AlluoLocked, AlluoLockedNew, IAlluoToken, PseudoMultisigWallet, TestERC20 } from '../typechain';
 
-import { Event } from "@ethersproject/contracts";
-
-let Token: ContractFactory;
 let lockingToken: IAlluoToken;
-let rewardToken: IAlluoToken;
 
 let Multisig: ContractFactory;
 let multisig: PseudoMultisigWallet;
@@ -61,7 +57,6 @@ describe("Locking contract", function () {
         await (await (await ethers.getContractFactory("ForceSender")).deploy({ value: amountToAdmin })).forceSend(admin.address);
 
         lockingToken = await ethers.getContractAt("IAlluoToken", "0x1E5193ccC53f25638Aa22a940af899B692e10B09");
-        rewardToken = lockingToken;
 
         Multisig = await ethers.getContractFactory("PseudoMultisigWallet");
         multisig = await Multisig.deploy(true) as PseudoMultisigWallet;
@@ -76,7 +71,7 @@ describe("Locking contract", function () {
                 startTime,
                 distrbutionTime,
                 lockingToken.address,
-                rewardToken.address
+                lockingToken.address
             ],
             { initializer: 'initialize', kind: 'uups' }
         ) as AlluoLocked;
@@ -88,16 +83,14 @@ describe("Locking contract", function () {
         locker = await upgrades.upgradeProxy(oldLocker, NewLocker) as AlluoLockedNew;
         await locker.connect(admin).initializeBalancerVersion();
 
-        await lockingToken.connect(admin).mint(addr[0].address, parseEther("100000"))
-        await rewardToken.connect(admin).mint(addr[0].address, parseEther("1000000"))
+        await lockingToken.connect(admin).mint(addr[0].address, parseEther("2000000"))
 
         await lockingToken.transfer(addr[1].address, parseEther("2500"));
         await lockingToken.transfer(addr[2].address, parseEther("7000"));
         await lockingToken.transfer(addr[3].address, parseEther("3500"));
         await lockingToken.transfer(addr[4].address, parseEther("35000"));
 
-        await rewardToken.connect(addr[0]).approve(locker.address, parseEther("1000000"));
-
+        await lockingToken.approve(locker.address, parseEther("1000000"));
         await locker.addReward(parseEther("1000000"))
 
         await lockingToken.connect(addr[1]).approve(locker.address, parseEther("2500"));
@@ -292,46 +285,52 @@ describe("Locking contract", function () {
 
             await shiftToStart();
 
-            await locker.connect(addr[1]).lock(parseEther("1000"));
+            await lockingToken.connect(addr[1]).transfer(addr[9].address, parseEther("1000"));
+            await lockingToken.connect(addr[9]).approve(locker.address, parseEther("1000"));
+            await locker.connect(addr[9]).lock(parseEther("1000"));
             await skipDays(1);
 
-            let claim = await locker.getClaim(addr[1].address);
+            let claim = await locker.getClaim(addr[9].address);
             //console.log(claim.toString());
 
             expect(claim).to.be.gt(parseEther("86400"));
-            expect(claim).to.be.lt(parseEther("86403"));
+            expect(claim).to.be.lt(parseEther("86404"));
 
             await skipDays(1);
 
-            await locker.connect(addr[1]).claim();
-            claim = await rewardToken.balanceOf(addr[1].address);
+            await locker.connect(addr[9]).claim();
+            claim = await lockingToken.balanceOf(addr[9].address);
             //console.log(claim.toString());
 
             expect(claim).to.be.gt(parseEther("172800"));
-            expect(claim).to.be.lt(parseEther("172804"));
+            expect(claim).to.be.lt(parseEther("174808"));
         });
         it("If there are two lockers lock at the same time rewards are distributed between them equally", async function () {
 
             await shiftToStart();
+            let startBalance = await lockingToken.balanceOf(addr[9].address);
+            await lockingToken.connect(addr[1]).transfer(addr[8].address, parseEther("1000"));
+            await lockingToken.connect(addr[1]).transfer(addr[9].address, parseEther("1000"));
+            await lockingToken.connect(addr[8]).approve(locker.address, parseEther("1000"));
+            await lockingToken.connect(addr[9]).approve(locker.address, parseEther("1000"));
 
-            await locker.connect(addr[1]).lock(parseEther("1000"));
-            await locker.connect(addr[2]).lock(parseEther("1000"));
+            await locker.connect(addr[8]).lock(parseEther("1000"));
+            await locker.connect(addr[9]).lock(parseEther("1000"));
             await skipDays(1);
 
-            let claim = await locker.getClaim(addr[1].address);
+            let claim = await locker.getClaim(addr[8].address);
             //console.log(claim.toString());
 
             expect(claim).to.be.gt(parseEther("43200"));
-            expect(claim).to.be.lt(parseEther("43203"));
+            expect(claim).to.be.lt(parseEther("43207"));
 
             await skipDays(1);
 
-            await locker.connect(addr[2]).claim();
-            claim = await rewardToken.balanceOf(addr[2].address);
-            //console.log(claim.toString());
+            await locker.connect(addr[9]).claim();
+            let endBalance = await lockingToken.balanceOf(addr[9].address);
 
-            expect(claim).to.be.gt(parseEther("86400"));
-            expect(claim).to.be.lt(parseEther("86403"));
+            expect(endBalance.sub(startBalance)).to.be.gt(parseEther("86400"));
+            expect(endBalance.sub(startBalance)).to.be.lt(parseEther("86404"));
         });
         it("If there are two lockers the rewards are distributed in proportion to their share", async function () {
             await shiftToStart();
@@ -342,7 +341,6 @@ describe("Locking contract", function () {
 
             await multisig.executeCall(locker.address, calldata);
 
-            //await locker.connect(multisig).setReward(parseEther("100000"))
 
             await locker.connect(addr[1]).lock(parseEther("1000"));
             await skipDays(1);
@@ -419,7 +417,7 @@ describe("Locking contract", function () {
             // 3 day
             claim = await locker.getClaim(addr[1].address);
             expect(claim).to.be.gt(parseEther("115200"));
-            expect(claim).to.be.lt(parseEther("115203"));
+            expect(claim).to.be.lt(parseEther("115204"));
 
             await locker.connect(addr[3]).lock(parseEther("2500"));
             await skipDays(1);
