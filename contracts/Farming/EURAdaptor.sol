@@ -35,28 +35,26 @@ contract EURAdaptor is AccessControl {
     function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         if (_token == jEUR) {
-            uint256 lpAmount = ICurvePoolEUR(curvePool).add_liquidity([_fullAmount, 0, 0, 0 ], 0, true);
+            uint256 lpAmount = ICurvePoolEUR(curvePool).add_liquidity([_fullAmount, 0, 0, 0 ], 0);
             if (toSend != 0) {
                 uint256 lpTokensBurned = ICurvePoolEUR(curvePool).remove_liquidity_imbalance(
                             [0, 0,0,toSend / 10**12], 
-                            lpAmount, 
-                            true);
+                            lpAmount);
                 IERC20Upgradeable(EURT).transfer(Wallet, toSend / 10**12 );
             }
         }
 
         else if (_token == EURT) {
-            IERC20Upgradeable(EURT).transfer(Wallet, toSend);
-            ICurvePoolEUR(curvePool).add_liquidity([0, 0, 0, _leaveInPool / 10**12], 0, true);
+            IERC20Upgradeable(EURT).transfer(Wallet, toSend / 10**12);
+            ICurvePoolEUR(curvePool).add_liquidity([0, 0, 0, _leaveInPool / 10**12], 0);
         }
 
         else if (_token == EURS) {
-            uint256 lpAmount = ICurvePoolEUR(curvePool).add_liquidity([0, 0, _fullAmount / 10**16, 0], 0, true);
+            uint256 lpAmount = ICurvePoolEUR(curvePool).add_liquidity([0, 0, _fullAmount / 10**16, 0], 0);
             if (toSend != 0) {
                 uint256 lpTokensBurned = ICurvePoolEUR(curvePool).remove_liquidity_imbalance(
                             [0,0,0,toSend / 10**12], 
-                            lpAmount, 
-                            true);
+                            lpAmount);
                 IERC20Upgradeable(EURT).transfer(Wallet, toSend / 10**12 );
             }
         }
@@ -67,8 +65,7 @@ contract EURAdaptor is AccessControl {
           if (_token == jEUR) {
             ICurvePoolEUR(curvePool).remove_liquidity_imbalance(
                     [_amount, 0, 0, 0], 
-                    _amount * (10000 + slippage) / 10000, 
-                    true
+                    _amount * (10000 + slippage) / 10000
                 );
             IERC20Upgradeable(jEUR).transfer(_user, _amount);
         }
@@ -81,8 +78,7 @@ contract EURAdaptor is AccessControl {
             uint256 toUser = ICurvePoolEUR(curvePool).remove_liquidity_one_coin(
                     toBurn, 
                     3, 
-                    _amount/10**12 * (10000 - slippage) / 10000, 
-                    true
+                    _amount/10**12 * (10000 - slippage) / 10000
                 );
             // toUser is already in 10**6
             IERC20Upgradeable(EURT).transfer(_user, toUser);
@@ -93,8 +89,7 @@ contract EURAdaptor is AccessControl {
             uint256 toUser = ICurvePoolEUR(curvePool).remove_liquidity_one_coin(
                     toBurn, 
                     2, 
-                    _amount/10**16 * (10000 - slippage) / 10000, 
-                    true
+                    _amount/10**16 * (10000 - slippage) / 10000
                 );
             // ToUser is already in 10**2.
             IERC20Upgradeable(EURS).transfer(_user, toUser);
@@ -104,6 +99,8 @@ contract EURAdaptor is AccessControl {
         IERC20Upgradeable(jEUR).approve(curvePool, type(uint256).max);
         IERC20Upgradeable(EURS).approve(curvePool, type(uint256).max);
         IERC20Upgradeable(EURT).approve(curvePool, type(uint256).max);
+        IERC20Upgradeable(curvePool).approve(curvePool, type(uint256).max);
+
     }
 
     function getAdapterAmount () external view returns ( uint256 ) {
