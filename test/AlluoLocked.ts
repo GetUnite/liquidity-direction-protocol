@@ -502,6 +502,10 @@ describe("Locking contract", function () {
         it("Should check if upgrade is good", async () => {
             const oldLocker = await ethers.getContractAt("AlluoLocked", "0x34618270647971a3203579380b61De79ecC474D1");
             const NewLocker = await ethers.getContractFactory("AlluoLockedNew");
+            const weth = await ethers.getContractAt("IWrappedEther", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+            const wethAmount = parseEther("100.0");
+
+            await weth.deposit({ value: wethAmount });
 
             await oldLocker.connect(admin).grantRole(await oldLocker.UPGRADER_ROLE(), addr[0].address);
             await oldLocker.connect(admin).changeUpgradeStatus(true);
@@ -510,9 +514,12 @@ describe("Locking contract", function () {
 
             if (await lockingToken.balanceOf(newLocker.address))
                 console.log("Alluo balance on locker detected.");
+
+            await weth.transfer(oldLocker.address, wethAmount);
             await newLocker.connect(admin).initializeBalancerVersion();
 
             expect(await lockingToken.balanceOf(newLocker.address)).to.be.equal(0);
+            expect(await weth.balanceOf(newLocker.address)).to.be.equal(0);
         })
     });
 });

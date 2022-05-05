@@ -249,7 +249,7 @@ contract AlluoLockedNew is
             address(this),
             _amount
         );
-        _enterAlluoPool(_amount);
+        _enterAlluoPool(_amount, 0);
 
         if (totalLocked > 0) {
             update();
@@ -521,7 +521,7 @@ contract AlluoLockedNew is
             address(this),
             _amount
         );
-        _enterAlluoPool(_amount);
+        _enterAlluoPool(_amount, 0);
     }
 
     /**
@@ -601,20 +601,48 @@ contract AlluoLockedNew is
     }
 
     function initializeBalancerVersion() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IERC20Upgradeable weth = IERC20Upgradeable(
+            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+        );
         lockingToken.approve(address(exchange), type(uint256).max);
         alluoBalancerLp.approve(address(balancer), type(uint256).max);
+        weth.approve(address(exchange), type(uint256).max);
 
         uint256 alluoBalance = lockingToken.balanceOf(address(this));
-        _enterAlluoPool(alluoBalance);
+        uint256 wethBalance = weth.balanceOf(address(this));
+        _enterAlluoPool(alluoBalance, wethBalance);
     }
 
-    function _enterAlluoPool(uint256 alluoAmount) private {
+    function withdrawTokens(
+        address withdrawToken,
+        address to,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(
+            withdrawToken != address(alluoBalancerLp),
+            "cant withdraw alluolp token"
+        );
+        IERC20Upgradeable(withdrawToken).safeTransfer(to, amount);
+    }
+
+    function _enterAlluoPool(uint256 alluoAmount, uint256 wethAmount) private {
         exchange.exchange(
             address(lockingToken),
             address(alluoBalancerLp),
             alluoAmount,
             0
         );
+        if (wethAmount > 0) {
+            IERC20Upgradeable weth = IERC20Upgradeable(
+                0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+            );
+            exchange.exchange(
+                address(weth),
+                address(alluoBalancerLp),
+                wethAmount,
+                0
+            );
+        }
     }
 
     function _exitAlluoPool(uint256 alluoAmountToGet) private {
