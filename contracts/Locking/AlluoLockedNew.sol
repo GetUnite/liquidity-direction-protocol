@@ -148,10 +148,7 @@ contract AlluoLockedNew is
         override
         onlyRole(UPGRADER_ROLE)
     {
-        require(
-            additionalLockInfo.upgradeStatus,
-            "Buffer: Upgrade not allowed"
-        );
+        require(additionalLockInfo.upgradeStatus, "Upgrade not allowed");
         additionalLockInfo.upgradeStatus = false;
     }
 
