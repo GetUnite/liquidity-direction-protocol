@@ -50,11 +50,12 @@ contract AlluoLocked is
     //period of locking after unlock function call
     uint256 public withdrawLockDuration;
 
-    struct AdditionalLockInfo {
+
+    struct AdditionalLockInfo{
         // Amount of locked tokens waiting for withdraw.
         uint256 waitingForWithdrawal;
         // Amount of currently claimed rewards by the users.
-        uint256 totalDistributed;
+        uint256  totalDistributed;
         // flag for allowing upgrade
         bool upgradeStatus;
         // flag for allowing migrate
@@ -62,9 +63,9 @@ contract AlluoLocked is
     }
 
     AdditionalLockInfo private additionalLockInfo;
-
+    
     //erc20-like interface
-    struct TokenInfo {
+    struct TokenInfo{
         string name;
         string symbol;
         uint8 decimals;
@@ -110,7 +111,7 @@ contract AlluoLocked is
      * @dev Emitted in `claim` when the user claimed his reward tokens
      */
     event TokensClaimed(uint256 amount, uint256 time, address indexed sender);
-
+    
     /**
      * @dev Emitted in `unlock` when the user unbinded his locked tokens
      */
@@ -130,20 +131,15 @@ contract AlluoLocked is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function _authorizeUpgrade(address)
+
+    function _authorizeUpgrade(address newImplementation)
         internal
         override
         onlyRole(UPGRADER_ROLE)
-    {
-        require(
-            additionalLockInfo.upgradeStatus,
-            "Buffer: Upgrade not allowed"
-        );
-        additionalLockInfo.upgradeStatus = false;
-    }
+    { require(additionalLockInfo.upgradeStatus, "Upgrade not allowed");}
 
     /**
-     * @dev Contract constructor
+     * @dev Contract constructor 
      */
     function initialize(
         address _multiSigWallet,
@@ -152,7 +148,7 @@ contract AlluoLocked is
         uint256 _distributionTime,
         address _lockingToken,
         address _rewardToken
-    ) public initializer {
+    ) public initializer{
         __AccessControl_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
@@ -186,11 +182,9 @@ contract AlluoLocked is
     function decimals() public view returns (uint8) {
         return token.decimals;
     }
-
     function name() public view returns (string memory) {
         return token.name;
     }
-
     function symbol() public view returns (string memory) {
         return token.symbol;
     }
@@ -255,9 +249,9 @@ contract AlluoLocked is
     }
 
     /**
-     * @dev Unbinds specified amount of tokens
-     * @param _amount An amount to unbid
-     */
+    * @dev Unbinds specified amount of tokens
+    * @param _amount An amount to unbid
+    */
     function unlock(uint256 _amount) public nonReentrant {
         Locker storage locker = _lockers[msg.sender];
 
@@ -298,8 +292,11 @@ contract AlluoLocked is
             locker.depositUnlockTime <= block.timestamp,
             "Locking: Locked tokens are not available yet"
         );
-
-        require(locker.amount > 0, "Locking: Not enough tokens to unlock");
+        
+        require(
+            locker.amount > 0,
+            "Locking: Not enough tokens to unlock"
+        );
         uint256 amount = locker.amount;
 
         update();
@@ -347,6 +344,7 @@ contract AlluoLocked is
      * @return Boolean result
      */
     function claim() public nonReentrant returns (bool) {
+
         if (totalLocked > 0) {
             update();
         }
@@ -421,11 +419,7 @@ contract AlluoLocked is
      * @param _address Locker's address
      * @return amount of vote/locked tokens
      */
-    function balanceOf(address _address)
-        external
-        view
-        returns (uint256 amount)
-    {
+    function balanceOf(address _address) external view  returns(uint256 amount) {
         return _lockers[_address].amount;
     }
 
@@ -434,11 +428,7 @@ contract AlluoLocked is
      * @param _address Locker's address
      * @return amount of unlocked tokens
      */
-    function unlockedBalanceOf(address _address)
-        external
-        view
-        returns (uint256 amount)
-    {
+    function unlockedBalanceOf(address _address) external view  returns(uint256 amount) {
         return _lockers[_address].unlockAmount;
     }
 
@@ -446,7 +436,7 @@ contract AlluoLocked is
      * @dev Returns total amount of tokens
      * @return amount of locked and unlocked tokens
      */
-    function totalSupply() external view returns (uint256 amount) {
+    function totalSupply() external view  returns(uint256 amount) {
         return totalLocked + additionalLockInfo.waitingForWithdrawal;
     }
 
@@ -477,13 +467,7 @@ contract AlluoLocked is
         withdrawUnlockTime_ = locker.withdrawUnlockTime;
         claim_ = getClaim(_address);
 
-        return (
-            locked_,
-            unlockAmount_,
-            claim_,
-            depositUnlockTime_,
-            withdrawUnlockTime_
-        );
+        return (locked_, unlockAmount_, claim_, depositUnlockTime_, withdrawUnlockTime_);
     }
 
     /* ========== ADMIN CONFIGURATION ========== */
@@ -522,7 +506,7 @@ contract AlluoLocked is
     }
 
     /**
-     * @dev Allows to update the time when the reward are available to withdraw
+     * @dev Allows to update the time when the reward are available to withdraw 
      * @param _withdrawLockDuration Date in unix timestamp format
      */
     function updateWithdrawLockDuration(uint256 _withdrawLockDuration)
@@ -533,7 +517,7 @@ contract AlluoLocked is
     }
 
     /**
-     * @dev Allows to update the time when the reward are available to unlock
+     * @dev Allows to update the time when the reward are available to unlock 
      * @param _depositLockDuration Date in unix timestamp format
      */
     function updateDepositLockDuration(uint256 _depositLockDuration)
@@ -574,14 +558,14 @@ contract AlluoLocked is
         require(additionalLockInfo.migrationStatus, "migration not allowed");
         Locker storage locker = _lockers[msg.sender];
         locker.depositUnlockTime = 0;
-        if (locker.amount > 0) {
+        if(locker.amount > 0){
             unlockAll();
         }
         if (getClaim(msg.sender) > 0) {
             claim();
         }
         locker.withdrawUnlockTime = 0;
-        if (locker.unlockAmount != 0) {
+        if(locker.unlockAmount != 0){
             withdraw();
         }
     }

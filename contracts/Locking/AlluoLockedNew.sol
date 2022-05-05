@@ -149,6 +149,7 @@ contract AlluoLockedNew is
         onlyRole(UPGRADER_ROLE)
     {
         require(additionalLockInfo.upgradeStatus, "Upgrade not allowed");
+        additionalLockInfo.upgradeStatus = false;
     }
 
     /**
