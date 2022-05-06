@@ -551,26 +551,6 @@ contract AlluoLockedNew is
         additionalLockInfo.migrationStatus = _status;
     }
 
-    /**
-     * @dev Withdrawing all tokens from the contract by user
-     * if migration allowed
-     */
-    function migrate() external {
-        require(additionalLockInfo.migrationStatus, "migration not allowed");
-        Locker storage locker = _lockers[msg.sender];
-        locker.depositUnlockTime = 0;
-        if (locker.amount > 0) {
-            unlockAll();
-        }
-        if (getClaim(msg.sender) > 0) {
-            claim();
-        }
-        locker.withdrawUnlockTime = 0;
-        if (locker.unlockAmount != 0) {
-            withdraw();
-        }
-    }
-
     function initializeBalancerVersion() external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20Upgradeable weth = IERC20Upgradeable(
             0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
