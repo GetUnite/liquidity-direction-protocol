@@ -85,6 +85,7 @@ contract AlluoLockedNew is
         uint256 unlockAmount; // Amount of tokens which is available to withdraw
         uint256 depositUnlockTime; // The time when tokens are available to unlock
         uint256 withdrawUnlockTime; // The time when tokens are available to withdraw
+        uint256 balancerLpAmonut;
     }
 
     // Lockers info by token holders.
@@ -127,7 +128,12 @@ contract AlluoLockedNew is
     /**
      * @dev Emitted in `unlock` when the user unbinded his locked tokens
      */
-    event TokensUnlocked(uint256 amount, uint256 time, address indexed sender);
+    event TokensUnlocked(
+        uint256 amount,
+        uint256 lpAmount,
+        uint256 time,
+        address indexed sender
+    );
     /**
      * @dev Emitted in `withdraw` when the user withdrew his locked tokens from the contract
      */
@@ -250,7 +256,7 @@ contract AlluoLockedNew is
             address(this),
             _amount
         );
-        _enterAlluoPool(_amount, 0);
+        uint256 lpAmount = _enterAlluoPool(_amount, 0);
 
         if (totalLocked > 0) {
             update();
@@ -261,6 +267,7 @@ contract AlluoLockedNew is
         totalLocked = totalLocked + _amount;
         locker.amount = locker.amount + _amount;
         locker.depositUnlockTime = block.timestamp + depositLockDuration;
+        locker.balancerLpAmonut += lpAmount;
 
         emit TokensLocked(_amount, block.timestamp, msg.sender);
     }
@@ -277,56 +284,31 @@ contract AlluoLockedNew is
             "Locking: Locked tokens are not available yet"
         );
 
-        require(
-            locker.amount >= _amount,
-            "Locking: Not enough tokens to unlock"
-        );
-
         update();
 
-        locker.rewardAllowed =
+        uint256 lpAmount = _exitAlluoPool(_amount);
+        require(locker.balancerLpAmonut >= lpAmount, "Locking: Not enough LPs");
+        locker.balancerLpAmonut -= lpAmount;
+
+        locker.rewardAllowed = // ??????
             locker.rewardAllowed +
             ((_amount * tokensPerLock) / 1e20);
 
-        locker.amount -= _amount;
-        totalLocked -= _amount;
+        if (_amount > locker.amount) {
+            locker.amount = 0; // what if price from 500 becomes 520 and he withdraws 510?
+            totalLocked -= locker.amount;
+        } else {
+            locker.amount -= _amount;
+            totalLocked -= _amount;
+        }
+
         additionalLockInfo.waitingForWithdrawal += _amount;
 
         locker.unlockAmount += _amount;
         locker.depositUnlockTime = 0;
         locker.withdrawUnlockTime = block.timestamp + withdrawLockDuration;
 
-        emit TokensUnlocked(_amount, block.timestamp, msg.sender);
-    }
-
-    /**
-     * @dev Unbinds all amount of locked tokens
-     */
-    function unlockAll() public nonReentrant {
-        Locker storage locker = _lockers[msg.sender];
-
-        require(
-            locker.depositUnlockTime <= block.timestamp,
-            "Locking: Locked tokens are not available yet"
-        );
-
-        require(locker.amount > 0, "Locking: Not enough tokens to unlock");
-        uint256 amount = locker.amount;
-
-        update();
-
-        locker.rewardAllowed =
-            locker.rewardAllowed +
-            ((amount * tokensPerLock) / 1e20);
-        locker.amount = 0;
-        totalLocked -= amount;
-        additionalLockInfo.waitingForWithdrawal += amount;
-
-        locker.unlockAmount += amount;
-        locker.depositUnlockTime = 0;
-        locker.withdrawUnlockTime = block.timestamp + withdrawLockDuration;
-
-        emit TokensUnlocked(amount, block.timestamp, msg.sender);
+        emit TokensUnlocked(_amount, lpAmount, block.timestamp, msg.sender);
     }
 
     /**
@@ -376,18 +358,6 @@ contract AlluoLockedNew is
         IERC20Upgradeable(rewardToken).safeTransfer(msg.sender, reward);
         emit TokensClaimed(reward, block.timestamp, msg.sender);
         return true;
-    }
-
-    /**
-     * @dev Claims all available rewards and unlocks the tokens
-     */
-    function claimAndUnlock() public {
-        unlockAll();
-
-        uint256 reward = getClaim(msg.sender);
-        if (reward > 0) {
-            claim();
-        }
     }
 
     /**
@@ -626,8 +596,11 @@ contract AlluoLockedNew is
         IERC20Upgradeable(withdrawToken).safeTransfer(to, amount);
     }
 
-    function _enterAlluoPool(uint256 alluoAmount, uint256 wethAmount) private {
-        exchange.exchange(
+    function _enterAlluoPool(uint256 alluoAmount, uint256 wethAmount)
+        private
+        returns (uint256)
+    {
+        uint256 lpAmount = exchange.exchange(
             address(lockingToken),
             address(alluoBalancerLp),
             alluoAmount,
@@ -644,9 +617,13 @@ contract AlluoLockedNew is
                 0
             );
         }
+        return lpAmount;
     }
 
-    function _exitAlluoPool(uint256 alluoAmountToGet) private {
+    function _exitAlluoPool(uint256 alluoAmountToGet)
+        private
+        returns (uint256)
+    {
         address[] memory assets = new address[](2);
         assets[0] = 0x1E5193ccC53f25638Aa22a940af899B692e10B09;
         assets[1] = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -667,11 +644,44 @@ contract AlluoLockedNew is
             data,
             false
         );
+        uint256 bptBalanceBefore = alluoBalancerLp.balanceOf(address(this));
         balancer.exitPool(
             poolId,
             address(this),
             payable(address(this)),
             request
         );
+
+        return bptBalanceBefore - alluoBalancerLp.balanceOf(address(this));
+    }
+
+    function _exitAlluoPoolExactLp(uint256 lpAmount) private returns (uint256) {
+        address[] memory assets = new address[](2);
+        assets[0] = 0x1E5193ccC53f25638Aa22a940af899B692e10B09;
+        assets[1] = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+
+        uint256[] memory amounts = new uint256[](2);
+
+        bytes memory data = abi.encode(
+            uint256(ExitKind.EXACT_BPT_IN_FOR_ONE_TOKEN_OUT),
+            lpAmount,
+            0
+        );
+
+        ExitPoolRequest memory request = ExitPoolRequest(
+            assets,
+            amounts,
+            data,
+            false
+        );
+        uint256 alluoBalanceBefore = lockingToken.balanceOf(address(this));
+        balancer.exitPool(
+            poolId,
+            address(this),
+            payable(address(this)),
+            request
+        );
+
+        return lockingToken.balanceOf(address(this)) - alluoBalanceBefore;
     }
 }
