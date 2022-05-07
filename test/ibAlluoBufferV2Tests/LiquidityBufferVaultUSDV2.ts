@@ -166,6 +166,7 @@ describe("IbAlluo and Buffer", function () {
     });
     describe('USD Adaptor with IbAlluoV2: Test cases', function () {
 
+        
         it("Depositing 100 DAI and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
             await deposit(signers[0], dai, parseEther("100"));
             await ibAlluoCurrent.connect(signers[0]).withdraw(dai.address, parseEther("50"));
@@ -187,6 +188,24 @@ describe("IbAlluo and Buffer", function () {
             await ibAlluoCurrent.connect(signers[0]).withdraw(usdc.address, parseUnits("100", 18));
             expect(await buffer.lastWithdrawalRequest()).not.equal(await buffer.lastSatisfiedWithdrawal());
         })
+
+        
+        it("Depositing surplus USDC should not revert (Checking USD Adaptor Deposit function: Check toSend", async function () {
+            await deposit(signers[0], usdc, parseUnits("100", 6));
+            await deposit(signers[0], usdc, parseUnits("100", 6));
+            await deposit(signers[0], usdc, parseUnits("100", 6));
+            await deposit(signers[0], usdc, parseUnits("100", 6))
+        })
+
+        it("Depositing USDC when there is outstanding withdrawals (leaveInPool>0, toSend =0) should not revert (Checking USD Adaptor Deposit function: Check leaveInPool", async function () {
+            await deposit(signers[0], usdc, parseUnits("10000", 6));
+            await ibAlluoCurrent.connect(signers[0]).withdraw(usdc.address, parseUnits("10000", 18));
+
+            await deposit(signers[0], usdc, parseUnits("100", 6));
+
+        })
+
+
         it("Depositing 100 USDC, attempt to withdraw 50 and then only get paid after there is a deposit", async function () {
             await deposit(signers[0], usdc, parseUnits("100", 6));
             await ibAlluoCurrent.connect(signers[0]).withdraw(usdc.address, parseUnits("50", 18));

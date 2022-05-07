@@ -103,6 +103,15 @@ contract LiquidityBufferVaultV3 is
     mapping(address => uint256) public inputTokenToAdapterId;
     uint256[] public AdapterIds;
     address[] public TokenAddresses;
+    address[] public ibAlluoAddresses;
+
+    struct WithdrawalSystem {
+        mapping(uint256 => Withdrawal) withdrawals;
+        uint256 lastWithdrawalRequest;
+        uint256 lastSatisfiedWithdrawal;
+        uint256 totalWithdrawalAmount;
+    }
+    mapping(address => WithdrawalSystem) public ibAlluoToWithdrawalSystems;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -138,12 +147,18 @@ contract LiquidityBufferVaultV3 is
     /** @notice Check withdrawal queue and satsify all withdrawals possible.
     * @dev Checks if there are outstanding withdrawal and if there are, loops around until there are not enough funds to satisfy anymore 
     **     or until all withdrawals ar satisfied.
+     ** @param _ibAlluo Address of the ibAlluo you want to satisfy wihtdrawals for
+
     */
-    function satisfyWithdrawals() public whenNotPaused{
-        if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
+    function satisfyWithdrawals(address _ibAlluo) public whenNotPaused{
+        WithdrawalSystem storage _ibAlluoWithdrawSystem = ibAlluoToWithdrawalSystems[_ibAlluo];
+        uint256 _lastWithdrawalRequest =  _ibAlluoWithdrawSystem.lastWithdrawalRequest;
+        uint256 _lastSatisfiedWithdrawal = _ibAlluoWithdrawSystem.lastSatisfiedWithdrawal;
+        if (_lastWithdrawalRequest != _lastSatisfiedWithdrawal) {
             uint256 inBuffer = getBufferAmount();
-            while (lastSatisfiedWithdrawal != lastWithdrawalRequest) {
-                Withdrawal memory withdrawal = withdrawals[lastSatisfiedWithdrawal + 1];
+            while (_lastSatisfiedWithdrawal != _lastWithdrawalRequest) {
+                Withdrawal memory withdrawal = _ibAlluoWithdrawSystem.withdrawals[_lastSatisfiedWithdrawal+1];
+
                 if (withdrawal.amount <= inBuffer) {
                     uint256 _AdapterId = inputTokenToAdapterId[withdrawal.token];
                     // Amount is in 10**18
@@ -151,8 +166,8 @@ contract LiquidityBufferVaultV3 is
                     _withdraw(_AdapterId, withdrawal.user, withdrawal.token, withdrawal.amount);
     
                     inBuffer -= withdrawal.amount;
-                    totalWithdrawalAmount -= withdrawal.amount;
-                    lastSatisfiedWithdrawal++;
+                    _ibAlluoWithdrawSystem.totalWithdrawalAmount -= withdrawal.amount;
+                    _ibAlluoWithdrawSystem.lastSatisfiedWithdrawal++;
                     keepersTrigger = false;
                     
                     emit WithdrawalSatisfied(

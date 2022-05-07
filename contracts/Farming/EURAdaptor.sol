@@ -31,7 +31,10 @@ contract EURAdaptor is AccessControl {
     function setWallet ( address newWallet ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         Wallet = newWallet;
     }
-
+    /// @notice When called by liquidity buffer, moves some funds to the Gnosis multisig and others into a LP to be kept as a 'buffer'
+    /// @param _token Deposit token address (eg. USDC)
+    /// @param _fullAmount Full amount deposited in 10**18 called by liquidity buffer
+    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Gnosis wallet (the "buffer" amount)
     function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         if (_token == jEUR) {
@@ -45,8 +48,12 @@ contract EURAdaptor is AccessControl {
         }
 
         else if (_token == EURT) {
-            IERC20Upgradeable(EURT).transfer(Wallet, toSend / 10**12);
-            ICurvePoolEUR(curvePool).add_liquidity([0, 0, 0, _leaveInPool / 10**12], 0);
+            if (toSend != 0) {
+                IERC20Upgradeable(EURT).transfer(Wallet, toSend / 10**12);
+            }
+            if (_leaveInPool != 0) {
+                ICurvePoolEUR(curvePool).add_liquidity([0, 0, 0, _leaveInPool / 10**12], 0);
+            }
         }
 
         else if (_token == EURS) {
@@ -60,21 +67,29 @@ contract EURAdaptor is AccessControl {
         }
     } 
       // 0 = jEUR, 18dec, 1 = PAR 18dec , 2 = EURS 2dec,   3= EURT 6dec
-
+    /// @notice When called by liquidity buffer, withdraws funds from liquidity pool
+    /// @dev It checks against arbitragers attempting to exploit spreads in stablecoins. EURS is chosen as it has the most liquidity.
+    /// @param _user Recipient address
+    /// @param _token Deposit token address (eg. USDC)
+    /// @param _amount  Amount to be withdrawn in 10*18
     function withdraw (address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
           if (_token == jEUR) {
-            ICurvePoolEUR(curvePool).remove_liquidity_imbalance(
-                    [_amount, 0, 0, 0], 
-                    _amount * (10000 + slippage) / 10000
+            // To be safe against arbitragers, when withdrawing jEUR or EURT, burn token in EURS first and then
+            // Claim appropriate token afterwards. 
+            uint256 toBurn = ICurvePoolEUR(curvePool).calc_token_amount([0, 0, _amount/10**16, 0], false);
+            uint256 toUser = ICurvePoolEUR(curvePool).remove_liquidity_one_coin(
+                    toBurn, 
+                    0, 
+                    _amount * (10000 - slippage) / 10000
                 );
-            IERC20Upgradeable(jEUR).transfer(_user, _amount);
+            // toUser already in 10**18
+            IERC20Upgradeable(jEUR).transfer(_user, toUser);
         }
 
         else if (_token == EURT) {
-            // We want to be save agains arbitragers so at any withraw of EURS/EURT
-            // contract checks how much will be burned curveLp by withrawing this amount in jEUR
-            // and passes this burned amount to get EURT/EURS
-            uint256 toBurn = ICurvePoolEUR(curvePool).calc_token_amount([_amount , 0, 0, 0], false);
+            // To be safe against arbitragers, when withdrawing jEUR or EURT, burn token in EURS first and then
+            // Claim appropriate token afterwards. 
+            uint256 toBurn = ICurvePoolEUR(curvePool).calc_token_amount([0, 0, _amount/10**16, 0], false);
             uint256 toUser = ICurvePoolEUR(curvePool).remove_liquidity_one_coin(
                     toBurn, 
                     3, 
@@ -85,14 +100,11 @@ contract EURAdaptor is AccessControl {
         }
 
         else if (_token == EURS) {
-            uint256 toBurn = ICurvePoolEUR(curvePool).calc_token_amount([_amount, 0, 0, 0], false);
-            uint256 toUser = ICurvePoolEUR(curvePool).remove_liquidity_one_coin(
-                    toBurn, 
-                    2, 
-                    _amount/10**16 * (10000 - slippage) / 10000
+            ICurvePoolEUR(curvePool).remove_liquidity_imbalance(
+                    [0, 0, _amount / 10**16, 0], 
+                    _amount * (10000 + slippage) / 10000
                 );
-            // ToUser is already in 10**2.
-            IERC20Upgradeable(EURS).transfer(_user, toUser);
+            IERC20Upgradeable(EURS).transfer(_user, _amount/10**16);
         }
     }
     function AdaptorApproveAll() external {

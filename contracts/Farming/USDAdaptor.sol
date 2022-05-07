@@ -13,6 +13,8 @@ contract USDAdaptor is AccessControl {
     using Address for address;
 
     address public Wallet;
+    
+    // All address are Polygon addresses.
     address public curvePool = 0x445FE580eF8d70FF569aB36e80c647af338db351;
     address public DAI = 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063;
     address public USDC = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
@@ -32,8 +34,13 @@ contract USDAdaptor is AccessControl {
         Wallet = newWallet;
     }
 
-    // amounts are in 10**18
+
+    /// @notice When called by liquidity buffer, moves some funds to the Gnosis multisig and others into a LP to be kept as a 'buffer'
+    /// @param _token Deposit token address (eg. USDC)
+    /// @param _fullAmount Full amount deposited in 10**18 called by liquidity buffer
+    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Gnosis wallet (the "buffer" amount)
     function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        // Full amount is always greater than leaveinPool
         uint256 toSend = _fullAmount - _leaveInPool;
         if (_token == DAI) {
             uint256 lpAmount = ICurvePoolUSD(curvePool).add_liquidity([_fullAmount, 0, 0], 0, true);
@@ -45,11 +52,14 @@ contract USDAdaptor is AccessControl {
                 IERC20Upgradeable(USDC).transfer(Wallet, toSend / 10**12);
             }
         }
-
+        // Need to check for non zero or tranfers throw/run 
         else if (_token == USDC) {
-            IERC20Upgradeable(USDC).transfer(Wallet, toSend / 10**12);
-            uint256 lpTokensBurned = ICurvePoolUSD(curvePool).add_liquidity([0, _leaveInPool/ 10**12, 0], 0, true);
-
+            if (toSend != 0) {
+                IERC20Upgradeable(USDC).transfer(Wallet, toSend / 10**12);
+            }
+            if (_leaveInPool != 0) {
+                uint256 lpTokensBurned = ICurvePoolUSD(curvePool).add_liquidity([0, _leaveInPool/ 10**12, 0], 0, true);
+            }
         }
 
         else if (_token == USDT) {
@@ -63,7 +73,13 @@ contract USDAdaptor is AccessControl {
             }
         }
     } 
-  
+
+
+    /// @notice When called by liquidity buffer, withdraws funds from liquidity pool
+    /// @dev It checks against arbitragers attempting to exploit spreads in stablecoins.
+    /// @param _user Recipient address
+    /// @param _token Deposit token address (eg. USDC)
+    /// @param _amount  Amount to be withdrawn in 10*18
     function withdraw (address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
           if (_token == DAI) {
             ICurvePoolUSD(curvePool).remove_liquidity_imbalance(

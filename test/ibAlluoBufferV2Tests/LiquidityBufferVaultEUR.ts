@@ -72,7 +72,7 @@ describe("IbAlluo and Buffer", function () {
 
         const jeurWhale = "0x2c1cb163a00733cf773b828a77ea347cb0fc91b4"
         const eursWhale = "0x1bee4f735062cd00841d6997964f187f5f5f5ac9"
-        const eurtWhale = "0xecded8b1c603cf21299835f1dfbe37f10f2a29af"
+        const eurtWhale = "0x0e57f58cc5eb3674c4738074362a3d9d82ca7648"
 
         const curveLpHolderAddress = "0xa0f2e2f7b3ab58e3e52b74f08d94ae52778d46df";
 
@@ -105,8 +105,8 @@ describe("IbAlluo and Buffer", function () {
         
         console.log("We are forking Polygon mainnet\n");
         expect(await jeur.balanceOf(jeurwhale.address)).to.be.gt(0, "Whale has no jeur, or you are not forking Polygon");
-        expect(await eurs.balanceOf(eurswhale.address)).to.be.gt(0, "Whale has no jeur, or you are not forking Polygon");
-        expect(await eurt.balanceOf(eurtwhale.address)).to.be.gt(0, "Whale has no jeur, or you are not forking Polygon");
+        expect(await eurs.balanceOf(eurswhale.address)).to.be.gt(0, "Whale has no eurs, or you are not forking Polygon");
+        expect(await eurt.balanceOf(eurtwhale.address)).to.be.gt(0, "Whale has no eurt, or you are not forking Polygon");
         await signers[0].sendTransaction({
             to: eurswhale.address,
             value: parseEther("100.0")
@@ -205,7 +205,9 @@ describe("IbAlluo and Buffer", function () {
             
             await deposit(signers[1], jeur, parseEther("100"));
             await buffer.satisfyWithdrawals();
-            expect(await jeur.balanceOf(signers[0].address)).equal(parseEther("50"))
+            // Loss from slippage makes tests awkward.
+
+            expect(Number(await jeur.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 18)))
         })
 
         it("Depositing 100 eurt and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
