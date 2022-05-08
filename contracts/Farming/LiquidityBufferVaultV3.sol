@@ -293,7 +293,8 @@ contract LiquidityBufferVaultV3 is
         // Assumes only 1 adapter per ibAlluo is active. So, if there is no active adaptor for the ibAlluo, simply iterate through balanceOf each token belonging to the ibAlluo contract.
         // Ex.) USDC, USDT DAI for ibAlluoUSD. If ibAlluoUSD has an active adapter, simply getAdapterAmount();
         // Else, loop through each token and get the ERC20 balance of the buffer, which must be holding the tokens instead.
-
+        // If the adapterId = Maxuint256 --> It will enter this if statement.
+        // This approach was used instead of doing if (id = maxuint256) because there could be cases where the adaptor is inactive.
         if (_adapterInfo.status != true) {
             address[] memory inputTokenList = ibAlluoToInputTokens[_ibAlluo];
             uint256 bufferAmount;
@@ -309,11 +310,14 @@ contract LiquidityBufferVaultV3 is
             return _AdapterAmount;
         }
     }
+    /** @notice Helper function used to check withdrawal system values. 
+    * @dev This function is only used in tests and debugging.
+    ** @param _ibAlluo Address of the ibAlluo you want to check the withdrawal system for.
+    */
 
-
-    function ibAlluoLastWithdrawalCheck(address _ibAlluo) public view returns (uint256[2] memory) {
+    function ibAlluoLastWithdrawalCheck(address _ibAlluo) public view returns (uint256[3] memory) {
         WithdrawalSystem storage _ibAlluoWithdrawalSystem = ibAlluoToWithdrawalSystems[_ibAlluo];
-        return [_ibAlluoWithdrawalSystem.lastWithdrawalRequest, _ibAlluoWithdrawalSystem.lastSatisfiedWithdrawal];
+        return [_ibAlluoWithdrawalSystem.lastWithdrawalRequest, _ibAlluoWithdrawalSystem.lastSatisfiedWithdrawal, _ibAlluoWithdrawalSystem.totalWithdrawalAmount];
     }
 
 
