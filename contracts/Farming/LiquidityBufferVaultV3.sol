@@ -95,7 +95,6 @@ contract LiquidityBufferVaultV3 is
     mapping(address => uint256) public ibAlluoToAdaptorId;
     mapping(uint256 => AdapterInfo) public AdapterIdsToAdapterInfo;
     mapping(address => uint256) public inputTokenToAdapterId;
-    uint256[] public AdapterIds;
     address[] public ibAlluoAddresses;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -347,12 +346,6 @@ contract LiquidityBufferVaultV3 is
         uint256 AdapterId
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         delete AdapterIdsToAdapterInfo[AdapterId];
-        for (uint256 i = 0; i < AdapterIds.length; i++) {
-            if (AdapterId == AdapterIds[i]) {
-
-                delete AdapterIds[i];
-            }
-        }
     }
 
        
