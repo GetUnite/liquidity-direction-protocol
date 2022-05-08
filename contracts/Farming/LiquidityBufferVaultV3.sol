@@ -30,9 +30,6 @@ contract LiquidityBufferVaultV3 is
     // 125 = 1.25%
     uint32 public slippage;
 
-    // address of main contract with which users will interact  
-    address public alluoLp;
-
     //flag for upgrades availability
     bool public upgradeStatus;
 
@@ -42,9 +39,6 @@ contract LiquidityBufferVaultV3 is
     // percent of total alluoLp value which will go to curve pool
     // 525 = 5.25%
     uint32 public bufferPercentage;
-
-    // amount which needed to satisfy all users in withdrawal list
-    uint256 public totalWithdrawalAmount;
 
     // max waiting withdrawals time after which them should be satisfyed
     uint256 public maxWaitingTime;
@@ -59,15 +53,6 @@ contract LiquidityBufferVaultV3 is
         // withdrawal time
         uint256 time;
     }
-
-    // list of Withdrawals in queue
-    mapping(uint256 => Withdrawal) public withdrawals;
-
-    // index of last withdrawal in queue
-    uint256 public lastWithdrawalRequest;
-    // index of last satisfied withdrawal in queue
-    uint256 public lastSatisfiedWithdrawal;
-
 
     event EnoughToSatisfy(
         uint256 inBufferAfterDeposit, 
@@ -98,13 +83,7 @@ contract LiquidityBufferVaultV3 is
         bool status; // active
         address ibAlluo;
     }
-    // all will be stored here
-    mapping(uint256 => AdapterInfo) public AdapterIdsToAdapterInfo;
-    mapping(address => uint256) public inputTokenToAdapterId;
-    uint256[] public AdapterIds;
-    address[] public TokenAddresses;
-    address[] public ibAlluoAddresses;
-
+    
     struct WithdrawalSystem {
         mapping(uint256 => Withdrawal) withdrawals;
         uint256 lastWithdrawalRequest;
@@ -112,6 +91,12 @@ contract LiquidityBufferVaultV3 is
         uint256 totalWithdrawalAmount;
     }
     mapping(address => WithdrawalSystem) public ibAlluoToWithdrawalSystems;
+    mapping(address => address[]) public ibAlluoToInputTokens;
+    mapping(address => uint256) public ibAlluoToAdaptorId;
+    mapping(uint256 => AdapterInfo) public AdapterIdsToAdapterInfo;
+    mapping(address => uint256) public inputTokenToAdapterId;
+    uint256[] public AdapterIds;
+    address[] public ibAlluoAddresses;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -124,14 +109,12 @@ contract LiquidityBufferVaultV3 is
         require(_multiSigWallet.isContract(), "Buffer: Not contract");
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
-        _grantRole(DEFAULT_ADMIN_ROLE, _alluoLp);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
 
         wallet = _multiSigWallet;
         bufferPercentage = 500;
         slippage = 200;
 
-        alluoLp = _alluoLp;
         maxWaitingTime = 3600 * 23;
     }
 
@@ -151,30 +134,30 @@ contract LiquidityBufferVaultV3 is
 
     */
     function satisfyWithdrawals(address _ibAlluo) public whenNotPaused{
+        // Using memory variables where possible to save on gas. There may be inefficiencies that need to be ironed out!
         WithdrawalSystem storage _ibAlluoWithdrawSystem = ibAlluoToWithdrawalSystems[_ibAlluo];
         uint256 _lastWithdrawalRequest =  _ibAlluoWithdrawSystem.lastWithdrawalRequest;
         uint256 _lastSatisfiedWithdrawal = _ibAlluoWithdrawSystem.lastSatisfiedWithdrawal;
         if (_lastWithdrawalRequest != _lastSatisfiedWithdrawal) {
-            uint256 inBuffer = getBufferAmount();
+            uint256 inBuffer = getBufferAmount(_ibAlluo);
             while (_lastSatisfiedWithdrawal != _lastWithdrawalRequest) {
                 Withdrawal memory withdrawal = _ibAlluoWithdrawSystem.withdrawals[_lastSatisfiedWithdrawal+1];
 
                 if (withdrawal.amount <= inBuffer) {
                     uint256 _AdapterId = inputTokenToAdapterId[withdrawal.token];
-                    // Amount is in 10**18
-                    // uint256 _amountCorrectDecimals = withdrawal.amount / 10 ** (18 - ERC20(withdrawal.token).decimals());
                     _withdraw(_AdapterId, withdrawal.user, withdrawal.token, withdrawal.amount);
-    
                     inBuffer -= withdrawal.amount;
-                    _ibAlluoWithdrawSystem.totalWithdrawalAmount -= withdrawal.amount;
-                    _ibAlluoWithdrawSystem.lastSatisfiedWithdrawal++;
+                    ibAlluoToWithdrawalSystems[_ibAlluo].totalWithdrawalAmount -= withdrawal.amount;
+                    ibAlluoToWithdrawalSystems[_ibAlluo].lastSatisfiedWithdrawal++;
+                    _lastSatisfiedWithdrawal++;
+
                     keepersTrigger = false;
                     
                     emit WithdrawalSatisfied(
                         withdrawal.user, 
                         withdrawal.token, 
                         withdrawal.amount, 
-                        lastSatisfiedWithdrawal,
+                        _lastSatisfiedWithdrawal +1,
                         block.timestamp
                     );
                 } else {
@@ -190,10 +173,11 @@ contract LiquidityBufferVaultV3 is
     ** @param _token Address of token (USDC, DAI, USDT...)
     ** @param _amount Amount of tokens in correct deimals (10**18 for DAI, 10**6 for USDT)
     */
-    function deposit(address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
-        uint256 inBuffer = getBufferAmount();
+    function deposit( address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
+        // Msg.sender must be an ibAlluo contract.
+        uint256 inBuffer = getBufferAmount(msg.sender);
         uint256 _amount18 = _amount * 10** (18 - ERC20(_token).decimals());
-        uint256 expectedBufferAmount = getExpectedBufferAmount(_amount18);
+        uint256 expectedBufferAmount = getExpectedBufferAmount(_amount18, msg.sender);
         uint256 _AdapterId = inputTokenToAdapterId[_token];
         require(_AdapterId != 0, "Token is not accepted");
 
@@ -254,32 +238,35 @@ contract LiquidityBufferVaultV3 is
 
     /** @notice Called by ibAlluo, withdraws otkens form the buffer.
     * @dev Attempt to withdraw. If there are insufficient funds, you are added to the queue.
+
     ** @param _user Address of depositor (msg.sender)
     ** @param _token Address of token (USDC, DAI, USDT...)
     ** @param _amount Amount of tokens in 10**18
     */
     function withdraw(address _user, address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
-        uint256 inBuffer = getBufferAmount();
+        uint256 inBuffer = getBufferAmount(msg.sender);
         uint256 _AdapterId = inputTokenToAdapterId[_token];
         require(_AdapterId != 0, "Token is not accepted");
-
-        if (inBuffer >= _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
+        WithdrawalSystem storage _ibAlluoWithdrawalSystem = ibAlluoToWithdrawalSystems[msg.sender];
+        uint256 _lastWithdrawalRequest = _ibAlluoWithdrawalSystem.lastWithdrawalRequest;
+        uint256 _lastSatisfiedWithdrawal = _ibAlluoWithdrawalSystem.lastSatisfiedWithdrawal;
+        if (inBuffer >= _amount && _lastWithdrawalRequest == _lastSatisfiedWithdrawal) {
             // If there are enough funds to payout + all requests are satisfied,
             _withdraw(_AdapterId, _user, _token, _amount);
             emit WithdrawalSatisfied(_user, _token, _amount, 0, block.timestamp);
 
         } else {
-            // Else, if there aren't enough funds, add to queue.
-            lastWithdrawalRequest++;
+            // Make sure storage value is being overwritten :)
+            ibAlluoToWithdrawalSystems[msg.sender].lastWithdrawalRequest++;
             uint256 timeNow = block.timestamp;
-            withdrawals[lastWithdrawalRequest] = Withdrawal({
+            ibAlluoToWithdrawalSystems[msg.sender].withdrawals[_lastWithdrawalRequest+1] = Withdrawal({
                 user: _user,
                 token: _token,
                 amount: _amount,
                 time: timeNow
             });
-            totalWithdrawalAmount += _amount;
-            emit AddedToQueue(_user, _token, _amount, lastWithdrawalRequest, timeNow);
+            ibAlluoToWithdrawalSystems[msg.sender].totalWithdrawalAmount += _amount;
+            emit AddedToQueue(_user, _token, _amount, _lastWithdrawalRequest + 1, timeNow);
         }
     }
 
@@ -292,36 +279,43 @@ contract LiquidityBufferVaultV3 is
         bufferPercentage = _newPercentage;
     }
     
-    function getExpectedBufferAmount(uint256 _newAmount) public view returns(uint256) {
+    function getExpectedBufferAmount(uint256 _newAmount, address _ibAlluo) public view returns(uint256) {
         // Expected buffer amount = 
         //  (newDeposit + totalSupply ibAlluo * index) * bufferPercentage + outstanding withdrawals
         // This is in 10**18.
-        return (_newAmount + IERC20Upgradeable(alluoLp).totalSupply()* IbAlluoV2(alluoLp).growingRatio()/10**18) * bufferPercentage / 10000 + totalWithdrawalAmount;
+        return (_newAmount + IERC20Upgradeable(_ibAlluo).totalSupply()* IbAlluoV2(_ibAlluo).growingRatio()/10**18) * bufferPercentage / 10000 + ibAlluoToWithdrawalSystems[_ibAlluo].totalWithdrawalAmount;
     }
 
-    function getBufferAmount() public view returns(uint256) {
-        uint256 bufferAmount;
+    function getBufferAmount(address _ibAlluo) public view returns(uint256) {
+        uint256 _adapterId = ibAlluoToAdaptorId[_ibAlluo];
+        AdapterInfo memory _adapterInfo =  AdapterIdsToAdapterInfo[_adapterId];
+        address Adapter = _adapterInfo.AdapterAddress;
 
-        for (uint256 i = 0; i < AdapterIds.length; i++) {
-            uint256 _adapterId = AdapterIds[i];
-            address Adapter = AdapterIdsToAdapterInfo[_adapterId].AdapterAddress;
-            uint256 _AdapterAmount = IAdapter(Adapter).getAdapterAmount();
-            bufferAmount += _AdapterAmount;
-        }
-        
-        for (uint256 i = 0; i < TokenAddresses.length; i++) {
-            address _tokenAddress = TokenAddresses[i];
-            uint256 _adapterId = inputTokenToAdapterId[_tokenAddress];
-   
-            if (_adapterId == type(uint256).max) {
+        // Assumes only 1 adapter per ibAlluo is active. So, if there is no active adaptor for the ibAlluo, simply iterate through balanceOf each token belonging to the ibAlluo contract.
+        // Ex.) USDC, USDT DAI for ibAlluoUSD. If ibAlluoUSD has an active adapter, simply getAdapterAmount();
+        // Else, loop through each token and get the ERC20 balance of the buffer, which must be holding the tokens instead.
+
+        if (_adapterInfo.status != true) {
+            address[] memory inputTokenList = ibAlluoToInputTokens[_ibAlluo];
+            uint256 bufferAmount;
+            for (uint256 i = 0; i < inputTokenList.length; i++) {
+                address _tokenAddress = inputTokenList[i];
                 bufferAmount += IERC20(_tokenAddress).balanceOf(address(this));
-            } 
+            }
+            return bufferAmount;
 
+        } else {
+
+            uint256 _AdapterAmount = IAdapter(Adapter).getAdapterAmount();
+            return _AdapterAmount;
         }
-        
-        return bufferAmount;
     }
 
+
+    function ibAlluoLastWithdrawalCheck(address _ibAlluo) public view returns (uint256[2] memory) {
+        WithdrawalSystem storage _ibAlluoWithdrawalSystem = ibAlluoToWithdrawalSystems[_ibAlluo];
+        return [_ibAlluoWithdrawalSystem.lastWithdrawalRequest, _ibAlluoWithdrawalSystem.lastSatisfiedWithdrawal];
+    }
 
 
     function registerAdapter(
@@ -332,8 +326,6 @@ contract LiquidityBufferVaultV3 is
         address _ibAlluo,
         uint256 _AdapterId
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        AdapterIds.push(_AdapterId);
-
         AdapterInfo memory _AdapterInfo = AdapterInfo(
             _name,
             _AdapterAddress,
@@ -344,7 +336,13 @@ contract LiquidityBufferVaultV3 is
         AdapterIdsToAdapterInfo[_AdapterId] = _AdapterInfo;
     }
 
-
+    function setTokenToAdapter (
+        address _token,
+        uint256 _AdapterId
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        inputTokenToAdapterId[_token] = _AdapterId;
+    }
+    
     function unregisterAdapter(
         uint256 AdapterId
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -357,15 +355,7 @@ contract LiquidityBufferVaultV3 is
         }
     }
 
-    function setTokenToAdapter (
-        address _token,
-        uint256 _AdapterId
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        inputTokenToAdapterId[_token] = _AdapterId;
-        TokenAddresses.push(_token);
-    }
-    
-   
+       
     function setWallet(address newWallet)
     external
     onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -374,16 +364,21 @@ contract LiquidityBufferVaultV3 is
         wallet = newWallet;
     }
 
-    function setAlluoLp(address newAlluoLp)
+    function setIbAlluoMappings(address _ibAlluo, address[] calldata _inputTokens, uint256 _AdaptorId )
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) {
+            ibAlluoToInputTokens[_ibAlluo] = _inputTokens;
+            ibAlluoToAdaptorId[_ibAlluo] = _AdaptorId;
+    }
+
+    function grantIbAlluoPermissions(address _ibAlluo) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _grantRole(DEFAULT_ADMIN_ROLE, _ibAlluo);
+    }
+    function setIbAlluoArray(address[] calldata _ibAlluoArray)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(newAlluoLp.isContract(), "Buffer: Not contract");
-        _grantRole(DEFAULT_ADMIN_ROLE, newAlluoLp);
-        if (alluoLp != wallet) {
-            _revokeRole(DEFAULT_ADMIN_ROLE, alluoLp);
-        }
-        alluoLp = newAlluoLp;
+        ibAlluoAddresses = _ibAlluoArray;
     }
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -412,19 +407,19 @@ contract LiquidityBufferVaultV3 is
         upgradeStatus = _status;
     }
 
-    function getWithdrawalPosition(uint256 _index) external view returns(uint256){
-        if(_index != 0 && _index <= lastWithdrawalRequest && _index > lastSatisfiedWithdrawal ){
-            return _index - lastSatisfiedWithdrawal;
+    function getWithdrawalPosition(uint256 _index, address _ibAlluo) external view returns(uint256){
+        if(_index != 0 && _index <= ibAlluoToWithdrawalSystems[_ibAlluo].lastWithdrawalRequest && _index > ibAlluoToWithdrawalSystems[_ibAlluo].lastSatisfiedWithdrawal ){
+            return _index - ibAlluoToWithdrawalSystems[_ibAlluo].lastSatisfiedWithdrawal;
         }
         else{
             return 0;
         }
     }
 
-    function isUserWaiting(address _user) external view returns(bool){
-        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
-            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
-                if(withdrawals[i].user == _user){
+    function isUserWaiting(address _user, address _ibAlluo) external view returns(bool){
+        if(ibAlluoToWithdrawalSystems[_ibAlluo].lastWithdrawalRequest != ibAlluoToWithdrawalSystems[_ibAlluo].lastSatisfiedWithdrawal){
+            for(uint i = ibAlluoToWithdrawalSystems[_ibAlluo].lastSatisfiedWithdrawal + 1; i <= ibAlluoToWithdrawalSystems[_ibAlluo].lastWithdrawalRequest; i++){
+                if(ibAlluoToWithdrawalSystems[_ibAlluo].withdrawals[i].user == _user){
                     return true;
                 }
             }
@@ -432,18 +427,18 @@ contract LiquidityBufferVaultV3 is
         return false;
     }
 
-    function getUserActiveWithdrawals(address _user) external view returns(uint256[] memory){
-        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+    function getUserActiveWithdrawals(address _user, address _ibAlluo) external view returns(uint256[] memory){
+        if(ibAlluoToWithdrawalSystems[_ibAlluo].lastWithdrawalRequest != ibAlluoToWithdrawalSystems[_ibAlluo].lastSatisfiedWithdrawal){
             uint256 userRequestAmount;
-            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
-                if(withdrawals[i].user == _user){
+            for(uint i = ibAlluoToWithdrawalSystems[_ibAlluo].lastSatisfiedWithdrawal + 1; i <= ibAlluoToWithdrawalSystems[_ibAlluo].lastWithdrawalRequest; i++){
+                if(ibAlluoToWithdrawalSystems[_ibAlluo].withdrawals[i].user == _user){
                     userRequestAmount++;
                 }
             }
             uint256[] memory indexes = new uint256[](userRequestAmount);
             uint256 counter;
-            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
-                if(withdrawals[i].user == _user){
+            for(uint i = ibAlluoToWithdrawalSystems[_ibAlluo].lastSatisfiedWithdrawal + 1; i <= ibAlluoToWithdrawalSystems[_ibAlluo].lastWithdrawalRequest; i++){
+                if(ibAlluoToWithdrawalSystems[_ibAlluo].withdrawals[i].user == _user){
                     indexes[counter] = i;
                     counter++;
                 }
@@ -454,19 +449,19 @@ contract LiquidityBufferVaultV3 is
         return empty;
     }
 
-    function getCloseToLimitWithdrawals()external view returns(uint256[] memory, uint256 amount){
-        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+    function getCloseToLimitWithdrawals(address _ibAlluo)external view returns(uint256[] memory, uint256 amount){
+        if(ibAlluoToWithdrawalSystems[_ibAlluo].lastWithdrawalRequest != ibAlluoToWithdrawalSystems[_ibAlluo].lastSatisfiedWithdrawal){
             uint256 counter;
-            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
-                if(withdrawals[i].time >= maxWaitingTime){
-                    amount += withdrawals[i].amount;
+            for(uint i = ibAlluoToWithdrawalSystems[_ibAlluo].lastSatisfiedWithdrawal + 1; i <= ibAlluoToWithdrawalSystems[_ibAlluo].lastWithdrawalRequest; i++){
+                if(ibAlluoToWithdrawalSystems[_ibAlluo].withdrawals[i].time >= maxWaitingTime){
+                    amount += ibAlluoToWithdrawalSystems[_ibAlluo].withdrawals[i].amount;
                     counter++;
                 }
             }
             uint256[] memory indexes = new uint256[](counter);
             if(counter !=0){
                 uint256 newCounter;
-                for(uint i = lastSatisfiedWithdrawal + 1; i <= lastSatisfiedWithdrawal + counter; i++){
+                for(uint i = ibAlluoToWithdrawalSystems[_ibAlluo].lastSatisfiedWithdrawal + 1; i <= ibAlluoToWithdrawalSystems[_ibAlluo].lastSatisfiedWithdrawal + counter; i++){
                     indexes[newCounter] = i;
                     newCounter++;
                 }
