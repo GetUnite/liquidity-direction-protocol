@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../interfaces/ILiquidityBufferVault.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "./IbAlluoUSD.sol";
 
-contract WithdrawalRequestResolver is AccessControl{
+contract IbAlluoUSDPriceResolver is AccessControl{
 
-    address public liquidityBufferAddress;
+    address public ibAlluoAddress;
     address public pokeMe;
+    address public alluoBank;
+    event IbAlluoUSDValue(address indexed user, uint256 amount); 
 
     modifier onlyPokeMe() {
         require(msg.sender == pokeMe, "Only PokeMe");
@@ -15,10 +17,11 @@ contract WithdrawalRequestResolver is AccessControl{
     }
 
     //current liquidityBuffer on Polygon: 0xa248Ba96d72005114e6C941f299D315757877c0e
-    constructor(address _pokeMe, address _liquidityBuffer, address _newAdmin) public {
+    constructor(address _pokeMe, address _ibAlluoAddress, address _newAdmin, address _alluoBank) public {
         pokeMe = _pokeMe;
         _grantRole(DEFAULT_ADMIN_ROLE, _newAdmin);
-        liquidityBufferAddress = _liquidityBuffer;
+        ibAlluoAddress = _ibAlluoAddress;
+        alluoBank = _alluoBank;
     }
     
     function checker()
@@ -27,10 +30,8 @@ contract WithdrawalRequestResolver is AccessControl{
         onlyPokeMe()
         returns (bool canExec, bytes memory execPayload)
     {
-        canExec = ILiquidityBufferVault(liquidityBufferAddress).keepersTrigger();
-        execPayload = abi.encodeWithSelector(
-            ILiquidityBufferVault.satisfyWithdrawals.selector
-        );
+        canExec = true;
+        execPayload = "0x";
         return (canExec, execPayload);
     }
 
