@@ -28,8 +28,8 @@ contract WithdrawalRequestResolver is AccessControl{
         returns (bool canExec, bytes memory execPayload)
     {
         canExec = ILiquidityBufferVault(liquidityBufferAddress).keepersTrigger();
-         execPayload = abi.encodeWithSelector(
-            ILiquidityBufferVault(liquidityBufferAddress).satisfyWithdrawals()
+        execPayload = abi.encodeWithSelector(
+            ILiquidityBufferVault.satisfyWithdrawals.selector
         );
         return (canExec, execPayload);
     }

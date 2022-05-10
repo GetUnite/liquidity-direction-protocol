@@ -2,13 +2,13 @@
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "../IbAlluoUsd.sol";
+import "./IbAlluoUSD.sol";
 
 contract IbAlluoUSDPriceResolver is AccessControl{
 
     address public ibAlluoAddress;
     address public pokeMe;
-    address public alluoBank
+    address public alluoBank;
     event IbAlluoUSDValue(address indexed user, uint256 amount); 
 
     modifier onlyPokeMe() {
@@ -30,7 +30,7 @@ contract IbAlluoUSDPriceResolver is AccessControl{
         onlyPokeMe()
         returns (bool canExec, bytes memory execPayload)
     {
-        canExec = IbAlluoUsd(ibAlluoAddress).getBalance(alluoBank);
+        canExec = true;
         execPayload = "0x";
         return (canExec, execPayload);
     }
