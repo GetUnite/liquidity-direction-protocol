@@ -23,13 +23,13 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    hardhat: {
-      forking: {
-        enabled: process.env.FORKING_ENABLED == "true",
-        url: process.env.MAINNET_FORKING_URL as string,
-        blockNumber: 14487893
-      }
-    },
+    // hardhat: {
+    //   forking: {
+    //     enabled: process.env.FORKING_ENABLED == "true",
+    //     url: process.env.MAINNET_FORKING_URL as string,
+    //     blockNumber: 14487893
+    //   }
+    // },
     mainnet: {
       url: process.env.MAINNET_URL,
       gasPrice: "auto",
@@ -53,7 +53,7 @@ const config: HardhatUserConfig = {
     },
     polygon: {
       url: process.env.POLYGON_URL,
-      gasPrice: 50000000000,
+      gasPrice: "auto",
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
