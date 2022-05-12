@@ -12,6 +12,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 
 contract IbAlluo is
     Initializable,
@@ -20,6 +21,7 @@ contract IbAlluo is
     AccessControlUpgradeable,
     UUPSUpgradeable,
     Interest
+    // ERC2771ContextUpgradeable(0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8) - injected in code directly
 {
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -52,6 +54,9 @@ contract IbAlluo is
     // contract that will distribute money between the pool and the wallet
     address public liquidityBuffer;
 
+    // trusted forwarder address, see EIP-2771
+    address public trustedForwarder;
+
     // flag for upgrades availability
     bool public upgradeStatus;
 
@@ -82,7 +87,8 @@ contract IbAlluo is
         address _buffer,
         address[] memory _supportedTokens,
         uint256 _interestPerSecond,
-        uint256 _annualInterest
+        uint256 _annualInterest,
+        address _trustedForwarder
     ) public initializer {
         __ERC20_init(_name, _symbol);
         __Pausable_init();
@@ -109,6 +115,7 @@ contract IbAlluo is
 
         wallet = _multiSigWallet;
         liquidityBuffer = _buffer;
+        trustedForwarder = _trustedForwarder;
 
         emit NewWalletSet(address(0), wallet);
         emit NewBufferSet(address(0), liquidityBuffer);
@@ -203,7 +210,7 @@ contract IbAlluo is
         );
 
         IERC20Upgradeable(_token).safeTransferFrom(
-            msg.sender,
+            _msgSender(),
             address(liquidityBuffer),
             _amount
         );
@@ -214,8 +221,8 @@ contract IbAlluo is
         uint256 amountIn18 = _amount *
             10**(18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = (amountIn18 * multiplier) / growingRatio;
-        _mint(msg.sender, adjustedAmount);
-        emit Deposited(msg.sender, _token, _amount);
+        _mint(_msgSender(), adjustedAmount);
+        emit Deposited(_msgSender(), _token, _amount);
     }
 
     /// @notice  Withdraws accuratel
@@ -235,14 +242,14 @@ contract IbAlluo is
         );
         updateRatio();
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
-        _burn(msg.sender, adjustedAmount);
+        _burn(_msgSender(), adjustedAmount);
 
         ILiquidityBufferVault(liquidityBuffer).withdraw(
             _recipient,
             _targetToken,
             _amount
         );
-        emit BurnedForWithdraw(msg.sender, adjustedAmount);
+        emit BurnedForWithdraw(_msgSender(), adjustedAmount);
     }
 
     /// @notice  Withdraws accuratel
@@ -252,7 +259,7 @@ contract IbAlluo is
     /// @param _amount Amount (parsed 10**18)
 
     function withdraw(address _targetToken, uint256 _amount) external {
-        withdrawTo(msg.sender, _targetToken, _amount);
+        withdrawTo(_msgSender(), _targetToken, _amount);
     }
 
     /// @notice  Returns balance in asset value
@@ -300,6 +307,15 @@ contract IbAlluo is
 
     function getListSupportedTokens() public view returns (address[] memory) {
         return supportedTokens.values();
+    }
+
+    function isTrustedForwarder(address forwarder)
+        public
+        view
+        virtual
+        returns (bool)
+    {
+        return forwarder == trustedForwarder;
     }
 
     function mint(address account, uint256 amount)
@@ -409,6 +425,13 @@ contract IbAlluo is
         _grantRole(role, account);
     }
 
+    function setTrustedForwarder(address newTrustedForwarder)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        trustedForwarder = newTrustedForwarder;
+    }
+
     function _beforeTokenTransfer(
         address from,
         address to,
@@ -417,12 +440,43 @@ contract IbAlluo is
         super._beforeTokenTransfer(from, to, amount);
     }
 
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address)
         internal
         override
         onlyRole(UPGRADER_ROLE)
     {
         require(upgradeStatus, "IbAlluo: Upgrade not allowed");
         upgradeStatus = false;
+    }
+
+    function _msgSender()
+        internal
+        view
+        virtual
+        override
+        returns (address sender)
+    {
+        if (isTrustedForwarder(msg.sender)) {
+            // The assembly code is more direct than the Solidity version using `abi.decode`.
+            assembly {
+                sender := shr(96, calldataload(sub(calldatasize(), 20)))
+            }
+        } else {
+            return super._msgSender();
+        }
+    }
+
+    function _msgData()
+        internal
+        view
+        virtual
+        override
+        returns (bytes calldata)
+    {
+        if (isTrustedForwarder(msg.sender)) {
+            return msg.data[:msg.data.length - 20];
+        } else {
+            return super._msgData();
+        }
     }
 }
