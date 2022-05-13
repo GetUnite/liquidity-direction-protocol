@@ -106,6 +106,16 @@ contract FakeCurve is
         wallet = newWallet;
     }
 
+    function setCoins(
+        address newDai,
+        address newUsdc,
+        address newUsdt
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        DAI = IERC20Upgradeable(newDai);
+        USDC = IERC20Upgradeable(newUsdc);
+        USDC = IERC20Upgradeable(newUsdt);
+    }
+
     function changeFee(uint256 usdt, uint256 usdc)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
