@@ -3237,6 +3237,312 @@
             "label": "curvePool",
             "offset": 0,
             "slot": "303",
+            "type": "t_contract(FakeCurve)4392",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:33"
+          },
+          {
+            "label": "inPoolAmount",
+            "offset": 0,
+            "slot": "304",
+            "type": "t_uint256",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:36"
+          },
+          {
+            "label": "upgradeStatus",
+            "offset": 0,
+            "slot": "305",
+            "type": "t_bool",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:39"
+          },
+          {
+            "label": "slippage",
+            "offset": 1,
+            "slot": "305",
+            "type": "t_uint32",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:42"
+          },
+          {
+            "label": "bufferPercentage",
+            "offset": 5,
+            "slot": "305",
+            "type": "t_uint32",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:45"
+          },
+          {
+            "label": "totalWithdrawalAmount",
+            "offset": 0,
+            "slot": "306",
+            "type": "t_uint256",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:48"
+          },
+          {
+            "label": "withdrawals",
+            "offset": 0,
+            "slot": "307",
+            "type": "t_mapping(t_uint256,t_struct(Withdrawal)4449_storage)",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:61"
+          },
+          {
+            "label": "lastWithdrawalRequest",
+            "offset": 0,
+            "slot": "308",
+            "type": "t_uint256",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:64"
+          },
+          {
+            "label": "lastSatisfiedWithdrawal",
+            "offset": 0,
+            "slot": "309",
+            "type": "t_uint256",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:66"
+          },
+          {
+            "label": "DAI",
+            "offset": 0,
+            "slot": "310",
+            "type": "t_contract(IERC20Upgradeable)1189",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:68"
+          },
+          {
+            "label": "USDC",
+            "offset": 0,
+            "slot": "311",
+            "type": "t_contract(IERC20Upgradeable)1189",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:69"
+          },
+          {
+            "label": "USDT",
+            "offset": 0,
+            "slot": "312",
+            "type": "t_contract(IERC20Upgradeable)1189",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:70"
+          },
+          {
+            "label": "keepersTrigger",
+            "offset": 20,
+            "slot": "312",
+            "type": "t_bool",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:73"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(FakeCurve)4392": {
+            "label": "contract FakeCurve",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IERC20Upgradeable)1189": {
+            "label": "contract IERC20Upgradeable",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Withdrawal)4449_storage)": {
+            "label": "mapping(uint256 => struct LiquidityBufferVaultForMumbai.Withdrawal)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Withdrawal)4449_storage": {
+            "label": "struct LiquidityBufferVaultForMumbai.Withdrawal",
+            "members": [
+              {
+                "label": "user",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "token",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "time",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint32": {
+            "label": "uint32",
+            "numberOfBytes": "4"
+          }
+        }
+      }
+    },
+    "d65cfe6e6f78c4d86fa12141a6fd23867d8837e4417ea903b88e4402758eabfc": {
+      "address": "0x659832f168B6b5BF983E062D0F8b1a28E822B661",
+      "txHash": "0x5ceb7ee6dbe28755758883c1a9e61a82b7e2b52c304acbdc78dc347aa818ad69",
+      "layout": {
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:39"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:44"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\security\\PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\security\\PausableUpgradeable.sol:102"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC165Upgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\introspection\\ERC165Upgradeable.sol:41"
+          },
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\AccessControlUpgradeable.sol:61"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\AccessControlUpgradeable.sol:235"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\ERC1967\\ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\UUPSUpgradeable.sol:107"
+          },
+          {
+            "label": "wallet",
+            "offset": 0,
+            "slot": "301",
+            "type": "t_address",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:27"
+          },
+          {
+            "label": "alluoLp",
+            "offset": 0,
+            "slot": "302",
+            "type": "t_address",
+            "contract": "LiquidityBufferVaultForMumbai",
+            "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:30"
+          },
+          {
+            "label": "curvePool",
+            "offset": 0,
+            "slot": "303",
             "type": "t_contract(FakeCurve)26145",
             "contract": "LiquidityBufferVaultForMumbai",
             "src": "contracts\\mock\\testnet\\LiquidityBufferVaultForMumbai.sol:33"
