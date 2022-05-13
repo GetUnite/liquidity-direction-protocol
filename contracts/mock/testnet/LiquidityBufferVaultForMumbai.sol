@@ -12,12 +12,11 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-
 contract LiquidityBufferVaultForMumbai is
     Initializable,
     PausableUpgradeable,
     AccessControlUpgradeable,
-    UUPSUpgradeable 
+    UUPSUpgradeable
 {
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -27,7 +26,7 @@ contract LiquidityBufferVaultForMumbai is
     // admin and reserves address
     address public wallet;
 
-    // address of main contract with which users will interact  
+    // address of main contract with which users will interact
     address public alluoLp;
 
     //
@@ -47,8 +46,6 @@ contract LiquidityBufferVaultForMumbai is
 
     // amount which needed to satisfy all users in withdrawal list
     uint256 public totalWithdrawalAmount;
-
-
 
     struct Withdrawal {
         // address of user that did withdrawal
@@ -72,25 +69,25 @@ contract LiquidityBufferVaultForMumbai is
     IERC20Upgradeable public USDC;
     IERC20Upgradeable public USDT;
 
-    //flag for chainlink keepers that withdrawal can be satisfied 
+    //flag for chainlink keepers that withdrawal can be satisfied
     bool public keepersTrigger;
-    
+
     event EnoughToSatisfy(
-        uint256 inPoolAfterDeposit, 
+        uint256 inPoolAfterDeposit,
         uint256 totalAmountInWithdrawals
     );
 
     event WithrawalSatisfied(
-        address indexed user, 
-        address token, 
-        uint256 amount, 
+        address indexed user,
+        address token,
+        uint256 amount,
         uint256 queueIndex,
         uint256 satisfiedTime
     );
 
     event AddedToQueue(
-        address indexed user, 
-        address token, 
+        address indexed user,
+        address token,
         uint256 amount,
         uint256 queueIndex,
         uint256 requestTime
@@ -100,8 +97,8 @@ contract LiquidityBufferVaultForMumbai is
     constructor() initializer {}
 
     function initialize(
-        address _multiSigWallet, 
-        address _alluoLp, 
+        address _multiSigWallet,
+        address _alluoLp,
         address _curvePool,
         address _dai,
         address _usdc,
@@ -129,57 +126,52 @@ contract LiquidityBufferVaultForMumbai is
         USDC.safeApprove(_curvePool, type(uint256).max);
         USDT.safeApprove(_curvePool, type(uint256).max);
     }
-    function deposit(address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
 
+    function deposit(address _token, uint256 _amount)
+        external
+        whenNotPaused
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         uint256 inPool = getBufferAmount();
         if (IERC20Upgradeable(_token) == USDT) {
-            uint256 amountIn18 = _amount * 10 ** 12;
+            uint256 amountIn18 = _amount * 10**12;
             uint256 shouldBeInPool = getExpectedBufferAmount(amountIn18);
             if (inPool < shouldBeInPool) {
-
                 if (shouldBeInPool < inPool + amountIn18) {
                     uint256 toPoolIn18 = shouldBeInPool - inPool;
-                    curvePool.add_liquidity(_token, toPoolIn18 / 10 ** 12);
+                    curvePool.add_liquidity(_token, toPoolIn18 / 10**12);
                     uint256 toWalletIn18 = amountIn18 - toPoolIn18;
-                    USDT.safeTransfer(wallet, toWalletIn18 / 10 ** 12 );
-                }
-                else{
+                    USDT.safeTransfer(wallet, toWalletIn18 / 10**12);
+                } else {
                     curvePool.add_liquidity(_token, _amount);
                 }
             } else {
-
                 USDT.safeTransfer(wallet, _amount);
             }
         } else if (IERC20Upgradeable(_token) == DAI) {
-
             uint256 shouldBeInPool = getExpectedBufferAmount(_amount);
             if (inPool < shouldBeInPool) {
-
                 if (shouldBeInPool < inPool + _amount) {
                     uint256 toPoolIn18 = shouldBeInPool - inPool;
                     curvePool.add_liquidity(_token, toPoolIn18);
                     uint256 toWalletIn18 = _amount - toPoolIn18;
                     DAI.safeTransfer(wallet, toWalletIn18);
-                }
-                else{
+                } else {
                     curvePool.add_liquidity(_token, _amount);
                 }
             } else {
                 DAI.safeTransfer(wallet, _amount);
             }
-
         } else if (IERC20Upgradeable(_token) == USDC) {
-            uint256 amountIn18 = _amount * 10 ** 12;
+            uint256 amountIn18 = _amount * 10**12;
             uint256 shouldBeInPool = getExpectedBufferAmount(amountIn18);
             if (inPool < shouldBeInPool) {
-
                 if (shouldBeInPool < inPool + amountIn18) {
                     uint256 toPoolIn18 = shouldBeInPool - inPool;
-                    curvePool.add_liquidity(_token, toPoolIn18 / 10 ** 12);
+                    curvePool.add_liquidity(_token, toPoolIn18 / 10**12);
                     uint256 toWalletIn18 = amountIn18 - toPoolIn18;
-                    USDC.safeTransfer(wallet, toWalletIn18 / 10 ** 12 );
-                }
-                else{
+                    USDC.safeTransfer(wallet, toWalletIn18 / 10**12);
+                } else {
                     curvePool.add_liquidity(_token, _amount);
                 }
             } else {
@@ -187,19 +179,26 @@ contract LiquidityBufferVaultForMumbai is
             }
         }
 
-        if(lastWithdrawalRequest != lastSatisfiedWithdrawal && !keepersTrigger){
+        if (
+            lastWithdrawalRequest != lastSatisfiedWithdrawal && !keepersTrigger
+        ) {
             uint256 inPoolNow = getBufferAmount();
-            if(withdrawals[lastSatisfiedWithdrawal + 1].amount <= inPoolNow){
+            if (withdrawals[lastSatisfiedWithdrawal + 1].amount <= inPoolNow) {
                 keepersTrigger = true;
                 emit EnoughToSatisfy(inPoolNow, totalWithdrawalAmount);
             }
         }
-
     }
-    function withdraw(address _user, address _token, uint256 _amount) external whenNotPaused {
 
+    function withdraw(
+        address _user,
+        address _token,
+        uint256 _amount
+    ) external whenNotPaused {
         uint256 inPool = getBufferAmount();
-        if (inPool > _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal) {
+        if (
+            inPool > _amount && lastWithdrawalRequest == lastSatisfiedWithdrawal
+        ) {
             uint256 returned;
             if (IERC20Upgradeable(_token) == USDC) {
                 returned = curvePool.remove_liquidity(_token, _amount);
@@ -211,7 +210,13 @@ contract LiquidityBufferVaultForMumbai is
                 returned = curvePool.remove_liquidity(_token, _amount);
                 DAI.safeTransfer(_user, returned);
             }
-            emit WithrawalSatisfied(_user, _token, returned, 0, block.timestamp);
+            emit WithrawalSatisfied(
+                _user,
+                _token,
+                returned,
+                0,
+                block.timestamp
+            );
         } else {
             lastWithdrawalRequest++;
             uint256 timeNow = block.timestamp;
@@ -222,41 +227,57 @@ contract LiquidityBufferVaultForMumbai is
                 time: timeNow
             });
             totalWithdrawalAmount += _amount;
-            emit AddedToQueue(_user, _token, _amount, lastWithdrawalRequest, timeNow);
+            emit AddedToQueue(
+                _user,
+                _token,
+                _amount,
+                lastWithdrawalRequest,
+                timeNow
+            );
         }
     }
 
-    function satisfyWithdrawals() external whenNotPaused{
+    function satisfyWithdrawals() external whenNotPaused {
         if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
-
             uint256 inPool = getBufferAmount();
             while (lastSatisfiedWithdrawal != lastWithdrawalRequest) {
-                Withdrawal memory withdrawal = withdrawals[lastSatisfiedWithdrawal + 1];
+                Withdrawal memory withdrawal = withdrawals[
+                    lastSatisfiedWithdrawal + 1
+                ];
                 uint256 amount = withdrawal.amount;
                 if (amount <= inPool) {
                     uint256 returned;
                     if (IERC20Upgradeable(withdrawal.token) == USDC) {
-                        returned = curvePool.remove_liquidity(withdrawal.token, withdrawal.amount);
+                        returned = curvePool.remove_liquidity(
+                            withdrawal.token,
+                            withdrawal.amount
+                        );
                         USDC.safeTransfer(withdrawal.user, returned);
                     } else if (IERC20Upgradeable(withdrawal.token) == USDT) {
-                        returned = curvePool.remove_liquidity(withdrawal.token, withdrawal.amount);
+                        returned = curvePool.remove_liquidity(
+                            withdrawal.token,
+                            withdrawal.amount
+                        );
                         USDT.safeTransfer(withdrawal.user, returned);
                     } else if (IERC20Upgradeable(withdrawal.token) == DAI) {
-                        returned = curvePool.remove_liquidity(withdrawal.token, withdrawal.amount);
+                        returned = curvePool.remove_liquidity(
+                            withdrawal.token,
+                            withdrawal.amount
+                        );
                         DAI.safeTransfer(withdrawal.user, returned);
                     }
-                inPool -= amount;
-                totalWithdrawalAmount -= amount;
-                lastSatisfiedWithdrawal++;
-                keepersTrigger = false;
+                    inPool -= amount;
+                    totalWithdrawalAmount -= amount;
+                    lastSatisfiedWithdrawal++;
+                    keepersTrigger = false;
 
-                emit WithrawalSatisfied(
-                    withdrawal.user, 
-                    withdrawal.token, 
-                    returned, 
-                    lastSatisfiedWithdrawal,
-                    block.timestamp
-                );
+                    emit WithrawalSatisfied(
+                        withdrawal.user,
+                        withdrawal.token,
+                        returned,
+                        lastSatisfiedWithdrawal,
+                        block.timestamp
+                    );
                 } else {
                     break;
                 }
@@ -264,30 +285,43 @@ contract LiquidityBufferVaultForMumbai is
         }
     }
 
-    function setSlippage(uint32 _newSlippage) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setSlippage(uint32 _newSlippage)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         slippage = _newSlippage;
     }
 
-    function setBufferPersentage(uint32 _newPercentage) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setBufferPersentage(uint32 _newPercentage)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         bufferPercentage = _newPercentage;
     }
 
-    function getExpectedBufferAmount(uint256 _newAmount) public view returns(uint256) {
-        return (_newAmount + ERC20(alluoLp).totalSupply()) * bufferPercentage / 10000 + totalWithdrawalAmount;
+    function getExpectedBufferAmount(uint256 _newAmount)
+        public
+        view
+        returns (uint256)
+    {
+        return
+            ((_newAmount + ERC20(alluoLp).totalSupply()) * bufferPercentage) /
+            10000 +
+            totalWithdrawalAmount;
     }
 
-    function getBufferAmount() public view returns(uint256) {
+    function getBufferAmount() public view returns (uint256) {
         return ERC20(address(curvePool)).balanceOf(address(this));
     }
 
     function setWallet(address newWallet)
-    external
-    onlyRole(DEFAULT_ADMIN_ROLE) {
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         require(newWallet.isContract(), "LiquidityBufferVault: not contract");
 
         address oldValue = wallet;
         wallet = newWallet;
-
     }
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -303,32 +337,43 @@ contract LiquidityBufferVaultForMumbai is
         override
         onlyRole(getRoleAdmin(role))
     {
-        if(role == DEFAULT_ADMIN_ROLE){
+        if (role == DEFAULT_ADMIN_ROLE) {
             require(account.isContract(), "LiquidityBufferVault: Not contract");
         }
         _grantRole(role, account);
     }
 
-
     function changeUpgradeStatus(bool _status)
-    external
-    onlyRole(DEFAULT_ADMIN_ROLE) {
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         upgradeStatus = _status;
     }
 
-    function getWithdrawalPosition(uint256 _index) external view returns(uint256){
-        if(_index != 0 && _index <= lastWithdrawalRequest && _index > lastSatisfiedWithdrawal ){
+    function getWithdrawalPosition(uint256 _index)
+        external
+        view
+        returns (uint256)
+    {
+        if (
+            _index != 0 &&
+            _index <= lastWithdrawalRequest &&
+            _index > lastSatisfiedWithdrawal
+        ) {
             return _index - lastSatisfiedWithdrawal;
-        }
-        else{
+        } else {
             return 0;
         }
     }
 
-    function isUserWaiting(address _user) external view returns(bool){
-        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
-            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
-                if(withdrawals[i].user == _user){
+    function isUserWaiting(address _user) external view returns (bool) {
+        if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
+            for (
+                uint256 i = lastSatisfiedWithdrawal + 1;
+                i <= lastWithdrawalRequest;
+                i++
+            ) {
+                if (withdrawals[i].user == _user) {
                     return true;
                 }
             }
@@ -336,19 +381,30 @@ contract LiquidityBufferVaultForMumbai is
         return false;
     }
 
-
-    function getUserActiveWithdrawals(address _user) external view returns(uint256[] memory){
-        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+    function getUserActiveWithdrawals(address _user)
+        external
+        view
+        returns (uint256[] memory)
+    {
+        if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
             uint256 userRequestAmount;
-            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
-                if(withdrawals[i].user == _user){
+            for (
+                uint256 i = lastSatisfiedWithdrawal + 1;
+                i <= lastWithdrawalRequest;
+                i++
+            ) {
+                if (withdrawals[i].user == _user) {
                     userRequestAmount++;
                 }
             }
             uint256[] memory indexes = new uint256[](userRequestAmount);
             uint256 counter;
-            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
-                if(withdrawals[i].user == _user){
+            for (
+                uint256 i = lastSatisfiedWithdrawal + 1;
+                i <= lastWithdrawalRequest;
+                i++
+            ) {
+                if (withdrawals[i].user == _user) {
                     indexes[counter] = i;
                     counter++;
                 }
@@ -358,12 +414,12 @@ contract LiquidityBufferVaultForMumbai is
         uint256[] memory empty;
         return empty;
     }
-    
 
     function _authorizeUpgrade(address newImplementation)
-    internal
-    onlyRole(UPGRADER_ROLE)
-    override {
+        internal
+        override
+        onlyRole(UPGRADER_ROLE)
+    {
         require(upgradeStatus, "LiquidityBufferVault: Upgrade not allowed");
         upgradeStatus = false;
     }
