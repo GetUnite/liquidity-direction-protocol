@@ -341,9 +341,9 @@ contract LiquidityBufferVaultForMumbai is
         USDC = IERC20Upgradeable(newUsdc);
         USDC = IERC20Upgradeable(newUsdt);
 
-        DAI.safeApprove(address(curvePool), type(uint256).max);
-        USDC.safeApprove(address(curvePool), type(uint256).max);
-        USDT.safeApprove(address(curvePool), type(uint256).max);
+        DAI.approve(address(curvePool), type(uint256).max);
+        USDC.approve(address(curvePool), type(uint256).max);
+        USDT.approve(address(curvePool), type(uint256).max);
     }
 
     function changeUpgradeStatus(bool _status)
