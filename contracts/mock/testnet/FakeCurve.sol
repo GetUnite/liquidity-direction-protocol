@@ -113,7 +113,7 @@ contract FakeCurve is
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         DAI = IERC20Upgradeable(newDai);
         USDC = IERC20Upgradeable(newUsdc);
-        USDC = IERC20Upgradeable(newUsdt);
+        USDT = IERC20Upgradeable(newUsdt);
     }
 
     function changeFee(uint256 usdt, uint256 usdc)

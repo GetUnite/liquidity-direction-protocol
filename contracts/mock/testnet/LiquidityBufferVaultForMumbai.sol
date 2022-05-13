@@ -339,7 +339,7 @@ contract LiquidityBufferVaultForMumbai is
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         DAI = IERC20Upgradeable(newDai);
         USDC = IERC20Upgradeable(newUsdc);
-        USDC = IERC20Upgradeable(newUsdt);
+        USDT = IERC20Upgradeable(newUsdt);
 
         DAI.approve(address(curvePool), type(uint256).max);
         USDC.approve(address(curvePool), type(uint256).max);
