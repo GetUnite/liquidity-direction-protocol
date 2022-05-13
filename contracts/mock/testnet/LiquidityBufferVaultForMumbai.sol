@@ -332,15 +332,14 @@ contract LiquidityBufferVaultForMumbai is
         _unpause();
     }
 
-    function grantRole(bytes32 role, address account)
-        public
-        override
-        onlyRole(getRoleAdmin(role))
-    {
-        if (role == DEFAULT_ADMIN_ROLE) {
-            require(account.isContract(), "LiquidityBufferVault: Not contract");
-        }
-        _grantRole(role, account);
+    function setCoins(
+        address newDai,
+        address newUsdc,
+        address newUsdt
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        DAI = IERC20Upgradeable(newDai);
+        USDC = IERC20Upgradeable(newUsdc);
+        USDC = IERC20Upgradeable(newUsdt);
     }
 
     function changeUpgradeStatus(bool _status)
