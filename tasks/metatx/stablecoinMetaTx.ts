@@ -75,7 +75,7 @@ async function getStablecoinMetatxSignature(
         // get domain separator, which is constant for only individual contract
         // on specific network, maybe it would be reasonable cache it
         "function DOMAIN_SEPARATOR() public view returns (bytes32)",
-        "function getDomainSeparator() public view returns (bytes32)",
+        "function getDomainSeperator() public view returns (bytes32)",
     ];
 
     const metaTxContract = new ethers.Contract(metaTxContractAddress, abi, provider);
@@ -85,7 +85,7 @@ async function getStablecoinMetatxSignature(
     try {
         domainSeparator = await metaTxContract.callStatic.DOMAIN_SEPARATOR();
     } catch (error) {
-        domainSeparator = await metaTxContract.callStatic.getDomainSeparator();
+        domainSeparator = await metaTxContract.callStatic.getDomainSeperator();
     }
 
     // get user nonce
