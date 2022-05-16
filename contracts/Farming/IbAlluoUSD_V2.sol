@@ -75,6 +75,13 @@ contract IbAlluoUSD_V2 is
         uint256 oldInterestPerSecond,
         uint256 newInterestPerSecond
     );
+    event TransferAssetValue(
+        address indexed from,
+        address indexed to,
+        uint256 tokenAmount,
+        uint256 assetValue,
+        uint256 growingRatio
+    );
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -454,6 +461,19 @@ contract IbAlluoUSD_V2 is
         uint256 amount
     ) internal override {
         super._beforeTokenTransfer(from, to, amount);
+    }
+
+    function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override {
+        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
+            updateRatio();
+        }
+        uint256 assetValue = (amount * growingRatio) / multiplier;
+        emit TransferAssetValue(from, to, amount, assetValue, growingRatio);
+        super._afterTokenTransfer(from, to, amount);
     }
 
     function _authorizeUpgrade(address)
