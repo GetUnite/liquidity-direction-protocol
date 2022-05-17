@@ -27,7 +27,7 @@ const config: HardhatUserConfig = {
       forking: {
         enabled: process.env.FORKING_ENABLED == "true",
         url: process.env.MAINNET_FORKING_URL as string,
-        blockNumber: 14487893
+        blockNumber: 14785940
       }
     },
     mainnet: {
@@ -39,7 +39,7 @@ const config: HardhatUserConfig = {
     },
     rinkeby: {
       url: process.env.RINKEBY_URL,
-      gasPrice: "auto",
+      gasPrice: 25000000000,
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
@@ -66,7 +66,7 @@ const config: HardhatUserConfig = {
       },
     }
   },
-  
+
   gasReporter: {
     enabled: process.env.REPORT_GAS == "true",
     currency: "USD",
