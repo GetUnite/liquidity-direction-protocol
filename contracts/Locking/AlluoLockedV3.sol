@@ -508,11 +508,11 @@ contract AlluoLockedV3 is
     }
 
     /**
-     * @dev convers amount of Alluo to Lp based on current ratio
+     * @dev converts amount of Alluo to Lp based on current ratio
      * @param _amount amount of Alluo tokens
      * @return amount amount of Lp tokens
      */
-    function converAlluoToLp(uint256 _amount)
+    function convertAlluoToLp(uint256 _amount)
         external
         view
         returns (uint256)
@@ -525,7 +525,7 @@ contract AlluoLockedV3 is
     }
 
     /**
-     * @dev convers amount of Lp to Alluo tokens based on current ratio
+     * @dev converts amount of Lp to Alluo tokens based on current ratio
      * @param _amount amount of Lp tokens
      * @return amount amount of Alluo tokens
      */
@@ -613,7 +613,10 @@ contract AlluoLockedV3 is
      * @dev Sets amount of reward during `distributionTime`
      * @param _amount Sets total reward amount per `distributionTime`
      */
-    function setReward(uint256 _amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setReward(uint256 _amount) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
+    {
         allProduced = produced();
         producedTime = block.timestamp;
         rewardPerDistribution = _amount;

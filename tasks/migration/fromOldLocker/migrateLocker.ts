@@ -67,7 +67,7 @@ task("migrateLocker", "claim all balances on old alluoLp")
     addreses.push(gnosis)
     amounts.push(treasuryLpAmount)
     
-    let locker = await hre.ethers.getContractAt("AlluoLockedV3", "address");
+    let locker = await hre.ethers.getContractAt("AlluoLockedV3", "0xF295EE9F1FA3Df84493Ae21e08eC2e1Ca9DebbAf");
 
     await ask(`Are you sure?`);
 
