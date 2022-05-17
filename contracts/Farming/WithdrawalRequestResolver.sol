@@ -24,11 +24,12 @@ contract WithdrawalRequestResolver is AccessControl{
     function checker()
         external
         view
-        onlyPokeMe()
         returns (bool canExec, bytes memory execPayload)
     {
         canExec = ILiquidityBufferVault(liquidityBufferAddress).keepersTrigger();
-        execPayload = "0x";
+        execPayload = abi.encodeWithSelector(
+            ILiquidityBufferVault.satisfyWithdrawals.selector
+        );
         return (canExec, execPayload);
     }
 
