@@ -165,6 +165,7 @@ contract IbAlluoUSD_V2 is
         updateRatio();
         uint256 adjustedAmount = (amount * multiplier) / growingRatio;
         _transfer(owner, to, adjustedAmount);
+        emit TransferAssetValue(owner, to, adjustedAmount, amount, growingRatio);
         return true;
     }
 
@@ -188,6 +189,7 @@ contract IbAlluoUSD_V2 is
         uint256 adjustedAmount = (amount * multiplier) / growingRatio;
         _spendAllowance(from, spender, adjustedAmount);
         _transfer(from, to, adjustedAmount);
+        emit TransferAssetValue(from, to, adjustedAmount, amount, growingRatio);
         return true;
     }
 
@@ -216,6 +218,7 @@ contract IbAlluoUSD_V2 is
             10**(18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = (amountIn18 * multiplier) / growingRatio;
         _mint(_msgSender(), adjustedAmount);
+        emit TransferAssetValue(address(0), _msgSender(), adjustedAmount, amountIn18, growingRatio);
         emit Deposited(_msgSender(), _token, _amount);
     }
 
@@ -243,6 +246,7 @@ contract IbAlluoUSD_V2 is
             _targetToken,
             _amount
         );
+        emit TransferAssetValue(_msgSender(), address(0), adjustedAmount, _amount, growingRatio);
         emit BurnedForWithdraw(_msgSender(), adjustedAmount);
     }
 
@@ -317,6 +321,11 @@ contract IbAlluoUSD_V2 is
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         _mint(account, amount);
+        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
+            updateRatio();
+        }
+        uint256 assetValue = (amount * growingRatio) / multiplier;
+        emit TransferAssetValue(address(0), _msgSender(), amount, assetValue, growingRatio);
     }
 
     function burn(address account, uint256 amount)
@@ -324,6 +333,11 @@ contract IbAlluoUSD_V2 is
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         _burn(account, amount);
+        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
+            updateRatio();
+        }
+        uint256 assetValue = (amount * growingRatio) / multiplier;
+        emit TransferAssetValue(_msgSender(), address(0), amount, assetValue, growingRatio);
     }
 
     /// @notice  Sets the new interest rate
@@ -463,17 +477,56 @@ contract IbAlluoUSD_V2 is
         super._beforeTokenTransfer(from, to, amount);
     }
 
-    function _afterTokenTransfer(
+
+    /**
+     * @dev See {IERC20-transfer}.
+     *
+     * Requirements:
+     *
+     * - `to` cannot be the zero address.
+     * - the caller must have a balance of at least `amount`.
+     */
+    function transfer(address to, uint256 amount) public override whenNotPaused returns (bool) {
+        address owner = _msgSender();
+        _transfer(owner, to, amount);
+        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
+            updateRatio();
+        }
+        uint256 assetValue = (amount * growingRatio) / multiplier;
+        emit TransferAssetValue(owner, to, amount, assetValue, growingRatio);
+        return true;
+    }
+
+    /**
+     * @dev See {IERC20-transferFrom}.
+     *
+     * Emits an {Approval} event indicating the updated allowance. This is not
+     * required by the EIP. See the note at the beginning of {ERC20}.
+     *
+     * NOTE: Does not update the allowance if the current allowance
+     * is the maximum `uint256`.
+     *
+     * Requirements:
+     *
+     * - `from` and `to` cannot be the zero address.
+     * - `from` must have a balance of at least `amount`.
+     * - the caller must have allowance for ``from``'s tokens of at least
+     * `amount`.
+     */
+    function transferFrom(
         address from,
         address to,
         uint256 amount
-    ) internal override {
+    ) public override whenNotPaused returns (bool) {
+        address spender = _msgSender();
+        _spendAllowance(from, spender, amount);
+        _transfer(from, to, amount);
         if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
             updateRatio();
         }
         uint256 assetValue = (amount * growingRatio) / multiplier;
         emit TransferAssetValue(from, to, amount, assetValue, growingRatio);
-        super._afterTokenTransfer(from, to, amount);
+        return true;
     }
 
     function _authorizeUpgrade(address)
