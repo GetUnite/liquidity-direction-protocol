@@ -10,12 +10,16 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-contract AlluoLocked is
+import "./../interfaces/IExchange.sol";
+import "./../interfaces/IBalancer.sol";
+
+contract AlluoLockedNew is
     Initializable,
     UUPSUpgradeable,
     AccessControlUpgradeable,
     ReentrancyGuardUpgradeable,
-    PausableUpgradeable
+    PausableUpgradeable,
+    IBalancerStructs
 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using AddressUpgradeable for address;
@@ -50,12 +54,11 @@ contract AlluoLocked is
     //period of locking after unlock function call
     uint256 public withdrawLockDuration;
 
-
-    struct AdditionalLockInfo{
+    struct AdditionalLockInfo {
         // Amount of locked tokens waiting for withdraw.
         uint256 waitingForWithdrawal;
         // Amount of currently claimed rewards by the users.
-        uint256  totalDistributed;
+        uint256 totalDistributed;
         // flag for allowing upgrade
         bool upgradeStatus;
         // flag for allowing migrate
@@ -63,9 +66,9 @@ contract AlluoLocked is
     }
 
     AdditionalLockInfo private additionalLockInfo;
-    
+
     //erc20-like interface
-    struct TokenInfo{
+    struct TokenInfo {
         string name;
         string symbol;
         uint8 decimals;
@@ -86,6 +89,15 @@ contract AlluoLocked is
 
     // Lockers info by token holders.
     mapping(address => Locker) public _lockers;
+
+    IExchange public constant exchange =
+        IExchange(0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec);
+    IBalancer public constant balancer =
+        IBalancer(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
+    IERC20Upgradeable public constant alluoBalancerLp =
+        IERC20Upgradeable(0x85Be1e46283f5f438D1f864c2d925506571d544f);
+    bytes32 public constant poolId =
+        0x85be1e46283f5f438d1f864c2d925506571d544f0002000000000000000001aa;
 
     /**
      * @dev Emitted in `initialize` when the locking was initialized
@@ -111,7 +123,7 @@ contract AlluoLocked is
      * @dev Emitted in `claim` when the user claimed his reward tokens
      */
     event TokensClaimed(uint256 amount, uint256 time, address indexed sender);
-    
+
     /**
      * @dev Emitted in `unlock` when the user unbinded his locked tokens
      */
@@ -131,15 +143,16 @@ contract AlluoLocked is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-
-    function _authorizeUpgrade(address newImplementation)
+    function _authorizeUpgrade(address)
         internal
         override
         onlyRole(UPGRADER_ROLE)
-    { require(additionalLockInfo.upgradeStatus, "Upgrade not allowed");}
+    {
+        require(additionalLockInfo.upgradeStatus, "Upgrade not allowed");
+    }
 
     /**
-     * @dev Contract constructor 
+     * @dev Contract constructor
      */
     function initialize(
         address _multiSigWallet,
@@ -148,7 +161,7 @@ contract AlluoLocked is
         uint256 _distributionTime,
         address _lockingToken,
         address _rewardToken
-    ) public initializer{
+    ) public initializer {
         __AccessControl_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
@@ -182,9 +195,11 @@ contract AlluoLocked is
     function decimals() public view returns (uint8) {
         return token.decimals;
     }
+
     function name() public view returns (string memory) {
         return token.name;
     }
+
     function symbol() public view returns (string memory) {
         return token.symbol;
     }
@@ -234,6 +249,7 @@ contract AlluoLocked is
             address(this),
             _amount
         );
+        _enterAlluoPool(_amount, 0);
 
         if (totalLocked > 0) {
             update();
@@ -249,9 +265,9 @@ contract AlluoLocked is
     }
 
     /**
-    * @dev Unbinds specified amount of tokens
-    * @param _amount An amount to unbid
-    */
+     * @dev Unbinds specified amount of tokens
+     * @param _amount An amount to unbid
+     */
     function unlock(uint256 _amount) public nonReentrant {
         Locker storage locker = _lockers[msg.sender];
 
@@ -292,11 +308,8 @@ contract AlluoLocked is
             locker.depositUnlockTime <= block.timestamp,
             "Locking: Locked tokens are not available yet"
         );
-        
-        require(
-            locker.amount > 0,
-            "Locking: Not enough tokens to unlock"
-        );
+
+        require(locker.amount > 0, "Locking: Not enough tokens to unlock");
         uint256 amount = locker.amount;
 
         update();
@@ -335,6 +348,8 @@ contract AlluoLocked is
         locker.unlockAmount = 0;
         locker.withdrawUnlockTime = 0;
         additionalLockInfo.waitingForWithdrawal -= amount;
+
+        _exitAlluoPool(amount);
         IERC20Upgradeable(lockingToken).safeTransfer(msg.sender, amount);
         emit TokensWithdrawed(amount, block.timestamp, msg.sender);
     }
@@ -344,7 +359,6 @@ contract AlluoLocked is
      * @return Boolean result
      */
     function claim() public nonReentrant returns (bool) {
-
         if (totalLocked > 0) {
             update();
         }
@@ -357,6 +371,7 @@ contract AlluoLocked is
         locker.distributed = locker.distributed + reward;
         additionalLockInfo.totalDistributed += reward;
 
+        _exitAlluoPool(reward);
         IERC20Upgradeable(rewardToken).safeTransfer(msg.sender, reward);
         emit TokensClaimed(reward, block.timestamp, msg.sender);
         return true;
@@ -419,7 +434,11 @@ contract AlluoLocked is
      * @param _address Locker's address
      * @return amount of vote/locked tokens
      */
-    function balanceOf(address _address) external view  returns(uint256 amount) {
+    function balanceOf(address _address)
+        external
+        view
+        returns (uint256 amount)
+    {
         return _lockers[_address].amount;
     }
 
@@ -428,7 +447,11 @@ contract AlluoLocked is
      * @param _address Locker's address
      * @return amount of unlocked tokens
      */
-    function unlockedBalanceOf(address _address) external view  returns(uint256 amount) {
+    function unlockedBalanceOf(address _address)
+        external
+        view
+        returns (uint256 amount)
+    {
         return _lockers[_address].unlockAmount;
     }
 
@@ -436,7 +459,7 @@ contract AlluoLocked is
      * @dev Returns total amount of tokens
      * @return amount of locked and unlocked tokens
      */
-    function totalSupply() external view  returns(uint256 amount) {
+    function totalSupply() external view returns (uint256 amount) {
         return totalLocked + additionalLockInfo.waitingForWithdrawal;
     }
 
@@ -467,7 +490,13 @@ contract AlluoLocked is
         withdrawUnlockTime_ = locker.withdrawUnlockTime;
         claim_ = getClaim(_address);
 
-        return (locked_, unlockAmount_, claim_, depositUnlockTime_, withdrawUnlockTime_);
+        return (
+            locked_,
+            unlockAmount_,
+            claim_,
+            depositUnlockTime_,
+            withdrawUnlockTime_
+        );
     }
 
     /* ========== ADMIN CONFIGURATION ========== */
@@ -492,6 +521,7 @@ contract AlluoLocked is
             address(this),
             _amount
         );
+        _enterAlluoPool(_amount, 0);
     }
 
     /**
@@ -506,7 +536,7 @@ contract AlluoLocked is
     }
 
     /**
-     * @dev Allows to update the time when the reward are available to withdraw 
+     * @dev Allows to update the time when the reward are available to withdraw
      * @param _withdrawLockDuration Date in unix timestamp format
      */
     function updateWithdrawLockDuration(uint256 _withdrawLockDuration)
@@ -517,7 +547,7 @@ contract AlluoLocked is
     }
 
     /**
-     * @dev Allows to update the time when the reward are available to unlock 
+     * @dev Allows to update the time when the reward are available to unlock
      * @param _depositLockDuration Date in unix timestamp format
      */
     function updateDepositLockDuration(uint256 _depositLockDuration)
@@ -558,15 +588,89 @@ contract AlluoLocked is
         require(additionalLockInfo.migrationStatus, "migration not allowed");
         Locker storage locker = _lockers[msg.sender];
         locker.depositUnlockTime = 0;
-        if(locker.amount > 0){
+        if (locker.amount > 0) {
             unlockAll();
         }
         if (getClaim(msg.sender) > 0) {
             claim();
         }
         locker.withdrawUnlockTime = 0;
-        if(locker.unlockAmount != 0){
+        if (locker.unlockAmount != 0) {
             withdraw();
         }
+    }
+
+    function initializeBalancerVersion() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IERC20Upgradeable weth = IERC20Upgradeable(
+            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+        );
+        lockingToken.approve(address(exchange), type(uint256).max);
+        alluoBalancerLp.approve(address(balancer), type(uint256).max);
+        weth.approve(address(exchange), type(uint256).max);
+
+        uint256 alluoBalance = lockingToken.balanceOf(address(this));
+        uint256 wethBalance = weth.balanceOf(address(this));
+        _enterAlluoPool(alluoBalance, wethBalance);
+    }
+
+    function withdrawTokens(
+        address withdrawToken,
+        address to,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(
+            withdrawToken != address(alluoBalancerLp),
+            "cant withdraw alluolp token"
+        );
+        IERC20Upgradeable(withdrawToken).safeTransfer(to, amount);
+    }
+
+    function _enterAlluoPool(uint256 alluoAmount, uint256 wethAmount) private {
+        exchange.exchange(
+            address(lockingToken),
+            address(alluoBalancerLp),
+            alluoAmount,
+            0
+        );
+        if (wethAmount > 0) {
+            IERC20Upgradeable weth = IERC20Upgradeable(
+                0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
+            );
+            exchange.exchange(
+                address(weth),
+                address(alluoBalancerLp),
+                wethAmount,
+                0
+            );
+        }
+    }
+
+    function _exitAlluoPool(uint256 alluoAmountToGet) private {
+        address[] memory assets = new address[](2);
+        assets[0] = 0x1E5193ccC53f25638Aa22a940af899B692e10B09;
+        assets[1] = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = alluoAmountToGet;
+        amounts[1] = 0;
+
+        bytes memory data = abi.encode(
+            uint256(ExitKind.BPT_IN_FOR_EXACT_TOKENS_OUT),
+            amounts,
+            type(uint256).max
+        );
+
+        ExitPoolRequest memory request = ExitPoolRequest(
+            assets,
+            amounts,
+            data,
+            false
+        );
+        balancer.exitPool(
+            poolId,
+            address(this),
+            payable(address(this)),
+            request
+        );
     }
 }
