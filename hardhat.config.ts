@@ -53,7 +53,7 @@ const config: HardhatUserConfig = {
     },
     polygon: {
       url: process.env.POLYGON_URL,
-      gasPrice: 50000000000,
+      gasPrice: "auto",
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
