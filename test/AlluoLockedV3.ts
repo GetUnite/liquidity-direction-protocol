@@ -5,12 +5,10 @@ import { Contract, ContractFactory } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { parseEther } from "@ethersproject/units";
 import { keccak256 } from "ethers/lib/utils";
-import { AlluoLockedNew, AlluoLockedV3, IAlluoToken, PseudoMultisigWallet, TestERC20 } from '../typechain';
+import { AlluoLockedNew, AlluoLockedV3, IAlluoToken, PseudoMultisigWallet, TestERC20, AlluoLockedV2Final } from '../typechain';
 import { getLockers } from "../scripts/dev/getLockers";
 import { writeFileSync } from 'fs';
 import { join } from "path";
-import { AlluoLockedV2Final } from "../typechain/AlluoLockedV2Final";
-import { getContractAddress } from "@openzeppelin/hardhat-upgrades/dist/utils";
 
 let alluoToken: IAlluoToken;
 let balancerAlluoLp: TestERC20;

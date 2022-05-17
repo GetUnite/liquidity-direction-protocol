@@ -13,7 +13,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./../interfaces/IExchange.sol";
 import "./../interfaces/IBalancer.sol";
 
-contract AlluoLockedOldFinalUpgrade is
+contract AlluoLockedV2Final is
     Initializable,
     UUPSUpgradeable,
     AccessControlUpgradeable,
