@@ -1,3 +1,4 @@
+import './dev/lockers'
 import './dev/holders'
 import "./voting/createEntry"
 import "./voting/getPoolId"
