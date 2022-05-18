@@ -2,7 +2,7 @@
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./IbAlluoUSD.sol";
+import "../IbAlluoUSD.sol";
 
 contract IbAlluoUSDPriceResolver is AccessControl{
 
