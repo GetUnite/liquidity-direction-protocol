@@ -2,7 +2,7 @@
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./IbAlluoUSD.sol";
+import "../interfaces/IIbAlluo.sol";
 
 contract IbAlluoUSDPriceResolver is AccessControl{
 
@@ -19,7 +19,7 @@ contract IbAlluoUSDPriceResolver is AccessControl{
     function emitter()
         external
     {
-        IbAlluoUSD(ibAlluoAddress).updateRatio();
-        emit IbAlluoUSDValue(alluoBank, IbAlluoUSD(ibAlluoAddress).getBalance(alluoBank), IbAlluoUSD(ibAlluoAddress).balanceOf(alluoBank), IbAlluoUSD(ibAlluoAddress).growingRatio());
+        IIbAlluo(ibAlluoAddress).updateRatio();
+        emit IbAlluoUSDValue(alluoBank, IIbAlluo(ibAlluoAddress).getBalance(alluoBank), IIbAlluo(ibAlluoAddress).balanceOf(alluoBank), IIbAlluo(ibAlluoAddress).growingRatio());
     }
 }

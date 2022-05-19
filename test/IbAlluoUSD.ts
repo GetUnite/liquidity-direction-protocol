@@ -3,9 +3,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, LiquidityBufferVault, LiquidityBufferVault__factory, IbAlluoUSD, IbAlluoUSD__factory, AlluoLpV6, IbAlluoUSDV2 } from "../typechain";
-import { writeFileSync } from 'fs';
-import { join } from "path";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, LiquidityBufferVault, LiquidityBufferVault__factory, IbAlluoUSD, IbAlluoUSD__factory, AlluoLpV6, IbAlluoUSDV2, IbAlluo, IbAlluo__factory } from "../typechain";
 
 async function skipDays(d: number) {
     ethers.provider.send('evm_increaseTime', [d * 86400]);
@@ -14,6 +12,15 @@ async function skipDays(d: number) {
 
 function getRandomArbitrary(min: number, max: number) {
     return Math.floor(Math.random() * (max - min) + min);
+}
+
+async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
+    await ethers.provider.send(
+        'hardhat_impersonateAccount',
+        [address]
+    );
+
+    return await ethers.getSigner(address);
 }
 
 async function prepareCallData(type: string, parameters: any[]): Promise<BytesLike> {
@@ -34,136 +41,15 @@ async function prepareCallData(type: string, parameters: any[]): Promise<BytesLi
     }
 }
 
-async function getHolders(): Promise<string[]> {
-
-    console.log("inside getHolders function");
-
-    const tokenAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec"
-    const deploymentBlock = 25009106
-    // console.log(Number("0x1a2874d"));
-
-    let balances: { [address: string]: BigNumber } = {};
-
-    const events1 = await ethers.provider.getLogs({
-        fromBlock: deploymentBlock,
-        toBlock: 27428685,
-        address: tokenAddress,
-        topics: ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]
-        //keccak256("Transfer(address,address,uint256)")
-    })
-
-    const events2 = await ethers.provider.getLogs({
-        fromBlock: 27428686,
-        toBlock: "latest",
-        address: tokenAddress,
-        topics: ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]
-        //keccak256("Transfer(address,address,uint256)")
-    })
-
-    let allEvents = events1.concat(events2)
-    const decoder = new ethers.utils.AbiCoder;
-
-    let fullList: string[] = [];
-
-    for (let i = 0; i < allEvents.length; i++) {
-
-        let addressFrom = (decoder.decode(["address"], allEvents[i].topics[1])).toString();
-        let addressTo = (decoder.decode(["address"], allEvents[i].topics[2])).toString();
-        let amount = BigNumber.from(allEvents[i].data);
-
-        balances[addressFrom] = balances[addressFrom] == undefined ? BigNumber.from(0) : balances[addressFrom]
-        balances[addressTo] = balances[addressTo] == undefined ? BigNumber.from(0) : balances[addressTo]
-
-        if (addressFrom != ethers.constants.AddressZero) {
-            balances[addressFrom] = balances[addressFrom].sub(amount)
-        }
-        if (addressTo != ethers.constants.AddressZero) {
-            balances[addressTo] = balances[addressTo].add(amount)
-        }
-    }
-
-    for (let address in balances) {
-        if (balances[address].gt(BigNumber.from(0)) && address != ethers.constants.AddressZero) {
-
-            fullList.push(address)
-
-        }
-    }
-
-    // console.log(fullList);
-
-    console.log("Number of holders: ", fullList.length);
-
-    return fullList;
-}
-
-
-async function migrationStep1(ibAlluoCurrent: any) {
-    const alluolp = await ethers.getContractAt("AlluoLpV6", "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec") as AlluoLpV6;
-
-    let holders = await getHolders();
-
-    let holdersInChunks = await chunkArray(holders, 90);
-
-    for (let i = 0; i < holdersInChunks.length; i++) {
-        let txn = await alluolp.claimAll(holdersInChunks[i])
-        await writeClaiming(`\nChunk #${i} with hash: ` + txn.hash + "\n[")
-        for (let g = 0; g < holdersInChunks[i].length; g++) {
-            writeClaiming(`\"${holdersInChunks[i][g]}\",`)
-        }
-        await writeClaiming(`]`)
-    }
-
-    holders = await getHolders();
-
-    holdersInChunks = await chunkArray(holders, 90);
-
-    for (let i = 0; i < holdersInChunks.length; i++) {
-        let txn = await ibAlluoCurrent.migrateStep1(alluolp.address, holdersInChunks[i])
-        await writeMinting(`\nChunk #${i} with hash: ` + txn.hash + "\n[")
-        for (let g = 0; g < holdersInChunks[i].length; g++) {
-            writeMinting(`\"${holdersInChunks[i][g]}\",`)
-        }
-        await writeMinting(`]`)
-    }
-}
-
-async function writeMinting(line: string) {
-
-    writeFileSync(join(__dirname, "./migration.txt"), line + "\n", {
-        flag: "a+",
-    });
-}
-
-async function writeClaiming(line: string) {
-
-    writeFileSync(join(__dirname, "./claiming.txt"), line + "\n", {
-        flag: "a+",
-    });
-}
-
-async function chunkArray(myArray: any[], chunk_size: number) {
-
-    let tempArray = [];
-
-    for (let index = 0; index < myArray.length; index += chunk_size) {
-        let myChunk = myArray.slice(index, index + chunk_size);
-
-        tempArray.push(myChunk);
-    }
-
-    console.log("Amount of chunks: " + tempArray.length);
-    return tempArray;
-}
-
 describe("IbAlluoUSD and Buffer", function () {
     let signers: SignerWithAddress[];
     let whale: SignerWithAddress;
     let curveLpHolder: SignerWithAddress;
+    let admin: SignerWithAddress;
 
-    let ibAlluoCurrent: IbAlluoUSDV2;
-    let multisig: PseudoMultisigWallet;
+    let ibAlluoCurrent: IbAlluo;
     let buffer: LiquidityBufferVault;
+    let multisig: PseudoMultisigWallet;
 
     let dai: IERC20, usdc: IERC20, usdt: IERC20;
     let curveLp: IERC20;
@@ -178,27 +64,19 @@ describe("IbAlluoUSD and Buffer", function () {
                     enabled: true,
                     jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
                     //you can fork from last block by commenting next line
-                    blockNumber: 27718275,
+                    blockNumber: 28479560,
                 },
             },],
         });
 
         signers = await ethers.getSigners();
-        const whaleAddress = "0x075e72a5eDf65F0A5f44699c7654C1a76941Ddc8";
-        const curveLpHolderAddress = "0xba0c565110f65d181b9ff1d8a9f787b52857bb0c";
 
-        await ethers.provider.send(
-            'hardhat_impersonateAccount',
-            [whaleAddress]
-        );
+        admin = await getImpersonatedSigner("0x2580f9954529853Ca5aC5543cE39E9B5B1145135");
+        await (await (await ethers.getContractFactory("ForceSender")).deploy({ value: parseEther("10.0") })).forceSend(admin.address);
 
-        await ethers.provider.send(
-            'hardhat_impersonateAccount',
-            [curveLpHolderAddress]
-        );
+        whale = await getImpersonatedSigner("0x075e72a5eDf65F0A5f44699c7654C1a76941Ddc8");
+        curveLpHolder = await getImpersonatedSigner("0x7117de93b352ae048925323f3fcb1cd4b4d52ec4");
 
-        whale = await ethers.getSigner(whaleAddress);
-        curveLpHolder = await ethers.getSigner(curveLpHolderAddress);
         dai = await ethers.getContractAt("IERC20", "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063");
         usdc = await ethers.getContractAt("IERC20", "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
         usdt = await ethers.getContractAt("IERC20", "0xc2132D05D31c914a87C6611C10748AEb04B58e8F");
@@ -206,6 +84,8 @@ describe("IbAlluoUSD and Buffer", function () {
 
         console.log("We are forking Polygon mainnet\n");
         expect(await dai.balanceOf(whale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Polygon");
+        expect(await usdc.balanceOf(whale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Polygon");
+        expect(await usdt.balanceOf(whale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Polygon");
 
         await signers[0].sendTransaction({
             to: whale.address,
@@ -213,23 +93,12 @@ describe("IbAlluoUSD and Buffer", function () {
         });
     });
 
-    // AlluoLP v0 - not upgradable
-    // AlluoLP v1 - upgradable with migration function
-    // AlluoLP v2 - upgradable with mint function and grantRole fix
-    // AlluoLP v3 - automated deposit and withdrawal with liquidity buffer 
-
-    // IbAlluo v1 - reward system changed, now ratio between alluoLp and USD grow, not amount of lp tokens
-
     beforeEach(async function () {
 
-        let simulateFullMigration = false
-
-        const IbAlluo = await ethers.getContractFactory("IbAlluoUSD") as IbAlluoUSD__factory;
+        const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
         //We are using this contract to simulate Gnosis multisig wallet
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
-        //For tests we are using version of contract with hardhat console.log, to see all Txn
-        //you can switch two next lines and turn off logs
-        // const Buffer = await ethers.getContractFactory("LiquidityBufferVaultForTests") as LiquidityBufferVaultForTests__factory;
+
         const Buffer = await ethers.getContractFactory("LiquidityBufferVault") as LiquidityBufferVault__factory;
 
         let curvePool = "0x445FE580eF8d70FF569aB36e80c647af338db351"
@@ -248,48 +117,43 @@ describe("IbAlluoUSD and Buffer", function () {
         await multisig.executeCall(buffer.address, calldata);
 
         ibAlluoCurrent = await upgrades.deployProxy(IbAlluo,
-            [multisig.address,
-            buffer.address,
-            [dai.address,
-            usdc.address,
-            usdt.address]],
+            [
+                "Interest Bearing Alluo USD",
+                "IbAlluoUSD",
+                multisig.address,
+                buffer.address,
+                [dai.address,
+                usdc.address,
+                usdt.address],
+                BigNumber.from("100000000470636740"),
+                1600,
+                "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8"],
             { initializer: 'initialize', kind: 'uups' }
-        ) as IbAlluoUSDV2;
+        ) as IbAlluo;
 
         ABI = ["function setAlluoLp(address newAlluoLp)"];
         iface = new ethers.utils.Interface(ABI);
         calldata = iface.encodeFunctionData("setAlluoLp", [ibAlluoCurrent.address]);
 
         await multisig.executeCall(buffer.address, calldata);
-
-        if (simulateFullMigration) {
-            await migrationStep1(ibAlluoCurrent)
-        }
-
-        await ibAlluoCurrent.migrateStep2();
     });
 
     describe("Upgradability", async function () {
         it("Should upgrade without issues", async () => {
-            const IbAlluoOld = await ethers.getContractFactory("IbAlluoUSD") as IbAlluoUSD__factory;
-            const oldContract = await upgrades.deployProxy(IbAlluoOld,
-                [multisig.address,
-                buffer.address,
-                [dai.address,
-                usdc.address,
-                usdt.address]],
-                { initializer: 'initialize', kind: 'uups' }
-            ) as IbAlluoUSD;
 
-            const IbAlluoNew = await ethers.getContractFactory("IbAlluoUSD_V2") as IbAlluoUSD__factory;
+            const IbAlluoOld = await ethers.getContractFactory("IbAlluoUSD");
+            const ibAlluoOld = await ethers.getContractAt("IbAlluoUSD", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6") as IbAlluoUSD;
+    
+            const IbAlluoCurrent = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
+    
+            await upgrades.forceImport("0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6", IbAlluoOld);
+            
+            await ibAlluoOld.connect(admin).grantRole(await ibAlluoOld.UPGRADER_ROLE(), signers[0].address)
+            await ibAlluoOld.connect(admin).changeUpgradeStatus(true)
+    
+            let ibAlluoCurrent = await upgrades.upgradeProxy(ibAlluoOld.address, IbAlluoCurrent) as IbAlluo
 
-            const dataStatus = await prepareCallData("status", [true]);
-            await multisig.executeCall(oldContract.address, dataStatus);
-
-            const dataRole = await prepareCallData("role", [await oldContract.UPGRADER_ROLE(), signers[0].address]);
-            await multisig.executeCall(oldContract.address, dataRole);
-
-            await upgrades.upgradeProxy(oldContract, IbAlluoNew);
+            expect(await ibAlluoCurrent.totalAssetSupply()).to.be.gt(0);
         })
     })
 
@@ -843,32 +707,6 @@ describe("IbAlluoUSD and Buffer", function () {
             await expect(ibAlluoCurrent.connect(notAdmin).setUpdateTimeLimit(newLimit)).to.be
                 .revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
         });
-
-        it("Should set new wallet", async () => {
-            const NewWallet = await ethers.getContractFactory('PseudoMultisigWallet') as PseudoMultisigWallet__factory;
-            const newWallet = await NewWallet.deploy(true);
-            const oldWallet = await ibAlluoCurrent.wallet();
-
-            expect(newWallet.address).to.not.be.equal(oldWallet);
-
-            let ABI = ["function setWallet(address newWallet)"];
-            let iface = new ethers.utils.Interface(ABI);
-            const calldata = iface.encodeFunctionData("setWallet", [newWallet.address]);
-
-            await expect(multisig.executeCall(ibAlluoCurrent.address, calldata)).to.emit(ibAlluoCurrent, "NewWalletSet").withArgs(oldWallet, newWallet.address);
-        });
-
-        it("Should not set new wallet (attempt to make wallet an EOA)", async () => {
-            const newWallet = signers[2]
-
-            let ABI = ["function setWallet(address newWallet)"];
-            let iface = new ethers.utils.Interface(ABI);
-            const calldata = iface.encodeFunctionData("setWallet", [newWallet.address]);
-
-            const tx = multisig.executeCall(ibAlluoCurrent.address, calldata);
-
-            await expect(tx).to.be.revertedWith("IbAlluo: Not contract")
-        })
 
         it("Should add new deposit token and allow to deposit with it", async () => {
 
