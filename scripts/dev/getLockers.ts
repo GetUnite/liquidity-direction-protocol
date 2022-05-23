@@ -10,7 +10,7 @@ type User = {
     claim: BigNumber,
 }
 
-async function getLockers(hre: HardhatRuntimeEnvironment) : Promise<User[]>{
+async function getLockers(hre: HardhatRuntimeEnvironment, write: boolean) : Promise<User[]>{
 
     console.log("\nGetting lockers list...");
 
@@ -56,9 +56,11 @@ async function getLockers(hre: HardhatRuntimeEnvironment) : Promise<User[]>{
                 }
                 userList.push(user)
 
-                writeFileSync(join(__dirname, "./lockersList.txt"), `${fullLockersList[i]} \n${info[0]} \n${info[1]} \n${info[2]} \n--------\n`,{
-                    flag: "a+",
-                });
+                if(write){
+                    writeFileSync(join(__dirname, "./lockersList.txt"), `${fullLockersList[i]} \n${info[0]} \n${info[1]} \n${info[2]} \n--------\n`,{
+                        flag: "a+",
+                    });
+                }
             }
         }
     }

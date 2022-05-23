@@ -24,11 +24,11 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
-      forking: {
-        enabled: process.env.FORKING_ENABLED == "true",
-        url: process.env.MAINNET_FORKING_URL as string,
-        blockNumber: 14785940
-      }
+      // forking: {
+      //   enabled: process.env.FORKING_ENABLED == "true",
+      //   url: process.env.MAINNET_FORKING_URL as string,
+      //   blockNumber: 14785940
+      // }
     },
     mainnet: {
       url: process.env.MAINNET_URL,
