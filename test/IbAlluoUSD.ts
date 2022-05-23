@@ -3,7 +3,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, LiquidityBufferVault, LiquidityBufferVault__factory, IbAlluoUSD, IbAlluoUSD__factory, AlluoLpV6, IbAlluoUSDV2, IbAlluo, IbAlluo__factory } from "../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, LiquidityBufferVault, LiquidityBufferVault__factory, IbAlluoUSD, IbAlluoUSD__factory, AlluoLpV6, IbAlluo, IbAlluo__factory } from "../typechain";
 
 async function skipDays(d: number) {
     ethers.provider.send('evm_increaseTime', [d * 86400]);

@@ -9,6 +9,10 @@
       "address": "0x245d71282EF44C988B486811E0cDb196cF41cfDC",
       "txHash": "0xd03a1d7f7e158f66d39afcbef50a34ab16ce6dd21005060e24460e7ad5dd9ce9",
       "kind": "uups"
+    },
+    {
+      "address": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+      "kind": "uups"
     }
   ],
   "impls": {
@@ -908,6 +912,651 @@
           "t_uint32": {
             "label": "uint32",
             "numberOfBytes": "4"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        }
+      }
+    },
+    "313fe08770c745aff0ad12fe995bcb4407be4f5bd0a5ef474ac5a1feaed74899": {
+      "address": "0x85adEF77325af70AC8922195fB6010ce5641d739",
+      "layout": {
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:102"
+          },
+          {
+            "label": "_balances",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "AlluoERC20Upgradable",
+            "src": "contracts/Farming/AlluoERC20Upgradable.sol:38"
+          },
+          {
+            "label": "_allowances",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+            "contract": "AlluoERC20Upgradable",
+            "src": "contracts/Farming/AlluoERC20Upgradable.sol:40"
+          },
+          {
+            "label": "_totalSupply",
+            "offset": 0,
+            "slot": "103",
+            "type": "t_uint256",
+            "contract": "AlluoERC20Upgradable",
+            "src": "contracts/Farming/AlluoERC20Upgradable.sol:42"
+          },
+          {
+            "label": "_name",
+            "offset": 0,
+            "slot": "104",
+            "type": "t_string_storage",
+            "contract": "AlluoERC20Upgradable",
+            "src": "contracts/Farming/AlluoERC20Upgradable.sol:44"
+          },
+          {
+            "label": "_symbol",
+            "offset": 0,
+            "slot": "105",
+            "type": "t_string_storage",
+            "contract": "AlluoERC20Upgradable",
+            "src": "contracts/Farming/AlluoERC20Upgradable.sol:45"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "106",
+            "type": "t_array(t_uint256)45_storage",
+            "contract": "AlluoERC20Upgradable",
+            "src": "contracts/Farming/AlluoERC20Upgradable.sol:396"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC165Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol:41"
+          },
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "202",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:247"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/ERC1967/ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "301",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol:107"
+          },
+          {
+            "label": "growingRatio",
+            "offset": 0,
+            "slot": "351",
+            "type": "t_uint256",
+            "contract": "IbAlluoUSD",
+            "src": "contracts/Farming/IbAlluoUSD_V1.sol:32"
+          },
+          {
+            "label": "lastInterestCompound",
+            "offset": 0,
+            "slot": "352",
+            "type": "t_uint256",
+            "contract": "IbAlluoUSD",
+            "src": "contracts/Farming/IbAlluoUSD_V1.sol:35"
+          },
+          {
+            "label": "updateTimeLimit",
+            "offset": 0,
+            "slot": "353",
+            "type": "t_uint256",
+            "contract": "IbAlluoUSD",
+            "src": "contracts/Farming/IbAlluoUSD_V1.sol:38"
+          },
+          {
+            "label": "multiplier",
+            "offset": 0,
+            "slot": "354",
+            "type": "t_uint256",
+            "contract": "IbAlluoUSD",
+            "src": "contracts/Farming/IbAlluoUSD_V1.sol:41"
+          },
+          {
+            "label": "interestPerSecond",
+            "offset": 0,
+            "slot": "355",
+            "type": "t_uint256",
+            "contract": "IbAlluoUSD",
+            "src": "contracts/Farming/IbAlluoUSD_V1.sol:44"
+          },
+          {
+            "label": "annualInterest",
+            "offset": 0,
+            "slot": "356",
+            "type": "t_uint256",
+            "contract": "IbAlluoUSD",
+            "src": "contracts/Farming/IbAlluoUSD_V1.sol:47"
+          },
+          {
+            "label": "liquidityBuffer",
+            "offset": 0,
+            "slot": "357",
+            "type": "t_address",
+            "contract": "IbAlluoUSD",
+            "src": "contracts/Farming/IbAlluoUSD_V1.sol:50"
+          },
+          {
+            "label": "upgradeStatus",
+            "offset": 20,
+            "slot": "357",
+            "type": "t_bool",
+            "contract": "IbAlluoUSD",
+            "src": "contracts/Farming/IbAlluoUSD_V1.sol:53"
+          },
+          {
+            "label": "supportedTokens",
+            "offset": 0,
+            "slot": "358",
+            "type": "t_struct(AddressSet)3103_storage",
+            "contract": "IbAlluoUSD",
+            "src": "contracts/Farming/IbAlluoUSD_V1.sol:56"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)45_storage": {
+            "label": "uint256[45]",
+            "numberOfBytes": "1440"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(address => mapping(address => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AddressSet)3103_storage": {
+            "label": "struct EnumerableSetUpgradeable.AddressSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)2802_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Set)2802_storage": {
+            "label": "struct EnumerableSetUpgradeable.Set",
+            "members": [
+              {
+                "label": "_values",
+                "type": "t_array(t_bytes32)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_indexes",
+                "type": "t_mapping(t_bytes32,t_uint256)",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        }
+      }
+    },
+    "4849c21f2e10166051cf914f76a042d47ac7ab332c2071ba719f5d5bba82a79f": {
+      "address": "0x4B4441Db0970b5706589401155f4E4971bEFE0d4",
+      "txHash": "0x7814049300e60fd810b1f277755ed9699da674b8f87746b24360714585f0f94f",
+      "layout": {
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:102"
+          },
+          {
+            "label": "_balances",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "AlluoERC20Upgradable",
+            "src": "contracts/Farming/AlluoERC20Upgradable.sol:38"
+          },
+          {
+            "label": "_allowances",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+            "contract": "AlluoERC20Upgradable",
+            "src": "contracts/Farming/AlluoERC20Upgradable.sol:40"
+          },
+          {
+            "label": "_totalSupply",
+            "offset": 0,
+            "slot": "103",
+            "type": "t_uint256",
+            "contract": "AlluoERC20Upgradable",
+            "src": "contracts/Farming/AlluoERC20Upgradable.sol:42"
+          },
+          {
+            "label": "_name",
+            "offset": 0,
+            "slot": "104",
+            "type": "t_string_storage",
+            "contract": "AlluoERC20Upgradable",
+            "src": "contracts/Farming/AlluoERC20Upgradable.sol:44"
+          },
+          {
+            "label": "_symbol",
+            "offset": 0,
+            "slot": "105",
+            "type": "t_string_storage",
+            "contract": "AlluoERC20Upgradable",
+            "src": "contracts/Farming/AlluoERC20Upgradable.sol:45"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "106",
+            "type": "t_array(t_uint256)45_storage",
+            "contract": "AlluoERC20Upgradable",
+            "src": "contracts/Farming/AlluoERC20Upgradable.sol:396"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC165Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol:41"
+          },
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "202",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:247"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/ERC1967/ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "301",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol:107"
+          },
+          {
+            "label": "growingRatio",
+            "offset": 0,
+            "slot": "351",
+            "type": "t_uint256",
+            "contract": "IbAlluo",
+            "src": "contracts/Farming/IbAlluo.sol:33"
+          },
+          {
+            "label": "lastInterestCompound",
+            "offset": 0,
+            "slot": "352",
+            "type": "t_uint256",
+            "contract": "IbAlluo",
+            "src": "contracts/Farming/IbAlluo.sol:36"
+          },
+          {
+            "label": "updateTimeLimit",
+            "offset": 0,
+            "slot": "353",
+            "type": "t_uint256",
+            "contract": "IbAlluo",
+            "src": "contracts/Farming/IbAlluo.sol:39"
+          },
+          {
+            "label": "multiplier",
+            "offset": 0,
+            "slot": "354",
+            "type": "t_uint256",
+            "contract": "IbAlluo",
+            "src": "contracts/Farming/IbAlluo.sol:42"
+          },
+          {
+            "label": "interestPerSecond",
+            "offset": 0,
+            "slot": "355",
+            "type": "t_uint256",
+            "contract": "IbAlluo",
+            "src": "contracts/Farming/IbAlluo.sol:45"
+          },
+          {
+            "label": "annualInterest",
+            "offset": 0,
+            "slot": "356",
+            "type": "t_uint256",
+            "contract": "IbAlluo",
+            "src": "contracts/Farming/IbAlluo.sol:48"
+          },
+          {
+            "label": "liquidityBuffer",
+            "offset": 0,
+            "slot": "357",
+            "type": "t_address",
+            "contract": "IbAlluo",
+            "src": "contracts/Farming/IbAlluo.sol:52"
+          },
+          {
+            "label": "upgradeStatus",
+            "offset": 20,
+            "slot": "357",
+            "type": "t_bool",
+            "contract": "IbAlluo",
+            "src": "contracts/Farming/IbAlluo.sol:55"
+          },
+          {
+            "label": "supportedTokens",
+            "offset": 0,
+            "slot": "358",
+            "type": "t_struct(AddressSet)3103_storage",
+            "contract": "IbAlluo",
+            "src": "contracts/Farming/IbAlluo.sol:58"
+          },
+          {
+            "label": "trustedForwarder",
+            "offset": 0,
+            "slot": "360",
+            "type": "t_address",
+            "contract": "IbAlluo",
+            "src": "contracts/Farming/IbAlluo.sol:61"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)45_storage": {
+            "label": "uint256[45]",
+            "numberOfBytes": "1440"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(address => mapping(address => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AddressSet)3103_storage": {
+            "label": "struct EnumerableSetUpgradeable.AddressSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)2802_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Set)2802_storage": {
+            "label": "struct EnumerableSetUpgradeable.Set",
+            "members": [
+              {
+                "label": "_values",
+                "type": "t_array(t_bytes32)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_indexes",
+                "type": "t_mapping(t_bytes32,t_uint256)",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
           },
           "t_uint8": {
             "label": "uint8",
