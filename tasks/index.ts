@@ -1,9 +1,10 @@
 import './dev/lockers'
 import './dev/holders'
+import "./migration/fromAlluoLp/claimAll"
+import "./migration/fromAlluoLp/mintNew"
+import "./migration/fromAlluoLp/lastStep"
+import "./migration/fromOldLocker/migrateLocker.ts"
 import "./voting/createEntry"
 import "./voting/getPoolId"
-import "./migration/claimAll"
-import "./migration/mintNew"
 import "./metatx/stablecoinMetaTx"
 import "./dev/testingResolver"
-import "./migration/fromOldLocker/migrateLocker.ts"

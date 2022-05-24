@@ -5,54 +5,57 @@ import { BigNumber } from 'ethers';
 import { config as dotenvConfig } from 'dotenv';
 import { formatBytes32String, parseBytes32String } from "@ethersproject/strings";
 import { Bytes } from "@ethersproject/bytes";
-import { getHolders } from "../../scripts/dev/getHolders";
+import { getHolders } from "../../../scripts/dev/getHolders";
+
 import { writeFileSync } from 'fs';
 import { join } from "path";
 
-task("mintNew", "mint tokens on new version")
+task("claimAll", "claim all balances on old alluoLp")
     .setAction(async function (taskArgs, hre) {
 
     const network = hre.network.name;
 
     console.log(network);
 
-    const ibAlluo = await hre.ethers.getContractAt("IbAlluoUSD", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
     const alluolp = await hre.ethers.getContractAt("AlluoLpV6", "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec");
 
     let holders: string[] = await getHolders(hre)
-
-    var holdersInChunks = await chunkArray(holders, 90);
+    
+    let holdersInChunks = await chunkArray(holders, 90);
 
     for(let i = 0; i < holdersInChunks.length; i++){
-        let txn = await ibAlluo.migrateStep1(alluolp.address, holdersInChunks[i])
+        let txn = await alluolp.claimAll(holdersInChunks[i])
 
-        await writeMinting(`\nChunk #${i} with hash: ` + txn.hash + "\n[")
+        await writeClaiming(`\nChunk #${i} with hash: ` + txn.hash + "\n[")
 
         for(let g = 0; g < holdersInChunks[i].length; g++){
-            writeMinting(`\"${holdersInChunks[i][g]}\",`)
+            writeClaiming(`\"${holdersInChunks[i][g]}\",`)
         }
 
-        await writeMinting(`]`)
+        await writeClaiming(`]`)
     }
 
     //in case some txn failed
     //part I
     // let list: string[] = []
 
-    // await ibAlluo.migrateStep1(alluolp.address, list)
+    // await alluolp.claimAll(list)
 
     // again?
     //part II
 
     // for(let i = 0; i < list.length; i++){
-    //     let balance = await alluolp.balanceOf(list[i])
-    //     await ibAlluo.mint(list[i], balance)
+    //     await alluolp.claim(list[i])
     //     console.log(list[i]);
     // }
-
-
-    console.log('mintNew task Done!');
 });
+
+async function writeClaiming(line: string){
+
+    writeFileSync(join(__dirname, "./claiming.txt"), line + "\n",{
+        flag: "a+",
+    });
+}
 
 async function chunkArray(myArray: any[], chunk_size: number){
 
@@ -63,14 +66,7 @@ async function chunkArray(myArray: any[], chunk_size: number){
 
         tempArray.push(myChunk);
     }
-
     console.log("Amount of chunks: " + tempArray.length);
+    
     return tempArray;
-}
-
-async function writeMinting(line: string){
-
-    writeFileSync(join(__dirname, "./migration.txt"), line + "\n",{
-        flag: "a+",
-    });
 }

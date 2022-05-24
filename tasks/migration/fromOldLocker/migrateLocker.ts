@@ -38,7 +38,7 @@ task("migrateLocker", "claim all balances on old alluoLp")
     let addreses: string[] = []
     let amounts: BigNumber[] = []
 
-    let oldLockers = await getLockers(hre)
+    let oldLockers = await getLockers(hre, true)
 
     for(let i = 0; i < oldLockers.length; i++){
         let user = oldLockers[i]

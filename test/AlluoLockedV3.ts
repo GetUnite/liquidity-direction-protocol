@@ -30,6 +30,8 @@ let oldLockers:any[];
 
 let rewardPerDistribution: BigNumber = parseEther("86400");
 
+let writeLogs: boolean = false;
+
 async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
     await ethers.provider.send(
         'hardhat_impersonateAccount',
@@ -72,7 +74,7 @@ async function migrate(): Promise<[string[], BigNumber[]]>  {
     let addreses: string[] = []
     let amounts: BigNumber[] = []
 
-    oldLockers = await getLockers(hre)
+    oldLockers = await getLockers(hre, writeLogs)
 
     for(let i = 0; i < oldLockers.length; i++){
         let user = oldLockers[i]
@@ -82,11 +84,11 @@ async function migrate(): Promise<[string[], BigNumber[]]>  {
 
         addreses.push(user.address)
         amounts.push(userLpAmount)
-
-        writeFileSync(join(__dirname, "./migration.txt"), user.address + " " + Number(userLpAmount) / 10 ** 18 + ` (${userLpAmount})` + `\n`,{
-            flag: "a+",
-        });
-
+        if(writeLogs){
+            writeFileSync(join(__dirname, "./migration.txt"), user.address + " " + Number(userLpAmount) / 10 ** 18 + ` (${userLpAmount})` + `\n`,{
+                flag: "a+",
+            });
+        }
         totalUsersLp = totalUsersLp.add(userLpAmount)
     }
 
@@ -99,29 +101,31 @@ async function migrate(): Promise<[string[], BigNumber[]]>  {
     addreses.push(admin.address)
     amounts.push(treasuryLpAmount)
 
-    writeFileSync(join(__dirname, "./migration.txt"), admin.address + " " + Number(treasuryLpAmount) / 10 ** 18 + ` (${treasuryLpAmount})` + `\n`,{
-        flag: "a+",
-    });
-    
+    if(writeLogs){
+        writeFileSync(join(__dirname, "./migration.txt"), admin.address + " " + Number(treasuryLpAmount) / 10 ** 18 + ` (${treasuryLpAmount})` + `\n`,{
+            flag: "a+",
+        });
+    }
     await locker.connect(admin).migrationLock(addreses, amounts)
     return [addreses, amounts]
 }
 
 describe("Locking contract", function () {
-    // before(async function () {
-    //     //We are forking Ethereum mainnet, please set Alchemy key in .env
-    //     await network.provider.request({
-    //         method: "hardhat_reset",
-    //         params: [{
-    //             forking: {
-    //                 enabled: true,
-    //                 jsonRpcUrl: process.env.MAINNET_FORKING_URL as string,
-    //                 //you can fork from last block by commenting next line
-    //                 blockNumber: 14785940, 
-    //             },
-    //         },],
-    //     });
-    // });
+    before(async function () {
+        //We are forking Ethereum mainnet, please set Alchemy key in .env
+        await network.provider.request({
+            method: "hardhat_reset",
+            params: [{
+                    //chainId: 1,
+                    forking: {
+                    enabled: true,
+                    jsonRpcUrl: process.env.MAINNET_FORKING_URL as string,
+                    //you can fork from the last block by commenting next line
+                    blockNumber: 14794595, 
+                },
+            },],
+        });
+    });
 
     beforeEach(async function () {
 
@@ -172,6 +176,7 @@ describe("Locking contract", function () {
         await alluoToken.connect(admin).burn(addr[4].address, await alluoToken.balanceOf(addr[4].address))
     })
     describe("Migration", function () {
+        // if the migration tests fail, uncomment chainId line in forking
 
         it("Should do all migration steps and allow old and new users to do all actions", async function () {
             let [addreses, amounts] = await migrate()
@@ -299,7 +304,7 @@ describe("Locking contract", function () {
             await locker.connect(addr[1]).lock(parseEther("1000"));
             await skipDays(7);
 
-            let lp = await locker.converAlluoToLp(parseEther("500"))
+            let lp = await locker.convertAlluoToLp(parseEther("500"))
             await locker.connect(addr[1]).unlock(lp);
 
             await skipDays(6);
@@ -341,7 +346,7 @@ describe("Locking contract", function () {
             
             expect(await locker.totalSupply()).to.equal(lpAmountReturned);
 
-            let lp = await locker.converAlluoToLp(parseEther("500"))
+            let lp = await locker.convertAlluoToLp(parseEther("500"))
             await locker.connect(addr[1]).unlock(lp);
 
             let unlockedBalance = await locker.unlockedBalanceOf(addr[1].address);
@@ -360,7 +365,7 @@ describe("Locking contract", function () {
             await locker.connect(admin).setReward(rewardPerDistribution)
             await skipDays(7);
 
-            let lp = await locker.converAlluoToLp(parseEther("400"))
+            let lp = await locker.convertAlluoToLp(parseEther("400"))
             await locker.connect(addr[1]).unlock(lp);
 
             let [locked, unlocked, forClaim, depositUnlockTime, withdrawUnlockTime] = await locker.getInfoByAddress(addr[1].address)
@@ -536,7 +541,7 @@ describe("Locking contract", function () {
 
             await locker.connect(addr[1]).lock(parseEther("1000"));
             await skipDays(7);
-            let lp = await locker.converAlluoToLp(parseEther("500"))
+            let lp = await locker.convertAlluoToLp(parseEther("500"))
             
             await locker.connect(addr[1]).unlock(lp);
 
@@ -554,7 +559,7 @@ describe("Locking contract", function () {
 
             await locker.connect(admin).unpause()
 
-            lp = await locker.converAlluoToLp(parseEther("400"))
+            lp = await locker.convertAlluoToLp(parseEther("400"))
             
             await locker.connect(addr[1]).unlock(lp);
         });

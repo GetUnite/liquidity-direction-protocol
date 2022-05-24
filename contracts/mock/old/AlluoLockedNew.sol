@@ -10,8 +10,8 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import "./../interfaces/IExchange.sol";
-import "./../interfaces/IBalancer.sol";
+import "../../interfaces/IExchange.sol";
+import "../../interfaces/IBalancer.sol";
 
 contract AlluoLockedNew is
     Initializable,
