@@ -26,7 +26,7 @@ let addr: Array<SignerWithAddress>;
 let admin: SignerWithAddress;
 let wethHolder: SignerWithAddress;
 
-let oldLockers:any[];
+let oldLockers: any[];
 
 let rewardPerDistribution: BigNumber = parseEther("86400");
 
@@ -41,18 +41,18 @@ async function getImpersonatedSigner(address: string): Promise<SignerWithAddress
     return await ethers.getSigner(address);
 }
 
-async function skipDays(days: number){
+async function skipDays(days: number) {
     ethers.provider.send("evm_increaseTime", [days * 86400]);
     ethers.provider.send("evm_mine", []);
 }
 
-async function getEvents(txn: any, eventName: string, indexes: number[]){
+async function getEvents(txn: any, eventName: string, indexes: number[]) {
     const receipt = await txn.wait()
 
     let info: any[] = []
     for (let event of receipt.events!) {
-        if(event.event == eventName){
-            for(let i = 0; i < indexes.length; i++){
+        if (event.event == eventName) {
+            for (let i = 0; i < indexes.length; i++) {
                 info.push(event.args![indexes[i]])
             }
         }
@@ -60,14 +60,14 @@ async function getEvents(txn: any, eventName: string, indexes: number[]){
     return info;
 }
 
-async function migrate(): Promise<[string[], BigNumber[]]>  {
+async function migrate(): Promise<[string[], BigNumber[]]> {
 
     let alluoOnBalancer = await alluoToken.balanceOf("0xBA12222222228d8Ba445958a75a0704d566BF2C8")
 
     let totalSupplyBalancerLp = await balancerAlluoLp.totalSupply()
 
     let alluoPerLp = alluoOnBalancer.mul(BigNumber.from(10000000000)).mul(BigNumber.from(100)).div(totalSupplyBalancerLp).div(BigNumber.from(80))
-    console.log("Alluo per lp: ", Number(alluoPerLp) / 10**10);
+    console.log("Alluo per lp: ", Number(alluoPerLp) / 10 ** 10);
 
     let totalUsersLp = BigNumber.from(0)
 
@@ -76,16 +76,16 @@ async function migrate(): Promise<[string[], BigNumber[]]>  {
 
     oldLockers = await getLockers(hre, writeLogs)
 
-    for(let i = 0; i < oldLockers.length; i++){
+    for (let i = 0; i < oldLockers.length; i++) {
         let user = oldLockers[i]
         let userAlluoAmount = user.staked.add(user.unlockAmount).add(user.claim)
-        
+
         let userLpAmount = userAlluoAmount.mul(BigNumber.from(10000000000)).div(alluoPerLp)
 
         addreses.push(user.address)
         amounts.push(userLpAmount)
-        if(writeLogs){
-            writeFileSync(join(__dirname, "./migration.txt"), user.address + " " + Number(userLpAmount) / 10 ** 18 + ` (${userLpAmount})` + `\n`,{
+        if (writeLogs) {
+            writeFileSync(join(__dirname, "./migration.txt"), user.address + " " + Number(userLpAmount) / 10 ** 18 + ` (${userLpAmount})` + `\n`, {
                 flag: "a+",
             });
         }
@@ -94,15 +94,15 @@ async function migrate(): Promise<[string[], BigNumber[]]>  {
 
     let treasuryLpAmount = totalSupplyBalancerLp.sub(totalUsersLp)
 
-    console.log("Total users lp amount: ", Number(totalUsersLp) / 10**18);
-    console.log("Treasury lp amount:    ", Number(treasuryLpAmount) / 10**18);
-    console.log("Treasury lp percentage:", (Number(treasuryLpAmount) / 10**16) / (Number(totalSupplyBalancerLp) / 10**18));
+    console.log("Total users lp amount: ", Number(totalUsersLp) / 10 ** 18);
+    console.log("Treasury lp amount:    ", Number(treasuryLpAmount) / 10 ** 18);
+    console.log("Treasury lp percentage:", (Number(treasuryLpAmount) / 10 ** 16) / (Number(totalSupplyBalancerLp) / 10 ** 18));
 
     addreses.push(admin.address)
     amounts.push(treasuryLpAmount)
 
-    if(writeLogs){
-        writeFileSync(join(__dirname, "./migration.txt"), admin.address + " " + Number(treasuryLpAmount) / 10 ** 18 + ` (${treasuryLpAmount})` + `\n`,{
+    if (writeLogs) {
+        writeFileSync(join(__dirname, "./migration.txt"), admin.address + " " + Number(treasuryLpAmount) / 10 ** 18 + ` (${treasuryLpAmount})` + `\n`, {
             flag: "a+",
         });
     }
@@ -116,12 +116,12 @@ describe("Locking contract", function () {
         await network.provider.request({
             method: "hardhat_reset",
             params: [{
-                    //chainId: 1,
-                    forking: {
+                //chainId: 1,
+                forking: {
                     enabled: true,
                     jsonRpcUrl: process.env.MAINNET_FORKING_URL as string,
                     //you can fork from the last block by commenting next line
-                    blockNumber: 14794595, 
+                    blockNumber: 14794595,
                 },
             },],
         });
@@ -178,60 +178,60 @@ describe("Locking contract", function () {
     describe("Migration", function () {
         // if the migration tests fail, uncomment chainId line in forking
 
-        it("Should do all migration steps and allow old and new users to do all actions", async function () {
-            let [addreses, amounts] = await migrate()
+        // it("Should do all migration steps and allow old and new users to do all actions", async function () {
+        //     let [addreses, amounts] = await migrate()
 
-            oldLocker = await ethers.getContractAt("AlluoLockedNew", "0x34618270647971a3203579380b61De79ecC474D1")
-            oldLocker.connect(admin).changeUpgradeStatus(true)
-            oldLocker.connect(admin).grantRole(await oldLocker.UPGRADER_ROLE(), addr[0].address)
+        //     oldLocker = await ethers.getContractAt("AlluoLockedNew", "0x34618270647971a3203579380b61De79ecC474D1")
+        //     oldLocker.connect(admin).changeUpgradeStatus(true)
+        //     oldLocker.connect(admin).grantRole(await oldLocker.UPGRADER_ROLE(), addr[0].address)
 
-            let OldFinalState = await ethers.getContractFactory("AlluoLockedV2Final")
-            
-            oldLockerFinal = await upgrades.upgradeProxy(oldLocker.address, OldFinalState) as AlluoLockedV2Final
+        //     let OldFinalState = await ethers.getContractFactory("AlluoLockedV2Final")
 
-            
-            let amountOfLp = await balancerAlluoLp.balanceOf(oldLockerFinal.address)
+        //     oldLockerFinal = await upgrades.upgradeProxy(oldLocker.address, OldFinalState) as AlluoLockedV2Final
 
-            await oldLockerFinal.connect(admin).withdrawTokens(balancerAlluoLp.address, locker.address, amountOfLp)
 
-            let balanceAfter = await balancerAlluoLp.balanceOf(locker.address)
+        //     let amountOfLp = await balancerAlluoLp.balanceOf(oldLockerFinal.address)
 
-            expect(balanceAfter).to.be.gt(BigNumber.from(0));
+        //     await oldLockerFinal.connect(admin).withdrawTokens(balancerAlluoLp.address, locker.address, amountOfLp)
 
-            expect(balanceAfter).to.equal(amountOfLp)
+        //     let balanceAfter = await balancerAlluoLp.balanceOf(locker.address)
 
-            let amoun10Percent = (await locker.totalSupply()).mul(BigNumber.from(10)).div(BigNumber.from(90))
+        //     expect(balanceAfter).to.be.gt(BigNumber.from(0));
 
-            let amoun10PercentInAlluo = await locker.convertLpToAlluo(amoun10Percent)
+        //     expect(balanceAfter).to.equal(amountOfLp)
 
-            await alluoToken.connect(admin).mint(addr[1].address, amoun10PercentInAlluo)
-            await alluoToken.connect(addr[1]).approve(locker.address, amoun10PercentInAlluo)
+        //     let amoun10Percent = (await locker.totalSupply()).mul(BigNumber.from(10)).div(BigNumber.from(90))
 
-            await locker.connect(addr[1]).lock(amoun10PercentInAlluo);
-            await locker.connect(admin).setReward(rewardPerDistribution)
+        //     let amoun10PercentInAlluo = await locker.convertLpToAlluo(amoun10Percent)
 
-            await skipDays(1);
-            let claim10 = await locker.getClaim(addr[1].address)
-            
-            expect(claim10).to.be.lt(parseEther("8640"));
-            expect(claim10).to.be.gt(parseEther("8500"));
+        //     await alluoToken.connect(admin).mint(addr[1].address, amoun10PercentInAlluo)
+        //     await alluoToken.connect(addr[1]).approve(locker.address, amoun10PercentInAlluo)
 
-            let randomOldLocker = await getImpersonatedSigner(addreses[13]);
-            await (await (await ethers.getContractFactory("ForceSender")).deploy({ value: parseEther("10") })).forceSend(randomOldLocker.address);
+        //     await locker.connect(addr[1]).lock(amoun10PercentInAlluo);
+        //     await locker.connect(admin).setReward(rewardPerDistribution)
 
-            await expect(locker.connect(randomOldLocker).unlockAll()
-            ).to.be.revertedWith("Locking: tokens not available");
+        //     await skipDays(1);
+        //     let claim10 = await locker.getClaim(addr[1].address)
 
-            await skipDays(6);
+        //     expect(claim10).to.be.lt(parseEther("8640"));
+        //     expect(claim10).to.be.gt(parseEther("8500"));
 
-            await locker.connect(addr[1]).unlock(parseEther("500"));
-            await locker.connect(randomOldLocker).unlock(parseEther("500"));
-            
-            await skipDays(5);
+        //     let randomOldLocker = await getImpersonatedSigner(addreses[13]);
+        //     await (await (await ethers.getContractFactory("ForceSender")).deploy({ value: parseEther("10") })).forceSend(randomOldLocker.address);
 
-            await locker.connect(addr[1]).withdraw();
-            await locker.connect(randomOldLocker).withdraw();
-        });
+        //     await expect(locker.connect(randomOldLocker).unlockAll()
+        //     ).to.be.revertedWith("Locking: tokens not available");
+
+        //     await skipDays(6);
+
+        //     await locker.connect(addr[1]).unlock(parseEther("500"));
+        //     await locker.connect(randomOldLocker).unlock(parseEther("500"));
+
+        //     await skipDays(5);
+
+        //     await locker.connect(addr[1]).withdraw();
+        //     await locker.connect(randomOldLocker).withdraw();
+        // });
 
     })
     describe("Basic functionality", function () {
@@ -243,7 +243,7 @@ describe("Locking contract", function () {
         });
 
         it("Should allow lock/unlock + withdraw", async function () {
-            
+
             await locker.connect(addr[1]).lock(parseEther("1000"));
             await skipDays(7);
 
@@ -256,12 +256,12 @@ describe("Locking contract", function () {
 
             await weth.connect(wethHolder).transfer(addr[1].address, parseEther("5"))
             await weth.connect(addr[1]).approve(locker.address, parseEther("5"))
-            
+
             await locker.connect(addr[2]).lock(parseEther("1000"));
             await locker.connect(addr[1]).lockWETH(parseEther("5"));
-            
+
             await skipDays(7);
-            
+
             await locker.connect(addr[1]).unlockAll();
             await skipDays(5);
 
@@ -339,11 +339,11 @@ describe("Locking contract", function () {
 
             let txn = await locker.connect(addr[1]).lock(amount);
 
-            let [lpAmountReturned] = await getEvents(txn,"TokensLocked",[3])
+            let [lpAmountReturned] = await getEvents(txn, "TokensLocked", [3])
 
             await skipDays(7);
             expect(await locker.balanceOf(addr[1].address)).to.equal(lpAmountReturned);
-            
+
             expect(await locker.totalSupply()).to.equal(lpAmountReturned);
 
             let lp = await locker.convertAlluoToLp(parseEther("500"))
@@ -360,7 +360,7 @@ describe("Locking contract", function () {
             let amount = parseEther("1000");
 
             let txn = await locker.connect(addr[1]).lock(amount);
-            let [lpAmountReturned] = await getEvents(txn,"TokensLocked",[3])
+            let [lpAmountReturned] = await getEvents(txn, "TokensLocked", [3])
 
             await locker.connect(admin).setReward(rewardPerDistribution)
             await skipDays(7);
@@ -381,7 +381,7 @@ describe("Locking contract", function () {
     describe("Reward calculation", function () {
 
         it("If there only one locker all rewards will go to him", async function () {
-            
+
             await locker.connect(admin).setReward(rewardPerDistribution)
 
             await locker.connect(addr[1]).lock(parseEther("2500"));
@@ -412,7 +412,7 @@ describe("Locking contract", function () {
 
             expect(claim).to.be.gt(parseEther("43200"));
             expect(claim).to.be.lt(parseEther("43207"));
-            
+
             await skipDays(1);
 
             await locker.connect(addr[1]).claim();
@@ -542,7 +542,7 @@ describe("Locking contract", function () {
             await locker.connect(addr[1]).lock(parseEther("1000"));
             await skipDays(7);
             let lp = await locker.convertAlluoToLp(parseEther("500"))
-            
+
             await locker.connect(addr[1]).unlock(lp);
 
             await locker.connect(admin).pause()
@@ -560,7 +560,7 @@ describe("Locking contract", function () {
             await locker.connect(admin).unpause()
 
             lp = await locker.convertAlluoToLp(parseEther("400"))
-            
+
             await locker.connect(addr[1]).unlock(lp);
         });
     });
