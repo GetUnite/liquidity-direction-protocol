@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeable.sol";
 
 import "../interfaces/IIbAlluo.sol";
 import "../interfaces/IAdapter.sol";
@@ -21,6 +22,7 @@ contract LiquidityHandler is
 
     using Address for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
+    using EnumerableMapUpgradeable for EnumerableMapUpgradeable.AddressToUintMap;
     
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
@@ -35,7 +37,7 @@ contract LiquidityHandler is
         bool status; // active
     }
 
-    mapping(address => uint256) public ibAlluoToAdapterId;
+    EnumerableMapUpgradeable.AddressToUintMap private ibAlluoToAdapterId;
     mapping(uint256 => AdapterInfo) public adapterIdsToAdapterInfo;
 
     struct Withdrawal {
@@ -61,11 +63,13 @@ contract LiquidityHandler is
 
     //info about what adapter or iballuo
     event EnoughToSatisfy(
+        address ibAlluo,
         uint256 inPoolAfterDeposit, 
         uint256 totalAmountInWithdrawals
     );
 
     event WithdrawalSatisfied(
+        address ibAlluo,
         address indexed user, 
         address token, 
         uint256 amount, 
@@ -74,6 +78,7 @@ contract LiquidityHandler is
     );
 
     event AddedToQueue(
+        address ibAlluo,
         address indexed user, 
         address token, 
         uint256 amount,
@@ -107,7 +112,7 @@ contract LiquidityHandler is
         uint256 inAdapter = getAdapterAmount(msg.sender);
         uint256 expectedAdapterAmount = getExpectedAdapterAmount(msg.sender, amount18);
 
-        uint256 adapterId = ibAlluoToAdapterId[msg.sender];
+        uint256 adapterId = ibAlluoToAdapterId.get(msg.sender);
         address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
 
         IERC20Upgradeable(_token).safeTransfer(adapter, _amount);
@@ -134,7 +139,7 @@ contract LiquidityHandler is
             uint256 firstInQueueAmount = withdrawalSystem.withdrawals[withdrawalSystem.lastSatisfiedWithdrawal + 1].amount;
             if(firstInQueueAmount <= inAdapterAfterDeposit){
                 withdrawalSystem.resolverTrigger = true;
-                emit EnoughToSatisfy(inAdapterAfterDeposit, withdrawalSystem.totalWithdrawalAmount);
+                emit EnoughToSatisfy(msg.sender, inAdapterAfterDeposit, withdrawalSystem.totalWithdrawalAmount);
             }
         }
     }
@@ -151,10 +156,10 @@ contract LiquidityHandler is
         WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[msg.sender];
 
         if (inAdapter >= _amount && withdrawalSystem.totalWithdrawalAmount == 0) {
-            uint256 adapterId = ibAlluoToAdapterId[msg.sender];
+            uint256 adapterId = ibAlluoToAdapterId.get(msg.sender);
             address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
             IAdapter(adapter).withdraw(_user, _token, _amount);
-            emit WithdrawalSatisfied(_user, _token, _amount, 0, block.timestamp);
+            emit WithdrawalSatisfied(msg.sender, _user, _token, _amount, 0, block.timestamp);
 
         } else {
             uint256 lastWithdrawalRequest = withdrawalSystem.lastWithdrawalRequest;
@@ -166,7 +171,7 @@ contract LiquidityHandler is
                 time: block.timestamp
             });
             withdrawalSystem.totalWithdrawalAmount += _amount;
-            emit AddedToQueue(_user, _token, _amount, lastWithdrawalRequest, block.timestamp);
+            emit AddedToQueue(msg.sender, _user, _token, _amount, lastWithdrawalRequest, block.timestamp);
         }
     }
 
@@ -181,7 +186,7 @@ contract LiquidityHandler is
                 Withdrawal memory withdrawal = withdrawalSystem.withdrawals[lastSatisfiedWithdrawal+1];
 
                 if (withdrawal.amount <= inAdapter) {
-                    uint adapterId = ibAlluoToAdapterId[_ibAlluo];
+                    uint adapterId = ibAlluoToAdapterId.get(_ibAlluo);
                     address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
                     IAdapter(adapter).withdraw(withdrawal.user, withdrawal.token, withdrawal.amount);
                     
@@ -193,6 +198,7 @@ contract LiquidityHandler is
                     withdrawalSystem.resolverTrigger = false;
                     
                     emit WithdrawalSatisfied(
+                        _ibAlluo,
                         withdrawal.user, 
                         withdrawal.token, 
                         withdrawal.amount, 
@@ -206,8 +212,15 @@ contract LiquidityHandler is
         }
     }
 
+    function satisfyAllWithdrawals() external whenNotPaused{
+        for(uint i = 1; i <= ibAlluoToAdapterId.length(); i++){
+            (address ibAlluo,) = ibAlluoToAdapterId.at(i);
+            satisfyAdapterWithdrawals(ibAlluo);
+        }
+    }
+
     function getAdapterAmount(address _ibAlluo) public view returns(uint256) {
-        uint256 adapterId = ibAlluoToAdapterId[_ibAlluo];
+        uint256 adapterId = ibAlluoToAdapterId.get(_ibAlluo);
         address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
 
         return IAdapter(adapter).getAdapterAmount();
@@ -215,7 +228,7 @@ contract LiquidityHandler is
 
     function getExpectedAdapterAmount(address _ibAlluo, uint256 _newAmount) public view returns(uint256) {
 
-        uint256 adapterId = ibAlluoToAdapterId[_ibAlluo];
+        uint256 adapterId = ibAlluoToAdapterId.get(_ibAlluo);
         uint256 percentage = adapterIdsToAdapterInfo[adapterId].percentage;
 
         uint256 totalWithdrawalAmount = ibAlluoToWithdrawalSystems[_ibAlluo].totalWithdrawalAmount;
@@ -223,10 +236,54 @@ contract LiquidityHandler is
         return (_newAmount + IIbAlluo(_ibAlluo).totalAssetSupply()) * percentage / 10000 + totalWithdrawalAmount;
     }
 
+    function getListOfIbAlluos()external view returns(address[] memory){
+        uint256 numberOfIbAlluos = ibAlluoToAdapterId.length();
+        address[] memory ibAlluos = new address[](numberOfIbAlluos);
+        for(uint i = 0; i < numberOfIbAlluos; i++){
+            (ibAlluos[i],) = ibAlluoToAdapterId.at(i + 1);
+        }
+        return ibAlluos;
+    }
+
+    function getLastAdapterIndex() public view returns(uint256){
+        uint256 counter = 1;
+        while(true){
+            if(adapterIdsToAdapterInfo[counter].adapterAddress == address(0)){
+                counter--;
+                break;
+            }
+            else{
+                counter++;
+            }
+        }
+        return counter;
+    }
+
+    function getActiveAdapters() external view returns(AdapterInfo[] memory, address[] memory){
+        uint256 numberOfIbAlluos = ibAlluoToAdapterId.length();
+        address[] memory ibAlluos = new address[](numberOfIbAlluos);
+        uint256[] memory adaptersId = new uint256[](numberOfIbAlluos);
+        AdapterInfo[] memory adapters = new AdapterInfo[](numberOfIbAlluos);
+        for(uint i = 0; i < numberOfIbAlluos; i++){
+            (ibAlluos[i], adaptersId[i]) = ibAlluoToAdapterId.at(i + 1);
+            adapters[i] = adapterIdsToAdapterInfo[adaptersId[i]];
+        }
+        return (adapters, ibAlluos);
+    }
+
+    function getAllAdapters() external view returns(AdapterInfo[] memory){
+        uint256 numberOfAllAdapters = getLastAdapterIndex();
+        AdapterInfo[] memory adapters = new AdapterInfo[](numberOfAllAdapters);
+        for(uint i = 0; i < numberOfAllAdapters; i++){
+            adapters[i] = adapterIdsToAdapterInfo[i+1];
+        }
+        return adapters;
+    }
+
     ////////////
 
     function setIbAlluoToAdapterId(address _ibAlluo, uint256 _adapterId) external onlyRole(DEFAULT_ADMIN_ROLE){
-        ibAlluoToAdapterId[_ibAlluo] = _adapterId;
+        ibAlluoToAdapterId.set(_ibAlluo, _adapterId);
     }
 
     function setAdapter(
@@ -236,6 +293,7 @@ contract LiquidityHandler is
         address _adapterAddress,
         bool _status
     )external onlyRole(DEFAULT_ADMIN_ROLE){
+        require(_id != 0, "Handler: !allowed 0 id");
         AdapterInfo storage adapter = adapterIdsToAdapterInfo[_id];
 
         adapter.name = _name;
@@ -250,7 +308,6 @@ contract LiquidityHandler is
     )external onlyRole(DEFAULT_ADMIN_ROLE){
         adapterIdsToAdapterInfo[_id].status = _status;
     }
-
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause();
