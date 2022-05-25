@@ -4,7 +4,7 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 
 async function getHolders(hre: HardhatRuntimeEnvironment) : Promise<string[]>{
 
-    console.log("inside getHolders script");
+    console.log("Getting holders...");
 
     const tokenAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec"
     const deploymentBlock = 25009106

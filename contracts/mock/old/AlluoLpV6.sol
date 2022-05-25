@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../../mock/old/OldAlluoERC20Upgradable.sol";
-import "./LiquidityBufferVaultForMumbai.sol";
+import "./OldAlluoERC20Upgradable.sol";
+import "../../Farming/LiquidityBufferVault.sol";
 import "hardhat/console.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -13,7 +13,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
-contract AlluoLpV3ForMumbai is 
+contract AlluoLpV6 is 
     Initializable, 
     PausableUpgradeable, 
     OldAlluoERC20Upgradable, 
@@ -56,7 +56,7 @@ contract AlluoLpV3ForMumbai is
     bool public upgradeStatus;
 
     // contract that will distribute money between curve pool and wallet
-    LiquidityBufferVaultForMumbai public liquidityBuffer; 
+    LiquidityBufferVault public liquidityBuffer; 
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
@@ -75,8 +75,11 @@ contract AlluoLpV3ForMumbai is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
+        require(_multiSigWallet.isContract(), "AlluoLp: Not contract");
+
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
+        _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         DF = 10**20;
         updateTimeLimit = 3600;
@@ -123,19 +126,14 @@ contract AlluoLpV3ForMumbai is
         userDF[_address] = DF;
     }
 
-    
-    function withdraw(address _token, uint256 _amount) external whenNotPaused {
-
-        require(supportedTokens.contains(_token), "this token is not supported");
-        claim(msg.sender);
-        _burn(msg.sender, _amount);
-        liquidityBuffer.withdraw(msg.sender, _token, _amount);
-
-        emit BurnedForWithdraw(msg.sender, _amount);
+    function claimAll(address[] memory _addresses) public whenNotPaused {
+        for(uint i = 0; i < _addresses.length; i++){
+            claim(_addresses[i]);
+        }
     }
 
     function deposit(address _token, uint256 _amount) external whenNotPaused {
-        require(supportedTokens.contains(_token), "this token is not supported");
+        require(supportedTokens.contains(_token), "AlluoLp: Token is not supported");
         
         IERC20Upgradeable(_token).safeTransferFrom(msg.sender, address(liquidityBuffer), _amount);
         claim(msg.sender);
@@ -147,6 +145,17 @@ contract AlluoLpV3ForMumbai is
 
         emit Deposited(msg.sender, _token, amountIn18);
     }
+      
+    function withdraw(address _token, uint256 _amount) external whenNotPaused {
+
+        require(supportedTokens.contains(_token), "AlluoLp: Token is not supported");
+        claim(msg.sender);
+        _burn(msg.sender, _amount);
+        liquidityBuffer.withdraw(msg.sender, _token, _amount);
+
+        emit BurnedForWithdraw(msg.sender, _amount);
+    }
+
 
     function mint(address _user, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
         
@@ -191,6 +200,7 @@ contract AlluoLpV3ForMumbai is
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
+        require(newWallet.isContract(), "AlluoLp: Not contract");
 
         address oldValue = wallet;
         wallet = newWallet;
@@ -202,12 +212,10 @@ contract AlluoLpV3ForMumbai is
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(newBuffer.isContract(), "AlluoLp: not contract");
+        require(newBuffer.isContract(), "AlluoLp: Not contract");
 
-        //address oldValue = wallet;
-        liquidityBuffer = LiquidityBufferVaultForMumbai(newBuffer);
+        liquidityBuffer = LiquidityBufferVault(newBuffer);
 
-        //emit NewWalletSet(oldValue, newWallet);
     }
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -223,7 +231,9 @@ contract AlluoLpV3ForMumbai is
         override
         onlyRole(getRoleAdmin(role))
     {
-
+        if(role == DEFAULT_ADMIN_ROLE){
+            require(account.isContract(), "AlluoLp: Not contract");
+        }
         _grantRole(role, account);
     }
 
@@ -255,6 +265,11 @@ contract AlluoLpV3ForMumbai is
 
     function getListSupportedTokens() public view returns (address[] memory) {
         return supportedTokens.values();
+    }
+
+    function burn(address user, uint256 amount) public onlyRole(DEFAULT_ADMIN_ROLE){
+        claim(user);
+        _burn(user, amount);
     }
 
     function _beforeTokenTransfer(

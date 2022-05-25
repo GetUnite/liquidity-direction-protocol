@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../interfaces/ILiquidityBufferVault.sol";
+import "../../interfaces/ILiquidityBufferVault.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract WithdrawalRequestResolver is AccessControl{
@@ -24,11 +24,12 @@ contract WithdrawalRequestResolver is AccessControl{
     function checker()
         external
         view
-        onlyPokeMe()
         returns (bool canExec, bytes memory execPayload)
     {
         canExec = ILiquidityBufferVault(liquidityBufferAddress).keepersTrigger();
-        execPayload = "0x";
+        execPayload = abi.encodeWithSelector(
+            ILiquidityBufferVault.satisfyWithdrawals.selector
+        );
         return (canExec, execPayload);
     }
 
