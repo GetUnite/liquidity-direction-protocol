@@ -21,14 +21,15 @@ contract UsdCurveAdapter is AccessControl {
     uint256 public slippage;
     address public wallet;
 
-    constructor (address _multiSigWallet, address _liquidityHandler) {
+    constructor (address _multiSigWallet, address _liquidityHandler, uint256 _slippage) {
         require(_multiSigWallet.isContract(), "Buffer: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
         wallet = _multiSigWallet;
+        slippage = _slippage;
     }
 
-    function adapterApproveAll() external {
+    function adapterApproveAll() external onlyRole(DEFAULT_ADMIN_ROLE){
         IERC20(DAI).approve(curvePool, type(uint256).max);
         IERC20(USDC).approve(curvePool, type(uint256).max);
         IERC20(USDT).approve(curvePool, type(uint256).max);
