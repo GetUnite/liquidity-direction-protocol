@@ -49,7 +49,7 @@ contract UsdCurveAdapter is AccessControl {
             if (toSend != 0) {
                 ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
                     [0, toSend / 10**12,0], 
-                    lpAmount, 
+                    lpAmount * (10000+slippage)/10000, 
                     true);
                 IERC20(USDC).safeTransfer(wallet, toSend / 10**12);
             }
@@ -69,7 +69,7 @@ contract UsdCurveAdapter is AccessControl {
             if (toSend != 0) {
                 ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
                                 [0, toSend / 10**12,0], 
-                                lpAmount, 
+                                lpAmount * (10000+slippage)/10000, 
                                 true);
                 IERC20(USDC).safeTransfer(wallet, toSend / 10**12);
             }
@@ -89,6 +89,7 @@ contract UsdCurveAdapter is AccessControl {
                     true
                 );
             IERC20(DAI).safeTransfer(_user, _amount);
+
         }
 
         else if (_token == USDC) {

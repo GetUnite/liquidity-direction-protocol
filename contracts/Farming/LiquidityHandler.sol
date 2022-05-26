@@ -116,7 +116,6 @@ contract LiquidityHandler is
         address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
 
         IERC20Upgradeable(_token).safeTransfer(adapter, _amount);
-
         if (inAdapter < expectedAdapterAmount) {
             if (expectedAdapterAmount < inAdapter + amount18) {
                 uint256 toWallet = inAdapter + amount18 - expectedAdapterAmount;
@@ -154,25 +153,33 @@ contract LiquidityHandler is
         uint256 inAdapter = getAdapterAmount(msg.sender);
 
         WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[msg.sender];
-
         if (inAdapter >= _amount && withdrawalSystem.totalWithdrawalAmount == 0) {
             uint256 adapterId = ibAlluoToAdapterId.get(msg.sender);
             address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
             IAdapter(adapter).withdraw(_user, _token, _amount);
             emit WithdrawalSatisfied(msg.sender, _user, _token, _amount, 0, block.timestamp);
 
-        } else {
+
+        } 
+        else {
+            // Need to start with lastWithdrawalRequest+1 because ex.)
+            // lastSatisfied = 0    lastRequest = 0
+            // lastSatisfied = 0     lastRequest = 1
+            // In satisfy function, it always starts with
+            // lastSatisfied + 1 --> So there are errors!
+            // Alternative: Can start at 0 here and change line 194 to + 0 instead.
             uint256 lastWithdrawalRequest = withdrawalSystem.lastWithdrawalRequest;
             withdrawalSystem.lastWithdrawalRequest++;
-            withdrawalSystem.withdrawals[lastWithdrawalRequest] = Withdrawal({
+            withdrawalSystem.withdrawals[lastWithdrawalRequest+1] = Withdrawal({
                 user: _user,
                 token: _token,
                 amount: _amount,
                 time: block.timestamp
             });
             withdrawalSystem.totalWithdrawalAmount += _amount;
-            emit AddedToQueue(msg.sender, _user, _token, _amount, lastWithdrawalRequest, block.timestamp);
+            emit AddedToQueue(msg.sender, _user, _token, _amount, lastWithdrawalRequest+1, block.timestamp);
         }
+    
     }
 
     function satisfyAdapterWithdrawals(address _ibAlluo) public whenNotPaused{
@@ -184,19 +191,17 @@ contract LiquidityHandler is
             uint256 inAdapter = getAdapterAmount(_ibAlluo);
             while (lastSatisfiedWithdrawal != lastWithdrawalRequest) {
                 Withdrawal memory withdrawal = withdrawalSystem.withdrawals[lastSatisfiedWithdrawal+1];
-
+                uint adapterId = ibAlluoToAdapterId.get(_ibAlluo);
+                address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
                 if (withdrawal.amount <= inAdapter) {
-                    uint adapterId = ibAlluoToAdapterId.get(_ibAlluo);
-                    address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
                     IAdapter(adapter).withdraw(withdrawal.user, withdrawal.token, withdrawal.amount);
-                    
+                
                     inAdapter -= withdrawal.amount;
                     withdrawalSystem.totalWithdrawalAmount -= withdrawal.amount;
                     withdrawalSystem.lastSatisfiedWithdrawal++;
                     lastSatisfiedWithdrawal++;
-
                     withdrawalSystem.resolverTrigger = false;
-                    
+
                     emit WithdrawalSatisfied(
                         _ibAlluo,
                         withdrawal.user, 
@@ -284,12 +289,21 @@ contract LiquidityHandler is
         return adapters;
     }
 
+    function ibAlluoLastWithdrawalCheck(address _ibAlluo) public view returns (uint256[3] memory) {
+        WithdrawalSystem storage _ibAlluoWithdrawalSystem = ibAlluoToWithdrawalSystems[_ibAlluo];
+        return [_ibAlluoWithdrawalSystem.lastWithdrawalRequest, _ibAlluoWithdrawalSystem.lastSatisfiedWithdrawal, _ibAlluoWithdrawalSystem.totalWithdrawalAmount];
+    }
+
     ////////////
 
     function setIbAlluoToAdapterId(address _ibAlluo, uint256 _adapterId) external onlyRole(DEFAULT_ADMIN_ROLE){
         ibAlluoToAdapterId.set(_ibAlluo, _adapterId);
     }
 
+    function grantIbAlluoPermissions(address _ibAlluo) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _grantRole(DEFAULT_ADMIN_ROLE, _ibAlluo);
+    }
+    
     function setAdapter(
         uint256 _id, 
         string memory _name, 
