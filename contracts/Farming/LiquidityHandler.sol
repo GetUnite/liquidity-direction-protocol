@@ -164,14 +164,14 @@ contract LiquidityHandler is
         } else {
             uint256 lastWithdrawalRequest = withdrawalSystem.lastWithdrawalRequest;
             withdrawalSystem.lastWithdrawalRequest++;
-            withdrawalSystem.withdrawals[lastWithdrawalRequest] = Withdrawal({
+            withdrawalSystem.withdrawals[lastWithdrawalRequest+1] = Withdrawal({
                 user: _user,
                 token: _token,
                 amount: _amount,
                 time: block.timestamp
             });
             withdrawalSystem.totalWithdrawalAmount += _amount;
-            emit AddedToQueue(msg.sender, _user, _token, _amount, lastWithdrawalRequest, block.timestamp);
+            emit AddedToQueue(msg.sender, _user, _token, _amount, lastWithdrawalRequest+1, block.timestamp);
         }
     }
 
