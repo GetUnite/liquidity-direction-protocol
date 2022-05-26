@@ -213,7 +213,7 @@ contract LiquidityHandler is
     }
 
     function satisfyAllWithdrawals() external whenNotPaused{
-        for(uint i = 1; i <= ibAlluoToAdapterId.length(); i++){
+        for(uint i = 0; i < ibAlluoToAdapterId.length(); i++){
             (address ibAlluo,) = ibAlluoToAdapterId.at(i);
             satisfyAdapterWithdrawals(ibAlluo);
         }
@@ -240,7 +240,7 @@ contract LiquidityHandler is
         uint256 numberOfIbAlluos = ibAlluoToAdapterId.length();
         address[] memory ibAlluos = new address[](numberOfIbAlluos);
         for(uint i = 0; i < numberOfIbAlluos; i++){
-            (ibAlluos[i],) = ibAlluoToAdapterId.at(i + 1);
+            (ibAlluos[i],) = ibAlluoToAdapterId.at(i);
         }
         return ibAlluos;
     }
@@ -265,7 +265,7 @@ contract LiquidityHandler is
         uint256[] memory adaptersId = new uint256[](numberOfIbAlluos);
         AdapterInfo[] memory adapters = new AdapterInfo[](numberOfIbAlluos);
         for(uint i = 0; i < numberOfIbAlluos; i++){
-            (ibAlluos[i], adaptersId[i]) = ibAlluoToAdapterId.at(i + 1);
+            (ibAlluos[i], adaptersId[i]) = ibAlluoToAdapterId.at(i);
             adapters[i] = adapterIdsToAdapterInfo[adaptersId[i]];
         }
         return (adapters, ibAlluos);
