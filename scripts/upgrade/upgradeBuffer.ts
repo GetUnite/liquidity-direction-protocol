@@ -5,7 +5,7 @@ async function main() {
 
   const Buffer = await ethers.getContractFactory("LiquidityBufferVaultForMumbai");
 
-  await upgrades.upgradeProxy('0x385AB598E7DBF09951ba097741d2Fa573bDe94A5', Buffer);
+  await upgrades.upgradeProxy('0xF9F9381Fbc5225180015b1f0eab6c33DbF0b37Ab', Buffer);
   console.log('Buffer upgraded');
 
 }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "./AlluoERC20Upgradable.sol";
-import "../interfaces/ILiquidityBufferVault.sol";
-import "../mock/interestHelper/Interest.sol";
+import "./LiquidityBufferVaultForMumbai.sol";
+import "../../Farming/AlluoERC20Upgradable.sol";
+import "../../mock/interestHelper/Interest.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -13,14 +13,13 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
-contract IbAlluo is
+contract IbAlluoForMumbai_V3 is
     Initializable,
     PausableUpgradeable,
     AlluoERC20Upgradable,
     AccessControlUpgradeable,
     UUPSUpgradeable,
     Interest
-    // ERC2771ContextUpgradeable(0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8) - injected in code directly
 {
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -47,6 +46,8 @@ contract IbAlluo is
     // current annual interest rate with 2 decimals
     uint256 public annualInterest;
 
+    // admin and reserves address
+    address private wallet;
 
     // contract that will distribute money between the pool and the wallet
     address public liquidityBuffer;
@@ -57,6 +58,7 @@ contract IbAlluo is
     // list of tokens from which deposit available
     EnumerableSetUpgradeable.AddressSet private supportedTokens;
 
+    // upgrade V2
     // trusted forwarder address, see EIP-2771
     address public trustedForwarder;
 
@@ -65,14 +67,12 @@ contract IbAlluo is
     event NewBufferSet(address oldBuffer, address newBuffer);
     event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
     event DepositTokenStatusChanged(address token, bool status);
-    
     event InterestChanged(
         uint256 oldYearInterest,
         uint256 newYearInterest,
         uint256 oldInterestPerSecond,
         uint256 newInterestPerSecond
     );
-    
     event TransferAssetValue(
         address indexed from,
         address indexed to,
@@ -84,23 +84,14 @@ contract IbAlluo is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-   function initialize(
-        string memory _name,
-        string memory _symbol,
+    function initialize(
         address _multiSigWallet,
-        address _buffer,
-        address[] memory _supportedTokens,
-        uint256 _interestPerSecond,
-        uint256 _annualInterest,
-        address _trustedForwarder
+        address[] memory _supportedTokens
     ) public initializer {
-        __ERC20_init(_name, _symbol);
+        __ERC20_init("Interest Bearing Alluo USD", "IbAlluoUSD");
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
-
-        require(_multiSigWallet.isContract(), "IbAlluo: Not contract");
-        require(_buffer.isContract(), "IbAlluo: Not contract");
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
@@ -109,18 +100,7 @@ contract IbAlluo is
             supportedTokens.add(_supportedTokens[i]);
             emit DepositTokenStatusChanged(_supportedTokens[i], true);
         }
-
-        interestPerSecond = _interestPerSecond * 10**10;
-        annualInterest = _annualInterest;
-        multiplier = 10**18;
-        growingRatio = 10**18;
-        updateTimeLimit = 60;
-        lastInterestCompound = block.timestamp;
-
-        liquidityBuffer = _buffer;
-        trustedForwarder = _trustedForwarder;
-
-        emit NewBufferSet(address(0), liquidityBuffer);
+        _pause();
     }
 
     /// @notice  Updates the growingRatio
@@ -202,9 +182,9 @@ contract IbAlluo is
     }
 
     /// @notice  Allows deposits and updates the index, then mints the new appropriate amount.
-    /// @dev When called, asset token is sent to the wallet, then the index is updated
+    /// @dev When called, stable coin is sent to the wallet, then the index is updated
     ///      so that the adjusted amount is accurate.
-    /// @param _token Deposit token address
+    /// @param _token Deposit token address (eg. USDC)
     /// @param _amount Amount (with token desimals)
 
     function deposit(address _token, uint256 _amount) external {
@@ -220,7 +200,7 @@ contract IbAlluo is
         );
         updateRatio();
 
-        ILiquidityBufferVault(liquidityBuffer).deposit(_token, _amount);
+        LiquidityBufferVaultForMumbai(liquidityBuffer).deposit(_token, _amount);
 
         uint256 amountIn18 = _amount *
             10**(18 - AlluoERC20Upgradable(_token).decimals());
@@ -232,8 +212,8 @@ contract IbAlluo is
 
     /// @notice  Withdraws accuratel
     /// @dev When called, immediately check for new interest index. Then find the adjusted amount in IbAlluo tokens
-    ///      Then burn appropriate amount of IbAlluo tokens to receive asset token
-    /// @param _targetToken Asset token
+    ///      Then burn appropriate amount of IbAlluo tokens to receive stablecoin
+    /// @param _targetToken Stablecoin desired (eg. USDC)
     /// @param _amount Amount (parsed 10**18)
 
     function withdrawTo(
@@ -249,7 +229,7 @@ contract IbAlluo is
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(_msgSender(), adjustedAmount);
 
-        ILiquidityBufferVault(liquidityBuffer).withdraw(
+        LiquidityBufferVaultForMumbai(liquidityBuffer).withdraw(
             _recipient,
             _targetToken,
             _amount
@@ -260,67 +240,15 @@ contract IbAlluo is
 
     /// @notice  Withdraws accuratel
     /// @dev When called, immediately check for new interest index. Then find the adjusted amount in IbAlluo tokens
-    ///      Then burn appropriate amount of IbAlluo tokens to receive asset token
-    /// @param _targetToken Asset token
+    ///      Then burn appropriate amount of IbAlluo tokens to receive stablecoin
+    /// @param _targetToken Stablecoin desired (eg. USDC)
     /// @param _amount Amount (parsed 10**18)
 
     function withdraw(address _targetToken, uint256 _amount) external {
         withdrawTo(_msgSender(), _targetToken, _amount);
     }
 
-
-    /**
-     * @dev See {IERC20-transfer}.
-     *
-     * Requirements:
-     *
-     * - `to` cannot be the zero address.
-     * - the caller must have a balance of at least `amount`.
-     */
-    function transfer(address to, uint256 amount) public override whenNotPaused returns (bool) {
-        address owner = _msgSender();
-        _transfer(owner, to, amount);
-        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
-            updateRatio();
-        }
-        uint256 assetValue = (amount * growingRatio) / multiplier;
-        emit TransferAssetValue(owner, to, amount, assetValue, growingRatio);
-        return true;
-    }
-
-    /**
-     * @dev See {IERC20-transferFrom}.
-     *
-     * Emits an {Approval} event indicating the updated allowance. This is not
-     * required by the EIP. See the note at the beginning of {ERC20}.
-     *
-     * NOTE: Does not update the allowance if the current allowance
-     * is the maximum `uint256`.
-     *
-     * Requirements:
-     *
-     * - `from` and `to` cannot be the zero address.
-     * - `from` must have a balance of at least `amount`.
-     * - the caller must have allowance for ``from``'s tokens of at least
-     * `amount`.
-     */
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    ) public override whenNotPaused returns (bool) {
-        address spender = _msgSender();
-        _spendAllowance(from, spender, amount);
-        _transfer(from, to, amount);
-        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
-            updateRatio();
-        }
-        uint256 assetValue = (amount * growingRatio) / multiplier;
-        emit TransferAssetValue(from, to, amount, assetValue, growingRatio);
-        return true;
-    }
-
-    /// @notice  Returns balance in asset value
+    /// @notice  Returns balance in USD
     /// @param _address address of user
 
     function getBalance(address _address) public view returns (uint256) {
@@ -332,7 +260,7 @@ contract IbAlluo is
         return (balanceOf(_address) * _growingRatio) / multiplier;
     }
 
-    /// @notice  Returns balance in asset value with correct info from update
+    /// @notice  Returns balance in USD with correct info from update
     /// @param _address address of user
 
     function getBalanceForTransfer(address _address)
@@ -352,7 +280,7 @@ contract IbAlluo is
         }
     }
 
-    /// @notice  Returns total supply in asset value
+    /// @notice  Returns total supply in USD value
 
     function totalAssetSupply() public view returns (uint256) {
         uint256 _growingRatio = changeRatio(
@@ -375,8 +303,6 @@ contract IbAlluo is
     {
         return forwarder == trustedForwarder;
     }
-
-    /* ========== ADMIN CONFIGURATION ========== */
 
     function mint(address account, uint256 amount)
         external
@@ -446,7 +372,6 @@ contract IbAlluo is
         emit UpdateTimeLimitSet(oldValue, _newLimit);
     }
 
-
     function setLiquidityBuffer(address newBuffer)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
@@ -473,22 +398,40 @@ contract IbAlluo is
         _unpause();
     }
 
-    function grantRole(bytes32 role, address account)
-        public
-        override
-        onlyRole(getRoleAdmin(role))
-    {
-        if (role == DEFAULT_ADMIN_ROLE) {
-            require(account.isContract(), "IbAlluo: Not contract");
-        }
-        _grantRole(role, account);
-    }
-
     function setTrustedForwarder(address newTrustedForwarder)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         trustedForwarder = newTrustedForwarder;
+    }
+
+    /// @notice migrates by minting balances.
+
+    function migrateStep1(address _oldContract, address[] memory _users)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        for (uint256 i = 0; i < _users.length; i++) {
+            uint256 oldBalance = AlluoERC20Upgradable(_oldContract).balanceOf(
+                _users[i]
+            );
+            _mint(_users[i], oldBalance);
+        }
+    }
+
+    /// @notice migrates by setting new interest variables.
+
+    function migrateStep2() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
+        _revokeRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        interestPerSecond = 100000000470636740 * 10**10;
+        multiplier = 10**18;
+        growingRatio = 10**18;
+        lastInterestCompound = block.timestamp;
+        annualInterest = 1600;
+        updateTimeLimit = 60;
+        emit UpdateTimeLimitSet(0, updateTimeLimit);
+        emit InterestChanged(0, annualInterest, 0, interestPerSecond);
     }
 
     function _beforeTokenTransfer(
@@ -499,6 +442,66 @@ contract IbAlluo is
         super._beforeTokenTransfer(from, to, amount);
     }
 
+
+    /**
+     * @dev See {IERC20-transfer}.
+     *
+     * Requirements:
+     *
+     * - `to` cannot be the zero address.
+     * - the caller must have a balance of at least `amount`.
+     */
+    function transfer(address to, uint256 amount) public override whenNotPaused returns (bool) {
+        address owner = _msgSender();
+        _transfer(owner, to, amount);
+        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
+            updateRatio();
+        }
+        uint256 assetValue = (amount * growingRatio) / multiplier;
+        emit TransferAssetValue(owner, to, amount, assetValue, growingRatio);
+        return true;
+    }
+
+    /**
+     * @dev See {IERC20-transferFrom}.
+     *
+     * Emits an {Approval} event indicating the updated allowance. This is not
+     * required by the EIP. See the note at the beginning of {ERC20}.
+     *
+     * NOTE: Does not update the allowance if the current allowance
+     * is the maximum `uint256`.
+     *
+     * Requirements:
+     *
+     * - `from` and `to` cannot be the zero address.
+     * - `from` must have a balance of at least `amount`.
+     * - the caller must have allowance for ``from``'s tokens of at least
+     * `amount`.
+     */
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    ) public override whenNotPaused returns (bool) {
+        address spender = _msgSender();
+        _spendAllowance(from, spender, amount);
+        _transfer(from, to, amount);
+        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
+            updateRatio();
+        }
+        uint256 assetValue = (amount * growingRatio) / multiplier;
+        emit TransferAssetValue(from, to, amount, assetValue, growingRatio);
+        return true;
+    }
+
+    function _authorizeUpgrade(address)
+        internal
+        override
+        onlyRole(UPGRADER_ROLE)
+    {
+        require(upgradeStatus, "IbAlluo: Upgrade not allowed");
+        upgradeStatus = false;
+    }
 
     function _msgSender()
         internal
@@ -524,19 +527,10 @@ contract IbAlluo is
         override
         returns (bytes calldata)
     {
-        if (isTrustedForwarder(msg.sender)) {
+        if (isTrustedForwarder(_msgSender())) {
             return msg.data[:msg.data.length - 20];
         } else {
             return super._msgData();
         }
-    }
-    
-    function _authorizeUpgrade(address)
-        internal
-        override
-        onlyRole(UPGRADER_ROLE)
-    {
-        require(upgradeStatus, "IbAlluo: Upgrade not allowed");
-        upgradeStatus = false;
     }
 }

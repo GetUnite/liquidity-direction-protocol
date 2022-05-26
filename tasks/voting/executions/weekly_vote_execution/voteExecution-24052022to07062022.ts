@@ -1,7 +1,7 @@
 import { task } from "hardhat/config";
 import "@nomiclabs/hardhat-waffle";
 
-task("entryv2", "Execute vote from Alluo DAO for liquidity direction")
+task("voteExecution-24052022to07062022", "Execute vote from Alluo DAO for liquidity direction")
     .setAction(async function (taskArgs, hre) {
         const network = hre.network.name;
         console.log("Network:", network);
@@ -14,22 +14,37 @@ task("entryv2", "Execute vote from Alluo DAO for liquidity direction")
         const usdt = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
         const crv3 = "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490"
 
-        let entryData = await strategy.encodeEntryParams(
-            "", //Curve pool address
-            "", //Curve LP token address
-            "", //Entry coin address
-            0, //Pool size
-            0, //Token index in Curve
-            0 //Convex pool id
+        let entryData1 = await strategy.encodeEntryParams(
+            "0x43b4FdFD4Ff969587185cDB6f0BD875c5Fc83f8c",
+            "0x43b4FdFD4Ff969587185cDB6f0BD875c5Fc83f8c",
+            crv3,
+            2,
+            1,
+            36
+        )
+
+        let entryData2 = await strategy.encodeEntryParams(
+            "0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B",
+            "0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B",
+            crv3,
+            2,
+            1,
+            32
         )
 
         let entries = [{
-            weight: 10000, //Weight percentage with 2 decimals 10000 = 100.00
-            strategyAddress: "", //Alluo Strategy address
-            entryToken: "", //Coin we are using to enter the Strategy that is balance of the Vote Executor
-            poolToken: "", //Token used to actually enter the Strategy, in case we need to exchange entryToken to poolToken 
-            data: entryData
-        }]
+            weight: 2005,
+            strategyAddress: "0xa95eDB5D867996717d873Ca1c2a586feC9c80754",
+            entryToken: usdt,
+            poolToken: crv3,
+            data: entryData1
+        }, {
+            weight: 7995,
+            strategyAddress: "0xa95eDB5D867996717d873Ca1c2a586feC9c80754",
+            entryToken: usdt,
+            poolToken: crv3,
+            data: entryData2
+        }, ]
 
 
         // when we can sort out multisig via tasks this will run

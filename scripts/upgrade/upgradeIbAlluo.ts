@@ -1,12 +1,13 @@
 import { ethers, upgrades } from "hardhat"
 
 async function main() {
+  const IbAlluoNew = await ethers.getContractFactory("IbAlluo");
+  const IbAlluoOld = await ethers.getContractFactory("IbAlluoUSD");
 
-  const IbAlluoNew = await ethers.getContractFactory("IbAlluoForMumbai");
+  await upgrades.forceImport("0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6", IbAlluoOld);
 
-  await upgrades.upgradeProxy('0x71402a46d78a10c8eE7E7CdEf2AffeC8d1E312A1', IbAlluoNew);
+  await upgrades.upgradeProxy('0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6', IbAlluoNew);
   console.log('IbAlluo upgraded');
-
 }
 
 main()
