@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "./FakeCurve.sol";
+import "./curve/FakeCurveUsd.sol";
 import "hardhat/console.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -30,7 +30,7 @@ contract LiquidityBufferVaultForMumbai is
     address public alluoLp;
 
     //
-    FakeCurve public curvePool;
+    FakeCurveUsd public curvePool;
 
     //
     uint256 private inPoolAmount;
@@ -115,7 +115,7 @@ contract LiquidityBufferVaultForMumbai is
         wallet = _multiSigWallet;
         bufferPercentage = 500;
         slippage = 200;
-        curvePool = FakeCurve(_curvePool);
+        curvePool = FakeCurveUsd(_curvePool);
         alluoLp = _alluoLp;
 
         DAI = IERC20Upgradeable(_dai);
