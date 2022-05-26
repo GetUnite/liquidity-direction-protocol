@@ -182,12 +182,13 @@ contract LiquidityHandler is
 
         if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
             uint256 inAdapter = getAdapterAmount(_ibAlluo);
+            uint adapterId = ibAlluoToAdapterId.get(_ibAlluo);
+            address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
             while (lastSatisfiedWithdrawal != lastWithdrawalRequest) {
                 Withdrawal memory withdrawal = withdrawalSystem.withdrawals[lastSatisfiedWithdrawal+1];
 
                 if (withdrawal.amount <= inAdapter) {
-                    uint adapterId = ibAlluoToAdapterId.get(_ibAlluo);
-                    address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
+
                     IAdapter(adapter).withdraw(withdrawal.user, withdrawal.token, withdrawal.amount);
                     
                     inAdapter -= withdrawal.amount;
@@ -195,7 +196,9 @@ contract LiquidityHandler is
                     withdrawalSystem.lastSatisfiedWithdrawal++;
                     lastSatisfiedWithdrawal++;
 
-                    withdrawalSystem.resolverTrigger = false;
+                    if(withdrawalSystem.resolverTrigger){
+                        withdrawalSystem.resolverTrigger = false;
+                    }
                     
                     emit WithdrawalSatisfied(
                         _ibAlluo,
