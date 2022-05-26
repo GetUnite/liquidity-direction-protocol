@@ -278,6 +278,8 @@ describe("IbAlluoUSD and Buffer", function () {
         )
 
         console.log(await handler.getListOfIbAlluos());
+        console.log(await handler.getAdapterId(ibAlluoEth.address));
+        console.log(await handler.getAdapterId(ibAlluoEur.address));
         console.log(await handler.getLastAdapterIndex());
         console.log(await handler.getActiveAdapters());
         console.log(await handler.getAllAdapters());

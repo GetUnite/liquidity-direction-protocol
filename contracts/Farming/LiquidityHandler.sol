@@ -236,6 +236,10 @@ contract LiquidityHandler is
         return (_newAmount + IIbAlluo(_ibAlluo).totalAssetSupply()) * percentage / 10000 + totalWithdrawalAmount;
     }
 
+    function getAdapterId(address _ibAlluo) external view returns(uint256){
+        return ibAlluoToAdapterId.get(_ibAlluo);
+    }
+
     function getListOfIbAlluos()external view returns(address[] memory){
         uint256 numberOfIbAlluos = ibAlluoToAdapterId.length();
         address[] memory ibAlluos = new address[](numberOfIbAlluos);
