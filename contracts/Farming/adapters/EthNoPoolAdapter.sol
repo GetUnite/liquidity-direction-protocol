@@ -14,8 +14,8 @@ contract EthNoPoolAdapter is AccessControl {
     address public wallet;
 
     constructor (address _multiSigWallet, address _liquidityHandler) {
-        require(_multiSigWallet.isContract(), "Buffer: Not contract");
-        require(_liquidityHandler.isContract(), "Buffer: Not contract");
+        require(_multiSigWallet.isContract(), "Adapter: Not contract");
+        require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
         wallet = _multiSigWallet;
@@ -24,19 +24,19 @@ contract EthNoPoolAdapter is AccessControl {
     function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         if(toSend != 0){
-            IERC20(_token).safeTransfer(wallet, toSend);
+            IERC20(WETH).safeTransfer(wallet, toSend);
         }
     } 
 
     function withdraw(address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        IERC20(_token).safeTransfer(_user, _amount);
+        IERC20(WETH).safeTransfer(_user, _amount);
     }
     
-    function getAdapterAmount() external view returns ( uint256 ) {
+    function getAdapterAmount() external view returns (uint256) {
         return IERC20(WETH).balanceOf(address(this));
     }
 
-    function setWallet (address _newWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setWallet(address _newWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
         wallet = _newWallet;
     }
 

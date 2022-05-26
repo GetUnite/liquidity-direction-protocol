@@ -14,15 +14,17 @@ contract UsdCurveAdapter is AccessControl {
     using SafeERC20 for IERC20;
 
     // All address are Polygon addresses.
-    address public constant curvePool = 0x445FE580eF8d70FF569aB36e80c647af338db351;
     address public constant DAI = 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063;
     address public constant USDC = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
     address public constant USDT = 0xc2132D05D31c914a87C6611C10748AEb04B58e8F;
-    uint256 public slippage;
+    address public constant curvePool = 0x445FE580eF8d70FF569aB36e80c647af338db351;
+    address public constant curveLp = 0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171;
     address public wallet;
+    uint256 public slippage;
 
     constructor (address _multiSigWallet, address _liquidityHandler, uint256 _slippage) {
-        require(_multiSigWallet.isContract(), "Buffer: Not contract");
+        require(_multiSigWallet.isContract(), "Adapter: Not contract");
+        require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
         wallet = _multiSigWallet;
@@ -30,10 +32,10 @@ contract UsdCurveAdapter is AccessControl {
     }
 
     function adapterApproveAll() external onlyRole(DEFAULT_ADMIN_ROLE){
-        IERC20(DAI).approve(curvePool, type(uint256).max);
-        IERC20(USDC).approve(curvePool, type(uint256).max);
-        IERC20(USDT).approve(curvePool, type(uint256).max);
-        IERC20(0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171).approve(curvePool, type(uint256).max);
+        IERC20(DAI).safeApprove(curvePool, type(uint256).max);
+        IERC20(USDC).safeApprove(curvePool, type(uint256).max);
+        IERC20(USDT).safeApprove(curvePool, type(uint256).max);
+        IERC20(curveLp).safeApprove(curvePool, type(uint256).max);
     }
 
     /// @notice When called by liquidity buffer, moves some funds to the Gnosis multisig and others into a LP to be kept as a 'buffer'
@@ -117,12 +119,11 @@ contract UsdCurveAdapter is AccessControl {
         }
     }
     
-    function getAdapterAmount () external view returns ( uint256 ) {
-        uint256 curveLp = IERC20(0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171).balanceOf((address(this)));
-        if(curveLp != 0){
+    function getAdapterAmount() external view returns ( uint256 ) {
+        uint256 curveLpAmount = IERC20(curveLp).balanceOf((address(this)));
+        if(curveLpAmount != 0){
             // Returns in 10**18
-            uint256 value = ICurvePoolUSD(curvePool).calc_withdraw_one_coin(curveLp, 0);
-            return value;
+            return ICurvePoolUSD(curvePool).calc_withdraw_one_coin(curveLpAmount, 0);
         } else {
             return 0;
         }

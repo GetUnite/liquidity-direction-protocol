@@ -12,16 +12,17 @@ contract EurCurveAdapter is AccessControl {
     using Address for address;
     using SafeERC20 for IERC20;
 
-    address public constant curvePool = 0xAd326c253A84e9805559b73A08724e11E49ca651;
     address public constant jEUR = 0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c;
     address public constant EURS = 0xE111178A87A3BFf0c8d18DECBa5798827539Ae99;
     address public constant EURT = 0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f;
+    address public constant curvePool = 0xAd326c253A84e9805559b73A08724e11E49ca651;
     address public wallet;
     uint256 public slippage;
 
     // 0 = jEUR, 18dec, 1 = PAR 18dec , 2 = EURS 2dec,   3= EURT 6dec
     constructor (address _multiSigWallet, address _liquidityHandler, uint256 _slippage) {
-        require(_multiSigWallet.isContract(), "Buffer: Not contract");
+        require(_multiSigWallet.isContract(), "Adapter: Not contract");
+        require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
         wallet = _multiSigWallet;
@@ -115,12 +116,11 @@ contract EurCurveAdapter is AccessControl {
     }
     
     function getAdapterAmount () external view returns (uint256) {
-        uint256 curveLp = IERC20(curvePool).balanceOf((address(this)));
-        if(curveLp != 0){
+        uint256 curveLpAmount = IERC20(curvePool).balanceOf((address(this)));
+        if(curveLpAmount != 0){
+            uint256 amountIn2 = ICurvePoolEUR(curvePool).calc_withdraw_one_coin(curveLpAmount, 3);
             // Returns in 10**18
-            //shold set to eurs
-            uint256 value = ICurvePoolEUR(curvePool).calc_withdraw_one_coin(curveLp, 0);
-            return value;
+            return amountIn2 * 10 ** 16;
         } else {
             return 0;
         }
