@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-
+import "hardhat/console.sol";
 import "../../interfaces/curve/ICurvePoolEUR.sol";
 
 contract EurCurveAdapter is AccessControl {
@@ -47,7 +47,7 @@ contract EurCurveAdapter is AccessControl {
             if (toSend != 0) {
                 ICurvePoolEUR(curvePool).remove_liquidity_imbalance(
                             [0, 0,0,toSend / 10**12], 
-                            lpAmount);
+                            lpAmount * (10000+slippage)/10000);
                 IERC20(EURT).safeTransfer(wallet, toSend / 10**12 );
             }
         }
@@ -66,7 +66,7 @@ contract EurCurveAdapter is AccessControl {
             if (toSend != 0) {
                 ICurvePoolEUR(curvePool).remove_liquidity_imbalance(
                             [0,0,0,toSend / 10**12], 
-                            lpAmount);
+                            lpAmount * (10000+slippage)/10000);
                 IERC20(EURT).safeTransfer(wallet, toSend / 10**12 );
             }
         }
@@ -91,6 +91,9 @@ contract EurCurveAdapter is AccessControl {
                 );
             // toUser already in 10**18
             IERC20(jEUR).safeTransfer(_user, toUser);
+
+
+
         }
 
         else if (_token == EURT) {
@@ -118,7 +121,7 @@ contract EurCurveAdapter is AccessControl {
     function getAdapterAmount () external view returns (uint256) {
         uint256 curveLpAmount = IERC20(curvePool).balanceOf((address(this)));
         if(curveLpAmount != 0){
-            uint256 amountIn2 = ICurvePoolEUR(curvePool).calc_withdraw_one_coin(curveLpAmount, 3);
+            uint256 amountIn2 = ICurvePoolEUR(curvePool).calc_withdraw_one_coin(curveLpAmount, 2);
             // Returns in 10**18
             return amountIn2 * 10 ** 16;
         } else {
