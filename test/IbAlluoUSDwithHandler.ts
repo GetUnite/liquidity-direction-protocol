@@ -181,7 +181,6 @@ describe("IbAlluoUSD and Buffer", function () {
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
-        await handler.connect(admin).grantIbAlluoPermissions(ibAlluoCurrent.address)
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoCurrent.address, 1)
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoCurrent.address)
     });
@@ -251,7 +250,6 @@ describe("IbAlluoUSD and Buffer", function () {
             ethAdapter.address, 
             true
         )
-        
 
         ibAlluoEth = await upgrades.deployProxy(IbAlluo,
             [
@@ -1425,6 +1423,7 @@ describe("IbAlluoUSD and Buffer", function () {
 
     });
 
+});
 
     async function deposit(recipient: SignerWithAddress, token: IERC20, amount: BigNumberish) {
         await token.connect(usdWhale).transfer(recipient.address, amount);

@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "hardhat/console.sol";
 import "../../interfaces/curve/ICurvePoolEUR.sol";
 
 contract EurCurveAdapter is AccessControl {
@@ -80,7 +79,7 @@ contract EurCurveAdapter is AccessControl {
     /// @param _token Deposit token address (eg. USDC)
     /// @param _amount  Amount to be withdrawn in 10*18
     function withdraw (address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-          if (_token == jEUR) {
+        if (_token == jEUR) {
             // To be safe against arbitragers, when withdrawing jEUR or EURT, burn token in EURS first and then
             // Claim appropriate token afterwards. 
             uint256 toBurn = ICurvePoolEUR(curvePool).calc_token_amount([0, 0, _amount/10**16, 0], false);
@@ -91,9 +90,6 @@ contract EurCurveAdapter is AccessControl {
                 );
             // toUser already in 10**18
             IERC20(jEUR).safeTransfer(_user, toUser);
-
-
-
         }
 
         else if (_token == EURT) {

@@ -12,28 +12,12 @@ async function skipDays(d: number) {
     ethers.provider.send('evm_mine', []);
 }
 
-function getRandomArbitrary(min: number, max: number) {
-    return Math.floor(Math.random() * (max - min) + min);
-  }
-
-async function  prepareCallData(type: string, parameters: any[]) : Promise<BytesLike>{
-    if(type == "status"){
-        let ABI = ["function changeUpgradeStatus(bool _status)"];
-        let iface = new ethers.utils.Interface(ABI);
-        let calldata = iface.encodeFunctionData("changeUpgradeStatus", [parameters[0]]);
-        return calldata;
-    }
-    else if(type == "role"){
-        let ABI = ["function grantRole(bytes32 role, address account)"];
-        let iface = new ethers.utils.Interface(ABI);
-        let calldata = iface.encodeFunctionData("grantRole", [parameters[0], parameters[1]]);
-        return calldata;
-    }
-    else{
-        return ethers.utils.randomBytes(0);
-    }
+async function getLastWithdrawalInfo(token: IbAlluo, handler: LiquidityHandler) {
+    let request = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastWithdrawalRequest
+    let satisfied = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastSatisfiedWithdrawal
+    let total = (await handler.ibAlluoToWithdrawalSystems(token.address)).totalWithdrawalAmount
+    return [request, satisfied, total]
 }
-
 
 async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
     await ethers.provider.send(
@@ -179,8 +163,6 @@ describe("IbAlluo and handler", function () {
             true
         )
 
-
-
         await handler.connect(admin).setAdapter(
             3, 
             "ETH No Pool Adapter", 
@@ -205,7 +187,7 @@ describe("IbAlluo and handler", function () {
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
-        await handler.connect(admin).grantIbAlluoPermissions(ibAlluoUsd.address)
+        await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoUsd.address)
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoUsd.address, 1)
         
 
@@ -225,10 +207,9 @@ describe("IbAlluo and handler", function () {
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
-        await handler.connect(admin).grantIbAlluoPermissions(ibAlluoEur.address)
+        await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEur.address)
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEur.address, 2)
         
-     
         ibAlluoEth = await upgrades.deployProxy(IbAlluo,
             [
                 "Interest Bearing Alluo ETH",
@@ -243,7 +224,7 @@ describe("IbAlluo and handler", function () {
         ) as IbAlluo;
      
 
-        await handler.connect(admin).grantIbAlluoPermissions(ibAlluoEth.address)
+        await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEth.address)
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEth.address, 3)
         
     });
@@ -252,21 +233,21 @@ describe("IbAlluo and handler", function () {
         it("Depositing 100 weth and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
             await deposit(signers[0], weth, parseEther("100"));
             await ibAlluoEth.connect(signers[0]).withdraw(weth.address, parseEther("50"));
-            let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEth.address)
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEth, handler)
+            
             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
         })
         it("Depositing 100 weth, attempt to withdraw 50 and then only get paid after there is a deposit", async function () {
             await deposit(signers[0], weth, parseEther("100"));
             await ibAlluoEth.connect(signers[0]).withdraw(weth.address, parseEther("50"));
-            let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEth.address)
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEth, handler)
             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
             
             await deposit(signers[1], weth, parseEther("100"));
             await handler.satisfyAdapterWithdrawals(ibAlluoEth.address);
-            expect(Number(await weth.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 18)))
+            
+            expect(await weth.balanceOf(signers[0].address)).equal(parseEther("50"))
         })
-
-       
 
         it("The balance of the multisig wallet should increase with weth deposits.", async function () {
                 let walletBalance = await weth.balanceOf(admin.address);
@@ -275,7 +256,6 @@ describe("IbAlluo and handler", function () {
                 expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
                 walletBalance = await weth.balanceOf(admin.address);
 
-
                 await deposit(signers[0], weth, parseEther("100"));
                 expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
                 walletBalance = await weth.balanceOf(admin.address);
@@ -300,7 +280,7 @@ describe("IbAlluo and handler", function () {
                 expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
                 walletBalance = await weth.balanceOf(admin.address);
 
-                console.log("Final multisig balance:", walletBalance);
+                //console.log("Final multisig balance:", walletBalance);
 
             })
         it("Attemping to withdraw more weth than allowed causes revert.", async function () {
@@ -317,6 +297,7 @@ describe("IbAlluo and handler", function () {
         describe('weth Mass deposits and withdrawal test cases', function () {
         it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
             let walletBalance = await weth.balanceOf(admin.address);
+            let userBalanceAtStart = await weth.balanceOf(signers[0].address);
 
             await deposit(signers[0], weth, parseEther("100"));
             expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
@@ -330,17 +311,16 @@ describe("IbAlluo and handler", function () {
             expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
             walletBalance = await weth.balanceOf(admin.address);
 
-
             await ibAlluoEth.connect(signers[0]).withdraw(weth.address, parseEther("50"));
-            let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEth.address)
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEth, handler)
             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
 
             await ibAlluoEth.connect(signers[1]).withdraw(weth.address, parseEther("35"));
-            withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEth.address)
+            withdrawalArray = await getLastWithdrawalInfo(ibAlluoEth, handler)
             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);    
 
             await ibAlluoEth.connect(signers[2]).withdraw(weth.address, parseEther("180"));
-            withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEth.address)
+            withdrawalArray = await getLastWithdrawalInfo(ibAlluoEth, handler)
             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
 
             // When there are deposits, should pay everyone back.
@@ -348,16 +328,16 @@ describe("IbAlluo and handler", function () {
             await handler.satisfyAdapterWithdrawals(ibAlluoEth.address);
             expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
 
-            expect(Number(await weth.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 18)))
+            let delta = (await weth.balanceOf(signers[0].address)).sub(userBalanceAtStart)
+
+            expect(Number(delta)).lessThan(Number(parseUnits("51", 18)))
+            expect(Number(delta)).greaterThanOrEqual(Number(parseUnits("49", 18)))
+            expect(Number(await weth.balanceOf(signers[1].address))).lessThan(Number(parseUnits("36", 18)))
             expect(Number(await weth.balanceOf(signers[1].address))).greaterThanOrEqual(Number(parseUnits("34", 18)))
+            expect(Number(await weth.balanceOf(signers[2].address))).lessThan(Number(parseUnits("181", 18)))
             expect(Number(await weth.balanceOf(signers[2].address))).greaterThanOrEqual(Number(parseUnits("179", 18)))
 
-
-
             })
-
-      
-            
     })
 
 
@@ -365,53 +345,56 @@ describe("IbAlluo and handler", function () {
         it("Depositing 100 jeur and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
             await deposit(signers[0], jeur, parseEther("100"));
             await ibAlluoEur.connect(signers[0]).withdraw(jeur.address, parseEther("50"));
-            let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEur.address)
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
         })
         it("Depositing 100 jeur, attempt to withdraw 50 and then only get paid after there is a deposit", async function () {
             await deposit(signers[0], jeur, parseEther("100"));
             await ibAlluoEur.connect(signers[0]).withdraw(jeur.address, parseEther("50"));
-            let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEur.address)
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
             
             await deposit(signers[1], jeur, parseEther("100"));
             await handler.satisfyAdapterWithdrawals(ibAlluoEur.address);
             // Loss from slippage makes tests awkward.
 
+            expect(Number(await jeur.balanceOf(signers[0].address))).lessThan(Number(parseUnits("51", 18)))
             expect(Number(await jeur.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 18)))
         })
 
         it("Depositing 100 eurt and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
             await deposit(signers[0], eurt, parseUnits("100", 6));
             await ibAlluoEur.connect(signers[0]).withdraw(eurt.address, parseUnits("100", 18));
-            let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEur.address)
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
         })
         it("Depositing 100 eurt, attempt to withdraw 50 and then only get paid after there is a deposit", async function () {
             await deposit(signers[0], eurt, parseUnits("100", 6));
             await ibAlluoEur.connect(signers[0]).withdraw(eurt.address, parseUnits("50", 18));
-            let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEur.address)
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
             
             await deposit(signers[1], eurt, parseUnits("100", 6));
             await handler.satisfyAdapterWithdrawals(ibAlluoEur.address);
+            expect(Number(await eurt.balanceOf(signers[0].address))).lessThan(Number(parseUnits("51", 6)))
             expect(Number(await eurt.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
         })
 
         it("Depositing 100 eurs and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
             await deposit(signers[0], eurs, parseUnits("100", 2));
             await ibAlluoEur.connect(signers[0]).withdraw(eurs.address, parseUnits("50", 18));
-            let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEur.address)
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
         })
         it("Depositing 100 eurs, attempt to withdraw 50 and then only get paid after there is a deposit", async function () {
             await deposit(signers[0], eurs, parseUnits("100", 2));
             await ibAlluoEur.connect(signers[0]).withdraw(eurs.address, parseUnits("50", 18));
-            let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEur.address)
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
             
             await deposit(signers[1], eurs, parseUnits("100", 2));
             await handler.satisfyAdapterWithdrawals(ibAlluoEur.address);
+            expect(Number(await eurs.balanceOf(signers[0].address))).lessThan(Number(parseUnits("51", 2)))
             expect(Number(await eurs.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 2)))
         })
 
@@ -458,7 +441,7 @@ describe("IbAlluo and handler", function () {
                 walletBalance = await eurt.balanceOf(admin.address);
 
                 console.log("Final multisig balance:", walletBalance);
-    
+
             })
         it("Attemping to withdraw more than allowed causes revert.", async function () {
             let walletBalance = await eurt.balanceOf(admin.address);
@@ -469,6 +452,7 @@ describe("IbAlluo and handler", function () {
             describe('EUR Mass deposits and withdrawal test cases', function () {
                 it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
                     let walletBalance = await eurt.balanceOf(admin.address);
+                    let userBalanceAtStart = await jeur.balanceOf(signers[0].address);
         
                     await deposit(signers[0], jeur, parseEther("100"));
                     expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
@@ -484,13 +468,13 @@ describe("IbAlluo and handler", function () {
                     walletBalance = await eurt.balanceOf(admin.address);
         
                     await ibAlluoEur.connect(signers[0]).withdraw(jeur.address, parseEther("50"));
-                    let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEur.address)
+                    let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
                     expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
                     await ibAlluoEur.connect(signers[1]).withdraw(eurt.address, parseUnits("50", 18));
-                    withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEur.address)
+                    withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
                     expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
                     await ibAlluoEur.connect(signers[2]).withdraw(eurs.address,parseUnits("50", 18));
-                    withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEur.address)
+                    withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
                     expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
         
                     // When there are deposits, should pay everyone back.
@@ -498,28 +482,28 @@ describe("IbAlluo and handler", function () {
                     await handler.satisfyAdapterWithdrawals(ibAlluoEur.address);
                     expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
         
-                    expect(Number(await jeur.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 18)))
+                    let delta = (await jeur.balanceOf(signers[0].address)).sub(userBalanceAtStart)
+
+                    expect(Number(delta)).lessThan(Number(parseUnits("51", 18)))
+                    expect(Number(delta)).greaterThanOrEqual(Number(parseUnits("49", 18)))
+                    expect(Number(await eurt.balanceOf(signers[1].address))).lessThan(Number(parseUnits("51", 6)))
                     expect(Number(await eurt.balanceOf(signers[1].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
+                    expect(Number(await eurs.balanceOf(signers[2].address))).lessThan(Number(parseUnits("51", 2)))
                     expect(Number(await eurs.balanceOf(signers[2].address))).greaterThanOrEqual(Number(parseUnits("49", 2)))
-        
-        
-        
                     })
-            
     })
   
-
         describe("USD Tests", function() {
             it("Depositing 100 DAI and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
                 await deposit(signers[0], dai, parseEther("100"));
                 await ibAlluoUsd.connect(signers[0]).withdraw(dai.address, parseEther("50"));
-                let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoUsd.address)
+                let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
             })
             it("Depositing 100 DAI, attempt to withdraw 50 and then only get paid after there is a deposit", async function () {
                 await deposit(signers[0], dai, parseEther("100"));
                 await ibAlluoUsd.connect(signers[0]).withdraw(dai.address, parseEther("50"));
-                let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoUsd.address)
+                let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
     
                 await deposit(signers[1], dai, parseEther("100"));
@@ -530,10 +514,9 @@ describe("IbAlluo and handler", function () {
             it("Depositing 100 USDC and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
                 await deposit(signers[0], usdc, parseUnits("100", 6));
                 await ibAlluoUsd.connect(signers[0]).withdraw(usdc.address, parseUnits("100", 18));
-                let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoUsd.address)
+                let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
             })
-    
             
             it("Depositing surplus USDC should not revert (Checking USD Adaptor Deposit function: Check toSend", async function () {
                 await deposit(signers[0], usdc, parseUnits("100", 6));
@@ -550,33 +533,34 @@ describe("IbAlluo and handler", function () {
     
             })
     
-    
             it("Depositing 100 USDC, attempt to withdraw 50 and then only get paid after there is a deposit", async function () {
                 await deposit(signers[0], usdc, parseUnits("100", 6));
                 await ibAlluoUsd.connect(signers[0]).withdraw(usdc.address, parseUnits("50", 18));
-                let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoUsd.address)
+                let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
                 
                 await deposit(signers[1], usdc, parseUnits("100", 6));
                 await handler.satisfyAdapterWithdrawals(ibAlluoUsd.address);
+                expect(Number(await usdc.balanceOf(signers[0].address))).lessThan(Number(parseUnits("51", 6)))
                 expect(Number(await usdc.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
             })
     
             it("Depositing 100 USDT and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
                 await deposit(signers[0], usdt, parseUnits("100", 6));
                 await ibAlluoUsd.connect(signers[0]).withdraw(usdt.address, parseUnits("50", 18));
-                let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoUsd.address)
+                let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
             })
             it("Depositing 100 USDT, attempt to withdraw 50 and then only get paid after there is a deposit", async function () {
                 await deposit(signers[0], usdt, parseUnits("100", 6));
                 await ibAlluoUsd.connect(signers[0]).withdraw(usdt.address, parseUnits("50", 18));
-                let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoUsd.address)
+                let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
                 
                 await deposit(signers[1], usdt, parseUnits("100", 6));
+
                 await handler.satisfyAdapterWithdrawals(ibAlluoUsd.address);
-    
+                expect(Number(await usdc.balanceOf(signers[0].address))).lessThan(Number(parseUnits("51", 6)))
                 expect(Number(await usdt.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
             })
     
@@ -631,14 +615,13 @@ describe("IbAlluo and handler", function () {
                 expect(Number(await usdc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
                 await expect(ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("500", 18))).to.be.revertedWith('ERC20: burn amount exceeds balance')
                 })
-    
                 
         })
-    
         
         describe('Mass deposits and withdrawal test cases', function () {
             it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
                 let walletBalance = await usdc.balanceOf(admin.address);
+                let userBalanceAtStart = await dai.balanceOf(signers[0].address);
     
                 await deposit(signers[0], dai, parseEther("100"));
                 expect(Number(await usdc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
@@ -656,30 +639,33 @@ describe("IbAlluo and handler", function () {
     
     
                 await ibAlluoUsd.connect(signers[0]).withdraw(dai.address, parseEther("50"));
-                let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoUsd.address)
+                let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
     
                 await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("50", 18));
-                withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoUsd.address)
+                withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
     
     
     
                 await ibAlluoUsd.connect(signers[2]).withdraw(usdt.address,parseUnits("50", 18));
-                withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoUsd.address)
+                withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);    
     
     
                 // When there are deposits, should pay everyone back.
                 await deposit(signers[2], usdt, parseUnits("1000", 6));
                 await handler.satisfyAdapterWithdrawals(ibAlluoUsd.address);
+
+                let delta = (await dai.balanceOf(signers[0].address)).sub(userBalanceAtStart)
      
     
-                expect(Number(await dai.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 18)))
+                expect(Number(delta)).lessThan(Number(parseUnits("51", 18)))
+                expect(Number(delta)).greaterThanOrEqual(Number(parseUnits("49", 18)))
+                expect(Number(await usdc.balanceOf(signers[1].address))).lessThan(Number(parseUnits("51", 6)))
                 expect(Number(await usdc.balanceOf(signers[1].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
+                expect(Number(await usdt.balanceOf(signers[2].address))).lessThan(Number(parseUnits("51", 6)))
                 expect(Number(await usdt.balanceOf(signers[2].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
-    
-    
     
                 })            
         })

@@ -12,7 +12,6 @@ import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeab
 
 import "../interfaces/IIbAlluo.sol";
 import "../interfaces/IAdapter.sol";
-import "hardhat/console.sol";
 
 contract LiquidityHandler is
     Initializable,
@@ -158,16 +157,8 @@ contract LiquidityHandler is
             address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
             IAdapter(adapter).withdraw(_user, _token, _amount);
             emit WithdrawalSatisfied(msg.sender, _user, _token, _amount, 0, block.timestamp);
-
-
         } 
         else {
-            // Need to start with lastWithdrawalRequest+1 because ex.)
-            // lastSatisfied = 0    lastRequest = 0
-            // lastSatisfied = 0     lastRequest = 1
-            // In satisfy function, it always starts with
-            // lastSatisfied + 1 --> So there are errors!
-            // Alternative: Can start at 0 here and change line 194 to + 0 instead.
             uint256 lastWithdrawalRequest = withdrawalSystem.lastWithdrawalRequest;
             withdrawalSystem.lastWithdrawalRequest++;
             withdrawalSystem.withdrawals[lastWithdrawalRequest+1] = Withdrawal({
@@ -193,8 +184,6 @@ contract LiquidityHandler is
             address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
             while (lastSatisfiedWithdrawal != lastWithdrawalRequest) {
                 Withdrawal memory withdrawal = withdrawalSystem.withdrawals[lastSatisfiedWithdrawal+1];
-                uint adapterId = ibAlluoToAdapterId.get(_ibAlluo);
-                address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
                 if (withdrawal.amount <= inAdapter) {
 
                     IAdapter(adapter).withdraw(withdrawal.user, withdrawal.token, withdrawal.amount);
@@ -223,7 +212,7 @@ contract LiquidityHandler is
         }
     }
 
-    function satisfyAllWithdrawals() external whenNotPaused{
+    function satisfyAllWithdrawals() external {
         for(uint i = 0; i < ibAlluoToAdapterId.length(); i++){
             (address ibAlluo,) = ibAlluoToAdapterId.at(i);
             satisfyAdapterWithdrawals(ibAlluo);
@@ -295,20 +284,12 @@ contract LiquidityHandler is
         return adapters;
     }
 
-    function ibAlluoLastWithdrawalCheck(address _ibAlluo) public view returns (uint256[3] memory) {
-        WithdrawalSystem storage _ibAlluoWithdrawalSystem = ibAlluoToWithdrawalSystems[_ibAlluo];
-        return [_ibAlluoWithdrawalSystem.lastWithdrawalRequest, _ibAlluoWithdrawalSystem.lastSatisfiedWithdrawal, _ibAlluoWithdrawalSystem.totalWithdrawalAmount];
-    }
-
     ////////////
 
     function setIbAlluoToAdapterId(address _ibAlluo, uint256 _adapterId) external onlyRole(DEFAULT_ADMIN_ROLE){
         ibAlluoToAdapterId.set(_ibAlluo, _adapterId);
     }
 
-    function grantIbAlluoPermissions(address _ibAlluo) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _grantRole(DEFAULT_ADMIN_ROLE, _ibAlluo);
-    }
     
     function setAdapter(
         uint256 _id, 

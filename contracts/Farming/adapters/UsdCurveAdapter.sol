@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 import "../../interfaces/curve/ICurvePoolUSD.sol";
-import "hardhat/console.sol";
 
 contract UsdCurveAdapter is AccessControl {
     using Address for address;
