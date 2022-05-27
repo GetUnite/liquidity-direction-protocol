@@ -98,6 +98,11 @@
       "address": "0x910c98B3EAc2B4c3f6FdB81882bfd0161e507567",
       "txHash": "0xafe2cf2ced58cb9287c4314031e6ff4aea17a6e3cb3a29e52e7c46c42572827d",
       "kind": "uups"
+    },
+    {
+      "address": "0x8EE1eDEE93B10e9b02628254eBd610D6b42020A8",
+      "txHash": "0x66ca46934a7b06704451db82258c9d24bce05de826b7b7f4dd392097f3a2d5f2",
+      "kind": "uups"
     }
   ],
   "impls": {
