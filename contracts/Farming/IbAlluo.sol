@@ -4,7 +4,6 @@ pragma solidity ^0.8.11;
 import "./AlluoERC20Upgradable.sol";
 import "../interfaces/ILiquidityBufferVault.sol";
 import "../mock/interestHelper/Interest.sol";
-import "../interfaces/IExchange.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -61,10 +60,6 @@ contract IbAlluo is
     // trusted forwarder address, see EIP-2771
     address public trustedForwarder;
 
-    // Address of the exchange used to convert non-supportedToken deposits and withdrawals
-    address public exchangeAddress;
-
-
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
     event NewBufferSet(address oldBuffer, address newBuffer);
@@ -97,8 +92,7 @@ contract IbAlluo is
         address[] memory _supportedTokens,
         uint256 _interestPerSecond,
         uint256 _annualInterest,
-        address _trustedForwarder,
-        address _exchangeAddress
+        address _trustedForwarder
     ) public initializer {
         __ERC20_init(_name, _symbol);
         __Pausable_init();
@@ -125,7 +119,7 @@ contract IbAlluo is
 
         liquidityBuffer = _buffer;
         trustedForwarder = _trustedForwarder;
-        exchangeAddress = _exchangeAddress;
+
         emit NewBufferSet(address(0), liquidityBuffer);
     }
 

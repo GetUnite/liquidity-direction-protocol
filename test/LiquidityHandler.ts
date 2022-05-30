@@ -139,7 +139,7 @@ describe("IbAlluo and handler", function () {
 
 
     beforeEach(async function () {
-        const exchangeAddress = ZERO_ADDRESS; // Temp
+        const exchangeAddress = ZERO_ADDRESS; // Temp for polygon
         const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
         //We are using this contract to simulate Gnosis multisig wallet
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
@@ -203,7 +203,7 @@ describe("IbAlluo and handler", function () {
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
-                exchangeAddress
+
             ],
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
@@ -224,8 +224,7 @@ describe("IbAlluo and handler", function () {
                 eurs.address],
                 BigNumber.from("100000000470636740"),
                 1600,
-                "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
-                exchangeAddress],
+                "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",],
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
@@ -243,7 +242,7 @@ describe("IbAlluo and handler", function () {
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
-                exchangeAddress],
+            ],
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
