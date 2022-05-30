@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -12,6 +13,7 @@ import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeab
 
 import "../interfaces/IIbAlluo.sol";
 import "../interfaces/IAdapter.sol";
+import "../interfaces/IExchange.sol";
 import "hardhat/console.sol";
 
 contract LiquidityHandler is
@@ -49,6 +51,8 @@ contract LiquidityHandler is
         uint256 amount;
         // withdrawal time
         uint256 time;
+        // Output token (Say, for ibAlluoETH, want withdrawal in USDC, then token is wETH and outputtoken is USDC);
+        address outputToken;
     }
 
     struct WithdrawalSystem {
@@ -60,6 +64,10 @@ contract LiquidityHandler is
     }
 
     mapping(address => WithdrawalSystem) public ibAlluoToWithdrawalSystems;
+
+    // Address of the exchange used to convert non-supportedToken deposits and withdrawals
+    address public exchangeAddress;
+    uint256 public exchangeSlippage;
 
     //info about what adapter or iballuo
     event EnoughToSatisfy(
@@ -89,13 +97,14 @@ contract LiquidityHandler is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(address _multiSigWallet) public initializer {
+    function initialize(address _multiSigWallet, address _exchangeAddress, uint256 _exchangeSlippage) public initializer {
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
         require(_multiSigWallet.isContract(), "Handler: Not contract");
-
+        exchangeAddress = _exchangeAddress;
+        exchangeSlippage = _exchangeSlippage;
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
@@ -107,7 +116,7 @@ contract LiquidityHandler is
      ** @param _amount Amount of tokens in correct deimals (10**18 for DAI, 10**6 for USDT)
      */
     function deposit(address _token, uint256 _amount) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
-        uint256 amount18 = _amount * 10 ** (18 - ERC20(_token).decimals());
+        uint256 amount18 = _amount * 10 ** (18 - ERC20Upgradeable(_token).decimals());
 
         uint256 inAdapter = getAdapterAmount(msg.sender);
         uint256 expectedAdapterAmount = getExpectedAdapterAmount(msg.sender, amount18);
@@ -174,7 +183,55 @@ contract LiquidityHandler is
                 user: _user,
                 token: _token,
                 amount: _amount,
-                time: block.timestamp
+                time: block.timestamp,
+                outputToken: _token
+            });
+            withdrawalSystem.totalWithdrawalAmount += _amount;
+            emit AddedToQueue(msg.sender, _user, _token, _amount, lastWithdrawalRequest+1, block.timestamp);
+        }
+    
+    }
+
+    function _withdrawThroughExchange(address _mainToken, address _targetToken, uint256 _amount18, address _user  ) internal {
+        uint256 amountinMainTokens = _amount18 * 10**ERC20Upgradeable(_mainToken).decimals() / 10**18;
+        IERC20Upgradeable(_mainToken).approve(exchangeAddress, type(uint256).max);
+        uint256 amountinTargetTokens = IExchange(exchangeAddress).exchange(_mainToken, _targetToken, amountinMainTokens,0);
+        IERC20Upgradeable(_targetToken).transfer(_user, amountinTargetTokens);
+    }
+    // Same function as above but overload for case when you want to withdraw in a different token native to an ibAlluo.
+    // For example: Withdraw USDC from ibAlluoEth.
+    function withdraw(address _user, address _token, uint256 _amount, address _outputToken) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE){
+        uint256 inAdapter = getAdapterAmount(msg.sender);
+
+        WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[msg.sender];
+        if (inAdapter >= _amount && withdrawalSystem.totalWithdrawalAmount == 0) {
+            uint256 adapterId = ibAlluoToAdapterId.get(msg.sender);
+            address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
+            if (_token != _outputToken) {
+                IAdapter(adapter).withdraw(address(this), _token, _amount);
+                _withdrawThroughExchange(_token, _outputToken, _amount, _user);
+            } else {
+                IAdapter(adapter).withdraw(_user, _token, _amount);
+            }
+            emit WithdrawalSatisfied(msg.sender, _user, _token, _amount, 0, block.timestamp);
+
+
+        } 
+        else {
+            // Need to start with lastWithdrawalRequest+1 because ex.)
+            // lastSatisfied = 0    lastRequest = 0
+            // lastSatisfied = 0     lastRequest = 1
+            // In satisfy function, it always starts with
+            // lastSatisfied + 1 --> So there are errors!
+            // Alternative: Can start at 0 here and change line 194 to + 0 instead.
+            uint256 lastWithdrawalRequest = withdrawalSystem.lastWithdrawalRequest;
+            withdrawalSystem.lastWithdrawalRequest++;
+            withdrawalSystem.withdrawals[lastWithdrawalRequest+1] = Withdrawal({
+                user: _user,
+                token: _token,
+                amount: _amount,
+                time: block.timestamp,
+                outputToken: _outputToken
             });
             withdrawalSystem.totalWithdrawalAmount += _amount;
             emit AddedToQueue(msg.sender, _user, _token, _amount, lastWithdrawalRequest+1, block.timestamp);
@@ -194,8 +251,12 @@ contract LiquidityHandler is
                 uint adapterId = ibAlluoToAdapterId.get(_ibAlluo);
                 address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
                 if (withdrawal.amount <= inAdapter) {
-                    IAdapter(adapter).withdraw(withdrawal.user, withdrawal.token, withdrawal.amount);
-                
+                    if (withdrawal.outputToken != withdrawal.token) {
+                        IAdapter(adapter).withdraw(address(this), withdrawal.token, withdrawal.amount);
+                        _withdrawThroughExchange(withdrawal.token, withdrawal.outputToken, withdrawal.amount, withdrawal.user);
+                    } else {
+                        IAdapter(adapter).withdraw(withdrawal.user, withdrawal.token, withdrawal.amount);
+                    }
                     inAdapter -= withdrawal.amount;
                     withdrawalSystem.totalWithdrawalAmount -= withdrawal.amount;
                     withdrawalSystem.lastSatisfiedWithdrawal++;

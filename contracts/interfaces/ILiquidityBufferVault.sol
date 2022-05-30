@@ -35,5 +35,6 @@ interface ILiquidityBufferVault {
   function upgradeStatus (  ) external view returns ( bool );
   function wallet (  ) external view returns ( address );
   function withdraw ( address _user, address _token, uint256 _amount ) external;
+  function withdraw ( address _user, address _token, uint256 _amount, address _outputToken ) external;
   function withdrawals ( uint256 ) external view returns ( address user, address token, uint256 amount, uint256 time );
 }

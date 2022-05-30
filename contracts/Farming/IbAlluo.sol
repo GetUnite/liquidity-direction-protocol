@@ -220,17 +220,28 @@ contract IbAlluo is
         // Do this once the adapter is optimised on chain to choose token with highest liquidity.
         // The main token is the one which isn't converted to primary tokens.
         // Small issue with deposits and withdrawals though. Need to approve.
-
         if (supportedTokens.contains(_token) == false) {
+            IERC20Upgradeable(_token).safeTransferFrom(
+            _msgSender(),
+            address(this),
+            _amount
+        );
             address mainToken = supportedTokens.at(0);
-            _amount = IExchange(exchangeAddress).exchange(_token, mainToken, _amount, _amount * (10000- exchangeSlippage)/10000);
+            IERC20Upgradeable(_token).approve(exchangeAddress, _amount);
+            _amount = IExchange(exchangeAddress).exchange(_token, mainToken, _amount, 0);
             _token = mainToken;
-        }
-        IERC20Upgradeable(_token).safeTransferFrom(
+            IERC20Upgradeable(mainToken).safeTransfer(
+            address(liquidityBuffer),
+            _amount
+        );
+
+        } else {
+            IERC20Upgradeable(_token).safeTransferFrom(
             _msgSender(),
             address(liquidityBuffer),
             _amount
         );
+        }
         updateRatio();
 
         ILiquidityBufferVault(liquidityBuffer).deposit(_token, _amount);
@@ -247,7 +258,7 @@ contract IbAlluo is
     /// @dev When called, immediately check for new interest index. Then find the adjusted amount in IbAlluo tokens
     ///      Then burn appropriate amount of IbAlluo tokens to receive asset token
     /// @param _targetToken Asset token
-    /// @param _amount Amount (parsed 10**18)
+    /// @param _amount Amount (parsed 10**18) in ibAlluo****
 
     function withdrawTo(
         address _recipient,
@@ -262,17 +273,14 @@ contract IbAlluo is
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(_msgSender(), adjustedAmount);
 
-
         if (supportedTokens.contains(_targetToken) == false) {
             address mainToken = supportedTokens.at(0);
             ILiquidityBufferVault(liquidityBuffer).withdraw(
             _recipient,
             mainToken,
-            _amount
+            _amount,
+            _targetToken
             );
-            uint256 _amountinMainTokens = _amount / 10**18 *  AlluoERC20Upgradable(mainToken).decimals();
-            IExchange(exchangeAddress).exchange(mainToken, _targetToken, _amountinMainTokens, _amountinMainTokens * (10000- exchangeSlippage)/10000);
-
         } else {
             ILiquidityBufferVault(liquidityBuffer).withdraw(
             _recipient,

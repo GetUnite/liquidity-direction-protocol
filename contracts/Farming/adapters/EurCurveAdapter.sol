@@ -12,9 +12,9 @@ contract EurCurveAdapter is AccessControl {
     using Address for address;
     using SafeERC20 for IERC20;
 
-    address public constant jEUR = 0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c;
-    address public constant EURS = 0xE111178A87A3BFf0c8d18DECBa5798827539Ae99;
-    address public constant EURT = 0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f;
+    address public constant jEUR = 0x0f17BC9a994b87b5225cFb6a2Cd4D667ADb4F20B;
+    address public constant EURS = 0xdB25f211AB05b1c97D595516F45794528a807ad8;
+    address public constant EURT = 0xC581b735A1688071A1746c968e0798D642EDE491;
     address public constant curvePool = 0xAd326c253A84e9805559b73A08724e11E49ca651;
     address public wallet;
     uint256 public slippage;
