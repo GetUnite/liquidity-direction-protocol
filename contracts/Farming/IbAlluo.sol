@@ -4,6 +4,7 @@ pragma solidity ^0.8.11;
 import "./AlluoERC20Upgradable.sol";
 import "../interfaces/ILiquidityBufferVault.sol";
 import "../mock/interestHelper/Interest.sol";
+import "../interfaces/IExchange.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -60,6 +61,10 @@ contract IbAlluo is
     // trusted forwarder address, see EIP-2771
     address public trustedForwarder;
 
+    // Address of the exchange used to convert non-supportedToken deposits and withdrawals
+    address public exchangeAddress;
+    uint256 public exchangeSlippage;
+
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
     event NewBufferSet(address oldBuffer, address newBuffer);
@@ -92,7 +97,9 @@ contract IbAlluo is
         address[] memory _supportedTokens,
         uint256 _interestPerSecond,
         uint256 _annualInterest,
-        address _trustedForwarder
+        address _trustedForwarder,
+        address _exchangeAddress,
+        uint256 _exchangeSlippage
     ) public initializer {
         __ERC20_init(_name, _symbol);
         __Pausable_init();
@@ -119,7 +126,8 @@ contract IbAlluo is
 
         liquidityBuffer = _buffer;
         trustedForwarder = _trustedForwarder;
-
+        exchangeAddress = _exchangeAddress;
+        exchangeSlippage = _exchangeSlippage;
         emit NewBufferSet(address(0), liquidityBuffer);
     }
 
@@ -205,14 +213,19 @@ contract IbAlluo is
     /// @dev When called, asset token is sent to the wallet, then the index is updated
     ///      so that the adjusted amount is accurate.
     /// @param _token Deposit token address
-    /// @param _amount Amount (with token desimals)
+    /// @param _amount Amount (with token decimals)
 
     function deposit(address _token, uint256 _amount) external {
-        require(
-            supportedTokens.contains(_token),
-            "IbAlluo: Token not supported"
-        );
+        // Change targetToken to either "mainToken read from adapter" or allow paramter set in ibAlluo itself
+        // Do this once the adapter is optimised on chain to choose token with highest liquidity.
+        // The main token is the one which isn't converted to primary tokens.
+        // Small issue with deposits and withdrawals though. Need to approve.
 
+        if (supportedTokens.contains(_token) == false) {
+            address mainToken = supportedTokens.at(0);
+            _amount = IExchange(exchangeAddress).exchange(_token, mainToken, _amount, _amount * (10000- exchangeSlippage)/10000);
+            _token = mainToken;
+        }
         IERC20Upgradeable(_token).safeTransferFrom(
             _msgSender(),
             address(liquidityBuffer),
@@ -241,19 +254,33 @@ contract IbAlluo is
         address _targetToken,
         uint256 _amount
     ) public {
-        require(
-            supportedTokens.contains(_targetToken),
-            "IbAlluo: Token not supported"
-        );
+        // Change mainToken to either "mainToken read from adapter" or allow paramter set in ibAlluo itself
+        // Do this once the adapter is optimised on chain to choose token with highest liquidity.
+        // The main token is the one which isn't converted to primary tokens.
+
         updateRatio();
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(_msgSender(), adjustedAmount);
 
-        ILiquidityBufferVault(liquidityBuffer).withdraw(
+
+        if (supportedTokens.contains(_targetToken) == false) {
+            address mainToken = supportedTokens.at(0);
+            ILiquidityBufferVault(liquidityBuffer).withdraw(
+            _recipient,
+            mainToken,
+            _amount
+            );
+            uint256 _amountinMainTokens = _amount / 10**18 *  AlluoERC20Upgradable(mainToken).decimals();
+            IExchange(exchangeAddress).exchange(mainToken, _targetToken, _amountinMainTokens, _amountinMainTokens * (10000- exchangeSlippage)/10000);
+
+        } else {
+            ILiquidityBufferVault(liquidityBuffer).withdraw(
             _recipient,
             _targetToken,
             _amount
-        );
+            );
+        }
+
         emit TransferAssetValue(_msgSender(), address(0), adjustedAmount, _amount, growingRatio);
         emit BurnedForWithdraw(_msgSender(), adjustedAmount);
     }
