@@ -139,17 +139,16 @@ describe("IbAlluo and handler", function () {
 
 
     beforeEach(async function () {
+        const exchangeAddress = ZERO_ADDRESS; // Temp
         const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
-        const exchangeAddress = ZERO_ADDRESS;
-        const exchangeSlippage = 500;
         //We are using this contract to simulate Gnosis multisig wallet
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
         multisig = await Multisig.deploy(true);
 
         const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
-
+        // Temp values for exchange stuff.
         handler = await upgrades.deployProxy(Handler,
-            [admin.address, exchangeAddress, exchangeSlippage],
+            [admin.address, exchangeAddress, 0],
             { initializer: 'initialize', kind: 'uups' }
         ) as LiquidityHandler;
 
@@ -204,8 +203,8 @@ describe("IbAlluo and handler", function () {
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
-                exchangeAddress,
-                exchangeSlippage],
+                exchangeAddress
+            ],
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
@@ -226,8 +225,7 @@ describe("IbAlluo and handler", function () {
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
-                exchangeAddress,
-                exchangeSlippage],
+                exchangeAddress],
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
@@ -245,8 +243,7 @@ describe("IbAlluo and handler", function () {
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
-                exchangeAddress,
-                exchangeSlippage],
+                exchangeAddress],
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 

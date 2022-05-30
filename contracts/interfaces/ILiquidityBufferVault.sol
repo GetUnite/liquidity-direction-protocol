@@ -12,6 +12,7 @@ interface ILiquidityBufferVault {
   function changeUpgradeStatus ( bool _status ) external;
   function curvePool (  ) external view returns ( address );
   function deposit ( address _token, uint256 _amount ) external;
+  function deposit ( address _token, uint256 _amount, address _targetToken) external;
   function getBufferAmount (  ) external view returns ( uint256 );
   function getCloseToLimitWithdrawals (  ) external view returns (uint256[] calldata, uint256 amount );
   function getExpectedBufferAmount ( uint256 _newAmount ) external view returns ( uint256 );

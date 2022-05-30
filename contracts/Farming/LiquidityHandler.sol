@@ -151,6 +151,50 @@ contract LiquidityHandler is
             }
         }
     }
+    // Same as above but for ibAlluo deposits not in ibAlluo supported token currency
+     function deposit(address _token, uint256 _amount, address _targetToken) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
+
+         if (_token != _targetToken) {
+            IERC20Upgradeable(_token).approve(exchangeAddress, _amount);
+            // Amount in TargetToken decimals.
+            _amount = IExchange(exchangeAddress).exchange(_token, _targetToken, _amount, 0);
+            _token = _targetToken;
+        }
+        uint256 amount18 = _amount * 10 ** (18 - ERC20Upgradeable(_token).decimals());
+
+        uint256 inAdapter = getAdapterAmount(msg.sender);
+        uint256 expectedAdapterAmount = getExpectedAdapterAmount(msg.sender, amount18);
+
+        uint256 adapterId = ibAlluoToAdapterId.get(msg.sender);
+        address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
+
+        IERC20Upgradeable(_token).safeTransfer(adapter, _amount);
+        if (inAdapter < expectedAdapterAmount) {
+            if (expectedAdapterAmount < inAdapter + amount18) {
+                uint256 toWallet = inAdapter + amount18 - expectedAdapterAmount;
+                uint256 leaveInPool = amount18 - toWallet;
+
+                IAdapter(adapter).deposit(_token, amount18, leaveInPool);
+
+            } else {
+                IAdapter(adapter).deposit(_token, amount18, amount18);
+            }
+
+        } else {
+            IAdapter(adapter).deposit(_token, amount18, 0);
+        }
+
+        WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[msg.sender];
+
+        if(withdrawalSystem.totalWithdrawalAmount > 0 && !withdrawalSystem.resolverTrigger){
+            uint256 inAdapterAfterDeposit = getAdapterAmount(msg.sender);
+            uint256 firstInQueueAmount = withdrawalSystem.withdrawals[withdrawalSystem.lastSatisfiedWithdrawal + 1].amount;
+            if(firstInQueueAmount <= inAdapterAfterDeposit){
+                withdrawalSystem.resolverTrigger = true;
+                emit EnoughToSatisfy(msg.sender, inAdapterAfterDeposit, withdrawalSystem.totalWithdrawalAmount);
+            }
+        }
+    }
 
     /** @notice Called by ibAlluo, withdraws tokens from the adapter.
     * @dev Attempt to withdraw. If there are insufficient funds, you are added to the queue.

@@ -63,7 +63,7 @@ contract IbAlluo is
 
     // Address of the exchange used to convert non-supportedToken deposits and withdrawals
     address public exchangeAddress;
-    uint256 public exchangeSlippage;
+
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
@@ -98,8 +98,7 @@ contract IbAlluo is
         uint256 _interestPerSecond,
         uint256 _annualInterest,
         address _trustedForwarder,
-        address _exchangeAddress,
-        uint256 _exchangeSlippage
+        address _exchangeAddress
     ) public initializer {
         __ERC20_init(_name, _symbol);
         __Pausable_init();
@@ -127,7 +126,6 @@ contract IbAlluo is
         liquidityBuffer = _buffer;
         trustedForwarder = _trustedForwarder;
         exchangeAddress = _exchangeAddress;
-        exchangeSlippage = _exchangeSlippage;
         emit NewBufferSet(address(0), liquidityBuffer);
     }
 
@@ -152,7 +150,7 @@ contract IbAlluo is
      *
      * NOTE: If `amount` is the maximum `uint256`, the allowance is not updated on
      * `transferFrom`. This is semantically equivalent to an infinite approval.
-     *
+     * 
      * NOTE: Because of constantly growing ratio between IbAlluo and asset value
      *       we recommend to approve amount slightly more
      */
@@ -220,31 +218,17 @@ contract IbAlluo is
         // Do this once the adapter is optimised on chain to choose token with highest liquidity.
         // The main token is the one which isn't converted to primary tokens.
         // Small issue with deposits and withdrawals though. Need to approve.
+        address mainToken = _token;
+        IERC20Upgradeable(_token).safeTransferFrom(
+            _msgSender(),
+            address(liquidityBuffer),
+            _amount
+        );
         if (supportedTokens.contains(_token) == false) {
-            IERC20Upgradeable(_token).safeTransferFrom(
-            _msgSender(),
-            address(this),
-            _amount
-        );
-            address mainToken = supportedTokens.at(0);
-            IERC20Upgradeable(_token).approve(exchangeAddress, _amount);
-            _amount = IExchange(exchangeAddress).exchange(_token, mainToken, _amount, 0);
-            _token = mainToken;
-            IERC20Upgradeable(mainToken).safeTransfer(
-            address(liquidityBuffer),
-            _amount
-        );
-
-        } else {
-            IERC20Upgradeable(_token).safeTransferFrom(
-            _msgSender(),
-            address(liquidityBuffer),
-            _amount
-        );
-        }
+            mainToken = supportedTokens.at(0);
+        } 
         updateRatio();
-
-        ILiquidityBufferVault(liquidityBuffer).deposit(_token, _amount);
+        ILiquidityBufferVault(liquidityBuffer).deposit(_token, _amount, mainToken);
 
         uint256 amountIn18 = _amount *
             10**(18 - AlluoERC20Upgradable(_token).decimals());
