@@ -4,7 +4,7 @@ pragma solidity ^0.8.11;
 import "./AlluoERC20Upgradable.sol";
 import "../interfaces/ILiquidityBufferVault.sol";
 import "../mock/interestHelper/Interest.sol";
-
+import "../interfaces/IExchange.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
@@ -59,6 +59,8 @@ contract IbAlluo is
 
     // trusted forwarder address, see EIP-2771
     address public trustedForwarder;
+    
+    address public exchangeAddress;
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
@@ -92,7 +94,8 @@ contract IbAlluo is
         address[] memory _supportedTokens,
         uint256 _interestPerSecond,
         uint256 _annualInterest,
-        address _trustedForwarder
+        address _trustedForwarder,
+        address _exchangeAddress
     ) public initializer {
         __ERC20_init(_name, _symbol);
         __Pausable_init();
@@ -116,7 +119,7 @@ contract IbAlluo is
         growingRatio = 10**18;
         updateTimeLimit = 60;
         lastInterestCompound = block.timestamp;
-
+        exchangeAddress = _exchangeAddress;
         liquidityBuffer = _buffer;
         trustedForwarder = _trustedForwarder;
 
@@ -212,18 +215,36 @@ contract IbAlluo is
         // Do this once the adapter is optimised on chain to choose token with highest liquidity.
         // The main token is the one which isn't converted to primary tokens.
         // Small issue with deposits and withdrawals though. Need to approve.
-        address mainToken = _token;
-        IERC20Upgradeable(_token).safeTransferFrom(
+        // Change targetToken to either "mainToken read from adapter" or allow paramter set in ibAlluo itself
+        // Do this once the adapter is optimised on chain to choose token with highest liquidity.
+        // The main token is the one which isn't converted to primary tokens.
+        // Small issue with deposits and withdrawals though. Need to approve.
+
+        if (supportedTokens.contains(_token) == false) {
+            IERC20Upgradeable(_token).safeTransferFrom(
+            _msgSender(),
+            address(this),
+            _amount
+        );
+            address mainToken = supportedTokens.at(0);
+            IERC20Upgradeable(_token).approve(exchangeAddress, _amount);
+            _amount = IExchange(exchangeAddress).exchange(_token, mainToken, _amount, 0);
+            _token = mainToken;
+            IERC20Upgradeable(mainToken).safeTransfer(
+            address(liquidityBuffer),
+            _amount
+        );
+
+        } else {
+            IERC20Upgradeable(_token).safeTransferFrom(
             _msgSender(),
             address(liquidityBuffer),
             _amount
         );
-        if (supportedTokens.contains(_token) == false) {
-            mainToken = supportedTokens.at(0);
-        } 
+        }
         updateRatio();
-        ILiquidityBufferVault(liquidityBuffer).deposit(_token, _amount, mainToken);
 
+        ILiquidityBufferVault(liquidityBuffer).deposit(_token, _amount);
         uint256 amountIn18 = _amount *
             10**(18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = (amountIn18 * multiplier) / growingRatio;

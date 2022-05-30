@@ -206,7 +206,8 @@ describe("IbAlluo and handler", function () {
                 usdt.address],
                 BigNumber.from("100000000470636740"),
                 1600,
-                trustedForwarder],
+                trustedForwarder,
+                exchangeAddress],
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
@@ -243,7 +244,8 @@ describe("IbAlluo and handler", function () {
                 [weth.address],
                 BigNumber.from("100000000470636740"),
                 1600,
-                trustedForwarder],
+                trustedForwarder,
+                exchangeAddress],
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 

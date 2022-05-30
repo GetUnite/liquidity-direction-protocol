@@ -203,7 +203,7 @@ describe("IbAlluo and handler", function () {
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
-
+                exchangeAddress
             ],
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
@@ -224,7 +224,8 @@ describe("IbAlluo and handler", function () {
                 eurs.address],
                 BigNumber.from("100000000470636740"),
                 1600,
-                "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",],
+                "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
+                exchangeAddress],
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
@@ -242,6 +243,7 @@ describe("IbAlluo and handler", function () {
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
+                exchangeAddress
             ],
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
