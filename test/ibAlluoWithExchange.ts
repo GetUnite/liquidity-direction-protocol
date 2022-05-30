@@ -266,9 +266,9 @@ describe("IbAlluo and handler", function () {
         it("Depositing in Dai and then withdrawing in Dai should give you Dai back (without being added to withdrawal queue) ", async function () {
             await depositToibAlluoEth(signers[0], dai, parseEther("100"));
             expect(Number(await ibAlluoEth.balanceOf(signers[0].address))).greaterThan(Number(0))
-            await depositToibAlluoEth(signers[0], dai, parseEther("1000"));
-            await depositToibAlluoEth(signers[0], dai, parseEther("1000"));
-            await depositToibAlluoEth(signers[0], dai, parseEther("1000"));
+            await depositToibAlluoEth(signers[8], dai, parseEther("1000"));
+            await depositToibAlluoEth(signers[8], dai, parseEther("1000"));
+            await depositToibAlluoEth(signers[8], dai, parseEther("1000"));
 
             await ibAlluoEth.connect(signers[0]).withdraw(dai.address, parseEther("0.039"))
             // Once there are sufficient deposits, withdrawal is fufilled.
@@ -278,18 +278,54 @@ describe("IbAlluo and handler", function () {
 
         })
         it("Depositing in Dai and then withdrawing in Dai should give you Dai back (after being added to withdrawal queue) ", async function () {
-            await depositToibAlluoEth(signers[0], dai, parseEther("100"));
-            expect(Number(await ibAlluoEth.balanceOf(signers[0].address))).greaterThan(Number(0))
-            await ibAlluoEth.connect(signers[0]).withdraw(dai.address, parseEther("0.039"))
+            await depositToibAlluoEth(signers[1], dai, parseEther("100"));
+            expect(Number(await ibAlluoEth.balanceOf(signers[1].address))).greaterThan(Number(0))
+            await ibAlluoEth.connect(signers[1]).withdraw(dai.address, parseEther("0.039"))
 
-            await depositToibAlluoEth(signers[0], dai, parseEther("1000"));
+            await depositToibAlluoEth(signers[8], dai, parseEther("10000"));
 
             // Once there are sufficient deposits, withdrawal is fufilled.
             await handler.satisfyAllWithdrawals();
-            console.log(await dai.balanceOf(signers[0].address));
-            expect(Number(await dai.balanceOf(signers[0].address))).greaterThan(Number(70))
+            console.log(await dai.balanceOf(signers[1].address));
+            expect(Number(await dai.balanceOf(signers[1].address))).greaterThan(Number(70))
 
         })
+
+        it("Depositing in USDC should give you ibAlluoEth", async function () {
+            await depositToibAlluoEth(signers[2], usdc, parseUnits("100", 6));
+            expect(Number(await ibAlluoEth.balanceOf(signers[2].address))).greaterThan(Number(0))
+        })
+        it("Depositing in USDC and then withdrawing in Dai should give you Dai back (without being added to withdrawal queue) ", async function () {
+            console.log(await dai.balanceOf(signers[3].address), "before");
+
+            await depositToibAlluoEth(signers[3], usdc, parseUnits("100", 6));
+            expect(Number(await ibAlluoEth.balanceOf(signers[3].address))).greaterThan(Number(0))
+            await depositToibAlluoEth(signers[8], dai, parseEther("10000"));
+
+
+            await ibAlluoEth.connect(signers[3]).withdraw(dai.address, parseEther("0.039"))
+
+            console.log(await dai.balanceOf(signers[3].address));
+            expect(Number(await dai.balanceOf(signers[3].address))).greaterThan(Number(70))
+
+        })
+        it("Depositing in USDC and then withdrawing in Dai should give you Dai back (after being added to withdrawal queue) ", async function () {
+            console.log(await dai.balanceOf(signers[4].address), "before");
+
+            await depositToibAlluoEth(signers[4], usdc, parseUnits("100", 6));
+            expect(Number(await ibAlluoEth.balanceOf(signers[4].address))).greaterThan(Number(0))
+            await ibAlluoEth.connect(signers[4]).withdraw(dai.address, parseEther("0.039"))
+
+            await depositToibAlluoEth(signers[8], dai, parseEther("1000"));
+
+            // Once there are sufficient deposits, withdrawal is fufilled.
+            await handler.satisfyAllWithdrawals();
+            console.log(await dai.balanceOf(signers[4].address));
+            expect(Number(await dai.balanceOf(signers[4].address))).greaterThan(Number(70))
+
+        })
+
+
     })
     // describe("EThAdapter no pool: Test cases", function () {
     //     it("Depositing 100 weth and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
