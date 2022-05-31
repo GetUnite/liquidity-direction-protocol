@@ -297,6 +297,10 @@ contract LiquidityHandler is
         return false;
     }
 
+    function getWithdrawal(address _ibAlluo, uint _id) external view returns(Withdrawal memory){
+        return ibAlluoToWithdrawalSystems[_ibAlluo].withdrawals[_id];
+    }
+
     /* ========== ADMIN CONFIGURATION ========== */
 
     function setIbAlluoToAdapterId(address _ibAlluo, uint256 _adapterId) external onlyRole(DEFAULT_ADMIN_ROLE){

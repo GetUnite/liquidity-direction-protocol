@@ -5,7 +5,7 @@ async function main() {
 
   const Handler = await ethers.getContractFactory("LiquidityHandler");
 
-  await upgrades.upgradeProxy('0xF877605269bB018c96bD1c93F276F834F45Ccc3f', Handler);
+  await upgrades.upgradeProxy('address', Handler);
   console.log('Handler upgraded');
 
 }
