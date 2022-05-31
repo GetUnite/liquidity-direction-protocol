@@ -5,6 +5,9 @@ import "./AlluoERC20Upgradable.sol";
 import "../interfaces/ILiquidityBufferVault.sol";
 import "../mock/interestHelper/Interest.sol";
 import "../interfaces/IExchange.sol";
+import "../interfaces/ITokenFetcher.sol";
+import "hardhat/console.sol";
+
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
@@ -61,6 +64,7 @@ contract IbAlluo is
     address public trustedForwarder;
     
     address public exchangeAddress;
+    address public tokenFetcher;
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
@@ -96,6 +100,7 @@ contract IbAlluo is
         uint256 _annualInterest,
         address _trustedForwarder,
         address _exchangeAddress
+        // address _tokenFetcher
     ) public initializer {
         __ERC20_init(_name, _symbol);
         __Pausable_init();
@@ -120,6 +125,7 @@ contract IbAlluo is
         updateTimeLimit = 60;
         lastInterestCompound = block.timestamp;
         exchangeAddress = _exchangeAddress;
+        // tokenFetcher = _tokenFetcher;
         liquidityBuffer = _buffer;
         trustedForwarder = _trustedForwarder;
 
@@ -265,15 +271,15 @@ contract IbAlluo is
         uint256 _amount
     ) public {
         // Change mainToken to either "mainToken read from adapter" or allow paramter set in ibAlluo itself
-        // Do this once the adapter is optimised on chain to choose token with highest liquidity.
+        // Do this once the adapter is optimised on chain to choose token with highest liquidity. (Artem is working on this ticket)
         // The main token is the one which isn't converted to primary tokens.
-
         updateRatio();
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(_msgSender(), adjustedAmount);
-
         if (supportedTokens.contains(_targetToken) == false) {
             address mainToken = supportedTokens.at(0);
+            // This just is used to revert if there is no active route.
+            require(IExchange(exchangeAddress).buildRoute(mainToken, _targetToken).length>0, "This token is not supported");
             ILiquidityBufferVault(liquidityBuffer).withdraw(
             _recipient,
             mainToken,
