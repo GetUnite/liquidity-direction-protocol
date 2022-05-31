@@ -128,6 +128,10 @@ contract UsdCurveAdapter is AccessControl {
             return 0;
         }
     }
+    function getCoreTokens() external pure returns ( address mathToken, address primaryToken ){
+        return (DAI, USDC);
+    }
+
 
     function setSlippage(uint32 _newSlippage) external onlyRole(DEFAULT_ADMIN_ROLE) {
         slippage = _newSlippage;

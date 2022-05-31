@@ -125,6 +125,10 @@ contract EurCurveAdapter is AccessControl {
         }
     }
 
+    function getCoreTokens() external pure returns ( address mathToken, address primaryToken ){
+        return (EURS, EURT);
+    }
+
     function setSlippage(uint32 _newSlippage) external onlyRole(DEFAULT_ADMIN_ROLE) {
         slippage = _newSlippage;
     }

@@ -170,7 +170,6 @@ contract LiquidityHandler is
             withdrawalSystem.totalWithdrawalAmount += _amount;
             emit AddedToQueue(msg.sender, _user, _token, _amount, lastWithdrawalRequest+1, block.timestamp);
         }
-    
     }
 
     function satisfyAdapterWithdrawals(address _ibAlluo) public whenNotPaused{
@@ -284,7 +283,21 @@ contract LiquidityHandler is
         return adapters;
     }
 
-    ////////////
+    function isUserWaiting(address _ibAlluo, address _user) external view returns(bool){
+        WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[_ibAlluo];
+        uint256 lastWithdrawalRequest = withdrawalSystem.lastWithdrawalRequest;
+        uint256 lastSatisfiedWithdrawal = withdrawalSystem.lastSatisfiedWithdrawal;
+        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
+                if(withdrawalSystem.withdrawals[i].user == _user){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /* ========== ADMIN CONFIGURATION ========== */
 
     function setIbAlluoToAdapterId(address _ibAlluo, uint256 _adapterId) external onlyRole(DEFAULT_ADMIN_ROLE){
         ibAlluoToAdapterId.set(_ibAlluo, _adapterId);

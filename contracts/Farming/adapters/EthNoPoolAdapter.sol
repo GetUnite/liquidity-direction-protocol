@@ -36,6 +36,10 @@ contract EthNoPoolAdapter is AccessControl {
         return IERC20(WETH).balanceOf(address(this));
     }
 
+    function getCoreTokens() external pure returns ( address mathToken, address primaryToken ){
+        return (WETH, WETH);
+    }
+
     function setWallet(address _newWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
         wallet = _newWallet;
     }
