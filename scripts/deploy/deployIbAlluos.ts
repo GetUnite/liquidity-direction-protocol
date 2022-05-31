@@ -4,7 +4,7 @@ import { ethers, upgrades } from "hardhat"
 async function main() {
 
   let gnosis = "0x2580f9954529853Ca5aC5543cE39E9B5B1145135";
-  let handler = "handlerAddress";
+  let handler = "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1";
   let trustedForwarder = "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8"
 
   const IbAlluo = await ethers.getContractFactory("IbAlluo");
@@ -50,3 +50,5 @@ main()
     console.error(error);
     process.exit(1);
   });
+
+//npx hardhat run scripts/deploy/deployIbAlluos.ts --network polygon

@@ -20,3 +20,6 @@ main()
     console.error(error);
     process.exit(1);
   });
+
+//npx hardhat run scripts/deploy/deployHandler.ts --network polygon
+//npx hardhat verify 0xb647c6fe9d2a6e7013c7e0924b71fa7926b2a0a3 --network polygon
