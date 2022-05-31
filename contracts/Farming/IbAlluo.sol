@@ -232,7 +232,9 @@ contract IbAlluo is
             address(this),
             _amount
         );
-            address mainToken = supportedTokens.at(0);
+        address mainToken = supportedTokens.at(0);
+        // We can extract the line below to a different function to be more efficient
+        // But leave here just for now for simplicity.
             IERC20Upgradeable(_token).approve(exchangeAddress, _amount);
             _amount = IExchange(exchangeAddress).exchange(_token, mainToken, _amount, 0);
             _token = mainToken;
