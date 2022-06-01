@@ -291,12 +291,12 @@ contract LiquidityHandler is
     function getAllAdapters() external view returns(AdapterInfo[] memory, address[] memory){
         uint256 numberOfAllAdapters = getLastAdapterIndex();
 
-        AdapterInfo[] memory adapters = new AdapterInfo[](numberOfAllAdapters+1);
-        address[] memory ibAlluos = new address[](numberOfAllAdapters+1);
+        AdapterInfo[] memory adapters = new AdapterInfo[](numberOfAllAdapters);
+        address[] memory ibAlluos = new address[](numberOfAllAdapters);
 
-        for(uint i = 1; i <= numberOfAllAdapters; i++){
-            adapters[i] = adapterIdsToAdapterInfo[i];
-            ibAlluos[i] = getIbAlluoByAdapterId(i);
+        for(uint i = 0; i < numberOfAllAdapters; i++){
+            adapters[i] = adapterIdsToAdapterInfo[i+1];
+            ibAlluos[i] = getIbAlluoByAdapterId(i+1);
         }
         return (adapters, ibAlluos);
     }
