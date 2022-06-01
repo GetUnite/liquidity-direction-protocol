@@ -239,6 +239,20 @@ contract LiquidityHandler is
         return ibAlluoToAdapterId.get(_ibAlluo);
     }
 
+    function getIbAlluoByAdapterId(uint256 _adapterId) public view returns(address){
+        address ibAlluo_;
+        uint256 numberOfIbAlluos = ibAlluoToAdapterId.length();
+
+        for(uint i = 0; i < numberOfIbAlluos; i++){
+            (address ibAlluo, uint adapterId) = ibAlluoToAdapterId.at(i);
+            if(adapterId == _adapterId){
+                ibAlluo_ = ibAlluo;
+                break;
+            }
+        }
+        return ibAlluo_;
+    }
+
     function getListOfIbAlluos()external view returns(address[] memory){
         uint256 numberOfIbAlluos = ibAlluoToAdapterId.length();
         address[] memory ibAlluos = new address[](numberOfIbAlluos);
@@ -274,13 +288,17 @@ contract LiquidityHandler is
         return (adapters, ibAlluos);
     }
 
-    function getAllAdapters() external view returns(AdapterInfo[] memory){
+    function getAllAdapters() external view returns(AdapterInfo[] memory, address[] memory){
         uint256 numberOfAllAdapters = getLastAdapterIndex();
-        AdapterInfo[] memory adapters = new AdapterInfo[](numberOfAllAdapters);
-        for(uint i = 0; i < numberOfAllAdapters; i++){
-            adapters[i] = adapterIdsToAdapterInfo[i+1];
+
+        AdapterInfo[] memory adapters = new AdapterInfo[](numberOfAllAdapters+1);
+        address[] memory ibAlluos = new address[](numberOfAllAdapters+1);
+
+        for(uint i = 1; i <= numberOfAllAdapters; i++){
+            adapters[i] = adapterIdsToAdapterInfo[i];
+            ibAlluos[i] = getIbAlluoByAdapterId(i);
         }
-        return adapters;
+        return (adapters, ibAlluos);
     }
 
     function isUserWaiting(address _ibAlluo, address _user) external view returns(bool){
