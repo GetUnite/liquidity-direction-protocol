@@ -514,7 +514,6 @@ describe("IbAlluo and handler", function () {
 
         })
 
-
         describe("USD Tests", function () {
             it("Depositing 100 DAI and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
                 await deposit(signers[0], dai, parseEther("100"));

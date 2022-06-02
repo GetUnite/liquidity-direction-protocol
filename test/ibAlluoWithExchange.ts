@@ -113,12 +113,10 @@ describe("IbAlluo and handler", function () {
         eursWhale = await getImpersonatedSigner("0x8dF9E3ec00Ba27415B679e033179377766A299E1");
 
         wethWhale = await getImpersonatedSigner("0xEf22c14F46858d5aC61326497b056974167F2eE1");
-
         dai = await ethers.getContractAt("IERC20", "0x6B175474E89094C44Da98b954EedeAC495271d0F");
         usdc = await ethers.getContractAt("IERC20", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
         usdt = await ethers.getContractAt("IERC20", "0xdAC17F958D2ee523a2206206994597C13D831ec7");
         curveLpUSD = await ethers.getContractAt("IERC20", "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490");
-
         jeur = await ethers.getContractAt("IERC20", "0x0f17BC9a994b87b5225cFb6a2Cd4D667ADb4F20B");
         eurt = await ethers.getContractAt("IERC20", "0xC581b735A1688071A1746c968e0798D642EDE491");
         eurs = await ethers.getContractAt("IERC20", "0xdB25f211AB05b1c97D595516F45794528a807ad8");
@@ -332,10 +330,8 @@ describe("IbAlluo and handler", function () {
 
         })
 
-
-
-
     })
+
 
     async function approveExchange(recipient: SignerWithAddress) {
         const exchange = await ethers.getContractAt("IERC20", "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec");
@@ -345,7 +341,6 @@ describe("IbAlluo and handler", function () {
         if (token == eurs) {
             await token.connect(eursWhale).transfer(recipient.address, amount);
             await token.connect(recipient).approve(ibAlluoEur.address, amount);
-            await token.connect(recipient).approve("0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec", amount)
             await ibAlluoEur.connect(recipient).deposit(token.address, amount);
         }
         else if (token == eurt) {

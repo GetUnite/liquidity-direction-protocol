@@ -221,40 +221,23 @@ contract IbAlluo is
         // Do this once the adapter is optimised on chain to choose token with highest liquidity.
         // The main token is the one which isn't converted to primary tokens.
         // Small issue with deposits and withdrawals though. Need to approve.
-        // Change targetToken to either "mainToken read from adapter" or allow paramter set in ibAlluo itself
-        // Do this once the adapter is optimised on chain to choose token with highest liquidity.
-        // The main token is the one which isn't converted to primary tokens.
-        // Small issue with deposits and withdrawals though. Need to approve.
 
         if (supportedTokens.contains(_token) == false) {
-            IERC20Upgradeable(_token).safeTransferFrom(
-            _msgSender(),
-            address(this),
-            _amount
-        );
-        address mainToken = supportedTokens.at(0);
-        // We can extract the line below to a different function to be more efficient
-        // But leave here just for now for simplicity.
+            IERC20Upgradeable(_token).safeTransferFrom(_msgSender(), address(this), _amount);
+            address mainToken = supportedTokens.at(0);
+            // We can extract the line below to a different function to be more efficient
+            // But leave here just for now for simplicity.
+            // SafeIncreaseAllownace doesn't work with upgradeable contracts.
             IERC20Upgradeable(_token).approve(exchangeAddress, _amount);
             _amount = IExchange(exchangeAddress).exchange(_token, mainToken, _amount, 0);
             _token = mainToken;
-            IERC20Upgradeable(mainToken).safeTransfer(
-            address(liquidityBuffer),
-            _amount
-        );
-
+            IERC20Upgradeable(mainToken).safeTransfer(address(liquidityBuffer),_amount);
         } else {
-            IERC20Upgradeable(_token).safeTransferFrom(
-            _msgSender(),
-            address(liquidityBuffer),
-            _amount
-        );
+            IERC20Upgradeable(_token).safeTransferFrom(_msgSender(),address(liquidityBuffer),_amount);
         }
         updateRatio();
-
         ILiquidityBufferVault(liquidityBuffer).deposit(_token, _amount);
-        uint256 amountIn18 = _amount *
-            10**(18 - AlluoERC20Upgradable(_token).decimals());
+        uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = (amountIn18 * multiplier) / growingRatio;
         _mint(_msgSender(), adjustedAmount);
         emit TransferAssetValue(address(0), _msgSender(), adjustedAmount, amountIn18, growingRatio);

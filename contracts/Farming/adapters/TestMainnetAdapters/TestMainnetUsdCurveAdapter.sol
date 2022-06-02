@@ -45,8 +45,6 @@ contract TestMainnetUsdCurveAdapter is AccessControl {
     function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         if (_token == DAI) {
-            console.log("inhere");
-            console.log("Details:",_fullAmount, _leaveInPool, _token);
             uint256 lpAmount = ICurvePoolUSD(curvePool).add_liquidity([_fullAmount, 0, 0], 0);
             console.log("inhere2");
             if (toSend != 0) {
@@ -60,10 +58,13 @@ contract TestMainnetUsdCurveAdapter is AccessControl {
         }
         // Need to check for non zero or tranfers throw/run 
         else if (_token == USDC) {
+                console.log("inhere2ha");
+
             if (toSend != 0) {
                 IERC20(USDC).safeTransfer(wallet, toSend / 10**12);
             }
             if (_leaveInPool != 0) {
+                console.log("hered");
                 ICurvePoolUSD(curvePool).add_liquidity([0, _leaveInPool/ 10**12, 0], 0);
             }
         }

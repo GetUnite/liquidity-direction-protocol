@@ -194,7 +194,7 @@ contract LiquidityHandler is
 
     function _withdrawThroughExchange(address _mainToken, address _targetToken, uint256 _amount18, address _user  ) internal {
         uint256 amountinMainTokens = _amount18 * 10**ERC20Upgradeable(_mainToken).decimals() / 10**18;
-        IERC20Upgradeable(_mainToken).approve(exchangeAddress, type(uint256).max);
+        IERC20Upgradeable(_mainToken).approve(exchangeAddress, amountinMainTokens);
         uint256 amountinTargetTokens = IExchange(exchangeAddress).exchange(_mainToken, _targetToken, amountinMainTokens,0);
         IERC20Upgradeable(_targetToken).transfer(_user, amountinTargetTokens);
     }

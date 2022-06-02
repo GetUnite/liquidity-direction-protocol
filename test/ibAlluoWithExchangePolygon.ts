@@ -2,9 +2,10 @@ import { parseEther, parseUnits } from "@ethersproject/units";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
+import { formatUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, Exchange, IWrappedEther, } from "../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, Exchange, IWrappedEther, IERC20Metadata, } from "../typechain";
 
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -76,7 +77,7 @@ describe("IbAlluo and handler", function () {
     let multisig: PseudoMultisigWallet;
     let handler: LiquidityHandler;
 
-    let dai: IERC20, usdc: IERC20, usdt: IERC20;
+    // let dai: IERC20, usdc: IERC20, usdt: IERC20;
     let curveLpUSD: IERC20;
 
     let usdWhale: SignerWithAddress;
@@ -94,8 +95,6 @@ describe("IbAlluo and handler", function () {
     let frax: IERC20;
     let wethWhale: SignerWithAddress;
 
-    let exchange: Exchange;
-
     type Edge = {
         swapProtocol: BigNumberish;
         pool: string;
@@ -103,13 +102,18 @@ describe("IbAlluo and handler", function () {
         toCoin: string;
     };
     type Route = Edge[];
+    let exchange: Exchange
+    let usdt: IERC20Metadata, usdc: IERC20Metadata,
+        dai: IERC20Metadata;
+    let PolygonCurve3Lp: IERC20Metadata;
 
-    let fraxUsdcRoute: Route, fraxDaiRoute: Route, fraxUsdtRoute: Route, usdtFraxRoute: Route
-        , daiFraxRoute: Route, usdcFraxRoute: Route
-    // On polygon
-    // const fraxPoolAddress = "0x5e5A23b52Cb48F5E70271Be83079cA5bC9c9e9ac";
-    const fraxPoolAddress = "0x92215849c439E1f8612b6646060B4E3E5ef822cC";
-    // let exchangeAddress = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773";
+    let usdtUsdcRoute: Route, usdtDaiRoute: Route, usdcUsdtRoute: Route, usdcDaiRoute: Route, daiUsdcRoute: Route, daiUsdtRoute: Route;
+
+    let polygonCurveEdge: Edge;
+
+
+
+    const PolygonCurve3Pool = "0x445FE580eF8d70FF569aB36e80c647af338db351";
     let exchangeAddress;
     before(async function () {
         //We are forking Polygon mainnet, please set Alchemy key in .env
@@ -140,9 +144,9 @@ describe("IbAlluo and handler", function () {
         fraxWhale = await getImpersonatedSigner("0xaca39b187352d9805deced6e73a3d72abf86e7a0")
 
 
-        dai = await ethers.getContractAt("IERC20", "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063");
-        usdc = await ethers.getContractAt("IERC20", "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
-        usdt = await ethers.getContractAt("IERC20", "0xc2132D05D31c914a87C6611C10748AEb04B58e8F");
+        dai = await ethers.getContractAt("IERC20Metadata", "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063");
+        usdc = await ethers.getContractAt("IERC20Metadata", "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
+        usdt = await ethers.getContractAt("IERC20Metadata", "0xc2132D05D31c914a87C6611C10748AEb04B58e8F");
         curveLpUSD = await ethers.getContractAt("IERC20", "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171");
 
         jeur = await ethers.getContractAt("IERC20", "0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c");
@@ -150,9 +154,6 @@ describe("IbAlluo and handler", function () {
         eurs = await ethers.getContractAt("IERC20", "0xE111178A87A3BFf0c8d18DECBa5798827539Ae99");
 
         weth = await ethers.getContractAt("IERC20", "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619");
-        frax = await ethers.getContractAt("IERC20", "0x45c32fA6DF82ead1e2EF74d17b76547EDdFaFF89")
-        // Temp test
-        frax = weth;
         exchange = await ethers.getContractAt("Exchange", "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773")
 
         console.log("We are forking Polygon mainnet\n");
@@ -166,58 +167,77 @@ describe("IbAlluo and handler", function () {
 
         await sendEth([usdWhale.address, jeurWhale.address, eurtWhale.address, eursWhale.address, wethWhale.address])
 
-        // Add frax-USD routes to exchange as it is currently empty.
-        fraxUsdcRoute = [
-            // FRAX - USDC
-            { swapProtocol: 1, pool: fraxPoolAddress, fromCoin: frax.address, toCoin: usdc.address },
-        ];
-        fraxDaiRoute = [
-            // FRAX - DAI
-            { swapProtocol: 1, pool: fraxPoolAddress, fromCoin: frax.address, toCoin: dai.address },
-        ];
-        fraxUsdtRoute = [
-            // FRAX - DAI
-            { swapProtocol: 1, pool: fraxPoolAddress, fromCoin: frax.address, toCoin: usdt.address },
-        ];
-        usdtFraxRoute = [
-            // USDT - FRAX
-            { swapProtocol: 1, pool: fraxPoolAddress, fromCoin: usdt.address, toCoin: frax.address },
-        ];
-        daiFraxRoute = [
-            // DAI - FRAX
-            { swapProtocol: 1, pool: fraxPoolAddress, fromCoin: dai.address, toCoin: frax.address },
-        ];
-        usdcFraxRoute = [
-            // USDC - FRAX
-            { swapProtocol: 1, pool: fraxPoolAddress, fromCoin: usdc.address, toCoin: frax.address },
-        ];
+        PolygonCurve3Lp = await ethers.getContractAt("IERC20Metadata", "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171");
 
-        const routes: Route[] = [
-            usdtFraxRoute, daiFraxRoute, usdcFraxRoute, fraxUsdcRoute, fraxDaiRoute,
-            fraxUsdtRoute,
+        polygonCurveEdge = { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: PolygonCurve3Lp.address, toCoin: usdc.address };
+
+        usdtUsdcRoute = [
+            // USDT - USDC
+            { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: usdt.address, toCoin: usdc.address }
+        ]
+        usdtDaiRoute = [
+            // USDT - DAI
+            { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: usdt.address, toCoin: dai.address }
+        ]
+
+        usdcUsdtRoute = [
+            // USDC - USDT
+            { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: usdc.address, toCoin: usdt.address }
         ];
-
-        // Deploy fake exchange while waiting for polygon one to be filled.
-        const Exchange = await ethers.getContractFactory("Exchange");
-        exchange = await Exchange.connect(admin).deploy(admin.address, false);
-        exchangeAddress = exchange.address;
-        await (await exchange.connect(admin).createInternalMajorRoutes(routes)).wait();
-        const Frax = await ethers.getContractFactory("CurveFraxAdapter");
-        const fraxAdapter = await (await Frax.deploy()).deployed();
-        await (await exchange.connect(admin).registerAdapters([fraxAdapter.address], [1])).wait();
-
-        await exchange.connect(admin).createApproval([dai.address, usdc.address, usdt.address],
-            [exchangeAddress,
-                exchangeAddress,
-                exchangeAddress]);
-
-
+        usdcDaiRoute = [
+            // USDC - DAI
+            { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: usdc.address, toCoin: dai.address }
+        ];
+        daiUsdcRoute = [
+            // DAI - USDC
+            { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: dai.address, toCoin: usdc.address }
+        ];
+        daiUsdtRoute = [
+            // DAI - USDT
+            { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: dai.address, toCoin: usdt.address }
+        ];
     });
 
 
     beforeEach(async function () {
+
+
+        // Deploy fake exchange with PolygonCurve3 Route
+        const Exchange = await ethers.getContractFactory("Exchange");
+        admin = await getImpersonatedSigner("0x2580f9954529853Ca5aC5543cE39E9B5B1145135");
+
+        exchange = await Exchange.deploy(admin.address, true);
+        await exchange.deployed();
+
+
+        const PolygonCurve = await ethers.getContractFactory("PolygonCurve3Adapter");
+
+        const polygonCurveAdapter = await PolygonCurve.deploy()
+        const routes: Route[] = [
+            usdtUsdcRoute, usdtDaiRoute, usdcUsdtRoute, usdcDaiRoute, daiUsdcRoute, daiUsdtRoute,
+        ];
+        await exchange.connect(admin).createInternalMajorRoutes(routes)
+
+        await exchange.connect(admin).createLpToken(
+            [{ swapProtocol: 1, pool: PolygonCurve3Pool }],
+            [PolygonCurve3Pool],
+            [[dai.address, usdt.address, usdc.address, PolygonCurve3Lp.address]]
+        );
+
+        await exchange.connect(admin).createApproval([dai.address, usdc.address, usdt.address],
+            [exchange.address,
+            exchange.address,
+            exchange.address]);
+        await exchange.connect(admin).registerAdapters([polygonCurveAdapter.address], [1])
+
+        await exchange.connect(admin).createMinorCoinEdge([polygonCurveEdge])
+
+
+
+
         const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
         // Polygon Mainnet address for exchange.
+        // Use fake exchange for now.
         exchangeAddress = exchange.address;
 
         const exchangeSlippage = 500;
@@ -331,103 +351,95 @@ describe("IbAlluo and handler", function () {
         await handler.connect(admin).grantIbAlluoPermissions(ibAlluoEth.address)
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEth.address, 3)
 
-
-
     });
-    describe("UsdAdapter with Exchange Tests", function () {
-        it("Depositing in Frax should give you ibAlluoUsd", async function () {
-            await deposit(signers[0], frax, parseEther("100"));
-            expect(Number(await ibAlluoEth.balanceOf(signers[0].address))).greaterThan(Number(0))
+    async function testSwap(fromAddress: string, toAddress: string, amount: BigNumberish) {
+        const from = await ethers.getContractAt("IERC20Metadata", fromAddress);
+        await from.connect(usdWhale).approve(exchange.address, amount);
+        // Usd whale doesn't have am3CRV, so change slightly,
+        if (fromAddress == "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171") {
+            usdc.connect(usdWhale).approve(exchange.address, parseUnits("100", 6));
+            const tx = await exchange.connect(usdWhale).exchange(usdc.address, "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171", parseUnits("100", 6), 0)
+            // Give some amCRV to the usdWhale so they can swap.
+        }
+        const to = await ethers.getContractAt("IERC20Metadata", toAddress);
+        const balBefore = await to.balanceOf(usdWhale.address);
+        const tx = await (await exchange.connect(usdWhale).exchange(fromAddress, toAddress, amount, 0)).wait();
+        console.log("Swapped", formatUnits(amount, await from.decimals()),
+            await from.symbol(), "for", formatUnits((await to.balanceOf(usdWhale.address)).sub(balBefore), await to.decimals()),
+            await to.symbol() + ",", "gas used:", tx.cumulativeGasUsed.toString());
+    }
+    describe("Exchange Test", function () {
+        it("The exchange should be working normally: Check all swap combinations", async function () {
+            const supportedCoinList = [dai, usdc, usdt, PolygonCurve3Lp];
+            // swap all combinations of all tokens
+            for (let i = 0; i < supportedCoinList.length; i++) {
+                for (let j = 0; j < supportedCoinList.length; j++) {
+                    if (i == j) continue;
+
+                    const coinIn = supportedCoinList[i];
+                    const coinOut = supportedCoinList[j];
+                    const oneToken = parseUnits("1.0", await coinIn.decimals());
+                    await testSwap(coinIn.address, coinOut.address, oneToken);
+                }
+            }
         })
-        // it("Depositing in Dai and then withdrawing in Dai should give you Dai back (without being added to withdrawal queue) ", async function () {
-        //     await deposit(signers[0], dai, parseEther("100"));
-        //     expect(Number(await ibAlluoEth.balanceOf(signers[0].address))).greaterThan(Number(0))
-        //     await deposit(signers[8], dai, parseEther("1000"));
-        //     await deposit(signers[8], dai, parseEther("1000"));
-        //     await deposit(signers[8], dai, parseEther("1000"));
+    })
+    describe("UsdAdapter with Exchange Tests", function () {
+        it("Depositing in amCurv3 should give you ibAlluoUsd", async function () {
+            await deposit(signers[0], PolygonCurve3Lp, parseEther("100"));
+            const ibAlluoBalance = await ibAlluoUsd.balanceOf(signers[0].address);
+            expect(Number(ibAlluoBalance)).greaterThan(Number(0))
+        })
+        it("Depositing in amCrv3 and then withdrawing in Dai should give you amCrv3 back (without being added to withdrawal queue) ", async function () {
+            await deposit(signers[0], PolygonCurve3Lp, parseEther("100"));
+            expect(Number(await ibAlluoUsd.balanceOf(signers[0].address))).greaterThan(Number(0))
+            await deposit(signers[8], PolygonCurve3Lp, parseEther("1000"));
+            await deposit(signers[8], PolygonCurve3Lp, parseEther("1000"));
+            await deposit(signers[8], PolygonCurve3Lp, parseEther("1000"));
 
-        //     await ibAlluoEth.connect(signers[0]).withdraw(dai.address, parseEther("0.039"))
-        //     // Once there are sufficient deposits, withdrawal is fufilled.
-        //     // await deposit(signers[0], dai, parseEther("1000"));
-        //     console.log(await dai.balanceOf(signers[0].address));
-        //     expect(Number(await dai.balanceOf(signers[0].address))).greaterThan(Number(70))
-
-        // })
-        // it("Depositing in Dai and then withdrawing in Dai should give you Dai back (after being added to withdrawal queue) ", async function () {
-        //     await deposit(signers[1], dai, parseEther("100"));
-        //     expect(Number(await ibAlluoEth.balanceOf(signers[1].address))).greaterThan(Number(0))
-        //     await ibAlluoEth.connect(signers[1]).withdraw(dai.address, parseEther("0.039"))
-
-        //     await deposit(signers[8], dai, parseEther("10000"));
-
-        //     // Once there are sufficient deposits, withdrawal is fufilled.
-        //     await handler.satisfyAllWithdrawals();
-        //     console.log(await dai.balanceOf(signers[1].address));
-        //     expect(Number(await dai.balanceOf(signers[1].address))).greaterThan(Number(70))
-
-        // })
-
-        // it("Depositing in USDC should give you ibAlluoEth", async function () {
-        //     await deposit(signers[2], usdc, parseUnits("100", 6));
-        //     expect(Number(await ibAlluoEth.balanceOf(signers[2].address))).greaterThan(Number(0))
-        // })
-        // it("Depositing in USDC and then withdrawing in Dai should give you Dai back (without being added to withdrawal queue) ", async function () {
-        //     console.log(await dai.balanceOf(signers[3].address), "before");
-
-        //     await deposit(signers[3], usdc, parseUnits("100", 6));
-        //     expect(Number(await ibAlluoEth.balanceOf(signers[3].address))).greaterThan(Number(0))
-        //     await deposit(signers[8], dai, parseEther("10000"));
+            // Once there are sufficient buffer
+            await ibAlluoUsd.connect(signers[0]).withdraw(PolygonCurve3Lp.address, parseEther("70"))
+            // Roughly 1 am3CRV = 1.05 USD
+            // 70 usd roughly 66.7 am3CRV so 
+            const balAfter = await PolygonCurve3Lp.balanceOf(signers[0].address);
+            console.log(balAfter);
+            expect(Number(balAfter)).greaterThan(Number(parseEther("60")))
+            expect(Number(balAfter)).lessThan(Number(parseEther("70")))
 
 
-        //     await ibAlluoEth.connect(signers[3]).withdraw(dai.address, parseEther("0.039"))
+        })
+        it("Depositing in amCrv3 and then withdrawing in amCrv3 should give you amCrv3 back (after being added to withdrawal queue) ", async function () {
+            await deposit(signers[1], PolygonCurve3Lp, parseEther("100"));
+            expect(Number(await ibAlluoUsd.balanceOf(signers[1].address))).greaterThan(Number(0))
+            await ibAlluoUsd.connect(signers[1]).withdraw(PolygonCurve3Lp.address, parseEther("70"))
 
-        //     console.log(await dai.balanceOf(signers[3].address));
-        //     expect(Number(await dai.balanceOf(signers[3].address))).greaterThan(Number(70))
+            await deposit(signers[8], dai, parseEther("10000"));
 
-        // })
-        // it("Depositing in USDC and then withdrawing in Dai should give you Dai back (after being added to withdrawal queue) ", async function () {
-        //     console.log(await dai.balanceOf(signers[4].address), "before");
-
-        //     await deposit(signers[4], usdc, parseUnits("100", 6));
-        //     expect(Number(await ibAlluoEth.balanceOf(signers[4].address))).greaterThan(Number(0))
-        //     await ibAlluoEth.connect(signers[4]).withdraw(dai.address, parseEther("0.039"))
-
-        //     await deposit(signers[8], dai, parseEther("1000"));
-
-        //     // Once there are sufficient deposits, withdrawal is fufilled.
-        //     await handler.satisfyAllWithdrawals();
-        //     console.log(await dai.balanceOf(signers[4].address));
-        //     expect(Number(await dai.balanceOf(signers[4].address))).greaterThan(Number(70))
-
-        // })
-
-        // it("Depositing in a token not supported by the exchange should revert", async function () {
-        //     await expect(deposit(signers[4], jeur, parseUnits("100", 18))).to.be.reverted;
-        // })
+            // Once there are sufficient deposits, withdrawal is fufilled.
+            await handler.satisfyAllWithdrawals();
+            const balAfter = await PolygonCurve3Lp.balanceOf(signers[1].address);
+            console.log(balAfter);
+            expect(Number(balAfter)).greaterThan(Number(parseEther("60")))
+            expect(Number(balAfter)).lessThan(Number(parseEther("70")))
 
 
-        // it("Withdrawing in a token not supported by the exchange should revert", async function () {
-        //     await deposit(signers[3], usdc, parseUnits("1000", 6));
-        //     await expect(ibAlluoEth.connect(signers[3]).withdraw(jeur.address, parseEther("0.039"))).to.be.reverted;
+        })
 
-        // })
+        it("Depositing in a token not supported by the exchange should revert", async function () {
+            await expect(deposit(signers[4], jeur, parseUnits("100", 18))).to.be.reverted;
+        })
 
 
+        it("Withdrawing in a token not supported by the exchange should revert", async function () {
+            await deposit(signers[3], usdc, parseUnits("1000", 6));
+            await expect(ibAlluoUsd.connect(signers[3]).withdraw(jeur.address, parseEther("10"))).to.be.reverted;
 
+        })
 
     })
-
-    async function approveExchange(recipient: SignerWithAddress) {
-        const exchange = await ethers.getContractAt("IERC20", "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773");
-    }
     async function deposit(recipient: SignerWithAddress, token: IERC20, amount: BigNumberish) {
         if (token == eurs) {
             await token.connect(eursWhale).transfer(recipient.address, amount);
-            await token.connect(recipient).approve(ibAlluoUsd.address, amount);
-            await ibAlluoUsd.connect(recipient).deposit(token.address, amount);
-        }
-        else if (token == frax) {
-            await token.connect(fraxWhale).transfer(recipient.address, amount);
             await token.connect(recipient).approve(ibAlluoUsd.address, amount);
             await ibAlluoUsd.connect(recipient).deposit(token.address, amount);
         }
@@ -447,8 +459,14 @@ describe("IbAlluo and handler", function () {
             await weth.connect(wethWhale).transfer(recipient.address, amount);
             await token.connect(recipient).approve(ibAlluoUsd.address, amount);
             await ibAlluoUsd.connect(recipient).deposit(token.address, amount)
+        } if (token == PolygonCurve3Lp) {
+            // The usd whale doesn't have enough usdc.
+            await usdc.connect(usdWhale).approve(exchange.address, parseUnits("10000000000", 6))
+            await exchange.connect(usdWhale).exchange(usdc.address, PolygonCurve3Lp.address, parseUnits("1000", 6), 0)
+            await token.connect(usdWhale).transfer(recipient.address, amount);
+            await token.connect(recipient).approve(ibAlluoUsd.address, amount);
+            await ibAlluoUsd.connect(recipient).deposit(token.address, amount);
         }
-
         else {
             await token.connect(usdWhale).transfer(recipient.address, amount);
             await token.connect(recipient).approve(ibAlluoUsd.address, amount);

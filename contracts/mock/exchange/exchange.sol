@@ -7,9 +7,8 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
-import "../../interfaces/IWrappedEther.sol";
-import "../../interfaces/IExchangeAdapter.sol";
-import "hardhat/console.sol";
+import "./interfaces/IWrappedEther.sol";
+import "./interfaces/IExchangeAdapter.sol";
 
 contract Exchange is ReentrancyGuard, AccessControl {
     using SafeERC20 for IERC20;
@@ -82,7 +81,7 @@ contract Exchange is ReentrancyGuard, AccessControl {
         uint256 minAmountOut
     ) external payable nonReentrant returns (uint256) {
         require(from != to, "Exchange: from == to");
-        
+
         if (lpTokens[to].swapProtocol != 0) {
             IERC20(from).safeTransferFrom(msg.sender, address(this), amountIn);
 
@@ -143,12 +142,12 @@ contract Exchange is ReentrancyGuard, AccessControl {
 
             return amountOut;
         }
-        console.log("Here", IERC20(from).balanceOf(address(this)));
         uint256 amountOut_ = _exchange(from, to, amountIn);
-        console.log(IERC20(to).balanceOf(address(this)));
+
         require(amountOut_ >= minAmountOut, "Exchange: slippage");
+
         IERC20(to).safeTransfer(msg.sender, amountOut_);
-        // Uncomment functions below.
+
         return amountOut_;
     }
 
@@ -335,16 +334,16 @@ contract Exchange is ReentrancyGuard, AccessControl {
     /// @notice Force unapprove of some coin to any pool
     /// @param coins coins list
     /// @param spenders pools list
-    // function removeApproval(
-    //     address[] calldata coins,
-    //     address[] calldata spenders
-    // ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    //     require(coins.length == spenders.length, "Exchange: length discrep");
-    //     for (uint256 i = 0; i < coins.length; i++) {
-    //         IERC20(coins[i]).safeApprove(spenders[i], 0);
-    //         approveCompleted[spenders[i]][coins[i]] = false;
-    //     }
-    // }
+    function removeApproval(
+        address[] calldata coins,
+        address[] calldata spenders
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(coins.length == spenders.length, "Exchange: length discrep");
+        for (uint256 i = 0; i < coins.length; i++) {
+            IERC20(coins[i]).safeApprove(spenders[i], 0);
+            approveCompleted[spenders[i]][coins[i]] = false;
+        }
+    }
 
     /// @notice Force approve of some coin to any pool
     /// @param coins coins list
@@ -394,14 +393,14 @@ contract Exchange is ReentrancyGuard, AccessControl {
 
     /// @notice Set addresses to be no longer recognized as LP tokens
     /// @param edges list of LP tokens
-    // function deleteLpToken(address[] calldata edges)
-    //     external
-    //     onlyRole(DEFAULT_ADMIN_ROLE)
-    // {
-    //     for (uint256 i = 0; i < edges.length; i++) {
-    //         delete lpTokens[edges[i]];
-    //     }
-    // }
+    function deleteLpToken(address[] calldata edges)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        for (uint256 i = 0; i < edges.length; i++) {
+            delete lpTokens[edges[i]];
+        }
+    }
 
     /// @inheritdoc	AccessControl
     function grantRole(bytes32 role, address account)
