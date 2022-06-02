@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../interfaces/ICurvePool.sol";
+import "../../interfaces/curve/ICurvePoolUSD.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -30,7 +30,7 @@ contract LiquidityBufferVault is
     address public alluoLp;
 
     // AAVE curve pool
-    ICurvePool public curvePool;
+    ICurvePoolUSD public curvePool;
 
     //flag for upgrades availability
     bool public upgradeStatus;
@@ -115,7 +115,7 @@ contract LiquidityBufferVault is
         wallet = _multiSigWallet;
         bufferPercentage = 500;
         slippage = 200;
-        curvePool = ICurvePool(_curvePool);
+        curvePool = ICurvePoolUSD(_curvePool);
         alluoLp = _alluoLp;
 
         maxWaitingTime = 3600 * 23;
@@ -381,7 +381,7 @@ contract LiquidityBufferVault is
     {
         require(newPool.isContract(), "Buffer: Not contract");
 
-        curvePool = ICurvePool(newPool);
+        curvePool = ICurvePoolUSD(newPool);
 
     }
 
