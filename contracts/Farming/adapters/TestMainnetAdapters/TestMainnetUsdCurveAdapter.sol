@@ -137,7 +137,9 @@ contract TestMainnetUsdCurveAdapter is AccessControl {
     function setWallet(address _newWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
         wallet = _newWallet;
     }
-
+    function getCoreTokens() external pure returns ( address mathToken, address primaryToken ){
+        return (DAI, USDC);
+    }
     /**
      * @dev admin function for removing funds from contract
      * @param _address address of the token being removed

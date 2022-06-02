@@ -349,7 +349,11 @@ contract LiquidityHandler is
         }
         return adapters;
     }
-
+    function getAdapterCoreTokensFromIbAlluo(address _ibAlluo) public view returns (address,address) {
+        uint256 adapterId = ibAlluoToAdapterId.get(_ibAlluo);
+        address adapterAddress = adapterIdsToAdapterInfo[adapterId].adapterAddress;
+        return (IAdapter(adapterAddress).getCoreTokens());
+    }
     function ibAlluoLastWithdrawalCheck(address _ibAlluo) public view returns (uint256[3] memory) {
         WithdrawalSystem storage _ibAlluoWithdrawalSystem = ibAlluoToWithdrawalSystems[_ibAlluo];
         return [_ibAlluoWithdrawalSystem.lastWithdrawalRequest, _ibAlluoWithdrawalSystem.lastSatisfiedWithdrawal, _ibAlluoWithdrawalSystem.totalWithdrawalAmount];

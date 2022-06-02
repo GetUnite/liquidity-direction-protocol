@@ -5,8 +5,7 @@ import "./AlluoERC20Upgradable.sol";
 import "../interfaces/ILiquidityBufferVault.sol";
 import "../mock/interestHelper/Interest.sol";
 import "../interfaces/IExchange.sol";
-import "../interfaces/ITokenFetcher.sol";
-import "hardhat/console.sol";
+import "../interfaces/IAdapter.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -221,13 +220,9 @@ contract IbAlluo is
         // Do this once the adapter is optimised on chain to choose token with highest liquidity.
         // The main token is the one which isn't converted to primary tokens.
         // Small issue with deposits and withdrawals though. Need to approve.
-
         if (supportedTokens.contains(_token) == false) {
             IERC20Upgradeable(_token).safeTransferFrom(_msgSender(), address(this), _amount);
-            address mainToken = supportedTokens.at(0);
-            // We can extract the line below to a different function to be more efficient
-            // But leave here just for now for simplicity.
-            // SafeIncreaseAllownace doesn't work with upgradeable contracts.
+            (, address mainToken) = ILiquidityBufferVault(liquidityBuffer).getAdapterCoreTokensFromIbAlluo(address(this));
             IERC20Upgradeable(_token).approve(exchangeAddress, _amount);
             _amount = IExchange(exchangeAddress).exchange(_token, mainToken, _amount, 0);
             _token = mainToken;
@@ -261,18 +256,19 @@ contract IbAlluo is
         updateRatio();
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(_msgSender(), adjustedAmount);
+        ILiquidityBufferVault buffer = ILiquidityBufferVault(liquidityBuffer);
         if (supportedTokens.contains(_targetToken) == false) {
-            address mainToken = supportedTokens.at(0);
+            (address primaryToken,) = ILiquidityBufferVault(liquidityBuffer).getAdapterCoreTokensFromIbAlluo(address(this));
             // This just is used to revert if there is no active route.
-            require(IExchange(exchangeAddress).buildRoute(mainToken, _targetToken).length>0, "This token is not supported");
-            ILiquidityBufferVault(liquidityBuffer).withdraw(
+            require(IExchange(exchangeAddress).buildRoute(primaryToken, _targetToken).length>0, "!Supported");
+            buffer.withdraw(
             _recipient,
-            mainToken,
+            primaryToken,
             _amount,
             _targetToken
             );
         } else {
-            ILiquidityBufferVault(liquidityBuffer).withdraw(
+            buffer.withdraw(
             _recipient,
             _targetToken,
             _amount
@@ -345,6 +341,7 @@ contract IbAlluo is
         return true;
     }
 
+    
     /// @notice  Returns balance in asset value
     /// @param _address address of user
 
@@ -497,7 +494,7 @@ contract IbAlluo is
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(newBuffer.isContract(), "IbAlluo: Not contract");
+        require(newBuffer.isContract(), "!Contract");
 
         address oldValue = liquidityBuffer;
         liquidityBuffer = newBuffer;

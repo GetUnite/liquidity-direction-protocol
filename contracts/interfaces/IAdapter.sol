@@ -10,4 +10,6 @@ interface IAdapter{
     
     function setSlippage ( uint32 _newSlippage ) external;
     function setWallet ( address newWallet ) external;
+    function getCoreTokens() external pure returns ( address mathToken, address primaryToken );
+
 }

@@ -119,7 +119,9 @@ contract UsdCurveAdapter is AccessControl {
             IERC20(USDT).safeTransfer(_user, toUser);
         }
     }
-    
+    function getCoreTokens() external pure returns ( address mathToken, address primaryToken ){
+        return (DAI, USDC);
+    }
     function getAdapterAmount() external view returns ( uint256 ) {
         uint256 curveLpAmount = IERC20(curveLp).balanceOf((address(this)));
         if(curveLpAmount != 0){

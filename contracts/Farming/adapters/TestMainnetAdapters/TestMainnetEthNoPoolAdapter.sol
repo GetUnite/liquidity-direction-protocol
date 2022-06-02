@@ -39,7 +39,9 @@ contract TestMainnetEthNoPoolAdapter is AccessControl {
     function setWallet(address _newWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
         wallet = _newWallet;
     }
-
+    function getCoreTokens() external pure returns ( address mathToken, address primaryToken ){
+        return (WETH, WETH);
+    }
     /**
      * @dev admin function for removing funds from contract
      * @param _address address of the token being removed

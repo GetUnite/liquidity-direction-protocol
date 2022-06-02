@@ -3,6 +3,13 @@
 pragma solidity 0.8.11;
 
 interface ILiquidityBufferVault {
+    struct AdapterInfo {
+        string name; // USD Curve-Aave
+        uint256 percentage; //500 == 5.00%
+        address adapterAddress; // 0x..
+        bool status; // active
+    }
+
   function DAI (  ) external view returns ( address );
   function USDC (  ) external view returns ( address );
   function USDT (  ) external view returns ( address );
@@ -38,4 +45,7 @@ interface ILiquidityBufferVault {
   function withdraw ( address _user, address _token, uint256 _amount ) external;
   function withdraw ( address _user, address _token, uint256 _amount, address _outputToken ) external;
   function withdrawals ( uint256 ) external view returns ( address user, address token, uint256 amount, uint256 time );
+  function getAdapterId(address _ibAlluo) external view returns(uint256);
+  function adapterIdsToAdapterInfo (uint256) external view returns (AdapterInfo memory );
+  function getAdapterCoreTokensFromIbAlluo(address _ibAlluo) external view returns (address,address);
 }
