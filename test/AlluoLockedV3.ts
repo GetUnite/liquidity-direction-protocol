@@ -5,7 +5,7 @@ import { Contract, ContractFactory } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { parseEther } from "@ethersproject/units";
 import { keccak256 } from "ethers/lib/utils";
-import { AlluoLockedNew, AlluoLockedV3, IAlluoToken, PseudoMultisigWallet, TestERC20, AlluoLockedV2Final } from '../typechain';
+import { AlluoLockedV3, IAlluoToken, PseudoMultisigWallet, TestERC20, AlluoLockedV2Final } from '../typechain';
 import { getLockers } from "../scripts/dev/getLockers";
 import { writeFileSync } from 'fs';
 import { join } from "path";
@@ -19,7 +19,6 @@ let multisig: PseudoMultisigWallet;
 
 let Locker: ContractFactory;
 let locker: AlluoLockedV3;
-let oldLocker: AlluoLockedNew;
 let oldLockerFinal: AlluoLockedV2Final;
 
 let addr: Array<SignerWithAddress>;
