@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "../../interfaces/curve/ICurvePoolUSD.sol";
 
@@ -19,15 +20,17 @@ contract UsdCurveAdapter is AccessControl {
     address public constant curvePool = 0x445FE580eF8d70FF569aB36e80c647af338db351;
     address public constant curveLp = 0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171;
     address public wallet;
-    uint256 public slippage;
+    uint128 public slippage;
+    uint128 public liquidTokenIndex;
 
-    constructor (address _multiSigWallet, address _liquidityHandler, uint256 _slippage) {
+    constructor (address _multiSigWallet, address _liquidityHandler, uint128 _slippage) {
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
         wallet = _multiSigWallet;
         slippage = _slippage;
+        liquidTokenIndex = 2;
     }
 
     function adapterApproveAll() external onlyRole(DEFAULT_ADMIN_ROLE){
@@ -79,23 +82,65 @@ contract UsdCurveAdapter is AccessControl {
     /// @dev It checks against arbitragers attempting to exploit spreads in stablecoins.
     /// @param _user Recipient address
     /// @param _token Deposit token address (eg. USDC)
-    /// @param _amount  Amount to be withdrawn in 10*18
+    /// @param _amount  Amount to be withdrawn in ALWAYS 10*18
     function withdraw (address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-          if (_token == DAI) {
-            ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
+
+        // We want to be save agains arbitragers so at any withraw contract checks 
+        // how much will be burned curveLp by withrawing this amount in token with most liquidity
+        // and passes this burned amount to get tokens
+        uint256[3] memory amounts;
+        if(liquidTokenIndex == 0){
+            if (_token == DAI) {
+                ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
                     [_amount, 0, 0], 
                     _amount * (10000 + slippage) / 10000, 
                     true
                 );
-            IERC20(DAI).safeTransfer(_user, _amount);
-
+                IERC20(DAI).safeTransfer(_user, _amount);
+                return;
+            }
+            amounts[0] = _amount;
+        }
+        else if (liquidTokenIndex == 1){
+            if (_token == USDC) {
+                uint256 amountIn6 = _amount/10**12;
+                ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
+                    [0, amountIn6, 0], 
+                    _amount * (10000 + slippage) / 10000, 
+                    true
+                );
+                IERC20(USDC).safeTransfer(_user, amountIn6);
+                return;
+            }
+            amounts[1] = _amount / 10**12;
+        }
+        else {
+            if (_token == USDT) {
+                uint256 amountIn6 = _amount/10**12;
+                ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
+                    [0, 0, amountIn6], 
+                    _amount * (10000 + slippage) / 10000, 
+                    true
+                );
+                IERC20(USDT).safeTransfer(_user, amountIn6);
+                return;
+            }
+            amounts[2] = _amount / 10**12;
         }
 
+        uint256 toBurn = ICurvePoolUSD(curvePool).calc_token_amount(amounts, false);
+
+        if (_token == DAI) {
+            uint256 toUser = ICurvePoolUSD(curvePool).remove_liquidity_one_coin(
+                toBurn, 
+                0, 
+                _amount * (10000 - slippage) / 10000, 
+                true
+            );
+            IERC20(DAI).safeTransfer(_user, toUser);
+        }
+        
         else if (_token == USDC) {
-            // We want to be save agains arbitragers so at any withraw of USDT/USDC
-            // contract checks how much will be burned curveLp by withrawing this amount in DAI
-            // and passes this burned amount to get USDC/USDT
-            uint256 toBurn = ICurvePoolUSD(curvePool).calc_token_amount([_amount, 0, 0], false);
             uint256 toUser = ICurvePoolUSD(curvePool).remove_liquidity_one_coin(
                     toBurn, 
                     1, 
@@ -105,9 +150,7 @@ contract UsdCurveAdapter is AccessControl {
             // toUser is already in 10**6
             IERC20(USDC).safeTransfer(_user, toUser);
         }
-
-        else if (_token == USDT) {
-            uint256 toBurn = ICurvePoolUSD(curvePool).calc_token_amount([_amount, 0, 0], false);
+        else { //(_token == USDT) 
             uint256 toUser = ICurvePoolUSD(curvePool).remove_liquidity_one_coin(
                     toBurn, 
                     2, 
@@ -122,18 +165,24 @@ contract UsdCurveAdapter is AccessControl {
     function getAdapterAmount() external view returns ( uint256 ) {
         uint256 curveLpAmount = IERC20(curveLp).balanceOf((address(this)));
         if(curveLpAmount != 0){
-            // Returns in 10**18
-            return ICurvePoolUSD(curvePool).calc_withdraw_one_coin(curveLpAmount, 0);
+            address liquidToken = ICurvePoolUSD(curvePool).underlying_coins(liquidTokenIndex);
+            uint256 amount = ICurvePoolUSD(curvePool).calc_withdraw_one_coin(curveLpAmount, int128(liquidTokenIndex));
+            return amount  * 10 **(18 - ERC20(liquidToken).decimals());
         } else {
             return 0;
         }
     }
-    function getCoreTokens() external pure returns ( address mathToken, address primaryToken ){
-        return (DAI, USDC);
+
+    // function changeLiquidToken() external{
+
+    // }
+
+    function getCoreTokens() external view returns ( address liquidToken, address primaryToken ){
+        return (ICurvePoolUSD(curvePool).underlying_coins(liquidTokenIndex), USDC);
     }
 
 
-    function setSlippage(uint32 _newSlippage) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setSlippage(uint128 _newSlippage) external onlyRole(DEFAULT_ADMIN_ROLE) {
         slippage = _newSlippage;
     }
     function setWallet(address _newWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
