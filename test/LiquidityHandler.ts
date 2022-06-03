@@ -508,8 +508,8 @@ describe("IbAlluo and handler", function () {
     
                 await deposit(signers[1], dai, parseEther("100"));
                 await handler.satisfyAdapterWithdrawals(ibAlluoUsd.address);
-                expect(await dai.balanceOf(signers[0].address)).lessThan(parseEther("51"))
-                expect(await dai.balanceOf(signers[0].address)).greaterThan(parseEther("49"))
+                expect(Number(await dai.balanceOf(signers[0].address))).lessThan(Number(parseUnits("51", 18)))
+                expect(Number(await dai.balanceOf(signers[0].address))).greaterThan(Number(parseUnits("49", 18)))
                 
             })
     
