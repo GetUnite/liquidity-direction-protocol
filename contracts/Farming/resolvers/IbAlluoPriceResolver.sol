@@ -4,10 +4,9 @@ pragma solidity ^0.8.11;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import "./../../interfaces/IIbAlluo.sol";
-import "./../LiquidityHandler.sol";
+import "./../../interfaces/ILiquidityHandler.sol";
 
-contract IbAlluoPriceResolver is AccessControl {
-    address[] public ibAlluoAddress;
+contract IbAlluoPriceResolver{
     address public alluoBank;
     address public liquidityHandlerAddress;
 
@@ -21,24 +20,22 @@ contract IbAlluoPriceResolver is AccessControl {
 
     constructor(
         address _liquidityHandlerAddress,
-        address _newAdmin,
         address _alluoBank
     ) {
-        _grantRole(DEFAULT_ADMIN_ROLE, _newAdmin);
         liquidityHandlerAddress = _liquidityHandlerAddress;
         alluoBank = _alluoBank;
     }
 
     function emitter() external {
-        address[] memory iBAlluos  = LiquidityHandler(liquidityHandlerAddress).getListOfIbAlluos();
-        for (uint i=0; i<iBAlluos.length; i++) {
-            IIbAlluo(iBAlluos[i]).updateRatio();
+        address[] memory ibAlluos  = ILiquidityHandler(liquidityHandlerAddress).getListOfIbAlluos();
+        for (uint i=0; i<ibAlluos.length; i++) {
+            IIbAlluo(ibAlluos[i]).updateRatio();
             emit IbAlluoValue(
                 alluoBank,
-                IERC20Metadata(iBAlluos[i]).symbol(),
-                IIbAlluo(iBAlluos[i]).getBalance(alluoBank),
-                IIbAlluo(iBAlluos[i]).balanceOf(alluoBank),
-                IIbAlluo(iBAlluos[i]).growingRatio()
+                IERC20Metadata(ibAlluos[i]).symbol(),
+                IIbAlluo(ibAlluos[i]).getBalance(alluoBank),
+                IIbAlluo(ibAlluos[i]).balanceOf(alluoBank),
+                IIbAlluo(ibAlluos[i]).growingRatio()
             );
         }
     }

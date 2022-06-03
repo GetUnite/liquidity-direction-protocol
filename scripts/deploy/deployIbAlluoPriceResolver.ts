@@ -5,7 +5,7 @@ const deploymentArguments = require('../verification/argumentsIbAlluoPriceResolv
 async function main() {
     const IbAlluoPriceResolver = await ethers.getContractFactory("IbAlluoPriceResolver");
 
-    let withdrawawlRequestResolver = await IbAlluoPriceResolver.deploy(deploymentArguments[0],deploymentArguments[1],deploymentArguments[2])
+    let withdrawawlRequestResolver = await IbAlluoPriceResolver.deploy(deploymentArguments[0],deploymentArguments[1])
 
     console.log("IbAlluoPriceResolver deployed to:", withdrawawlRequestResolver.address);
 }
