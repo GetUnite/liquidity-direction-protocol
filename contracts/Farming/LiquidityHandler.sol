@@ -51,8 +51,6 @@ contract LiquidityHandler is
         uint256 amount;
         // withdrawal time
         uint256 time;
-        // Output token (Say, for ibAlluoETH, want withdrawal in USDC, then token is wETH and outputtoken is USDC);
-        address outputToken;
     }
 
     struct WithdrawalSystem {
@@ -183,8 +181,7 @@ contract LiquidityHandler is
                 user: _user,
                 token: _token,
                 amount: _amount,
-                time: block.timestamp,
-                outputToken: _token
+                time: block.timestamp
             });
             withdrawalSystem.totalWithdrawalAmount += _amount;
             emit AddedToQueue(msg.sender, _user, _token, _amount, lastWithdrawalRequest+1, block.timestamp);
@@ -224,14 +221,14 @@ contract LiquidityHandler is
             // In satisfy function, it always starts with
             // lastSatisfied + 1 --> So there are errors!
             // Alternative: Can start at 0 here and change line 194 to + 0 instead.
+            require(_token == _outputToken, "Handler: Withdrawal queue only if tokens are supported");
             uint256 lastWithdrawalRequest = withdrawalSystem.lastWithdrawalRequest;
             withdrawalSystem.lastWithdrawalRequest++;
             withdrawalSystem.withdrawals[lastWithdrawalRequest+1] = Withdrawal({
                 user: _user,
                 token: _token,
                 amount: _amount,
-                time: block.timestamp,
-                outputToken: _outputToken
+                time: block.timestamp
             });
             withdrawalSystem.totalWithdrawalAmount += _amount;
             emit AddedToQueue(msg.sender, _user, _token, _amount, lastWithdrawalRequest+1, block.timestamp);
@@ -250,19 +247,19 @@ contract LiquidityHandler is
                 Withdrawal memory withdrawal = withdrawalSystem.withdrawals[lastSatisfiedWithdrawal+1];
                 uint adapterId = ibAlluoToAdapterId.get(_ibAlluo);
                 address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
-                if (withdrawal.amount <= inAdapter) {
-                    if (withdrawal.outputToken != withdrawal.token) {
-                        IAdapter(adapter).withdraw(address(this), withdrawal.token, withdrawal.amount);
-                        _withdrawThroughExchange(withdrawal.token, withdrawal.outputToken, withdrawal.amount, withdrawal.user);
-                    } else {
-                        IAdapter(adapter).withdraw(withdrawal.user, withdrawal.token, withdrawal.amount);
-                    }
+              if (withdrawal.amount <= inAdapter) {
+
+                    IAdapter(adapter).withdraw(withdrawal.user, withdrawal.token, withdrawal.amount);
+                
                     inAdapter -= withdrawal.amount;
                     withdrawalSystem.totalWithdrawalAmount -= withdrawal.amount;
                     withdrawalSystem.lastSatisfiedWithdrawal++;
                     lastSatisfiedWithdrawal++;
-                    withdrawalSystem.resolverTrigger = false;
 
+                    if(withdrawalSystem.resolverTrigger){
+                        withdrawalSystem.resolverTrigger = false;
+                    }
+                    
                     emit WithdrawalSatisfied(
                         _ibAlluo,
                         withdrawal.user, 
@@ -276,6 +273,16 @@ contract LiquidityHandler is
                 }
             }
         }
+    }
+    /// @notice Function used by frontend to see if withdrawals in different tokens can be made
+    /// @dev For example, withdrawing weth from ibAlluoUSD. Possible if you are not added to queue
+    /// @param _ibAlluo address
+    /// @param _amount Amount in ibAlluo decimals you want to withdraw 
+    /// @return True if possible, false if not.
+    function withdrawalInDifferentTokenPossible(address _ibAlluo, uint256 _amount) public view returns (bool) {
+        uint256 inAdapter = getAdapterAmount(_ibAlluo);
+        WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[_ibAlluo];
+        return (inAdapter >= _amount && withdrawalSystem.totalWithdrawalAmount == 0);
     }
 
     function satisfyAllWithdrawals() external whenNotPaused{

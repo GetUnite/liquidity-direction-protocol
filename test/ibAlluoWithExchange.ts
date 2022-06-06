@@ -263,7 +263,8 @@ describe("IbAlluo and handler", function () {
             await depositToibAlluoEth(signers[8], dai, parseEther("1000"));
             await depositToibAlluoEth(signers[8], dai, parseEther("1000"));
             await depositToibAlluoEth(signers[8], dai, parseEther("1000"));
-
+            // just test the frontend view function
+            expect(await handler.withdrawalInDifferentTokenPossible(ibAlluoEth.address, parseEther("0.039"))).equal(true);
             await ibAlluoEth.connect(signers[0]).withdraw(dai.address, parseEther("0.039"))
             // Once there are sufficient deposits, withdrawal is fufilled.
             // await depositToibAlluoEth(signers[0], dai, parseEther("1000"));
@@ -271,17 +272,11 @@ describe("IbAlluo and handler", function () {
             expect(Number(await dai.balanceOf(signers[0].address))).greaterThan(Number(70))
 
         })
-        it("Depositing in Dai and then withdrawing in Dai should give you Dai back (after being added to withdrawal queue) ", async function () {
+        it("Depositing in Dai and then withdrawing in Dai should revert as buffer is insufficient ", async function () {
             await depositToibAlluoEth(signers[1], dai, parseEther("100"));
             expect(Number(await ibAlluoEth.balanceOf(signers[1].address))).greaterThan(Number(0))
-            await ibAlluoEth.connect(signers[1]).withdraw(dai.address, parseEther("0.039"))
-
-            await depositToibAlluoEth(signers[8], dai, parseEther("10000"));
-
-            // Once there are sufficient deposits, withdrawal is fufilled.
-            await handler.satisfyAllWithdrawals();
-            console.log(await dai.balanceOf(signers[1].address));
-            expect(Number(await dai.balanceOf(signers[1].address))).greaterThan(Number(70))
+            expect(await handler.withdrawalInDifferentTokenPossible(ibAlluoEth.address, parseEther("0.039"))).equal(false);
+            await expect(ibAlluoEth.connect(signers[1]).withdraw(dai.address, parseEther("0.039"))).to.be.revertedWith("Handler: Withdrawal queue only if tokens are supported")
 
         })
 
@@ -303,19 +298,13 @@ describe("IbAlluo and handler", function () {
             expect(Number(await dai.balanceOf(signers[3].address))).greaterThan(Number(70))
 
         })
-        it("Depositing in USDC and then withdrawing in Dai should give you Dai back (after being added to withdrawal queue) ", async function () {
+        it("Depositing in USDC and then withdrawing in Dai should revert as buffer is insufficient ", async function () {
             console.log(await dai.balanceOf(signers[4].address), "before");
 
             await depositToibAlluoEth(signers[4], usdc, parseUnits("100", 6));
             expect(Number(await ibAlluoEth.balanceOf(signers[4].address))).greaterThan(Number(0))
-            await ibAlluoEth.connect(signers[4]).withdraw(dai.address, parseEther("0.039"))
-
-            await depositToibAlluoEth(signers[8], dai, parseEther("1000"));
-
-            // Once there are sufficient deposits, withdrawal is fufilled.
-            await handler.satisfyAllWithdrawals();
-            console.log(await dai.balanceOf(signers[4].address));
-            expect(Number(await dai.balanceOf(signers[4].address))).greaterThan(Number(70))
+            expect(await handler.withdrawalInDifferentTokenPossible(ibAlluoEth.address, parseEther("0.039"))).equal(false);
+            await expect(ibAlluoEth.connect(signers[4]).withdraw(dai.address, parseEther("0.039"))).to.be.revertedWith("Handler: Withdrawal queue only if tokens are supported")
 
         })
 

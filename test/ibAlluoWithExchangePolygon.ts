@@ -408,20 +408,10 @@ describe("IbAlluo and handler", function () {
 
 
         })
-        it("Depositing in amCrv3 and then withdrawing in amCrv3 should give you amCrv3 back (after being added to withdrawal queue) ", async function () {
+        it("Depositing in amCrv3 and then withdrawing in amCrv3 should revert as buffer is insufficient", async function () {
             await deposit(signers[1], PolygonCurve3Lp, parseEther("100"));
             expect(Number(await ibAlluoUsd.balanceOf(signers[1].address))).greaterThan(Number(0))
-            await ibAlluoUsd.connect(signers[1]).withdraw(PolygonCurve3Lp.address, parseEther("70"))
-
-            await deposit(signers[8], dai, parseEther("10000"));
-
-            // Once there are sufficient deposits, withdrawal is fufilled.
-            await handler.satisfyAllWithdrawals();
-            const balAfter = await PolygonCurve3Lp.balanceOf(signers[1].address);
-            console.log(balAfter);
-            expect(Number(balAfter)).greaterThan(Number(parseEther("60")))
-            expect(Number(balAfter)).lessThan(Number(parseEther("70")))
-
+            await expect(ibAlluoUsd.connect(signers[1]).withdraw(PolygonCurve3Lp.address, parseEther("70"))).to.be.revertedWith("Handler: Withdrawal queue only if tokens are supported")
 
         })
 
