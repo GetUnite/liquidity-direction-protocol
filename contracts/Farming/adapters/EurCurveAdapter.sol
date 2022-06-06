@@ -131,8 +131,19 @@ contract EurCurveAdapter is AccessControl {
         }
     }
 
-    function getCoreTokens() external view returns ( address liquidToken, address primaryToken ){
-        return (ICurvePoolEUR(curvePool).coins(liquidTokenIndex), EURT);
+    function getCoreTokens() external view returns (address liquidToken, address primaryToken){
+        return (
+            ICurvePoolEUR(curvePool).coins(liquidTokenIndex), 
+            ICurvePoolEUR(curvePool).coins(primaryTokenIndex)
+        );
+    }
+
+    function changeLiquidTokenIndex(uint128 _newLiquidTokenIndex) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        liquidTokenIndex = _newLiquidTokenIndex;
+    }
+
+    function changePrimaryTokenIndex(uint64 _newPrimaryTokenIndex) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        primaryTokenIndex = _newPrimaryTokenIndex;
     }
 
     function setSlippage(uint64 _newSlippage) external onlyRole(DEFAULT_ADMIN_ROLE) {

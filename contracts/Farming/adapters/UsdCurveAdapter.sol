@@ -132,12 +132,19 @@ contract UsdCurveAdapter is AccessControl {
         }
     }
 
-    // function changeLiquidToken() external{
+    function getCoreTokens() external view returns (address liquidToken, address primaryToken){
+        return (
+            ICurvePoolUSD(curvePool).underlying_coins(liquidTokenIndex), 
+            ICurvePoolUSD(curvePool).underlying_coins(primaryTokenIndex)
+        );
+    }
 
-    // }
+    function changeLiquidTokenIndex(uint128 _newLiquidTokenIndex) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        liquidTokenIndex = _newLiquidTokenIndex;
+    }
 
-    function getCoreTokens() external view returns ( address liquidToken, address primaryToken ){
-        return (ICurvePoolUSD(curvePool).underlying_coins(liquidTokenIndex), USDC);
+    function changePrimaryTokenIndex(uint64 _newPrimaryTokenIndex) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        primaryTokenIndex = _newPrimaryTokenIndex;
     }
 
 
