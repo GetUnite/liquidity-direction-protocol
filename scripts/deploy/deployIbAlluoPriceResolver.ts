@@ -1,13 +1,13 @@
 import { ethers} from "hardhat"
 
-const deploymentArguments = require('../verification/argumentsIbAlluoUSDPriceResolver.ts');
+const deploymentArguments = require('../verification/argumentsIbAlluoPriceResolver.ts');
 
 async function main() {
-    const IbAlluoUSDPriceResolver = await ethers.getContractFactory("IbAlluoUSDPriceResolver");
+    const IbAlluoPriceResolver = await ethers.getContractFactory("IbAlluoPriceResolver");
 
-    let withdrawawlRequestResolver = await IbAlluoUSDPriceResolver.deploy(deploymentArguments[0],deploymentArguments[1],deploymentArguments[2])
+    let withdrawawlRequestResolver = await IbAlluoPriceResolver.deploy(deploymentArguments[0],deploymentArguments[1])
 
-    console.log("WithdrawawlRequestResolver deployed to:", withdrawawlRequestResolver.address);
+    console.log("IbAlluoPriceResolver deployed to:", withdrawawlRequestResolver.address);
 }
 
 main()
