@@ -60,10 +60,11 @@ describe("IbAlluo and handler", function () {
     let usdWhale: SignerWithAddress;
     let curveUsdLpHolder: SignerWithAddress;
 
-    let jeur: IERC20,  eurt: IERC20, eurs: IERC20;
+    let jeur: IERC20, par: IERC20,  eurt: IERC20, eurs: IERC20;
     let curveLpEUR: IERC20;
 
     let jeurWhale: SignerWithAddress;
+    let parWhale: SignerWithAddress;
     let eurtWhale: SignerWithAddress;
     let eursWhale : SignerWithAddress;
 
@@ -93,6 +94,7 @@ describe("IbAlluo and handler", function () {
         curveUsdLpHolder = await getImpersonatedSigner("0x7117de93b352ae048925323f3fcb1cd4b4d52ec4");
 
         jeurWhale = await getImpersonatedSigner("0x00d7c133b923548f29cc2cc01ecb1ea2acdf2d4c");
+        parWhale = await getImpersonatedSigner("0xac3203d77823496e421aa7e88cdc2f6c387d6182");
         eurtWhale = await getImpersonatedSigner("0x1a4b038c31a8e5f98b00016b1005751296adc9a4");
         eursWhale = await getImpersonatedSigner("0x6de2865067b65d4571c17f6b9eeb8dbdd5e36584");
 
@@ -104,6 +106,7 @@ describe("IbAlluo and handler", function () {
         curveLpUSD = await ethers.getContractAt("IERC20", "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171");
 
         jeur = await ethers.getContractAt("IERC20", "0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c");
+        par = await ethers.getContractAt("IERC20", "0xE2Aa7db6dA1dAE97C5f5C6914d285fBfCC32A128");
         eurt = await ethers.getContractAt("IERC20", "0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f");
         eurs = await ethers.getContractAt("IERC20", "0xE111178A87A3BFf0c8d18DECBa5798827539Ae99");
 
@@ -114,11 +117,12 @@ describe("IbAlluo and handler", function () {
         expect(await usdc.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDC, or you are not forking Polygon");
         expect(await usdt.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDT, or you are not forking Polygon");
         expect(await jeur.balanceOf(jeurWhale.address)).to.be.gt(0, "Whale has no jeur, or you are not forking Polygon");
+        expect(await par.balanceOf(parWhale.address)).to.be.gt(0, "Whale has no par, or you are not forking Polygon");
         expect(await eurt.balanceOf(eurtWhale.address)).to.be.gt(0, "Whale has no eurt, or you are not forking Polygon");
         expect(await eurs.balanceOf(eursWhale.address)).to.be.gt(0, "Whale has no eurs, or you are not forking Polygon");
         expect(await weth.balanceOf(wethWhale.address)).to.be.gt(0, "Whale has no weth, or you are not forking Polygon");
         
-        await sendEth([usdWhale.address, jeurWhale.address, eurtWhale.address, eursWhale.address, wethWhale.address])
+        await sendEth([usdWhale.address, jeurWhale.address, parWhale.address, eurtWhale.address, eursWhale.address, wethWhale.address])
     });
 
 
@@ -171,7 +175,6 @@ describe("IbAlluo and handler", function () {
             true
         )
 
-
         ibAlluoUsd = await upgrades.deployProxy(IbAlluo,
             [
                 "Interest Bearing Alluo USD",
@@ -199,8 +202,9 @@ describe("IbAlluo and handler", function () {
                 admin.address,
                 handler.address,
                 [jeur.address,
-                    eurt.address,
-                    eurs.address],
+                par.address,
+                eurt.address,
+                eurs.address],
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8"],
@@ -362,6 +366,26 @@ describe("IbAlluo and handler", function () {
             expect(Number(await jeur.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 18)))
         })
 
+        it("Depositing 100 par and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
+            await deposit(signers[0], par, parseEther("100"));
+            await ibAlluoEur.connect(signers[0]).withdraw(par.address, parseEther("50"));
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
+            expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+        })
+        it("Depositing 100 par, attempt to withdraw 50 and then only get paid after there is a deposit", async function () {
+            await deposit(signers[0], par, parseEther("100"));
+            await ibAlluoEur.connect(signers[0]).withdraw(par.address, parseEther("50"));
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
+            expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+            
+            await deposit(signers[1], par, parseEther("100"));
+            await handler.satisfyAdapterWithdrawals(ibAlluoEur.address);
+            // Loss from slippage makes tests awkward.
+
+            expect(Number(await par.balanceOf(signers[0].address))).lessThan(Number(parseUnits("51", 18)))
+            expect(Number(await par.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 18)))
+        })
+
         it("Depositing 100 eurt and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
             await deposit(signers[0], eurt, parseUnits("100", 6));
             await ibAlluoEur.connect(signers[0]).withdraw(eurt.address, parseUnits("100", 18));
@@ -405,6 +429,9 @@ describe("IbAlluo and handler", function () {
                 expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
                 walletBalance = await eurt.balanceOf(admin.address);
 
+                await deposit(signers[0], par, parseEther("100"));
+                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(admin.address);
 
                 await deposit(signers[0], eurt, parseUnits("100", 6));
                 expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
@@ -418,6 +445,9 @@ describe("IbAlluo and handler", function () {
                 expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
                 walletBalance = await eurt.balanceOf(admin.address);
 
+                await deposit(signers[0], par, parseEther("100"));
+                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(admin.address);
 
                 await deposit(signers[0], eurt, parseUnits("100", 6));
                 expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
@@ -431,6 +461,9 @@ describe("IbAlluo and handler", function () {
                 expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
                 walletBalance = await eurt.balanceOf(admin.address);
 
+                await deposit(signers[0], par, parseEther("100"));
+                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(admin.address);
 
                 await deposit(signers[0], eurt, parseUnits("100", 6));
                 expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
@@ -508,7 +541,9 @@ describe("IbAlluo and handler", function () {
     
                 await deposit(signers[1], dai, parseEther("100"));
                 await handler.satisfyAdapterWithdrawals(ibAlluoUsd.address);
-                expect(await dai.balanceOf(signers[0].address)).equal(parseEther("50"))
+                expect(Number(await dai.balanceOf(signers[0].address))).lessThan(Number(parseUnits("51", 18)))
+                expect(Number(await dai.balanceOf(signers[0].address))).greaterThan(Number(parseUnits("49", 18)))
+                
             })
     
             it("Depositing 100 USDC and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
@@ -693,6 +728,12 @@ describe("IbAlluo and handler", function () {
 
         else if (token == jeur) {
             await token.connect(jeurWhale).transfer(recipient.address, amount);
+            await token.connect(recipient).approve(ibAlluoEur.address, amount);        
+            await ibAlluoEur.connect(recipient).deposit(token.address, amount);
+        }
+
+        else if (token == par) {
+            await token.connect(parWhale).transfer(recipient.address, amount);
             await token.connect(recipient).approve(ibAlluoEur.address, amount);        
             await ibAlluoEur.connect(recipient).deposit(token.address, amount);
         }
