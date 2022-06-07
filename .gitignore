@@ -1,6 +1,5 @@
 node_modules
 .env
-.openzeppelin/unknown-*.json
 .vscode
 coverage
 coverage.json
@@ -12,3 +11,12 @@ artifacts
 
 #Macbook files
 .DS_Store
+
+##Network files for upgraded contracts
+
+#Not include local networks
+.openzeppelin/unknown-*.json
+#Polygon exception
+!.openzeppelin/unknown-137.json      
+#Mumbai exception
+!.openzeppelin/unknown-80001.json    

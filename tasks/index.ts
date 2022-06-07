@@ -1,7 +1,11 @@
-import './dev/addDepositToken'
-import "./dev/grantRole"
-import './dev/migrate'
+import './dev/lockers'
+import './dev/holders'
+import "./migration/fromAlluoLp/claimAll"
+import "./migration/fromAlluoLp/mintNew"
+import "./migration/fromAlluoLp/lastStep"
+import "./migration/fromOldLocker/migrateLocker.ts"
 import "./voting/createEntry"
 import "./voting/getPoolId"
-import "./migration/claimAll"
-import "./migration/mintNew"
+import "./metatx/stablecoinMetaTx"
+import "./dev/testingResolver"
+import "./voting/executions/weekly_vote_execution/voteExecution-24052022to07062022"
