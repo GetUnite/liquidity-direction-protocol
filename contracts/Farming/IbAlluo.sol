@@ -4,6 +4,8 @@ pragma solidity ^0.8.11;
 import "./AlluoERC20Upgradable.sol";
 import "../interfaces/ILiquidityBufferVault.sol";
 import "../mock/interestHelper/Interest.sol";
+import "../interfaces/IExchange.sol";
+import "../interfaces/IAdapter.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -59,6 +61,9 @@ contract IbAlluo is
 
     // trusted forwarder address, see EIP-2771
     address public trustedForwarder;
+    
+    address public exchangeAddress;
+    address public tokenFetcher;
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
@@ -92,7 +97,9 @@ contract IbAlluo is
         address[] memory _supportedTokens,
         uint256 _interestPerSecond,
         uint256 _annualInterest,
-        address _trustedForwarder
+        address _trustedForwarder,
+        address _exchangeAddress
+        // address _tokenFetcher
     ) public initializer {
         __ERC20_init(_name, _symbol);
         __Pausable_init();
@@ -116,7 +123,8 @@ contract IbAlluo is
         growingRatio = 10**18;
         updateTimeLimit = 60;
         lastInterestCompound = block.timestamp;
-
+        exchangeAddress = _exchangeAddress;
+        // tokenFetcher = _tokenFetcher;
         liquidityBuffer = _buffer;
         trustedForwarder = _trustedForwarder;
 
@@ -144,7 +152,7 @@ contract IbAlluo is
      *
      * NOTE: If `amount` is the maximum `uint256`, the allowance is not updated on
      * `transferFrom`. This is semantically equivalent to an infinite approval.
-     *
+     * 
      * NOTE: Because of constantly growing ratio between IbAlluo and asset value
      *       we recommend to approve amount slightly more
      */
@@ -205,25 +213,26 @@ contract IbAlluo is
     /// @dev When called, asset token is sent to the wallet, then the index is updated
     ///      so that the adjusted amount is accurate.
     /// @param _token Deposit token address
-    /// @param _amount Amount (with token desimals)
+    /// @param _amount Amount (with token decimals)
 
     function deposit(address _token, uint256 _amount) external {
-        require(
-            supportedTokens.contains(_token),
-            "IbAlluo: Token not supported"
-        );
-
-        IERC20Upgradeable(_token).safeTransferFrom(
-            _msgSender(),
-            address(liquidityBuffer),
-            _amount
-        );
+        // Change targetToken to either "mainToken read from adapter" or allow paramter set in ibAlluo itself
+        // Do this once the adapter is optimised on chain to choose token with highest liquidity.
+        // The main token is the one which isn't converted to primary tokens.
+        // Small issue with deposits and withdrawals though. Need to approve.
+        if (supportedTokens.contains(_token) == false) {
+            IERC20Upgradeable(_token).safeTransferFrom(_msgSender(), address(this), _amount);
+            (, address mainToken) = ILiquidityBufferVault(liquidityBuffer).getAdapterCoreTokensFromIbAlluo(address(this));
+            IERC20Upgradeable(_token).approve(exchangeAddress, _amount);
+            _amount = IExchange(exchangeAddress).exchange(_token, mainToken, _amount, 0);
+            _token = mainToken;
+            IERC20Upgradeable(mainToken).safeTransfer(address(liquidityBuffer),_amount);
+        } else {
+            IERC20Upgradeable(_token).safeTransferFrom(_msgSender(),address(liquidityBuffer),_amount);
+        }
         updateRatio();
-
         ILiquidityBufferVault(liquidityBuffer).deposit(_token, _amount);
-
-        uint256 amountIn18 = _amount *
-            10**(18 - AlluoERC20Upgradable(_token).decimals());
+        uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = (amountIn18 * multiplier) / growingRatio;
         _mint(_msgSender(), adjustedAmount);
         emit TransferAssetValue(address(0), _msgSender(), adjustedAmount, amountIn18, growingRatio);
@@ -234,26 +243,38 @@ contract IbAlluo is
     /// @dev When called, immediately check for new interest index. Then find the adjusted amount in IbAlluo tokens
     ///      Then burn appropriate amount of IbAlluo tokens to receive asset token
     /// @param _targetToken Asset token
-    /// @param _amount Amount (parsed 10**18)
+    /// @param _amount Amount (parsed 10**18) in ibAlluo****
 
     function withdrawTo(
         address _recipient,
         address _targetToken,
         uint256 _amount
     ) public {
-        require(
-            supportedTokens.contains(_targetToken),
-            "IbAlluo: Token not supported"
-        );
+        // Change mainToken to either "mainToken read from adapter" or allow paramter set in ibAlluo itself
+        // Do this once the adapter is optimised on chain to choose token with highest liquidity. (Artem is working on this ticket)
+        // The main token is the one which isn't converted to primary tokens.
         updateRatio();
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(_msgSender(), adjustedAmount);
-
-        ILiquidityBufferVault(liquidityBuffer).withdraw(
+        ILiquidityBufferVault buffer = ILiquidityBufferVault(liquidityBuffer);
+        if (supportedTokens.contains(_targetToken) == false) {
+            (address primaryToken,) = ILiquidityBufferVault(liquidityBuffer).getAdapterCoreTokensFromIbAlluo(address(this));
+            // This just is used to revert if there is no active route.
+            require(IExchange(exchangeAddress).buildRoute(primaryToken, _targetToken).length>0, "!Supported");
+            buffer.withdraw(
+            _recipient,
+            primaryToken,
+            _amount,
+            _targetToken
+            );
+        } else {
+            buffer.withdraw(
             _recipient,
             _targetToken,
             _amount
-        );
+            );
+        }
+
         emit TransferAssetValue(_msgSender(), address(0), adjustedAmount, _amount, growingRatio);
         emit BurnedForWithdraw(_msgSender(), adjustedAmount);
     }
@@ -320,6 +341,7 @@ contract IbAlluo is
         return true;
     }
 
+    
     /// @notice  Returns balance in asset value
     /// @param _address address of user
 
@@ -423,9 +445,30 @@ contract IbAlluo is
             interestPerSecond
         );
     }
+    
+    /// @notice migrates by minting balances.
 
-    function changeTokenStatus(address _token, bool _status)
-        external
+    function migrateStep1(address _oldContract, address[] memory _users) external onlyRole(DEFAULT_ADMIN_ROLE){
+        for(uint i = 0; i < _users.length; i++){
+            uint256 oldBalance = AlluoERC20Upgradable(_oldContract).balanceOf(_users[i]);
+            _mint(_users[i], oldBalance);
+        }
+    }
+
+    /// @notice migrates by setting new interest variables.
+
+    function migrateStep2() external onlyRole(DEFAULT_ADMIN_ROLE){
+        _unpause();
+        _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        interestPerSecond = 100000000244041*10**13;
+        multiplier = 10**18;
+        growingRatio = 10**18;
+        lastInterestCompound = block.timestamp;
+        annualInterest = 800;
+        updateTimeLimit = 60;
+    }
+    
+    function changeTokenStatus(address _token, bool _status) external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         if (_status) {
@@ -451,7 +494,7 @@ contract IbAlluo is
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(newBuffer.isContract(), "IbAlluo: Not contract");
+        require(newBuffer.isContract(), "!Contract");
 
         address oldValue = liquidityBuffer;
         liquidityBuffer = newBuffer;
