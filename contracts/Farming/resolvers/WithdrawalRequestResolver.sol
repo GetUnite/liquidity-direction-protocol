@@ -16,7 +16,7 @@ contract WithdrawalRequestResolver is AccessControl{
     }
 
     //current liquidityBuffer on Polygon: 0xa248Ba96d72005114e6C941f299D315757877c0e
-    constructor(address _pokeMe, address _liquidityBuffer, address _newAdmin) public {
+    constructor(address _pokeMe, address _liquidityHandlerAddress, address _newAdmin) {
         pokeMe = _pokeMe;
         _grantRole(DEFAULT_ADMIN_ROLE, _newAdmin);
         liquidityHandlerAddress = _liquidityHandlerAddress;
