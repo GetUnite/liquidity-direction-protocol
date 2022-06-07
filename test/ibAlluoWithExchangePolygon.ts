@@ -309,7 +309,7 @@ describe("IbAlluo and handler", function () {
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
-        await handler.connect(admin).grantIbAlluoPermissions(ibAlluoUsd.address)
+        await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoUsd.address)
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoUsd.address, 1)
 
 
@@ -329,7 +329,7 @@ describe("IbAlluo and handler", function () {
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
-        await handler.connect(admin).grantIbAlluoPermissions(ibAlluoEur.address)
+        await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEur.address)
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEur.address, 2)
 
 
@@ -348,7 +348,7 @@ describe("IbAlluo and handler", function () {
         ) as IbAlluo;
 
 
-        await handler.connect(admin).grantIbAlluoPermissions(ibAlluoEth.address)
+        await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEth.address)
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEth.address, 3)
 
     });

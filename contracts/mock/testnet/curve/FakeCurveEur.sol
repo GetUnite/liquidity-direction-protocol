@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "./../../Farming/AlluoERC20Upgradable.sol";
+import "../../../Farming/AlluoERC20Upgradable.sol";
 import "hardhat/console.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -12,7 +12,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
-contract FakeCurve is
+contract FakeCurveEur is
     Initializable,
     PausableUpgradeable,
     AlluoERC20Upgradable,
@@ -28,22 +28,19 @@ contract FakeCurve is
     // admin and reserves address
     address public wallet;
 
-    uint256 public usdtFee;
-    uint256 public usdcFee;
+    uint256 public jeurFee;
+    uint256 public eurtFee;
 
-    IERC20Upgradeable public DAI;
-    IERC20Upgradeable public USDC;
-    IERC20Upgradeable public USDT;
+    IERC20Upgradeable public constant EURS = IERC20Upgradeable(0x3Aa4345De8B32e5c9c14FC7146597EAf262Fd70E);
+    IERC20Upgradeable public constant JEUR = IERC20Upgradeable(0x4bf7737515EE8862306Ddc221cE34cA9d5C91200);
+    IERC20Upgradeable public constant EURT = IERC20Upgradeable(0x34A13C2D581efe6239b92F9a65c8BAa65dfdeBE9);
+    //IERC20Upgradeable public constant  = ;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(
-        address _dai,
-        address _usdc,
-        address _usdt
-    ) public initializer {
-        __ERC20_init("Fake Curve LP", "FCLP");
+    function initialize() public initializer {
+        __ERC20_init("Fake EUR Curve LP", "FECLP");
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -52,27 +49,20 @@ contract FakeCurve is
         _grantRole(UPGRADER_ROLE, msg.sender);
 
         wallet = msg.sender;
-
-        usdtFee = 40;
-        usdcFee = 20;
-
-        DAI = IERC20Upgradeable(_dai);
-        USDC = IERC20Upgradeable(_usdc);
-        USDT = IERC20Upgradeable(_usdt);
+        jeurFee = 60;
+        eurtFee = 40;
     }
 
     function add_liquidity(address _token, uint256 _amount) external {
-        if (IERC20Upgradeable(_token) == USDT) {
-            uint256 amountIn18 = _amount * 10**12;
-            USDT.transferFrom(msg.sender, wallet, _amount);
-            _mint(msg.sender, amountIn18);
-        } else if (IERC20Upgradeable(_token) == DAI) {
-            DAI.transferFrom(msg.sender, wallet, _amount);
+        if (IERC20Upgradeable(_token) == EURS) {
+            EURS.transferFrom(msg.sender, wallet, _amount);
+            _mint(msg.sender, _amount * 10 ** 16);
+        } else if (IERC20Upgradeable(_token) == JEUR) {
+            JEUR.transferFrom(msg.sender, wallet, _amount);
             _mint(msg.sender, _amount);
-        } else if (IERC20Upgradeable(_token) == USDC) {
-            uint256 amountIn18 = _amount * 10**12;
-            USDC.transferFrom(msg.sender, wallet, _amount);
-            _mint(msg.sender, amountIn18);
+        } else if (IERC20Upgradeable(_token) == EURT) {
+            EURT.transferFrom(msg.sender, wallet, _amount);
+            _mint(msg.sender, _amount * 10 **12);
         }
     }
 
@@ -80,21 +70,19 @@ contract FakeCurve is
         external
         returns (uint256)
     {
-        if (IERC20Upgradeable(_token) == USDT) {
-            _burn(msg.sender, _amount);
-            uint256 amountIn6 = _amount / 10**12;
-            uint256 amountWithFee = (amountIn6 * (10000 - usdtFee)) / 10000;
-            USDT.transferFrom(wallet, msg.sender, amountWithFee);
+        if (IERC20Upgradeable(_token) == EURT) {
+            _burn(msg.sender, _amount * 10 ** 12);
+            uint256 amountWithFee = (_amount * (10000 - eurtFee)) / 10000;
+            EURT.transferFrom(wallet, msg.sender, amountWithFee);
             return amountWithFee;
-        } else if (IERC20Upgradeable(_token) == DAI) {
-            _burn(msg.sender, _amount);
-            DAI.transferFrom(wallet, msg.sender, _amount);
+        } else if (IERC20Upgradeable(_token) == EURS) {
+            _burn(msg.sender, _amount * 10**16);
+            EURS.transferFrom(wallet, msg.sender, _amount);
             return _amount;
-        } else if (IERC20Upgradeable(_token) == USDC) {
+        } else if (IERC20Upgradeable(_token) == JEUR) {
             _burn(msg.sender, _amount);
-            uint256 amountIn6 = _amount / 10**12;
-            uint256 amountWithFee = (amountIn6 * (10000 - usdcFee)) / 10000;
-            USDC.transferFrom(wallet, msg.sender, amountWithFee);
+            uint256 amountWithFee = (_amount * (10000 - jeurFee)) / 10000;
+            JEUR.transferFrom(wallet, msg.sender, amountWithFee);
             return amountWithFee;
         }
     }
@@ -106,22 +94,12 @@ contract FakeCurve is
         wallet = newWallet;
     }
 
-    function setCoins(
-        address newDai,
-        address newUsdc,
-        address newUsdt
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        DAI = IERC20Upgradeable(newDai);
-        USDC = IERC20Upgradeable(newUsdc);
-        USDT = IERC20Upgradeable(newUsdt);
-    }
-
-    function changeFee(uint256 usdt, uint256 usdc)
+    function changeFee(uint256 jeur, uint256 eurt)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        usdtFee = usdt;
-        usdcFee = usdc;
+        jeurFee = jeur;
+        eurtFee = eurt;
     }
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {

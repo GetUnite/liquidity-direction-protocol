@@ -156,33 +156,10 @@ describe("IbAlluo and handler", function () {
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), admin.address)
 
-        const UsdAdapter = await ethers.getContractFactory("TestMainnetUsdCurveAdapter") as TestMainnetUsdCurveAdapter__factory;
-        const EurAdapter = await ethers.getContractFactory("EurCurveAdapter") as EurCurveAdapter__factory;
         const EthAdapter = await ethers.getContractFactory("TestMainnetEthNoPoolAdapter") as TestMainnetEthNoPoolAdapter__factory;
 
         // eurAdapter = await EurAdapter.deploy(admin.address, handler.address, 200);
-        usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200);
         ethAdapter = await EthAdapter.deploy(admin.address, handler.address);
-
-        await usdAdapter.connect(admin).adapterApproveAll()
-        await handler.connect(admin).setAdapter(
-            1,
-            "USD Curve-Aave",
-            500,
-            usdAdapter.address,
-            true
-        )
-
-        // await eurAdapter.connect(admin).adapterApproveAll()
-        // await handler.connect(admin).setAdapter(
-        //     2,
-        //     "EUR Curve-Aave",
-        //     500,
-        //     eurAdapter.address,
-        //     true
-        // )
-
-
 
         await handler.connect(admin).setAdapter(
             3,
@@ -191,47 +168,6 @@ describe("IbAlluo and handler", function () {
             ethAdapter.address,
             true
         )
-
-
-        ibAlluoUsd = await upgrades.deployProxy(IbAlluo,
-            [
-                "Interest Bearing Alluo USD",
-                "ibAlluoUsd",
-                admin.address,
-                handler.address,
-                [dai.address,
-                usdc.address,
-                usdt.address],
-                BigNumber.from("100000000470636740"),
-                1600,
-                trustedForwarder,
-                exchangeAddress],
-            { initializer: 'initialize', kind: 'uups' }
-        ) as IbAlluo;
-
-        await handler.connect(admin).grantIbAlluoPermissions(ibAlluoUsd.address)
-        await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoUsd.address, 1)
-
-
-
-        // ibAlluoEur = await upgrades.deployProxy(IbAlluo,
-        //     [
-        //         "Interest Bearing Alluo EUR",
-        //         "ibAlluoEur",
-        //         admin.address,
-        //         handler.address,
-        //         [jeur.address,
-        //         eurt.address,
-        //         eurs.address],
-        //         BigNumber.from("100000000470636740"),
-        //         1600,
-        //         trustedForwarder],
-        //     { initializer: 'initialize', kind: 'uups' }
-        // ) as IbAlluo;
-
-        // await handler.connect(admin).grantIbAlluoPermissions(ibAlluoEur.address)
-        // await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEur.address, 2)
-
 
         ibAlluoEth = await upgrades.deployProxy(IbAlluo,
             [
@@ -247,8 +183,7 @@ describe("IbAlluo and handler", function () {
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
-
-        await handler.connect(admin).grantIbAlluoPermissions(ibAlluoEth.address)
+        await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEth.address)
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEth.address, 3)
 
     });
