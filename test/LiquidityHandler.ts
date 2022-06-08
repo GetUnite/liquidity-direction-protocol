@@ -503,6 +503,7 @@ describe("IbAlluo and handler", function () {
         describe('EUR Mass deposits and withdrawal test cases', function () {
             it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
                 let walletBalance = await eurt.balanceOf(admin.address);
+                let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
 
                 await deposit(signers[0], jeur, parseEther("100"));
                 expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
@@ -521,13 +522,16 @@ describe("IbAlluo and handler", function () {
                 walletBalance = await eurt.balanceOf(admin.address);
 
                 await ibAlluoEur.connect(signers[0]).withdraw(jeur.address, parseEther("50"));
-                let withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEur.address)
+                withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
+
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
                 await ibAlluoEur.connect(signers[1]).withdraw(eurt.address, parseUnits("50", 18));
-                withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEur.address)
+                withdrawalArray =await getLastWithdrawalInfo(ibAlluoEur, handler)
+
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
                 await ibAlluoEur.connect(signers[2]).withdraw(eurs.address, parseUnits("50", 18));
-                withdrawalArray = await handler.ibAlluoLastWithdrawalCheck(ibAlluoEur.address)
+                withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
+
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
 
                 // When there are deposits, should pay everyone back.

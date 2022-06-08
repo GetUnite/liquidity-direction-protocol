@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, TestMainnetUsdCurveAdapter, TestMainnetUsdCurveAdapter__factory, TestMainnetEthNoPoolAdapter, TestMainnetEthNoPoolAdapter__factory } from "../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, TestMainnetUsdCurveAdapter, TestMainnetUsdCurveAdapter__factory, TestMainnetEthNoPoolAdapter, TestMainnetEthNoPoolAdapter__factory,IbAlluoBufferVar, IbAlluoBufferVar__factory } from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 async function skipDays(d: number) {
@@ -55,7 +55,7 @@ async function sendEth(addresses: string[]) {
     }
 }
 
-describe("IbAlluo and handler", function () {
+describe("IbAlluo and Exchange L1", function () {
     let signers: SignerWithAddress[];
     let admin: SignerWithAddress;
 
@@ -138,6 +138,7 @@ describe("IbAlluo and handler", function () {
 
     beforeEach(async function () {
         const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
+
         // Mainnet address for exchange.
         const exchangeAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec";
         const exchangeSlippage = 500;
@@ -168,6 +169,8 @@ describe("IbAlluo and handler", function () {
             ethAdapter.address,
             true
         )
+        
+
 
         ibAlluoEth = await upgrades.deployProxy(IbAlluo,
             [
@@ -187,6 +190,33 @@ describe("IbAlluo and handler", function () {
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEth.address, 3)
 
     });
+    describe("Should be able to upgrade from current ibAlluo deployment", function () {
+        it("Should work upgrade", async function() {
+            const trustedForwarder = "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8";
+
+            const IbAlluoBufferVar = await ethers.getContractFactory("IbAlluoBufferVar") as IbAlluoBufferVar__factory;
+            const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
+    
+            const ibAlluoCurrent = await upgrades.deployProxy(IbAlluoBufferVar,
+                [
+                    "Interest Bearing Alluo Eth",
+                    "ibAlluoEth",
+                    signers[0].address,
+                    handler.address,
+                    [weth.address],
+                    BigNumber.from("100000000470636740"),
+                    1600,
+                    trustedForwarder],
+                { initializer: 'initialize', kind: 'uups' }
+            ) as IbAlluo;
+            await ibAlluoCurrent.pause();
+            await ibAlluoCurrent.changeUpgradeStatus(true);
+
+            const ibAlluoNew = await upgrades.upgradeProxy(ibAlluoCurrent.address, IbAlluo) as IbAlluo
+            expect(await ibAlluoNew.liquidityHandler()).equal(handler.address)
+        })
+
+    })
     describe("ETHAdapter with Exchange Tests", function () {
         it("Depositing in Dai should give you ibAlluoEth", async function () {
             await depositToibAlluoEth(signers[0], dai, parseEther("100"));

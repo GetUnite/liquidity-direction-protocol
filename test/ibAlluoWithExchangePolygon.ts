@@ -63,7 +63,7 @@ async function sendEth(addresses: string[]) {
 
 
 
-describe("IbAlluo and handler", function () {
+describe("IbAlluo and Exchange", function () {
     let signers: SignerWithAddress[];
     let admin: SignerWithAddress;
 

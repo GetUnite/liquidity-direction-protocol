@@ -233,7 +233,7 @@ contract LiquidityHandler is
     ) internal {
         uint256 amountinMainTokens = (_amount18 *
             10**ERC20Upgradeable(_mainToken).decimals()) / 10**18;
-        IERC20Upgradeable(_mainToken).approve(
+        IERC20Upgradeable(_mainToken).safeIncreaseAllowance(
             exchangeAddress,
             amountinMainTokens
         );
@@ -243,7 +243,7 @@ contract LiquidityHandler is
             amountinMainTokens,
             0
         );
-        IERC20Upgradeable(_targetToken).transfer(_user, amountinTargetTokens);
+        IERC20Upgradeable(_targetToken).safeTransfer(_user, amountinTargetTokens);
     }
 
     // Same function as above but overload for case when you want to withdraw in a different token native to an ibAlluo.
@@ -494,47 +494,6 @@ contract LiquidityHandler is
         address adapterAddress = adapterIdsToAdapterInfo[adapterId]
             .adapterAddress;
         return (IAdapter(adapterAddress).getCoreTokens());
-    }
-
-    function ibAlluoLastWithdrawalCheck(address _ibAlluo)
-        public
-        view
-        returns (uint256[3] memory)
-    {
-        WithdrawalSystem
-            storage _ibAlluoWithdrawalSystem = ibAlluoToWithdrawalSystems[
-                _ibAlluo
-            ];
-        return [
-            _ibAlluoWithdrawalSystem.lastWithdrawalRequest,
-            _ibAlluoWithdrawalSystem.lastSatisfiedWithdrawal,
-            _ibAlluoWithdrawalSystem.totalWithdrawalAmount
-        ];
-    }
-
-    function isUserWaiting(address _ibAlluo, address _user)
-        external
-        view
-        returns (bool)
-    {
-        WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[
-            _ibAlluo
-        ];
-        uint256 lastWithdrawalRequest = withdrawalSystem.lastWithdrawalRequest;
-        uint256 lastSatisfiedWithdrawal = withdrawalSystem
-            .lastSatisfiedWithdrawal;
-        if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
-            for (
-                uint256 i = lastSatisfiedWithdrawal + 1;
-                i <= lastWithdrawalRequest;
-                i++
-            ) {
-                if (withdrawalSystem.withdrawals[i].user == _user) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     function getWithdrawal(address _ibAlluo, uint256 _id)
