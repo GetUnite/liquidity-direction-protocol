@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory } from "../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory } from "../typechain";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 async function skipDays(d: number) {
@@ -28,13 +28,14 @@ async function getImpersonatedSigner(address: string): Promise<SignerWithAddress
     return await ethers.getSigner(address);
 }
 
-async function sendEth(addresses: string[]){
+async function sendEth(users: SignerWithAddress[]){
     let signers = await ethers.getSigners();
 
-    for (let i = 0; i < addresses.length; i++){
+    for (let i = 0; i < users.length; i++){
         await signers[0].sendTransaction({
-            to: addresses[i],
-            value: parseEther("3.0")
+            to: users[i].address,
+            value: parseEther("1.0")
+            
         });
     }
 }
@@ -46,10 +47,12 @@ describe("IbAlluo and handler", function () {
     let ibAlluoUsd: IbAlluo;
     let ibAlluoEur: IbAlluo;
     let ibAlluoEth: IbAlluo;
+    let ibAlluoBtc: IbAlluo;
 
     let usdAdapter: UsdCurveAdapter;
     let eurAdapter: EurCurveAdapter;
     let ethAdapter: EthNoPoolAdapter;
+    let btcAdapter: BtcCurveAdapter;
 
     let multisig: PseudoMultisigWallet;
     let handler: LiquidityHandler;
@@ -71,6 +74,13 @@ describe("IbAlluo and handler", function () {
     let weth: IERC20;
 
     let wethWhale: SignerWithAddress;
+
+    let wbtc: IERC20, renBtc: IERC20;
+    let curveLpBTC: IERC20;
+
+    let wbtcWhale: SignerWithAddress;
+    let renBtcWhale: SignerWithAddress;
+
     before(async function () {
         //We are forking Polygon mainnet, please set Alchemy key in .env
         await network.provider.request({
@@ -100,6 +110,10 @@ describe("IbAlluo and handler", function () {
 
         wethWhale = await getImpersonatedSigner("0x72a53cdbbcc1b9efa39c834a540550e23463aacb");
 
+
+        wbtcWhale = await getImpersonatedSigner("0xF9930a9d65cc57d024CF9149AE67e66c7a77E167");
+        renBtcWhale = await getImpersonatedSigner("0x7477a4d4bf17c4eae4f41493b7b49a2d8901ab45");
+
         dai = await ethers.getContractAt("IERC20", "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063");
         usdc = await ethers.getContractAt("IERC20", "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
         usdt = await ethers.getContractAt("IERC20", "0xc2132D05D31c914a87C6611C10748AEb04B58e8F");
@@ -112,6 +126,10 @@ describe("IbAlluo and handler", function () {
 
         weth = await ethers.getContractAt("IERC20", "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619");
 
+        wbtc = await ethers.getContractAt("IERC20", "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6");
+        renBtc = await ethers.getContractAt("IERC20", "0xDBf31dF14B66535aF65AaC99C32e9eA844e14501");
+        curveLpBTC = await ethers.getContractAt("IERC20", "0xf8a57c1d3b9629b77b6726a042ca48990A84Fb49");
+
         console.log("We are forking Polygon mainnet\n");
         expect(await dai.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Polygon");
         expect(await usdc.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDC, or you are not forking Polygon");
@@ -121,8 +139,10 @@ describe("IbAlluo and handler", function () {
         expect(await eurt.balanceOf(eurtWhale.address)).to.be.gt(0, "Whale has no eurt, or you are not forking Polygon");
         expect(await eurs.balanceOf(eursWhale.address)).to.be.gt(0, "Whale has no eurs, or you are not forking Polygon");
         expect(await weth.balanceOf(wethWhale.address)).to.be.gt(0, "Whale has no weth, or you are not forking Polygon");
+        expect(await wbtc.balanceOf(wbtcWhale.address)).to.be.gt(0, "Whale has no wbtc, or you are not forking Polygon");
+        expect(await renBtc.balanceOf(renBtcWhale.address)).to.be.gt(0, "Whale has no renBtc, or you are not forking Polygon");
         
-        await sendEth([usdWhale.address, jeurWhale.address, parWhale.address, eurtWhale.address, eursWhale.address, wethWhale.address])
+        await sendEth([usdWhale, jeurWhale, parWhale, eurtWhale, eursWhale, wethWhale, wbtcWhale, renBtcWhale])
     });
 
 
@@ -144,10 +164,12 @@ describe("IbAlluo and handler", function () {
         const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapter") as UsdCurveAdapter__factory;
         const EurAdapter = await ethers.getContractFactory("EurCurveAdapter") as EurCurveAdapter__factory;
         const EthAdapter = await ethers.getContractFactory("EthNoPoolAdapter") as EthNoPoolAdapter__factory;
+        const BtcAdapter = await ethers.getContractFactory("BtcCurveAdapter") as BtcCurveAdapter__factory;
 
         eurAdapter = await EurAdapter.deploy(admin.address, handler.address, 200);
         usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200);
         ethAdapter = await EthAdapter.deploy(admin.address, handler.address);
+        btcAdapter = await BtcAdapter.deploy(admin.address, handler.address, 200);
 
         await usdAdapter.connect(admin).adapterApproveAll()
         await handler.connect(admin).setAdapter(
@@ -172,6 +194,14 @@ describe("IbAlluo and handler", function () {
             "ETH No Pool Adapter", 
             500, 
             ethAdapter.address, 
+            true
+        )
+
+        await handler.connect(admin).setAdapter(
+            4, 
+            "BTC Curve-Ren", 
+            500, 
+            btcAdapter.address, 
             true
         )
 
@@ -230,8 +260,140 @@ describe("IbAlluo and handler", function () {
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEth.address)
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEth.address, 3)
+
+        ibAlluoBtc = await upgrades.deployProxy(IbAlluo,
+            [
+                "Interest Bearing Alluo BTC",
+                "ibAlluoBtc",
+                admin.address,
+                handler.address,
+                [wbtc.address,
+                renBtc.address],
+                BigNumber.from("100000000470636740"),
+                1600,
+                "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8"],
+            { initializer: 'initialize', kind: 'uups' }
+        ) as IbAlluo;
+     
+
+        await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoBtc.address)
+        await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoBtc.address, 4)
         
     });
+
+    
+    describe('BTC Adaptor with IbAlluo: Test cases', function () {
+        it("Depositing 1 wbtc and immediately attempting to withdraw 0.5 should put you in the waiting list", async function () {
+            await deposit(signers[0], wbtc, parseUnits("1", 8));
+            await ibAlluoBtc.connect(signers[0]).withdraw(wbtc.address, parseUnits("0.5", 18));
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
+            expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+        })
+        it("Depositing 1 wbtc, attempt to withdraw 0.5 and then only get paid after there is a deposit", async function () {
+            await deposit(signers[0], wbtc, parseUnits("1", 8));
+            await ibAlluoBtc.connect(signers[0]).withdraw(wbtc.address, parseUnits("0.5", 18));
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
+            expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+            
+            await deposit(signers[1], wbtc, parseUnits("1", 8));
+            await handler.satisfyAdapterWithdrawals(ibAlluoBtc.address);
+            // Loss from slippage makes tests awkward.
+
+            expect(Number(await wbtc.balanceOf(signers[0].address))).lessThan(Number(parseUnits("0.51", 8)))
+            expect(Number(await wbtc.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("0.49", 8)))
+        })
+
+        it("Depositing 0.1 renBtc and immediately attempting to withdraw 0.05 should put you in the waiting list", async function () {
+            await deposit(signers[0], renBtc, parseUnits("0.1", 8));
+            await ibAlluoBtc.connect(signers[0]).withdraw(renBtc.address, parseUnits("0.05", 18));
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
+            expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+        })
+        it("Depositing 0.1 renBtc, attempt to withdraw 0.05 and then only get paid after there is a deposit", async function () {
+            await deposit(signers[0], renBtc, parseUnits("0.1", 8));
+            await ibAlluoBtc.connect(signers[0]).withdraw(renBtc.address, parseUnits("0.05", 18));
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
+            expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+            
+            await deposit(signers[1], renBtc, parseUnits("0.1", 8));
+            await handler.satisfyAdapterWithdrawals(ibAlluoBtc.address);
+            // Loss from slippage makes tests awkward.
+
+            expect(Number(await renBtc.balanceOf(signers[0].address))).lessThan(Number(parseUnits("0.051", 8)))
+            expect(Number(await renBtc.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("0.049", 8)))
+        })
+
+        it("The balance of the multisig wallet should increase with deposits.", async function () {
+                let walletBalance = await wbtc.balanceOf(admin.address);
+
+                await deposit(signers[0], wbtc, parseUnits("1", 8));
+                expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                walletBalance = await wbtc.balanceOf(admin.address);
+
+                await deposit(signers[0], renBtc, parseUnits("0.1", 8));
+                expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                walletBalance = await wbtc.balanceOf(admin.address);
+
+                await deposit(signers[0], wbtc, parseUnits("1", 8));
+                expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                walletBalance = await wbtc.balanceOf(admin.address);
+
+                await deposit(signers[0], renBtc, parseUnits("0.1", 8));
+                expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                walletBalance = await wbtc.balanceOf(admin.address);
+
+                await deposit(signers[0], wbtc, parseUnits("1", 8));
+                expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                walletBalance = await wbtc.balanceOf(admin.address);
+
+                await deposit(signers[0], renBtc, parseUnits("0.1", 8));
+                expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                walletBalance = await wbtc.balanceOf(admin.address);
+           console.log("Final multisig balance:", walletBalance);
+
+            })
+        it("Attemping to withdraw more than allowed causes revert.", async function () {
+            let walletBalance = await wbtc.balanceOf(admin.address);
+            await deposit(signers[1], wbtc, parseUnits("1", 8));
+            expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+            await expect(ibAlluoBtc.connect(signers[1]).withdraw(wbtc.address, parseUnits("2", 18))).to.be.revertedWith('ERC20: burn amount exceeds balance')
+            })
+            describe('BTC Mass deposits and withdrawal test cases', function () {
+                it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
+                    let walletBalance = await wbtc.balanceOf(admin.address);
+                    let userBalanceAtStart = await wbtc.balanceOf(signers[0].address);
+        
+                    await deposit(signers[0], wbtc, parseUnits("1", 8));
+                    expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                    walletBalance = await wbtc.balanceOf(admin.address);
+        
+                    await deposit(signers[2], renBtc, parseUnits("0.1", 8));
+                    expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                    walletBalance = await wbtc.balanceOf(admin.address);
+        
+                    await ibAlluoBtc.connect(signers[0]).withdraw(wbtc.address, parseUnits("0.5", 18));
+                    let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
+                    expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+   
+                    await ibAlluoBtc.connect(signers[2]).withdraw(renBtc.address,parseUnits("0.05", 18));
+                    withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
+                    expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+        
+                    // When there are deposits, should pay everyone back.
+                    await deposit(signers[2], renBtc, parseUnits("2", 8));
+                    await handler.satisfyAdapterWithdrawals(ibAlluoBtc.address);
+                    expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+        
+                    let delta = (await wbtc.balanceOf(signers[0].address)).sub(userBalanceAtStart)
+
+                    expect(Number(delta)).lessThan(Number(parseUnits("0.51", 8)))
+                    expect(Number(delta)).greaterThanOrEqual(Number(parseUnits("0.49", 8)))
+                    expect(Number(await renBtc.balanceOf(signers[2].address))).lessThan(Number(parseUnits("0.051", 8)))
+                    expect(Number(await renBtc.balanceOf(signers[2].address))).greaterThanOrEqual(Number(parseUnits("0.049", 8)))
+                    })
+                })
+            })
+
 
     describe("EThAdapter no pool: Test cases", function () {
         it("Depositing 100 weth and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
@@ -345,7 +507,7 @@ describe("IbAlluo and handler", function () {
     })
 
 
-    describe('EUR Adaptor with IbAlluoV2: Test cases', function () {
+    describe('EUR Adaptor with IbAlluo: Test cases', function () {
         it("Depositing 100 jeur and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
             await deposit(signers[0], jeur, parseEther("100"));
             await ibAlluoEur.connect(signers[0]).withdraw(jeur.address, parseEther("50"));
@@ -524,7 +686,8 @@ describe("IbAlluo and handler", function () {
                     expect(Number(await eurs.balanceOf(signers[2].address))).lessThan(Number(parseUnits("51", 2)))
                     expect(Number(await eurs.balanceOf(signers[2].address))).greaterThanOrEqual(Number(parseUnits("49", 2)))
                     })
-    })
+                })
+            })
   
         describe("USD Tests", function() {
             it("Depositing 100 DAI and immediately attempting to withdraw 50 should put you in the waiting list", async function () {
@@ -705,14 +868,6 @@ describe("IbAlluo and handler", function () {
                 })            
         })
       
-    })
-    // async function sendFundsToMultiSig(token: TestERC20, amount:BigNumberish) {
-    //     let ABI = ["function sendFundsToMultiSig(address _token, uint256 _amount)"];
-    //     let iface = new ethers.utils.Interface(ABI);
-    //     let calldata = iface.encodeFunctionData("sendFundsToMultiSig", [token.address, amount]);
-    //     await multisig.executeCall(handler.address, calldata);
-    // }
-
     async function deposit(recipient: SignerWithAddress, token: IERC20, amount: BigNumberish) {
 
         if (token == eurs) {
@@ -743,7 +898,19 @@ describe("IbAlluo and handler", function () {
             await token.connect(recipient).approve(ibAlluoEth.address, amount);
             await ibAlluoEth.connect(recipient).deposit(token.address, amount)
         }
+
+        else if (token == wbtc) {
+            await wbtc.connect(wbtcWhale).transfer(recipient.address, amount);
+            await token.connect(recipient).approve(ibAlluoBtc.address, amount);
+            await ibAlluoBtc.connect(recipient).deposit(token.address, amount)
+        }
     
+        else if (token == renBtc) {
+            await renBtc.connect(renBtcWhale).transfer(recipient.address, amount);
+            await token.connect(recipient).approve(ibAlluoBtc.address, amount);
+            await ibAlluoBtc.connect(recipient).deposit(token.address, amount);
+        }
+
         else {
             await token.connect(usdWhale).transfer(recipient.address, amount);
             await token.connect(recipient).approve(ibAlluoUsd.address, amount);        
