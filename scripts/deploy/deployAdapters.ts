@@ -4,7 +4,7 @@ async function main() {
 
   // const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapter");
   // const EurAdapter = await ethers.getContractFactory("EurCurveAdapter");
-  const BtcAdapter = await ethers.getContractFactory("BtcCurveAdapter");
+  const BtcAdapter = await ethers.getContractFactory("BtcNoPoolAdapter");
 
   const gnosis = "0x2580f9954529853Ca5aC5543cE39E9B5B1145135";
   const handler = "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1";
@@ -16,7 +16,7 @@ async function main() {
   // const eurAdapter = await EurAdapter.deploy(gnosis, handler, slippage)
   // console.log("EurAdapter deployed to:", eurAdapter.address);
 
-  const btcAdapter = await BtcAdapter.deploy(gnosis, handler, slippage)
+  const btcAdapter = await BtcAdapter.deploy(gnosis, handler)
   console.log("BtcAdapter deployed to:", btcAdapter.address);
 }
 
