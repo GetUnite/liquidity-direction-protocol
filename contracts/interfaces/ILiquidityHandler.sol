@@ -20,6 +20,7 @@ interface ILiquidityHandler is IAccessControl{
     function changeUpgradeStatus(bool _status) external;
 
     function deposit(address _token, uint256 _amount) external;
+    function deposit ( address _token, uint256 _amount, address _targetToken) external;
 
     function getActiveAdapters()
         external
@@ -105,6 +106,10 @@ interface ILiquidityHandler is IAccessControl{
         address _token,
         uint256 _amount
     ) external;
+    function withdraw ( address _user, address _token, uint256 _amount, address _outputToken ) external;
+
+    function getAdapterCoreTokensFromIbAlluo(address _ibAlluo) external view returns (address,address);
+
 }
 
 interface ILiquidityHandlerStructs {

@@ -1,8 +1,16 @@
 
+
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.11;
 
 interface ILiquidityBufferVault {
+    struct AdapterInfo {
+        string name; // USD Curve-Aave
+        uint256 percentage; //500 == 5.00%
+        address adapterAddress; // 0x..
+        bool status; // active
+    }
+
   function DAI (  ) external view returns ( address );
   function USDC (  ) external view returns ( address );
   function USDT (  ) external view returns ( address );
@@ -12,6 +20,7 @@ interface ILiquidityBufferVault {
   function changeUpgradeStatus ( bool _status ) external;
   function curvePool (  ) external view returns ( address );
   function deposit ( address _token, uint256 _amount ) external;
+  function deposit ( address _token, uint256 _amount, address _targetToken) external;
   function getBufferAmount (  ) external view returns ( uint256 );
   function getCloseToLimitWithdrawals (  ) external view returns (uint256[] calldata, uint256 amount );
   function getExpectedBufferAmount ( uint256 _newAmount ) external view returns ( uint256 );
@@ -35,5 +44,9 @@ interface ILiquidityBufferVault {
   function upgradeStatus (  ) external view returns ( bool );
   function wallet (  ) external view returns ( address );
   function withdraw ( address _user, address _token, uint256 _amount ) external;
+  function withdraw ( address _user, address _token, uint256 _amount, address _outputToken ) external;
   function withdrawals ( uint256 ) external view returns ( address user, address token, uint256 amount, uint256 time );
+  function getAdapterId(address _ibAlluo) external view returns(uint256);
+  function adapterIdsToAdapterInfo (uint256) external view returns (AdapterInfo memory );
+  function getAdapterCoreTokensFromIbAlluo(address _ibAlluo) external view returns (address,address);
 }
