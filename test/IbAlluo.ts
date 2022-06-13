@@ -204,7 +204,7 @@ describe("IbAlluoUSD and Buffer", function () {
         // })
     })
     describe("New adapters", async function () {
-        it("should add eur", async function () {
+        it("Should add other adapters", async function () {
 
         const EurAdapter = await ethers.getContractFactory("EurCurveAdapter") as EurCurveAdapter__factory;
 
