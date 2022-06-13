@@ -65,7 +65,6 @@ contract LiquidityHandler is
 
     // Address of the exchange used to convert non-supportedToken deposits and withdrawals
     address public exchangeAddress;
-    uint256 public exchangeSlippage;
 
     //info about what adapter or iballuo
     event EnoughToSatisfy(
@@ -97,8 +96,7 @@ contract LiquidityHandler is
 
     function initialize(
         address _multiSigWallet,
-        address _exchangeAddress,
-        uint256 _exchangeSlippage
+        address _exchangeAddress
     ) public initializer {
         __Pausable_init();
         __AccessControl_init();
@@ -106,7 +104,6 @@ contract LiquidityHandler is
 
         require(_multiSigWallet.isContract(), "Handler: Not contract");
         exchangeAddress = _exchangeAddress;
-        exchangeSlippage = _exchangeSlippage;
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
@@ -543,6 +540,13 @@ contract LiquidityHandler is
             require(account.isContract(), "Handler: Not contract");
         }
         _grantRole(role, account);
+    }
+
+    function setExchangeAddress(address newExchangeAddress)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        exchangeAddress = newExchangeAddress;
     }
 
     /**

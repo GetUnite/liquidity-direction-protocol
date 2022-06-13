@@ -157,7 +157,7 @@ describe("IbAlluo and handler", function () {
         const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
         // Temp values for exchange stuff.
         handler = await upgrades.deployProxy(Handler,
-            [admin.address, exchangeAddress, 0],
+            [admin.address, exchangeAddress],
             { initializer: 'initialize', kind: 'uups' }
         ) as LiquidityHandler;
 

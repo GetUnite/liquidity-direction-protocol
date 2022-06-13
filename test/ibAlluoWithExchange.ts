@@ -231,7 +231,6 @@ describe("IbAlluo and Exchange", function () {
         // Use fake exchange for now.
         exchangeAddress = exchange.address;
 
-        const exchangeSlippage = 500;
         // Change trustedForwarder for mainnet (TODO!)
         const trustedForwarder = "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8";
         //We are using this contract to simulate Gnosis multisig wallet
@@ -241,7 +240,7 @@ describe("IbAlluo and Exchange", function () {
         const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
 
         handler = await upgrades.deployProxy(Handler,
-            [admin.address, exchangeAddress, exchangeSlippage],
+            [admin.address, exchangeAddress],
             { initializer: 'initialize', kind: 'uups' }
         ) as LiquidityHandler;
 
