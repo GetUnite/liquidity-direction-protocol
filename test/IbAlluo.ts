@@ -189,85 +189,39 @@ describe("IbAlluoUSD and Buffer", function () {
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoCurrent.address)
     });
 
-    // describe("Upgradability", async function () {
-    //     it("Should upgrade without issues", async () => {
-
-    //         const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
-    //         const HandlerOld = await ethers.getContractFactory("LiquidityHandlerOld") as LiquidityHandlerOld__factory;
-
-    //         let exchange = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773"
-
-    //         let handlerO = await ethers.getContractAt("LiquidityHandler", "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1");
-    //         await handlerO.connect(admin).changeUpgradeStatus(true)
-    //         await handlerO.connect(admin).grantRole(await handlerO.UPGRADER_ROLE(), signers[0].address)
-            
-    //         handlerO = await upgrades.upgradeProxy(handlerO.address, Handler) as LiquidityHandler;
-
-    //         await handlerO.connect(admin).setExchangeAddress(exchange)
-
-    //         const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
-    //         const IbAlluoOld = await ethers.getContractFactory("IbAlluoOld") as IbAlluoOld__factory;
-
-    //         await upgrades.forceImport("0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6", IbAlluoOld);
-    //         let IbAlluoU = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
-    //         let IbAlluoE = await ethers.getContractAt("IbAlluo", "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92");
-    //         let IbAlluoEt = await ethers.getContractAt("IbAlluo", "0xc677B0918a96ad258A68785C2a3955428DeA7e50");
-    //         let IbAlluoB = await ethers.getContractAt("IbAlluo", "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2");
-
-    //         await IbAlluoU.connect(admin).grantRole(await IbAlluoU.UPGRADER_ROLE(), signers[0].address)
-    //         await IbAlluoE.connect(admin).grantRole(await IbAlluoE.UPGRADER_ROLE(), signers[0].address)
-    //         await IbAlluoEt.connect(admin).grantRole(await IbAlluoEt.UPGRADER_ROLE(), signers[0].address)
-    //         await IbAlluoB.connect(admin).grantRole(await IbAlluoB.UPGRADER_ROLE(), signers[0].address)
-
-    //         await IbAlluoU.connect(admin).changeUpgradeStatus(true)
-    //         await IbAlluoE.connect(admin).changeUpgradeStatus(true)
-    //         await IbAlluoEt.connect(admin).changeUpgradeStatus(true)
-    //         await IbAlluoB.connect(admin).changeUpgradeStatus(true)
-            
-    //         IbAlluoU = await upgrades.upgradeProxy(IbAlluoU.address, IbAlluo) as IbAlluo;
-    //         IbAlluoE = await upgrades.upgradeProxy(IbAlluoE.address, IbAlluo) as IbAlluo;
-    //         IbAlluoEt = await upgrades.upgradeProxy(IbAlluoEt.address, IbAlluo) as IbAlluo;
-    //         IbAlluoB = await upgrades.upgradeProxy(IbAlluoB.address, IbAlluo) as IbAlluo;
-
-    //         await IbAlluoU.connect(admin).setExchangeAddress(exchange)
-    //         await IbAlluoE.connect(admin).setExchangeAddress(exchange)
-    //         await IbAlluoEt.connect(admin).setExchangeAddress(exchange)
-    //         await IbAlluoB.connect(admin).setExchangeAddress(exchange)
-    //     })
-    // })
     describe("New adapters", async function () {
-        it("should add eur", async function () {
+        it("Should add other adapters", async function () {
 
-            const EurAdapter = await ethers.getContractFactory("EurCurveAdapter") as EurCurveAdapter__factory;
+        const EurAdapter = await ethers.getContractFactory("EurCurveAdapter") as EurCurveAdapter__factory;
 
-            eurAdapter = await EurAdapter.deploy(admin.address, handler.address, 200)
+        eurAdapter = await EurAdapter.deploy(admin.address, handler.address, 200)
 
-            await eurAdapter.connect(admin).adapterApproveAll()
+        await eurAdapter.connect(admin).adapterApproveAll()
 
-            await handler.connect(admin).setAdapter(
-                2,
-                "EUR Curve-4eur",
-                500,
-                eurAdapter.address,
-                true
-            )
+        await handler.connect(admin).setAdapter(
+            2, 
+            "EUR Curve-4eur", 
+            500, 
+            eurAdapter.address, 
+            true
+        )
 
-            const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
-            ibAlluoEur = await upgrades.deployProxy(IbAlluo,
-                [
-                    "Interest Bearing Alluo EUR",
-                    "IbAlluoEUR",
-                    multisig.address,
-                    handler.address,
-                    [jeur.address,
-                    eurs.address,
-                    eurt.address],
-                    BigNumber.from("100000000470636740"),
-                    1600,
-                    "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
-                    exchangeAddress],
-                { initializer: 'initialize', kind: 'uups' }
-            ) as IbAlluo;
+        const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
+        ibAlluoEur = await upgrades.deployProxy(IbAlluo,
+            [
+                "Interest Bearing Alluo EUR",
+                "IbAlluoEUR",
+                multisig.address,
+                handler.address,
+                [jeur.address,
+                eurs.address,
+                eurt.address],
+                BigNumber.from("100000000470636740"),
+                1600,
+                "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8"],
+            { initializer: 'initialize', kind: 'uups' }
+        ) as IbAlluo;
+
 
             await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEur.address, 2)
             await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEur.address)
