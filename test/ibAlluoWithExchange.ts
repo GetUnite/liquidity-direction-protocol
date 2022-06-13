@@ -2,9 +2,11 @@ import { parseEther, parseUnits } from "@ethersproject/units";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
+import { formatUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, TestMainnetUsdCurveAdapter, TestMainnetUsdCurveAdapter__factory, TestMainnetEthNoPoolAdapter, TestMainnetEthNoPoolAdapter__factory,IbAlluoBufferVar, IbAlluoBufferVar__factory } from "../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, Exchange, IWrappedEther, IERC20Metadata, } from "../typechain";
+
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 async function skipDays(d: number) {
@@ -55,7 +57,7 @@ async function sendEth(addresses: string[]) {
     }
 }
 
-describe("IbAlluo and Exchange L1", function () {
+describe("IbAlluo and Exchange", function () {
     let signers: SignerWithAddress[];
     let admin: SignerWithAddress;
 
@@ -70,7 +72,7 @@ describe("IbAlluo and Exchange L1", function () {
     let multisig: PseudoMultisigWallet;
     let handler: LiquidityHandler;
 
-    let dai: IERC20, usdc: IERC20, usdt: IERC20;
+    // let dai: IERC20, usdc: IERC20, usdt: IERC20;
     let curveLpUSD: IERC20;
 
     let usdWhale: SignerWithAddress;
@@ -82,65 +84,153 @@ describe("IbAlluo and Exchange L1", function () {
     let jeurWhale: SignerWithAddress;
     let eurtWhale: SignerWithAddress;
     let eursWhale: SignerWithAddress;
+    let fraxWhale: SignerWithAddress;
 
     let weth: IERC20;
-
+    let frax: IERC20;
     let wethWhale: SignerWithAddress;
+
+    type Edge = {
+        swapProtocol: BigNumberish;
+        pool: string;
+        fromCoin: string;
+        toCoin: string;
+    };
+    type Route = Edge[];
+    let exchange: Exchange
+    let usdt: IERC20Metadata, usdc: IERC20Metadata,
+        dai: IERC20Metadata;
+    let PolygonCurve3Lp: IERC20Metadata;
+
+    let usdtUsdcRoute: Route, usdtDaiRoute: Route, usdcUsdtRoute: Route, usdcDaiRoute: Route, daiUsdcRoute: Route, daiUsdtRoute: Route;
+
+    let polygonCurveEdge: Edge;
+
+
+
+    const PolygonCurve3Pool = "0x445FE580eF8d70FF569aB36e80c647af338db351";
+    let exchangeAddress;
     before(async function () {
-        //We are forking mainnet mainnet, please set Alchemy key in .env
+        //We are forking Polygon mainnet, please set Alchemy key in .env
         await network.provider.request({
             method: "hardhat_reset",
             params: [{
                 forking: {
                     enabled: true,
-                    jsonRpcUrl: process.env.MAINNET_FORKING_URL as string,
+                    jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
                     //you can fork from last block by commenting next line
-                    blockNumber: 14870065,
+                    blockNumber: 28729129,
                 },
             },],
         });
 
         signers = await ethers.getSigners();
-
-        admin = await getImpersonatedSigner("0x1F020A4943EB57cd3b2213A66b355CB662Ea43C3");
+        admin = await getImpersonatedSigner("0x2580f9954529853Ca5aC5543cE39E9B5B1145135");
         await (await (await ethers.getContractFactory("ForceSender")).deploy({ value: parseEther("10.0") })).forceSend(admin.address);
 
-        usdWhale = await getImpersonatedSigner("0xd6216fc19db775df9774a6e33526131da7d19a2c");
-        curveUsdLpHolder = await getImpersonatedSigner("0xd6216fc19db775df9774a6e33526131da7d19a2c");
+        usdWhale = await getImpersonatedSigner("0x075e72a5eDf65F0A5f44699c7654C1a76941Ddc8");
+        curveUsdLpHolder = await getImpersonatedSigner("0x7117de93b352ae048925323f3fcb1cd4b4d52ec4");
 
-        jeurWhale = await getImpersonatedSigner("0x4f0CF2F63913524b85c1126AB7eE7957857f3482");
-        eurtWhale = await getImpersonatedSigner("0x6Cf9AA65EBaD7028536E353393630e2340ca6049");
-        eursWhale = await getImpersonatedSigner("0x8dF9E3ec00Ba27415B679e033179377766A299E1");
+        jeurWhale = await getImpersonatedSigner("0x00d7c133b923548f29cc2cc01ecb1ea2acdf2d4c");
+        eurtWhale = await getImpersonatedSigner("0x1a4b038c31a8e5f98b00016b1005751296adc9a4");
+        eursWhale = await getImpersonatedSigner("0x6de2865067b65d4571c17f6b9eeb8dbdd5e36584");
 
-        wethWhale = await getImpersonatedSigner("0xEf22c14F46858d5aC61326497b056974167F2eE1");
-        dai = await ethers.getContractAt("IERC20", "0x6B175474E89094C44Da98b954EedeAC495271d0F");
-        usdc = await ethers.getContractAt("IERC20", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
-        usdt = await ethers.getContractAt("IERC20", "0xdAC17F958D2ee523a2206206994597C13D831ec7");
-        curveLpUSD = await ethers.getContractAt("IERC20", "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490");
-        jeur = await ethers.getContractAt("IERC20", "0x0f17BC9a994b87b5225cFb6a2Cd4D667ADb4F20B");
-        eurt = await ethers.getContractAt("IERC20", "0xC581b735A1688071A1746c968e0798D642EDE491");
-        eurs = await ethers.getContractAt("IERC20", "0xdB25f211AB05b1c97D595516F45794528a807ad8");
+        wethWhale = await getImpersonatedSigner("0x72a53cdbbcc1b9efa39c834a540550e23463aacb");
+        fraxWhale = await getImpersonatedSigner("0xaca39b187352d9805deced6e73a3d72abf86e7a0")
 
-        weth = await ethers.getContractAt("IERC20", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
 
-        console.log("We are forking mainnet \n");
-        expect(await dai.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking mainnet");
-        expect(await usdc.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDC, or you are not forking mainnet");
-        expect(await usdt.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDT, or you are not forking mainnet");
-        expect(await jeur.balanceOf(jeurWhale.address)).to.be.gt(0, "Whale has no jeur, or you are not forking mainnet");
-        expect(await eurt.balanceOf(eurtWhale.address)).to.be.gt(0, "Whale has no eurt, or you are not forking mainnet");
-        expect(await eurs.balanceOf(eursWhale.address)).to.be.gt(0, "Whale has no eurs, or you are not forking mainnet");
-        expect(await weth.balanceOf(wethWhale.address)).to.be.gt(0, "Whale has no weth, or you are not forking mainnet");
+        dai = await ethers.getContractAt("IERC20Metadata", "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063");
+        usdc = await ethers.getContractAt("IERC20Metadata", "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
+        usdt = await ethers.getContractAt("IERC20Metadata", "0xc2132D05D31c914a87C6611C10748AEb04B58e8F");
+        curveLpUSD = await ethers.getContractAt("IERC20", "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171");
+
+        jeur = await ethers.getContractAt("IERC20", "0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c");
+        eurt = await ethers.getContractAt("IERC20", "0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f");
+        eurs = await ethers.getContractAt("IERC20", "0xE111178A87A3BFf0c8d18DECBa5798827539Ae99");
+
+        weth = await ethers.getContractAt("IERC20", "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619");
+        exchange = await ethers.getContractAt("Exchange", "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773")
+
+        console.log("We are forking Polygon mainnet\n");
+        expect(await dai.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Polygon");
+        expect(await usdc.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDC, or you are not forking Polygon");
+        expect(await usdt.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDT, or you are not forking Polygon");
+        expect(await jeur.balanceOf(jeurWhale.address)).to.be.gt(0, "Whale has no jeur, or you are not forking Polygon");
+        expect(await eurt.balanceOf(eurtWhale.address)).to.be.gt(0, "Whale has no eurt, or you are not forking Polygon");
+        expect(await eurs.balanceOf(eursWhale.address)).to.be.gt(0, "Whale has no eurs, or you are not forking Polygon");
+        expect(await weth.balanceOf(wethWhale.address)).to.be.gt(0, "Whale has no weth, or you are not forking Polygon");
 
         await sendEth([usdWhale.address, jeurWhale.address, eurtWhale.address, eursWhale.address, wethWhale.address])
+
+        PolygonCurve3Lp = await ethers.getContractAt("IERC20Metadata", "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171");
+
+        polygonCurveEdge = { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: PolygonCurve3Lp.address, toCoin: usdc.address };
+
+        usdtUsdcRoute = [
+            // USDT - USDC
+            { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: usdt.address, toCoin: usdc.address }
+        ]
+        usdtDaiRoute = [
+            // USDT - DAI
+            { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: usdt.address, toCoin: dai.address }
+        ]
+
+        usdcUsdtRoute = [
+            // USDC - USDT
+            { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: usdc.address, toCoin: usdt.address }
+        ];
+        usdcDaiRoute = [
+            // USDC - DAI
+            { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: usdc.address, toCoin: dai.address }
+        ];
+        daiUsdcRoute = [
+            // DAI - USDC
+            { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: dai.address, toCoin: usdc.address }
+        ];
+        daiUsdtRoute = [
+            // DAI - USDT
+            { swapProtocol: 1, pool: PolygonCurve3Pool, fromCoin: dai.address, toCoin: usdt.address }
+        ];
     });
 
 
     beforeEach(async function () {
-        const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
 
-        // Mainnet address for exchange.
-        const exchangeAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec";
+
+        // Deploy fake exchange with PolygonCurve3 Route
+        const Exchange = await ethers.getContractFactory("Exchange");
+        admin = await getImpersonatedSigner("0x2580f9954529853Ca5aC5543cE39E9B5B1145135");
+
+        exchange = await Exchange.deploy(admin.address, true);
+        await exchange.deployed();
+
+        const PolygonCurve = await ethers.getContractFactory("PolygonCurve3Adapter");
+
+        const polygonCurveAdapter = await PolygonCurve.deploy()
+        const routes: Route[] = [
+            usdtUsdcRoute, usdtDaiRoute, usdcUsdtRoute, usdcDaiRoute, daiUsdcRoute, daiUsdtRoute,
+        ];
+        await exchange.connect(admin).createInternalMajorRoutes(routes)
+
+        await exchange.connect(admin).createLpToken(
+            [{ swapProtocol: 1, pool: PolygonCurve3Pool }],
+            [PolygonCurve3Pool],
+            [[dai.address, usdt.address, usdc.address, PolygonCurve3Lp.address]]
+        );
+
+        await exchange.connect(admin).createApproval([dai.address, usdc.address, usdt.address],
+            [exchange.address,
+            exchange.address,
+            exchange.address]);
+        await exchange.connect(admin).registerAdapters([polygonCurveAdapter.address], [1])
+
+        await exchange.connect(admin).createMinorCoinEdge([polygonCurveEdge])
+
+        const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
+        // Polygon Mainnet address for exchange.
+        // Use fake exchange for now.
+        exchangeAddress = exchange.address;
+
         const exchangeSlippage = 500;
         // Change trustedForwarder for mainnet (TODO!)
         const trustedForwarder = "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8";
@@ -157,10 +247,31 @@ describe("IbAlluo and Exchange L1", function () {
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), admin.address)
 
-        const EthAdapter = await ethers.getContractFactory("TestMainnetEthNoPoolAdapter") as TestMainnetEthNoPoolAdapter__factory;
+        const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapter") as UsdCurveAdapter__factory;
+        const EurAdapter = await ethers.getContractFactory("EurCurveAdapter") as EurCurveAdapter__factory;
+        const EthAdapter = await ethers.getContractFactory("EthNoPoolAdapter") as EthNoPoolAdapter__factory;
 
-        // eurAdapter = await EurAdapter.deploy(admin.address, handler.address, 200);
+        eurAdapter = await EurAdapter.deploy(admin.address, handler.address, 200);
+        usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200);
         ethAdapter = await EthAdapter.deploy(admin.address, handler.address);
+
+        await usdAdapter.connect(admin).adapterApproveAll()
+        await handler.connect(admin).setAdapter(
+            1,
+            "USD Curve-Aave",
+            500,
+            usdAdapter.address,
+            true
+        )
+
+        await eurAdapter.connect(admin).adapterApproveAll()
+        await handler.connect(admin).setAdapter(
+            2,
+            "EUR Curve-Aave",
+            500,
+            eurAdapter.address,
+            true
+        )
 
         await handler.connect(admin).setAdapter(
             3,
@@ -169,7 +280,46 @@ describe("IbAlluo and Exchange L1", function () {
             ethAdapter.address,
             true
         )
-        
+
+
+        ibAlluoUsd = await upgrades.deployProxy(IbAlluo,
+            [
+                "Interest Bearing Alluo USD",
+                "ibAlluoUsd",
+                admin.address,
+                handler.address,
+                [dai.address,
+                usdc.address,
+                usdt.address],
+                BigNumber.from("100000000470636740"),
+                1600,
+                trustedForwarder,
+                exchangeAddress],
+            { initializer: 'initialize', kind: 'uups' }
+        ) as IbAlluo;
+
+        await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoUsd.address)
+        await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoUsd.address, 1)
+
+
+
+        ibAlluoEur = await upgrades.deployProxy(IbAlluo,
+            [
+                "Interest Bearing Alluo EUR",
+                "ibAlluoEur",
+                admin.address,
+                handler.address,
+                [jeur.address,
+                eurt.address,
+                eurs.address],
+                BigNumber.from("100000000470636740"),
+                1600,
+                trustedForwarder, exchangeAddress],
+            { initializer: 'initialize', kind: 'uups' }
+        ) as IbAlluo;
+
+        await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEur.address)
+        await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEur.address, 2)
 
 
         ibAlluoEth = await upgrades.deployProxy(IbAlluo,
@@ -186,135 +336,116 @@ describe("IbAlluo and Exchange L1", function () {
             { initializer: 'initialize', kind: 'uups' }
         ) as IbAlluo;
 
+
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEth.address)
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEth.address, 3)
 
     });
-    describe("Should be able to upgrade from current ibAlluo deployment", function () {
-        it("Should work upgrade", async function() {
-            const trustedForwarder = "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8";
+    async function testSwap(fromAddress: string, toAddress: string, amount: BigNumberish) {
+        const from = await ethers.getContractAt("IERC20Metadata", fromAddress);
+        await from.connect(usdWhale).approve(exchange.address, amount);
+        // Usd whale doesn't have am3CRV, so change slightly,
+        if (fromAddress == "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171") {
+            usdc.connect(usdWhale).approve(exchange.address, parseUnits("100", 6));
+            const tx = await exchange.connect(usdWhale).exchange(usdc.address, "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171", parseUnits("100", 6), 0)
+            // Give some amCRV to the usdWhale so they can swap.
+        }
+        const to = await ethers.getContractAt("IERC20Metadata", toAddress);
+        const balBefore = await to.balanceOf(usdWhale.address);
+        const tx = await (await exchange.connect(usdWhale).exchange(fromAddress, toAddress, amount, 0)).wait();
+        console.log("Swapped", formatUnits(amount, await from.decimals()),
+            await from.symbol(), "for", formatUnits((await to.balanceOf(usdWhale.address)).sub(balBefore), await to.decimals()),
+            await to.symbol() + ",", "gas used:", tx.cumulativeGasUsed.toString());
+    }
+    describe("Exchange Test", function () {
+        it("The exchange should be working normally: Check all swap combinations", async function () {
+            const supportedCoinList = [dai, usdc, usdt, PolygonCurve3Lp];
+            // swap all combinations of all tokens
+            for (let i = 0; i < supportedCoinList.length; i++) {
+                for (let j = 0; j < supportedCoinList.length; j++) {
+                    if (i == j) continue;
 
-            const IbAlluoBufferVar = await ethers.getContractFactory("IbAlluoBufferVar") as IbAlluoBufferVar__factory;
-            const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
-    
-            const ibAlluoCurrent = await upgrades.deployProxy(IbAlluoBufferVar,
-                [
-                    "Interest Bearing Alluo Eth",
-                    "ibAlluoEth",
-                    signers[0].address,
-                    handler.address,
-                    [weth.address],
-                    BigNumber.from("100000000470636740"),
-                    1600,
-                    trustedForwarder],
-                { initializer: 'initialize', kind: 'uups' }
-            ) as IbAlluo;
-            await ibAlluoCurrent.pause();
-            await ibAlluoCurrent.changeUpgradeStatus(true);
-
-            const ibAlluoNew = await upgrades.upgradeProxy(ibAlluoCurrent.address, IbAlluo) as IbAlluo
-            expect(await ibAlluoNew.liquidityHandler()).equal(handler.address)
+                    const coinIn = supportedCoinList[i];
+                    const coinOut = supportedCoinList[j];
+                    const oneToken = parseUnits("1.0", await coinIn.decimals());
+                    await testSwap(coinIn.address, coinOut.address, oneToken);
+                }
+            }
         })
-
     })
-    describe("ETHAdapter with Exchange Tests", function () {
-        it("Depositing in Dai should give you ibAlluoEth", async function () {
-            await depositToibAlluoEth(signers[0], dai, parseEther("100"));
-            expect(Number(await ibAlluoEth.balanceOf(signers[0].address))).greaterThan(Number(0))
+    describe("UsdAdapter with Exchange Tests", function () {
+        it("Depositing in amCurv3 should give you ibAlluoUsd", async function () {
+            await deposit(signers[0], PolygonCurve3Lp, parseEther("100"));
+            const ibAlluoBalance = await ibAlluoUsd.balanceOf(signers[0].address);
+            expect(Number(ibAlluoBalance)).greaterThan(Number(0))
         })
-        it("Depositing in Dai and then withdrawing in Dai should give you Dai back (without being added to withdrawal queue) ", async function () {
-            await depositToibAlluoEth(signers[0], dai, parseEther("100"));
-            expect(Number(await ibAlluoEth.balanceOf(signers[0].address))).greaterThan(Number(0))
-            await depositToibAlluoEth(signers[8], dai, parseEther("1000"));
-            await depositToibAlluoEth(signers[8], dai, parseEther("1000"));
-            await depositToibAlluoEth(signers[8], dai, parseEther("1000"));
-            // just test the frontend view function
-            expect(await handler.withdrawalInDifferentTokenPossible(ibAlluoEth.address, parseEther("0.039"))).equal(true);
-            await ibAlluoEth.connect(signers[0]).withdraw(dai.address, parseEther("0.039"))
-            // Once there are sufficient deposits, withdrawal is fufilled.
-            // await depositToibAlluoEth(signers[0], dai, parseEther("1000"));
-            console.log(await dai.balanceOf(signers[0].address));
-            expect(Number(await dai.balanceOf(signers[0].address))).greaterThan(Number(70))
+        it("Depositing in amCrv3 and then withdrawing in Dai should give you amCrv3 back (without being added to withdrawal queue) ", async function () {
+            await deposit(signers[0], PolygonCurve3Lp, parseEther("100"));
+            expect(Number(await ibAlluoUsd.balanceOf(signers[0].address))).greaterThan(Number(0))
+            await deposit(signers[8], PolygonCurve3Lp, parseEther("1000"));
+            await deposit(signers[8], PolygonCurve3Lp, parseEther("1000"));
+            await deposit(signers[8], PolygonCurve3Lp, parseEther("1000"));
 
-        })
-        it("Depositing in Dai and then withdrawing in Dai should revert as buffer is insufficient ", async function () {
-            await depositToibAlluoEth(signers[1], dai, parseEther("100"));
-            expect(Number(await ibAlluoEth.balanceOf(signers[1].address))).greaterThan(Number(0))
-            expect(await handler.withdrawalInDifferentTokenPossible(ibAlluoEth.address, parseEther("0.039"))).equal(false);
-            await expect(ibAlluoEth.connect(signers[1]).withdraw(dai.address, parseEther("0.039"))).to.be.revertedWith("Handler: Withdrawal queue only if tokens are supported")
+            // Once there are sufficient buffer
+            await ibAlluoUsd.connect(signers[0]).withdraw(PolygonCurve3Lp.address, parseEther("70"))
+            // Roughly 1 am3CRV = 1.05 USD
+            // 70 usd roughly 66.7 am3CRV so 
+            const balAfter = await PolygonCurve3Lp.balanceOf(signers[0].address);
+            console.log(balAfter);
+            expect(Number(balAfter)).greaterThan(Number(parseEther("60")))
+            expect(Number(balAfter)).lessThan(Number(parseEther("70")))
+
 
         })
-
-        it("Depositing in USDC should give you ibAlluoEth", async function () {
-            await depositToibAlluoEth(signers[2], usdc, parseUnits("100", 6));
-            expect(Number(await ibAlluoEth.balanceOf(signers[2].address))).greaterThan(Number(0))
-        })
-        it("Depositing in USDC and then withdrawing in Dai should give you Dai back (without being added to withdrawal queue) ", async function () {
-            console.log(await dai.balanceOf(signers[3].address), "before");
-
-            await depositToibAlluoEth(signers[3], usdc, parseUnits("100", 6));
-            expect(Number(await ibAlluoEth.balanceOf(signers[3].address))).greaterThan(Number(0))
-            await depositToibAlluoEth(signers[8], dai, parseEther("10000"));
-
-
-            await ibAlluoEth.connect(signers[3]).withdraw(dai.address, parseEther("0.039"))
-
-            console.log(await dai.balanceOf(signers[3].address));
-            expect(Number(await dai.balanceOf(signers[3].address))).greaterThan(Number(70))
-
-        })
-        it("Depositing in USDC and then withdrawing in Dai should revert as buffer is insufficient ", async function () {
-            console.log(await dai.balanceOf(signers[4].address), "before");
-
-            await depositToibAlluoEth(signers[4], usdc, parseUnits("100", 6));
-            expect(Number(await ibAlluoEth.balanceOf(signers[4].address))).greaterThan(Number(0))
-            expect(await handler.withdrawalInDifferentTokenPossible(ibAlluoEth.address, parseEther("0.039"))).equal(false);
-            await expect(ibAlluoEth.connect(signers[4]).withdraw(dai.address, parseEther("0.039"))).to.be.revertedWith("Handler: Withdrawal queue only if tokens are supported")
+        it("Depositing in amCrv3 and then withdrawing in amCrv3 should revert as buffer is insufficient", async function () {
+            await deposit(signers[1], PolygonCurve3Lp, parseEther("100"));
+            expect(Number(await ibAlluoUsd.balanceOf(signers[1].address))).greaterThan(Number(0))
+            await expect(ibAlluoUsd.connect(signers[1]).withdraw(PolygonCurve3Lp.address, parseEther("70"))).to.be.revertedWith("Handler: Only supported tokens")
 
         })
 
         it("Depositing in a token not supported by the exchange should revert", async function () {
-            await expect(depositToibAlluoEth(signers[4], jeur, parseUnits("100", 18))).to.be.reverted;
+            await expect(deposit(signers[4], jeur, parseUnits("100", 18))).to.be.reverted;
         })
 
 
         it("Withdrawing in a token not supported by the exchange should revert", async function () {
-            await depositToibAlluoEth(signers[3], usdc, parseUnits("1000", 6));
-            await expect(ibAlluoEth.connect(signers[3]).withdraw(jeur.address, parseEther("0.039"))).to.be.reverted;
+            await deposit(signers[3], usdc, parseUnits("1000", 6));
+            await expect(ibAlluoUsd.connect(signers[3]).withdraw(jeur.address, parseEther("10"))).to.be.reverted;
 
         })
 
     })
-
-
-    async function approveExchange(recipient: SignerWithAddress) {
-        const exchange = await ethers.getContractAt("IERC20", "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec");
-    }
     async function deposit(recipient: SignerWithAddress, token: IERC20, amount: BigNumberish) {
-
         if (token == eurs) {
             await token.connect(eursWhale).transfer(recipient.address, amount);
-            await token.connect(recipient).approve(ibAlluoEur.address, amount);
-            await ibAlluoEur.connect(recipient).deposit(token.address, amount);
+            await token.connect(recipient).approve(ibAlluoUsd.address, amount);
+            await ibAlluoUsd.connect(recipient).deposit(token.address, amount);
         }
         else if (token == eurt) {
             await token.connect(eurtWhale).transfer(recipient.address, amount);
-            await token.connect(recipient).approve(ibAlluoEur.address, amount);
-            await ibAlluoEur.connect(recipient).deposit(token.address, amount);
+            await token.connect(recipient).approve(ibAlluoUsd.address, amount);
+            await ibAlluoUsd.connect(recipient).deposit(token.address, amount);
         }
 
         else if (token == jeur) {
             await token.connect(jeurWhale).transfer(recipient.address, amount);
-            await token.connect(recipient).approve(ibAlluoEur.address, amount);
-            await ibAlluoEur.connect(recipient).deposit(token.address, amount);
+            await token.connect(recipient).approve(ibAlluoUsd.address, amount);
+            await ibAlluoUsd.connect(recipient).deposit(token.address, amount);
         }
 
         else if (token == weth) {
             await weth.connect(wethWhale).transfer(recipient.address, amount);
-            await token.connect(recipient).approve(ibAlluoEth.address, amount);
-            await ibAlluoEth.connect(recipient).deposit(token.address, amount)
+            await token.connect(recipient).approve(ibAlluoUsd.address, amount);
+            await ibAlluoUsd.connect(recipient).deposit(token.address, amount)
+        } if (token == PolygonCurve3Lp) {
+            // The usd whale doesn't have enough usdc.
+            await usdc.connect(usdWhale).approve(exchange.address, parseUnits("10000000000", 6))
+            await exchange.connect(usdWhale).exchange(usdc.address, PolygonCurve3Lp.address, parseUnits("1000", 6), 0)
+            await token.connect(usdWhale).transfer(recipient.address, amount);
+            await token.connect(recipient).approve(ibAlluoUsd.address, amount);
+            await ibAlluoUsd.connect(recipient).deposit(token.address, amount);
         }
-
         else {
             await token.connect(usdWhale).transfer(recipient.address, amount);
             await token.connect(recipient).approve(ibAlluoUsd.address, amount);
@@ -325,7 +456,6 @@ describe("IbAlluo and Exchange L1", function () {
 
     async function depositToibAlluoEth(recipient: SignerWithAddress, token: IERC20, amount: BigNumberish) {
         await token.connect(recipient).approve(ibAlluoEth.address, amount);
-        // await token.connect(recipient).approve("0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec", amount)
         if (token == eurs) {
             await token.connect(eursWhale).transfer(recipient.address, amount);
         }

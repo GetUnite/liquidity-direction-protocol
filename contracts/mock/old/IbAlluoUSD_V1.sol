@@ -2,7 +2,7 @@
 pragma solidity ^0.8.11;
 
 import "./../../Farming/AlluoERC20Upgradable.sol";
-import "./../../interfaces/ILiquidityBufferVault.sol";
+import "./../../interfaces/ILiquidityHandler.sol";
 import "./../../mock/interestHelper/Interest.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -192,7 +192,7 @@ contract IbAlluoUSD is
         );
         updateRatio();
 
-        ILiquidityBufferVault(liquidityBuffer).deposit(_token, _amount);
+        ILiquidityHandler(liquidityBuffer).deposit(_token, _amount);
 
         uint256 amountIn18 = _amount *
             10**(18 - AlluoERC20Upgradable(_token).decimals());
@@ -220,7 +220,7 @@ contract IbAlluoUSD is
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(msg.sender, adjustedAmount);
 
-        ILiquidityBufferVault(liquidityBuffer).withdraw(
+        ILiquidityHandler(liquidityBuffer).withdraw(
             _recipient,
             _targetToken,
             _amount

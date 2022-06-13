@@ -5,7 +5,6 @@ import "./AlluoERC20Upgradable.sol";
 import "../interfaces/ILiquidityHandler.sol";
 import "../mock/interestHelper/Interest.sol";
 import "../interfaces/IExchange.sol";
-import "../interfaces/IAdapter.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -67,7 +66,7 @@ contract IbAlluo is
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
-    event newHandlerSet(address oldHandler, address newHandler);
+    event NewHandlerSet(address oldHandler, address newHandler);
     event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
     event DepositTokenStatusChanged(address token, bool status);
     
@@ -93,7 +92,7 @@ contract IbAlluo is
         string memory _name,
         string memory _symbol,
         address _multiSigWallet,
-        address _Handler,
+        address _handler,
         address[] memory _supportedTokens,
         uint256 _interestPerSecond,
         uint256 _annualInterest,
@@ -106,7 +105,7 @@ contract IbAlluo is
         __UUPSUpgradeable_init();
 
         require(_multiSigWallet.isContract(), "IbAlluo: Not contract");
-        require(_Handler.isContract(), "IbAlluo: Not contract");
+        require(_handler.isContract(), "IbAlluo: Not contract");
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
@@ -123,10 +122,10 @@ contract IbAlluo is
         updateTimeLimit = 60;
         lastInterestCompound = block.timestamp;
         exchangeAddress = _exchangeAddress;
-        liquidityHandler = _Handler;
+        liquidityHandler = _handler;
         trustedForwarder = _trustedForwarder;
 
-        emit newHandlerSet(address(0), liquidityHandler);
+        emit NewHandlerSet(address(0), liquidityHandler);
     }
 
     /// @notice  Updates the growingRatio
@@ -214,17 +213,15 @@ contract IbAlluo is
     /// @param _amount Amount (with token decimals)
 
     function deposit(address _token, uint256 _amount) external {
-        // Change targetToken to either "mainToken read from adapter" or allow paramter set in ibAlluo itself
-        // Do this once the adapter is optimised on chain to choose token with highest liquidity.
         // The main token is the one which isn't converted to primary tokens.
         // Small issue with deposits and withdrawals though. Need to approve.
         if (supportedTokens.contains(_token) == false) {
             IERC20Upgradeable(_token).safeTransferFrom(_msgSender(), address(this), _amount);
-            (, address mainToken) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
+            (, address primaryToken) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
             IERC20Upgradeable(_token).safeIncreaseAllowance(exchangeAddress, _amount);
-            _amount = IExchange(exchangeAddress).exchange(_token, mainToken, _amount, 0);
-            _token = mainToken;
-            IERC20Upgradeable(mainToken).safeTransfer(address(liquidityHandler),_amount);
+            _amount = IExchange(exchangeAddress).exchange(_token, primaryToken, _amount, 0);
+            _token = primaryToken;
+            IERC20Upgradeable(primaryToken).safeTransfer(address(liquidityHandler), _amount);
         } else {
             IERC20Upgradeable(_token).safeTransferFrom(_msgSender(),address(liquidityHandler),_amount);
         }
@@ -248,20 +245,17 @@ contract IbAlluo is
         address _targetToken,
         uint256 _amount
     ) public {
-        // Change mainToken to either "mainToken read from adapter" or allow paramter set in ibAlluo itself
-        // Do this once the adapter is optimised on chain to choose token with highest liquidity. (Artem is working on this ticket)
-        // The main token is the one which isn't converted to primary tokens.
         updateRatio();
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(_msgSender(), adjustedAmount);
         ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
         if (supportedTokens.contains(_targetToken) == false) {
-            (address primaryToken,) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
+            (address liquidToken,) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
             // This just is used to revert if there is no active route.
-            require(IExchange(exchangeAddress).buildRoute(primaryToken, _targetToken).length>0, "!Supported");
+            require(IExchange(exchangeAddress).buildRoute(liquidToken, _targetToken).length > 0, "!Supported");
             handler.withdraw(
             _recipient,
-            primaryToken,
+            liquidToken,
             _amount,
             _targetToken
             );
@@ -372,6 +366,23 @@ contract IbAlluo is
         }
     }
 
+    function convertToAssetValue(uint256 _amount)
+        public
+        view
+        returns (uint256)
+    {
+        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
+            uint256 _growingRatio = changeRatio(
+                growingRatio,
+                interestPerSecond,
+                lastInterestCompound
+            );
+            return (_amount * _growingRatio) / multiplier;
+        } else {
+            return (_amount * growingRatio) / multiplier;
+        }
+    }
+
     /// @notice  Returns total supply in asset value
 
     function totalAssetSupply() public view returns (uint256) {
@@ -470,11 +481,25 @@ contract IbAlluo is
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(newHandler.isContract(), "!Contract");
+        require(newHandler.isContract(), "IbAlluo: Not contract");
 
         address oldValue = liquidityHandler;
         liquidityHandler = newHandler;
-        emit newHandlerSet(oldValue, liquidityHandler);
+        emit NewHandlerSet(oldValue, liquidityHandler);
+    }
+
+    function setExchangeAddress(address newExchangeAddress)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        exchangeAddress = newExchangeAddress;
+    }
+
+    function setTrustedForwarder(address newTrustedForwarder)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        trustedForwarder = newTrustedForwarder;
     }
 
     function changeUpgradeStatus(bool _status)
@@ -503,21 +528,6 @@ contract IbAlluo is
         _grantRole(role, account);
     }
 
-
-    function setExchangeAddress(address newExchangeAddress)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        exchangeAddress = newExchangeAddress;
-    }
-
-    function setTrustedForwarder(address newTrustedForwarder)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        trustedForwarder = newTrustedForwarder;
-    }
-
     function _beforeTokenTransfer(
         address from,
         address to,
@@ -525,7 +535,6 @@ contract IbAlluo is
     ) internal override {
         super._beforeTokenTransfer(from, to, amount);
     }
-
 
     function _msgSender()
         internal

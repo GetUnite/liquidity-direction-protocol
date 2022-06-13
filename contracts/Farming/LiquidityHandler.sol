@@ -153,13 +153,11 @@ contract LiquidityHandler is
         ];
 
         if (
-            withdrawalSystem.totalWithdrawalAmount > 0 &&
-            !withdrawalSystem.resolverTrigger
+            withdrawalSystem.totalWithdrawalAmount > 0 && !withdrawalSystem.resolverTrigger
         ) {
             uint256 inAdapterAfterDeposit = getAdapterAmount(msg.sender);
             uint256 firstInQueueAmount = withdrawalSystem
-                .withdrawals[withdrawalSystem.lastSatisfiedWithdrawal + 1]
-                .amount;
+                .withdrawals[withdrawalSystem.lastSatisfiedWithdrawal + 1].amount;
             if (firstInQueueAmount <= inAdapterAfterDeposit) {
                 withdrawalSystem.resolverTrigger = true;
                 emit EnoughToSatisfy(
@@ -187,9 +185,7 @@ contract LiquidityHandler is
         WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[
             msg.sender
         ];
-        if (
-            inAdapter >= _amount && withdrawalSystem.totalWithdrawalAmount == 0
-        ) {
+        if (inAdapter >= _amount && withdrawalSystem.totalWithdrawalAmount == 0) {
             uint256 adapterId = ibAlluoToAdapterId.get(msg.sender);
             address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
             IAdapter(adapter).withdraw(_user, _token, _amount);
@@ -225,27 +221,6 @@ contract LiquidityHandler is
         }
     }
 
-    function _withdrawThroughExchange(
-        address _mainToken,
-        address _targetToken,
-        uint256 _amount18,
-        address _user
-    ) internal {
-        uint256 amountinMainTokens = (_amount18 *
-            10**ERC20Upgradeable(_mainToken).decimals()) / 10**18;
-        IERC20Upgradeable(_mainToken).safeIncreaseAllowance(
-            exchangeAddress,
-            amountinMainTokens
-        );
-        uint256 amountinTargetTokens = IExchange(exchangeAddress).exchange(
-            _mainToken,
-            _targetToken,
-            amountinMainTokens,
-            0
-        );
-        IERC20Upgradeable(_targetToken).safeTransfer(_user, amountinTargetTokens);
-    }
-
     // Same function as above but overload for case when you want to withdraw in a different token native to an ibAlluo.
     // For example: Withdraw USDC from ibAlluoEth.
     function withdraw(
@@ -279,15 +254,9 @@ contract LiquidityHandler is
                 block.timestamp
             );
         } else {
-            // Need to start with lastWithdrawalRequest+1 because ex.)
-            // lastSatisfied = 0    lastRequest = 0
-            // lastSatisfied = 0     lastRequest = 1
-            // In satisfy function, it always starts with
-            // lastSatisfied + 1 --> So there are errors!
-            // Alternative: Can start at 0 here and change line 194 to + 0 instead.
             require(
                 _token == _outputToken,
-                "Handler: Withdrawal queue only if tokens are supported"
+                "Handler: Only supported tokens"
             );
             uint256 lastWithdrawalRequest = withdrawalSystem
                 .lastWithdrawalRequest;
@@ -310,6 +279,27 @@ contract LiquidityHandler is
                 block.timestamp
             );
         }
+    }
+
+    function _withdrawThroughExchange(
+        address _inputToken,
+        address _targetToken,
+        uint256 _amount18,
+        address _user
+    ) internal {
+        uint256 amountinInputTokens = (_amount18 *
+            10**ERC20Upgradeable(_inputToken).decimals()) / 10**18;
+        IERC20Upgradeable(_inputToken).safeIncreaseAllowance(
+            exchangeAddress,
+            amountinInputTokens
+        );
+        uint256 amountinTargetTokens = IExchange(exchangeAddress).exchange(
+            _inputToken,
+            _targetToken,
+            amountinInputTokens,
+            0
+        );
+        IERC20Upgradeable(_targetToken).safeTransfer(_user, amountinTargetTokens);
     }
 
     function satisfyAdapterWithdrawals(address _ibAlluo) public whenNotPaused {
@@ -359,6 +349,13 @@ contract LiquidityHandler is
         }
     }
 
+    function satisfyAllWithdrawals() external {
+        for (uint256 i = 0; i < ibAlluoToAdapterId.length(); i++) {
+            (address ibAlluo, ) = ibAlluoToAdapterId.at(i);
+            satisfyAdapterWithdrawals(ibAlluo);
+        }
+    }
+
     /// @notice Function used by frontend to see if withdrawals in different tokens can be made
     /// @dev For example, withdrawing weth from ibAlluoUSD. Possible if you are not added to queue
     /// @param _ibAlluo address
@@ -374,13 +371,6 @@ contract LiquidityHandler is
         ];
         return (inAdapter >= _amount &&
             withdrawalSystem.totalWithdrawalAmount == 0);
-    }
-
-    function satisfyAllWithdrawals() external {
-        for (uint256 i = 0; i < ibAlluoToAdapterId.length(); i++) {
-            (address ibAlluo, ) = ibAlluoToAdapterId.at(i);
-            satisfyAdapterWithdrawals(ibAlluo);
-        }
     }
 
     function getAdapterAmount(address _ibAlluo) public view returns (uint256) {
