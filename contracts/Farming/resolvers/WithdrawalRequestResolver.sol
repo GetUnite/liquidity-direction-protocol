@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../../interfaces/ILiquidityBufferVault.sol";
+import "../../interfaces/ILiquidityHandler.sol";
+import "../../interfaces/IIbAlluo.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract WithdrawalRequestResolver is AccessControl{
 
-    address public liquidityBufferAddress;
+    address public liquidityHandlerAddress;
     address public pokeMe;
 
     modifier onlyPokeMe() {
@@ -15,10 +16,10 @@ contract WithdrawalRequestResolver is AccessControl{
     }
 
     //current liquidityBuffer on Polygon: 0xa248Ba96d72005114e6C941f299D315757877c0e
-    constructor(address _pokeMe, address _liquidityBuffer, address _newAdmin) public {
+    constructor(address _pokeMe, address _liquidityHandlerAddress, address _newAdmin) {
         pokeMe = _pokeMe;
         _grantRole(DEFAULT_ADMIN_ROLE, _newAdmin);
-        liquidityBufferAddress = _liquidityBuffer;
+        liquidityHandlerAddress = _liquidityHandlerAddress;
     }
     
     function checker()
@@ -26,10 +27,17 @@ contract WithdrawalRequestResolver is AccessControl{
         view
         returns (bool canExec, bytes memory execPayload)
     {
-        canExec = ILiquidityBufferVault(liquidityBufferAddress).keepersTrigger();
-        execPayload = abi.encodeWithSelector(
-            ILiquidityBufferVault.satisfyWithdrawals.selector
-        );
+        address[] memory ibAlluos  = ILiquidityHandler(liquidityHandlerAddress).getListOfIbAlluos();
+        for (uint i=0; i<ibAlluos.length; i++) {
+            (,,,bool resolverTrigger) = ILiquidityHandler(liquidityHandlerAddress).ibAlluoToWithdrawalSystems(ibAlluos[i]);
+            if(resolverTrigger){
+                canExec = resolverTrigger;
+                execPayload = abi.encodeWithSelector(
+                    ILiquidityHandler.satisfyAllWithdrawals.selector
+                );
+                break;
+            }
+        }
         return (canExec, execPayload);
     }
 
