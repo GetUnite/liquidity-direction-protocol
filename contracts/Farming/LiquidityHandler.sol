@@ -12,7 +12,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeable.sol";
 
 import "../interfaces/IIbAlluo.sol";
-import "../interfaces/IAdapter.sol";
+import "../interfaces/IHandlerAdapter.sol";
 import "../interfaces/IExchange.sol";
 import "hardhat/console.sol";
 
@@ -137,12 +137,12 @@ contract LiquidityHandler is
                 uint256 toWallet = inAdapter + amount18 - expectedAdapterAmount;
                 uint256 leaveInPool = amount18 - toWallet;
 
-                IAdapter(adapter).deposit(_token, amount18, leaveInPool);
+                IHandlerAdapter(adapter).deposit(_token, amount18, leaveInPool);
             } else {
-                IAdapter(adapter).deposit(_token, amount18, amount18);
+                IHandlerAdapter(adapter).deposit(_token, amount18, amount18);
             }
         } else {
-            IAdapter(adapter).deposit(_token, amount18, 0);
+            IHandlerAdapter(adapter).deposit(_token, amount18, 0);
         }
 
         WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[
@@ -185,7 +185,7 @@ contract LiquidityHandler is
         if (inAdapter >= _amount && withdrawalSystem.totalWithdrawalAmount == 0) {
             uint256 adapterId = ibAlluoToAdapterId.get(msg.sender);
             address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
-            IAdapter(adapter).withdraw(_user, _token, _amount);
+            IHandlerAdapter(adapter).withdraw(_user, _token, _amount);
             emit WithdrawalSatisfied(
                 msg.sender,
                 _user,
@@ -237,10 +237,10 @@ contract LiquidityHandler is
             uint256 adapterId = ibAlluoToAdapterId.get(msg.sender);
             address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
             if (_token != _outputToken) {
-                IAdapter(adapter).withdraw(address(this), _token, _amount);
+                IHandlerAdapter(adapter).withdraw(address(this), _token, _amount);
                 _withdrawThroughExchange(_token, _outputToken, _amount, _user);
             } else {
-                IAdapter(adapter).withdraw(_user, _token, _amount);
+                IHandlerAdapter(adapter).withdraw(_user, _token, _amount);
             }
             emit WithdrawalSatisfied(
                 msg.sender,
@@ -316,7 +316,7 @@ contract LiquidityHandler is
                     lastSatisfiedWithdrawal + 1
                 ];
                 if (withdrawal.amount <= inAdapter) {
-                    IAdapter(adapter).withdraw(
+                    IHandlerAdapter(adapter).withdraw(
                         withdrawal.user,
                         withdrawal.token,
                         withdrawal.amount
@@ -374,7 +374,7 @@ contract LiquidityHandler is
         uint256 adapterId = ibAlluoToAdapterId.get(_ibAlluo);
         address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
 
-        return IAdapter(adapter).getAdapterAmount();
+        return IHandlerAdapter(adapter).getAdapterAmount();
     }
 
     function getExpectedAdapterAmount(address _ibAlluo, uint256 _newAmount)
@@ -480,7 +480,7 @@ contract LiquidityHandler is
         uint256 adapterId = ibAlluoToAdapterId.get(_ibAlluo);
         address adapterAddress = adapterIdsToAdapterInfo[adapterId]
             .adapterAddress;
-        return (IAdapter(adapterAddress).getCoreTokens());
+        return (IHandlerAdapter(adapterAddress).getCoreTokens());
     }
 
     function getWithdrawal(address _ibAlluo, uint256 _id)
