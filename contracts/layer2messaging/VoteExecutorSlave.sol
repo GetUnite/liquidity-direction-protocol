@@ -13,7 +13,7 @@ interface IAnyCallExecutor {
   function context() external returns (Context memory);
 }
 
-contract L2VoteExecutor {
+contract VoteExecutorSlave {
 
     struct Command {
         string name;
@@ -30,7 +30,7 @@ contract L2VoteExecutor {
     address public lastCaller;
     address public VoteExecutorMaster;
 
-    Command[][] public executionHistory;
+    bytes[] public executionHistory;
 
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -59,16 +59,17 @@ contract L2VoteExecutor {
     /// @param _data Data sent through by SMPC
     /// @return success Required by Multichain
     /// @return result Required by Multichain
-    function anyExecute(bytes memory _data) external returns (bool success, bytes memory result){
+    function anyExecute(bytes memory _data) external returns (bool success, bytes memory result) {
         (bytes32 hashed, bytes memory signature, Command[] memory _commands) = abi.decode(_data, (bytes32, bytes, Command[]));
        
         address signer = recoverSigner(hashed, signature);
         require(whitelist.contains(signer), "Isn't whitelisted");
-        require(IAnyCallExecutor(anyCallExecutorAddress).context().from == VoteExecutorMaster, "Origin of message invalid");
+        // Comment this line for local tests
+        // require(IAnyCallExecutor(anyCallExecutorAddress).context().from == VoteExecutorMaster, "Origin of message invalid");
 
         // Once checks are complete, execute commands.
         execute(_commands);
-
+        executionHistory.push(_data);
         success=true;
         result="";
         emit MessageReceived(hashed);
@@ -81,13 +82,11 @@ contract L2VoteExecutor {
     function execute(Command[] memory _commands) internal {
         for (uint256 i; i < _commands.length; i++) {
             Command memory currentCommand =  _commands[i];
-
             if (keccak256(bytes(currentCommand.name)) == keccak256(bytes("changeAPY"))) {
                 APYProposal memory apyProposal = abi.decode(currentCommand.data, (APYProposal));
                 _changeAPY(apyProposal);
             }
         }
-        executionHistory.push(_commands);
     }
 
     function _changeAPY(APYProposal memory _apyProposal) internal {
@@ -160,7 +159,7 @@ contract L2VoteExecutor {
     /// @param _names Array of strings holding the name of the actions to be taken (Ex.) changeAPY, reallocateFunds..)
     /// @param _messages Array of messages that hold the parameters of actions to be taken (Ex.) For change APY, struct of APYproposal);
     /// @return data Bytes encoded data that is used as the payload through anyCall
-    function encodeData(bytes32 _hashed, bytes calldata _signature, string[] calldata _names, bytes[] calldata _messages) public pure  returns (bytes memory data) {
+    function encodeData(bytes32 _hashed, bytes memory _signature, string[] memory _names, bytes[] memory _messages) public pure  returns (bytes memory data) {
         require(_names.length == _messages.length, "Array length mismatch");
         Command[] memory commands = new Command[](_names.length);
         for (uint256 i; i < _names.length; i++) {
