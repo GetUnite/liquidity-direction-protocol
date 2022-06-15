@@ -34,7 +34,7 @@ async function sendEth(users: SignerWithAddress[]) {
     }
 }
 
-describe("IbAlluo and handler", function () {
+describe("Handler and different adapters", function () {
     let signers: SignerWithAddress[];
     let admin: SignerWithAddress;
 
