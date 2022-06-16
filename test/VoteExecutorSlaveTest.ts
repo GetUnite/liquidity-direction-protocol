@@ -2,6 +2,7 @@ import { parseEther, parseUnits } from "@ethersproject/units";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike, Wallet } from "ethers";
+import { defaultAbiCoder } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
 import { ERC20, IbAlluo, IbAlluo__factory, VoteExecutorSlave, VoteExecutorSlave__factory,} from "../typechain";
@@ -121,14 +122,13 @@ describe("Test L2 Contracts", function() {
         let apydata4 = ethers.utils.defaultAbiCoder.encode(["uint256", "uint256", "address"], [0,  getInterestPerSecond(1), ibAlluo4.address])
       
         let messages = [apydata1, apydata2, apydata3, apydata4]
-        let encodedMessages = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes", "bytes", "bytes"], messages);
-        let messageHash = ethers.utils.solidityKeccak256(['bytes'], [encodedMessages]);
-
         let names = ["changeAPY", "changeAPY", "changeAPY", "changeAPY"]
-        var sig = await wallet.signMessage(ethers.utils.arrayify(messageHash));
-        let entryData = await VoteExecutorSlave.callStatic.encodeData(messageHash, sig, names, messages);
 
-        await expect(VoteExecutorSlave.anyExecute(entryData)).to.emit(VoteExecutorSlave, "MessageReceived").withArgs(messageHash);
+        let encodedCommands = await VoteExecutorSlave.callStatic.encodeCommands(names, messages)
+        var sig = await wallet.signMessage(ethers.utils.arrayify(encodedCommands.hashedCommands));
+        let entryData = await VoteExecutorSlave.callStatic.encodeData(encodedCommands.hashedCommands, sig,encodedCommands.commands);
+   
+        await expect(VoteExecutorSlave.anyExecute(entryData)).to.emit(VoteExecutorSlave, "MessageReceived").withArgs(encodedCommands.hashedCommands);
 
         expect(await ibAlluo1.interestPerSecond()).equal(getInterestPerSecond(1.08).mul(10**10))
         expect(await ibAlluo2.interestPerSecond()).equal(getInterestPerSecond(1.16).mul(10**10))
@@ -146,17 +146,43 @@ describe("Test L2 Contracts", function() {
         let apydata4 = ethers.utils.defaultAbiCoder.encode(["uint256", "uint256", "address"], [0,  getInterestPerSecond(1), ibAlluo4.address])
       
         let messages = [apydata1, apydata2, apydata3, apydata4]
-        let encodedMessages = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes", "bytes", "bytes"], messages);
-        let messageHash = ethers.utils.solidityKeccak256(['bytes'], [encodedMessages]);
-
         let names = ["changeAPY", "changeAPY", "changeAPY", "changeAPY"]
+        let encodedCommands = await VoteExecutorSlave.callStatic.encodeCommands(names, messages)
+   
 
         let attacker =  signers[1]
-        var fakeSig = await attacker.signMessage(ethers.utils.arrayify(messageHash));
+        var fakeSig = await attacker.signMessage(ethers.utils.arrayify(encodedCommands.hashedCommands));
 
-        let entryData = await VoteExecutorSlave.callStatic.encodeData(messageHash, fakeSig, names, messages);
+        let entryData = await VoteExecutorSlave.callStatic.encodeData(encodedCommands.hashedCommands, fakeSig,encodedCommands.commands);
         await expect(VoteExecutorSlave.anyExecute(entryData)).to.be.revertedWith("Isn't whitelisted");
      
     })
-    
+
+    it("Incorrect hash of commands should revert", async function() {
+        if (typeof mneumonic !== "string") {
+            return
+        }
+        let apydata1 = ethers.utils.defaultAbiCoder.encode(["uint256", "uint256", "address"], [800, getInterestPerSecond(1.08), ibAlluo1.address])
+        let apydata2 = ethers.utils.defaultAbiCoder.encode(["uint256", "uint256", "address"], [1600,  getInterestPerSecond(1.16), ibAlluo2.address])
+        let apydata3 = ethers.utils.defaultAbiCoder.encode(["uint256", "uint256", "address"], [2400,  getInterestPerSecond(1.24), ibAlluo3.address])
+        let apydata4 = ethers.utils.defaultAbiCoder.encode(["uint256", "uint256", "address"], [0,  getInterestPerSecond(1), ibAlluo4.address])
+      
+        let messages = [apydata1, apydata2, apydata3, apydata4]
+        let names = ["changeAPY", "changeAPY", "changeAPY", "changeAPY"]
+
+        let encodedCommands = await VoteExecutorSlave.callStatic.encodeCommands(names, messages)
+        var sig = await wallet.signMessage(ethers.utils.arrayify(encodedCommands.hashedCommands));
+
+        let fakeMessages = [apydata1, apydata2, apydata3, apydata4, apydata1]
+        let fakeNames = ["changeAPY", "changeAPY", "changeAPY", "changeAPY", "changeAPY"]
+        let fakeEncodedCommands = await VoteExecutorSlave.callStatic.encodeCommands(fakeNames, fakeMessages)
+
+        let entryData = await VoteExecutorSlave.callStatic.encodeData(encodedCommands.hashedCommands, sig,fakeEncodedCommands.commands);
+   
+        await expect(VoteExecutorSlave.anyExecute(entryData)).to.be.revertedWith("Hash doesn't match");
+     
+    })
 })
+// 0x00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000320000000000000000000000000000000000000000000000000016345786c15c884000000000000000000000000c6e7df5e7b4f2a278906862b61205850344d4e7d0000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000064000000000000000000000000000000000000000000000000001634578799758ce00000000000000000000000059b670e9fa9d0a427751af201d676719a970857b000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000009600000000000000000000000000000000000000000000000000163457886323ac20000000000000000000000004ed7c70f96b99c776995fb64377f0d4ab3b0e1c100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016345785d8a0000000000000000000000000000322813fd9a801c5507c9de605d63cea4f2ce6c44
+// 0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000320000000000000000000000000000000000000000000000000016345786c15c884000000000000000000000000c6e7df5e7b4f2a278906862b61205850344d4e7d0000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000064000000000000000000000000000000000000000000000000001634578799758ce00000000000000000000000059b670e9fa9d0a427751af201d676719a970857b000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000009600000000000000000000000000000000000000000000000000163457886323ac20000000000000000000000004ed7c70f96b99c776995fb64377f0d4ab3b0e1c100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016345785d8a0000000000000000000000000000322813fd9a801c5507c9de605d63cea4f2ce6c44
+// 0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000320000000000000000000000000000000000000000000000000016345786c15c884000000000000000000000000c6e7df5e7b4f2a278906862b61205850344d4e7d0000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000064000000000000000000000000000000000000000000000000001634578799758ce00000000000000000000000059b670e9fa9d0a427751af201d676719a970857b000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000009600000000000000000000000000000000000000000000000000163457886323ac20000000000000000000000004ed7c70f96b99c776995fb64377f0d4ab3b0e1c100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000016345785d8a0000000000000000000000000000322813fd9a801c5507c9de605d63cea4f2ce6c44

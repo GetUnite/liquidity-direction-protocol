@@ -61,7 +61,8 @@ contract VoteExecutorSlave {
     /// @return result Required by Multichain
     function anyExecute(bytes memory _data) external returns (bool success, bytes memory result) {
         (bytes32 hashed, bytes memory signature, Command[] memory _commands) = abi.decode(_data, (bytes32, bytes, Command[]));
-       
+
+        require(hashed == keccak256(abi.encode(_commands)), "Hash doesn't match");
         address signer = recoverSigner(hashed, signature);
         require(whitelist.contains(signer), "Isn't whitelisted");
         // Comment this line for local tests
@@ -156,25 +157,32 @@ contract VoteExecutorSlave {
     /// @dev Loops through and just forms the bytes encoded data that VoteExecutorSlave takes as inputs.
     /// @param _hashed Keccak256 Hash of the array of messages we are sending as payload
     /// @param _signature Signed _hashed using private key on github actions 
-    /// @param _names Array of strings holding the name of the actions to be taken (Ex.) changeAPY, reallocateFunds..)
-    /// @param _messages Array of messages that hold the parameters of actions to be taken (Ex.) For change APY, struct of APYproposal);
+    /// @param _commands Array of commands encoded with encodeCommands()
     /// @return data Bytes encoded data that is used as the payload through anyCall
-    function encodeData(bytes32 _hashed, bytes memory _signature, string[] memory _names, bytes[] memory _messages) public pure  returns (bytes memory data) {
+    function encodeData(bytes32 _hashed, bytes memory _signature, Command[] memory _commands) public pure  returns (bytes memory data) {
+        data = abi.encode(
+                _hashed,
+                _signature,
+                _commands
+            );
+    }
+
+    // Helper to simulate L1 Encoding
+    /// @notice Simulates what gnosis is doing when calling VoteExecutorMaster to encode commands
+    /// @dev Loops through and just forms the bytes encoded data that VoteExecutorSlave takes as inputs.
+    /// @param _names Array of action names ("changeAPY");
+    /// @param _messages "actions" that are abi.encoded.
+    /// @return commands Struct form to input into encodeData
+    /// @return hashedCommands Keccak256 hashed commands used to sign.
+    function encodeCommands( string[] memory _names, bytes[] memory _messages) public pure  returns (Command[] memory commands, bytes32 hashedCommands) {
         require(_names.length == _messages.length, "Array length mismatch");
-        Command[] memory commands = new Command[](_names.length);
+        commands = new Command[](_names.length);
         for (uint256 i; i < _names.length; i++) {
             Command memory currentCommand = Command(_names[i], _messages[i]);
             commands[i] = currentCommand;
         }
-        data = abi.encode(
-                _hashed,
-                _signature,
-                commands
-            );
+        hashedCommands = keccak256(abi.encode(commands));
     }
-
-
-
 
     /// Admin functions 
     function setAnyCallAddresses(address _newProxyAddress, address _newExecutorAddress) public onlyWhitelist {
@@ -194,6 +202,5 @@ contract VoteExecutorSlave {
     function removeFromWhitelist(address _remove) public onlyWhitelist {
         whitelist.remove(_remove);
     }
-
 
 }
