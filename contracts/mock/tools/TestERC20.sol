@@ -10,10 +10,12 @@ contract TestERC20 is ERC20, ERC20Burnable, AccessControl {
 
     uint8 realDecimals;
 
-    constructor(string memory _name, string memory _symbol, uint8 _decimals, bool _isFork) ERC20(_name, _symbol) {
+    constructor(string memory _name, string memory _symbol, uint8 _decimals, bool _isFork, address _multisig) ERC20(_name, _symbol) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
-
+        _grantRole(DEFAULT_ADMIN_ROLE, _multisig);
+        _grantRole(MINTER_ROLE, _multisig);
+        
         realDecimals = _decimals;
 
         uint256 id;

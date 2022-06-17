@@ -64,19 +64,26 @@ const config: HardhatUserConfig = {
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
-    }
+    },
+    fantom: {
+      url: process.env.FANTOM_URL,
+      gasPrice: "auto",
+      accounts: {
+        mnemonic: process.env.MNEMONIC,
+      },
+    },
   },
 
   gasReporter: {
     enabled: process.env.REPORT_GAS == "true",
     currency: "USD",
   },
-  // etherscan: {
-  //   apiKey: process.env.ETHERSCAN_API_KEY,
-  // },
   etherscan: {
-    apiKey: process.env.POLYGONSCAN_API_KEY,
+    apiKey: process.env.ETHERSCAN_API_KEY,
   },
+  // etherscan: {
+  //   apiKey: process.env.POLYGONSCAN_API_KEY,
+  // },
 
   mocha: {
     timeout: 3600000,
