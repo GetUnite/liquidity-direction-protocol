@@ -164,7 +164,65 @@ describe("Test L2 Contracts", function() {
 
         // (10**27) representation of APY per second on ibAlluos
     })
+    it("Calling anyExecute without enough approved sigs should revert (if it was somehow forced through anyCall)", async function() {
+        
+        if (typeof mneumonic !== "string") {
+            return
+        }
 
+        let encodedAPYETH = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoETH",800, getInterestPerSecond(1.08));
+        let encodedAPYUSD = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoUSD",1600, getInterestPerSecond(1.16));
+        let encodedAPYEUR = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoEUR",2400, getInterestPerSecond(1.24));
+        let encodedAPYBTC = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoBTC",0, getInterestPerSecond(1));
+
+
+        let commandIndexes = [encodedAPYETH[0], encodedAPYUSD[0], encodedAPYEUR[0], encodedAPYBTC[0]];
+        let commandDatas = [encodedAPYETH[1], encodedAPYUSD[1], encodedAPYEUR[1], encodedAPYBTC[1]];
+
+        let messages = await VoteExecutorSlave.callStatic.encodeAllMessages(commandIndexes, commandDatas);
+        let sigsArray = [];
+        for (let i=0; i<2; i++) {
+            // Only 2/3 signatures!
+            let currentOwner = await getImpersonatedSigner(owners[i]);
+            let currentSig = await currentOwner.signMessage(ethers.utils.arrayify(messages.messagesHash))
+            sigsArray.push(currentSig);
+        }
+        let entryData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes[]"], [messages.inputData, sigsArray])
+
+        await expect(VoteExecutorSlave.anyExecute(entryData)).to.be.revertedWith("Hash has not been approved");
+
+        // (10**27) representation of APY per second on ibAlluos
+    })
+    
+    it("Calling anyExecute without enough approved sigs should revert (if it was somehow forced through anyCall)", async function() {
+        
+        if (typeof mneumonic !== "string") {
+            return
+        }
+
+        let encodedAPYETH = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoETH",800, getInterestPerSecond(1.08));
+        let encodedAPYUSD = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoUSD",1600, getInterestPerSecond(1.16));
+        let encodedAPYEUR = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoEUR",2400, getInterestPerSecond(1.24));
+        let encodedAPYBTC = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoBTC",0, getInterestPerSecond(1));
+
+
+        let commandIndexes = [encodedAPYETH[0], encodedAPYUSD[0], encodedAPYEUR[0], encodedAPYBTC[0]];
+        let commandDatas = [encodedAPYETH[1], encodedAPYUSD[1], encodedAPYEUR[1], encodedAPYBTC[1]];
+
+        let messages = await VoteExecutorSlave.callStatic.encodeAllMessages(commandIndexes, commandDatas);
+        let sigsArray = [];
+        for (let i=0; i<owners.length; i++) {
+            // Only 1 signature x3
+            let currentOwner = await getImpersonatedSigner(owners[0]);
+            let currentSig = await currentOwner.signMessage(ethers.utils.arrayify(messages.messagesHash))
+            sigsArray.push(currentSig);
+        }
+        let entryData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes[]"], [messages.inputData, sigsArray])
+
+        await expect(VoteExecutorSlave.anyExecute(entryData)).to.be.revertedWith("Hash has not been approved");
+
+        // (10**27) representation of APY per second on ibAlluos
+    })
     it("Calling anyExecute with fake sigs should revert (if it was somehow forced through anyCall", async function() {
         
         let encodedAPYETH = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoETH",800, getInterestPerSecond(1.08));

@@ -142,11 +142,12 @@ contract VoteExecutorSlave is
     /// @return bool
     function _checkSignedHashes(bytes[] memory _signs, bytes32 _hashed) internal view returns (bool) {
         address[] memory owners = IGnosis(gnosis).getOwners();
+        address[] memory uniqueSigners = new address[](owners.length);
         uint256 numberOfSigns;
         for (uint256 i; i < _signs.length; i++) {
             for (uint256 j; j < owners.length; j++) {
-                // console.log(recoverSigner(_hashed, _signs[i]));
-                if(_verify(_hashed, _signs[i], owners[j])){
+                if(_verify(_hashed, _signs[i], owners[j]) && _checkUniqueSignature(uniqueSigners, owners[j])){
+                    uniqueSigners[numberOfSigns] = owners[j];
                     numberOfSigns++;
                     break;
                 }
@@ -156,7 +157,14 @@ contract VoteExecutorSlave is
     }
 
 
-
+    function _checkUniqueSignature(address[] memory _uniqueSigners, address _signer) public pure returns (bool) {
+        for (uint256 k; k< _uniqueSigners.length; k++) {
+            if (_uniqueSigners[k] ==_signer) {
+                return false;
+            }
+        }
+        return true;
+    }
     /// Helper functions
 
     /**
