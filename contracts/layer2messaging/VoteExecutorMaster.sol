@@ -90,7 +90,18 @@ contract VoteExecutorMaster is
             }
         }
     }
-
+//check for existing sign for single address
+    function singleApproveSubmitedData(uint256 dataId, bytes memory sign) public {
+        address[] memory owners = IGnosis(gnosis).getOwners();
+        (bytes32 dataHash,) = abi.decode(submitedData[dataId].data, (bytes32, Message[]));
+            for (uint256 j; j < owners.length; j++) {
+                if(_verify(dataHash, sign, owners[j])){
+                    submitedData[dataId].signs.push(sign);
+                    break;
+                }
+            }
+        }
+    
 //how to deal with other networks
     function execute() public {
         for (uint256 i = firstNotExecutedData; i <= submitedData.length; i++) {

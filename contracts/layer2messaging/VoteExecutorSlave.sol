@@ -7,9 +7,9 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeable.sol";
 
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "../interfaces/IGnosis.sol";
 import "../interfaces/ILiquidityHandler.sol";
 import "../interfaces/IIbAlluo.sol";
 import "hardhat/console.sol";
@@ -29,8 +29,8 @@ contract VoteExecutorSlave is
     AccessControlUpgradeable,
     UUPSUpgradeable {
 
+    using ECDSA for bytes32;
     using Address for address;
-    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.Bytes32Set;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bool upgradeStatus;
@@ -45,11 +45,12 @@ contract VoteExecutorSlave is
     address public anyCallExecutorAddress;
 
     ILiquidityHandler public handler;
-    
-    EnumerableSetUpgradeable.Bytes32Set private signedHashes;
+    address public gnosis;
+    uint256 minSigns;
+
     mapping(string => IIbAlluo) IbAlluoSymbolToAddress;
     
-    struct Command {
+    struct Message {
         uint256 CommandIndex;
         bytes CommandData;
     }
@@ -60,7 +61,7 @@ contract VoteExecutorSlave is
         string ibAlluo;
     }
     
-    event MessageReceived(bytes32 indexed commandsHash);
+    event MessageReceived(bytes32 indexed messagesHash);
 
 
     function initialize(address _multiSigWallet, address _handlerAddress) public initializer {
@@ -71,7 +72,9 @@ contract VoteExecutorSlave is
             anyCallAddress = 0xD7c295E399CA928A3a14b01D760E794f1AdF8990;
             anyCallExecutorAddress = 0xe3aee52608Db94F2691a7F9Aba30235B14B7Bb70;
             handler = ILiquidityHandler(_handlerAddress);
-
+            gnosis  = _multiSigWallet;
+            minSigns = 3;
+            
             require(_multiSigWallet.isContract(), "Handler: Not contract");
 
             _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
@@ -93,15 +96,15 @@ contract VoteExecutorSlave is
     /// @return success Required by Multichain
     /// @return result Required by Multichain
     function anyExecute(bytes memory _data) external returns (bool success, bytes memory result) {
-        (bytes32 hashed, Command[] memory _commands) = abi.decode(_data, (bytes32, Command[]));
+        (bytes memory message, bytes[] memory signs) = abi.decode(_data, (bytes, bytes[]));
+        (bytes32 hashed, Message[] memory _messages) = abi.decode(message, (bytes32, Message[]));
 
-        require(hashed == keccak256(abi.encode(_commands)), "Hash doesn't match the plaintext commands");
-        require(signedHashes.contains(hashed), "Hash has not been approved");
+        require(hashed == keccak256(abi.encode(_messages)), "Hash doesn't match the plaintext messages");
+        require(_checkSignedHashes(signs, hashed), "Hash has not been approved");
         // Comment this line for local tests
         // require(IAnyCallExecutor(anyCallExecutorAddress).context().from == VoteExecutorMaster, "Origin of message invalid");
 
-        // Once checks are complete, execute commands.
-        execute(_commands);
+        execute(_messages);
         executionHistory.push(_data);
         success=true;
         result="";
@@ -109,14 +112,14 @@ contract VoteExecutorSlave is
         }
 
 
-    /// @notice Executes all commands received after authentication
+    /// @notice Executes all messages received after authentication
     /// @dev Loops through each command in the array and executes it.
-    /// @param _commands Array of commands
-    function execute(Command[] memory _commands) internal {
-        for (uint256 i; i < _commands.length; i++) {
-            Command memory currentCommand =  _commands[i];
-            if (currentCommand.CommandIndex == 0) {
-                (uint256 newAnnualInterest, uint256 newInterestPerSecond, string memory ibAlluoSymbol) = abi.decode(currentCommand.CommandData, (uint256, uint256, string));
+    /// @param _messages Array of messages
+    function execute(Message[] memory _messages) internal {
+        for (uint256 i; i < _messages.length; i++) {
+            Message memory currentMessage =  _messages[i];
+            if (currentMessage.CommandIndex == 0) {
+                (string memory ibAlluoSymbol, uint256 newAnnualInterest, uint256 newInterestPerSecond) = abi.decode(currentMessage.CommandData, (string, uint256, uint256));
                 _changeAPY(newAnnualInterest, newInterestPerSecond, ibAlluoSymbol);
             }
         }
@@ -132,17 +135,43 @@ contract VoteExecutorSlave is
     function _reallocate(bytes memory data) internal {
     }
 
-
-    /// Helper functions
-    /**
-    * @notice Only the multisig can approve the hash for data integrity.
-    * @dev A precaution against bridge hacks
-    * @param _hash  Hash of payload sent from VoteExecutorMaster
-    **/
-    function approveHash(bytes32 _hash) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        signedHashes.add(_hash);
+    /// @notice Checks the array of signatures from L1 for authentication
+    /// @dev Grabs list of approved multisig signers and loops through eth_sign recovery and returns true if it exceeds minimum signs.
+    /// @param _signs Array of signatures sent from L1
+    /// @param _hashed The hash of the data from L1
+    /// @return bool
+    function _checkSignedHashes(bytes[] memory _signs, bytes32 _hashed) internal view returns (bool) {
+        address[] memory owners = IGnosis(gnosis).getOwners();
+        uint256 numberOfSigns;
+        for (uint256 i; i < _signs.length; i++) {
+            for (uint256 j; j < owners.length; j++) {
+                // console.log(recoverSigner(_hashed, _signs[i]));
+                if(_verify(_hashed, _signs[i], owners[j])){
+                    numberOfSigns++;
+                    break;
+                }
+            }
+        }
+        return numberOfSigns >= minSigns ? true : false;
     }
 
+
+
+    /// Helper functions
+
+    /**
+    * @notice Set the address of the multisig.
+    * @param _gnosisAddress  
+    **/
+    function setGnosis(address _gnosisAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        gnosis = _gnosisAddress;
+    }
+
+    /// @notice Sets the minimum required signatures before data is accepted on L2.
+    /// @param _minSigns New value
+    function setMinSigns(uint256 _minSigns) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        minSigns = _minSigns;
+    }
     
     function updateIbAlluoAddresses() public {
         address[] memory ibAlluoAddressList = handler.getListOfIbAlluos();
@@ -151,36 +180,56 @@ contract VoteExecutorSlave is
             IbAlluoSymbolToAddress[ibAlluo.symbol()] = IIbAlluo(ibAlluoAddressList[i]);
         }
     }
+
+
     // Helper to simulate L1 Encoding
     /// @notice Simulates what gnosis is doing when calling VoteExecutorMaster
     /// @dev Loops through and just forms the bytes encoded data that VoteExecutorSlave takes as inputs.
     /// @param _hashed Keccak256 Hash of the array of messages we are sending as payload
-    /// @param _commands Array of commands encoded with encodeCommands()
+    /// @param _messages Array of messages encoded with encodemessages()
     /// @return data Bytes encoded data that is used as the payload through anyCall
-    function encodeData(bytes32 _hashed, Command[] memory _commands) public pure  returns (bytes memory data) {
+    function encodeData(bytes32 _hashed, Message[] memory _messages) public pure  returns (bytes memory data) {
         data = abi.encode(
                 _hashed,
-                _commands
+                _messages
             );
     }
 
+
     // Helper to simulate L1 Encoding
-    /// @notice Simulates what gnosis is doing when calling VoteExecutorMaster to encode commands
+    /// @notice Simulates what gnosis is doing when calling VoteExecutorMaster to encode messages
     /// @dev Loops through and just forms the bytes encoded data that VoteExecutorSlave takes as inputs.
-    /// @param _CommandIndexes Array of action names ("changeAPY");
+    /// @param _commandIndexes Array of action names ("changeAPY");
     /// @param _messages "actions" that are abi.encoded.
-    /// @return commands Struct form to input into encodeData
-    /// @return hashedCommands Keccak256 hashed commands used to sign.
-    function encodeCommands( uint256[] memory _CommandIndexes, bytes[] memory _messages) public pure  returns (Command[] memory commands, bytes32 hashedCommands) {
-        require(_CommandIndexes.length == _messages.length, "Array length mismatch");
-        commands = new Command[](_CommandIndexes.length);
-        for (uint256 i; i < _CommandIndexes.length; i++) {
-            Command memory currentCommand = Command(_CommandIndexes[i], _messages[i]);
-            commands[i] = currentCommand;
+    /// @return messagesHash Keccak256 hashed messages used to sign.
+    /// @return messages Struct form to input into encodeData
+
+    function encodeAllMessages(uint256[] memory _commandIndexes, bytes[] memory _messages) public pure  returns (bytes32 messagesHash, Message[] memory messages, bytes memory inputData) {
+        require(_commandIndexes.length == _messages.length, "Array length mismatch");
+        messages = new Message[](_commandIndexes.length);
+        for (uint256 i; i < _commandIndexes.length; i++) {
+            messages[i] = Message(_commandIndexes[i], _messages[i]);
         }
-        hashedCommands = keccak256(abi.encode(commands));
+        messagesHash = keccak256(abi.encode(messages));
+        inputData = abi.encode(
+                messagesHash,
+                messages
+            );
     }
 
+    function encodeApyCommand(
+        string memory _ibAlluoName, 
+        uint256 _newAnnualInterest, 
+        uint256 _newInterestPerSecond
+    ) public pure  returns (uint256, bytes memory) {
+        bytes memory encodedComand = abi.encode(_ibAlluoName, _newAnnualInterest, _newInterestPerSecond);
+        return (0, encodedComand);
+    }
+
+    function _verify(bytes32 data, bytes memory signature, address account) internal pure returns (bool) {
+        return data.toEthSignedMessageHash().recover(signature) == account;
+    }
+    
     /// Admin functions 
     function setAnyCallAddresses(address _newProxyAddress, address _newExecutorAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
         anyCallAddress = _newProxyAddress;
