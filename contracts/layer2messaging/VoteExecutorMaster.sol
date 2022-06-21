@@ -35,7 +35,7 @@ contract VoteExecutorMaster is
         bytes[] signs;
     }
 
-    SubmittedData[] private submittedData;
+    SubmittedData[] public submittedData;
 
     uint256 public minSigns;
     uint256 public timeLock;
@@ -70,6 +70,10 @@ contract VoteExecutorMaster is
         anyCallAddress = _anyCall;
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
+
+        // Just leave in for tests!!!###########
+        _grantRole(UPGRADER_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     function submitData(bytes memory data) external {
@@ -112,8 +116,8 @@ contract VoteExecutorMaster is
     }
     
     function execute() external {
-        for (uint256 i = firstInQueueData; i <= submittedData.length; i++) {
-            require(submittedData[i].time + timeLock > block.timestamp, "time has not come yet");
+        for (uint256 i = firstInQueueData; i < submittedData.length; i++) {
+            require(submittedData[i].time + timeLock < block.timestamp, "time has not come yet");
             if(submittedData[i].signs.length >= minSigns){
                 (,Message[] memory messages) = abi.decode(submittedData[i].data, (bytes32, Message[]));
                 for (uint256 j; j < messages.length; j++) {
@@ -125,7 +129,7 @@ contract VoteExecutorMaster is
                 }
                 bytes memory finalData = abi.encode(submittedData[i].data, submittedData[i].signs);
                 // need to change chain id before test deploy
-                IAnyCall(anyCallAddress).anyCall(polygonExecutor, finalData, address(0), 137, 0);
+                IAnyCall(anyCallAddress).anyCall(polygonExecutor, finalData, address(0), 4002, 0);
             }
             firstInQueueData++;
         }
@@ -148,6 +152,11 @@ contract VoteExecutorMaster is
                 messagesHash,
                 messages
             );
+    }
+
+    function getSubmitedData(uint256 _dataId) external view returns(bytes memory, uint256, bytes[] memory){
+        SubmittedData memory submittedDataExact = submittedData[_dataId];
+        return(submittedDataExact.data, submittedDataExact.time, submittedDataExact.signs);
     }
 
     function decodeData(bytes memory _data) public pure returns(bytes32, Message[] memory){
@@ -189,7 +198,7 @@ contract VoteExecutorMaster is
     override
     onlyRole(getRoleAdmin(role)) {
         if (role == DEFAULT_ADMIN_ROLE) {
-            require(account.isContract(), "Handler: Not contract");
+            // require(account.isContract(), "Handler: Not contract");
         }
         _grantRole(role, account);
     }
@@ -252,5 +261,6 @@ contract VoteExecutorMaster is
 
 
 interface IAnyCall {
-    function anyCall( address _to, bytes calldata _data, address _fallback, uint256 _toChainID, uint256 _flags ) external;
+    function anyCall(address _to, bytes calldata _data, address _fallback, uint256 _toChainID, uint256 _flags) external;
+
 }

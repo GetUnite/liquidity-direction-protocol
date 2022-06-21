@@ -1,0 +1,1027 @@
+{
+  "manifestVersion": "3.2",
+  "proxies": [
+    {
+      "address": "0x2D182Fc86Cd4C38D9FE94566251A6aF1A85F784b",
+      "kind": "uups"
+    },
+    {
+      "address": "0xC80C86C4Ba081C6ACe06801d0C7910F430A29Be8",
+      "txHash": "0x79d738fce6f6dabe9d9b2e793698a5c2b23ed570c8caee165ee6fc765016e6e7",
+      "kind": "uups"
+    }
+  ],
+  "impls": {
+    "ba060586277276caaf1f0e3c53ba1a419b16c7e9c418b1c73b9c1cdfc1569b94": {
+      "address": "0xD4D02C277dE8b96Cc55777C06247692CC293a31a",
+      "layout": {
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:102"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC165Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol:41"
+          },
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:247"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/ERC1967/ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol:107"
+          },
+          {
+            "label": "submittedData",
+            "offset": 0,
+            "slot": "301",
+            "type": "t_array(t_struct(SubmittedData)18993_storage)dyn_storage",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts/layer2messaging/VoteExecutorMaster.sol:38"
+          },
+          {
+            "label": "minSigns",
+            "offset": 0,
+            "slot": "302",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts/layer2messaging/VoteExecutorMaster.sol:40"
+          },
+          {
+            "label": "timeLock",
+            "offset": 0,
+            "slot": "303",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts/layer2messaging/VoteExecutorMaster.sol:41"
+          },
+          {
+            "label": "firstInQueueData",
+            "offset": 0,
+            "slot": "304",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts/layer2messaging/VoteExecutorMaster.sol:43"
+          },
+          {
+            "label": "gnosis",
+            "offset": 0,
+            "slot": "305",
+            "type": "t_address",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts/layer2messaging/VoteExecutorMaster.sol:45"
+          },
+          {
+            "label": "locker",
+            "offset": 0,
+            "slot": "306",
+            "type": "t_address",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts/layer2messaging/VoteExecutorMaster.sol:46"
+          },
+          {
+            "label": "anyCallAddress",
+            "offset": 0,
+            "slot": "307",
+            "type": "t_address",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts/layer2messaging/VoteExecutorMaster.sol:47"
+          },
+          {
+            "label": "polygonExecutor",
+            "offset": 0,
+            "slot": "308",
+            "type": "t_address",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts/layer2messaging/VoteExecutorMaster.sol:48"
+          },
+          {
+            "label": "upgradeStatus",
+            "offset": 20,
+            "slot": "308",
+            "type": "t_bool",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts/layer2messaging/VoteExecutorMaster.sol:50"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes_storage)dyn_storage": {
+            "label": "bytes[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(SubmittedData)18993_storage)dyn_storage": {
+            "label": "struct VoteExecutorMaster.SubmittedData[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_bytes_storage": {
+            "label": "bytes",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(SubmittedData)18993_storage": {
+            "label": "struct VoteExecutorMaster.SubmittedData",
+            "members": [
+              {
+                "label": "data",
+                "type": "t_bytes_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "time",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "signs",
+                "type": "t_array(t_bytes_storage)dyn_storage",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        }
+      }
+    },
+    "acb1017a6deb074b79475b534d1c2ac64468041f230dcf5ad73e5b18b3848b2d": {
+      "address": "0x65c2cAa2e9308697880A9899Dab2F37837a80472",
+      "txHash": "0x26dff3f3a452ab1c91ba28d5efbb80bd48c379211212ae92bd4e557774f74214",
+      "layout": {
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:102"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC165Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol:41"
+          },
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:247"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/ERC1967/ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol:107"
+          },
+          {
+            "label": "submittedData",
+            "offset": 0,
+            "slot": "301",
+            "type": "t_array(t_struct(SubmittedData)3299_storage)dyn_storage",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:38"
+          },
+          {
+            "label": "minSigns",
+            "offset": 0,
+            "slot": "302",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:40"
+          },
+          {
+            "label": "timeLock",
+            "offset": 0,
+            "slot": "303",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:41"
+          },
+          {
+            "label": "firstInQueueData",
+            "offset": 0,
+            "slot": "304",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:43"
+          },
+          {
+            "label": "gnosis",
+            "offset": 0,
+            "slot": "305",
+            "type": "t_address",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:45"
+          },
+          {
+            "label": "locker",
+            "offset": 0,
+            "slot": "306",
+            "type": "t_address",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:46"
+          },
+          {
+            "label": "anyCallAddress",
+            "offset": 0,
+            "slot": "307",
+            "type": "t_address",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:47"
+          },
+          {
+            "label": "polygonExecutor",
+            "offset": 0,
+            "slot": "308",
+            "type": "t_address",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:48"
+          },
+          {
+            "label": "upgradeStatus",
+            "offset": 20,
+            "slot": "308",
+            "type": "t_bool",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:50"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes_storage)dyn_storage": {
+            "label": "bytes[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(SubmittedData)3299_storage)dyn_storage": {
+            "label": "struct VoteExecutorMasterNew.SubmittedData[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_bytes_storage": {
+            "label": "bytes",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(SubmittedData)3299_storage": {
+            "label": "struct VoteExecutorMasterNew.SubmittedData",
+            "members": [
+              {
+                "label": "data",
+                "type": "t_bytes_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "time",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "signs",
+                "type": "t_array(t_bytes_storage)dyn_storage",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        }
+      }
+    },
+    "733e1441e7eace947c89043a3b47dbbbaccaf6b053f93ebb38229b1b33e8aa16": {
+      "address": "0xD30C91A8078b98DfDDEc4807799100a695cb7fb0",
+      "txHash": "0xcaf7bda4bc58ea2a115e0ab9e54917da5847678a25c3ea2aadb500c81fad1d2e",
+      "layout": {
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:102"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC165Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol:41"
+          },
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:247"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/ERC1967/ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol:107"
+          },
+          {
+            "label": "submittedData",
+            "offset": 0,
+            "slot": "301",
+            "type": "t_array(t_struct(SubmittedData)19853_storage)dyn_storage",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:38"
+          },
+          {
+            "label": "minSigns",
+            "offset": 0,
+            "slot": "302",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:40"
+          },
+          {
+            "label": "timeLock",
+            "offset": 0,
+            "slot": "303",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:41"
+          },
+          {
+            "label": "firstInQueueData",
+            "offset": 0,
+            "slot": "304",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:43"
+          },
+          {
+            "label": "gnosis",
+            "offset": 0,
+            "slot": "305",
+            "type": "t_address",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:45"
+          },
+          {
+            "label": "locker",
+            "offset": 0,
+            "slot": "306",
+            "type": "t_address",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:46"
+          },
+          {
+            "label": "anyCallAddress",
+            "offset": 0,
+            "slot": "307",
+            "type": "t_address",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:47"
+          },
+          {
+            "label": "polygonExecutor",
+            "offset": 0,
+            "slot": "308",
+            "type": "t_address",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:48"
+          },
+          {
+            "label": "upgradeStatus",
+            "offset": 20,
+            "slot": "308",
+            "type": "t_bool",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:50"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes_storage)dyn_storage": {
+            "label": "bytes[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(SubmittedData)19853_storage)dyn_storage": {
+            "label": "struct VoteExecutorMasterNew.SubmittedData[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_bytes_storage": {
+            "label": "bytes",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(SubmittedData)19853_storage": {
+            "label": "struct VoteExecutorMasterNew.SubmittedData",
+            "members": [
+              {
+                "label": "data",
+                "type": "t_bytes_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "time",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "signs",
+                "type": "t_array(t_bytes_storage)dyn_storage",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        }
+      }
+    },
+    "19e0c31f5fd31aa5d6aad1dc4e365d401fed2fbaa2d3b419b1472a8c7071e724": {
+      "address": "0x61AE9F84ace303034Aa5bd2DEc37Fe0b93491F65",
+      "txHash": "0x3c2a5c84939d028f28346918bbf8f7dad2a32928b8363203e4af0baaa888a020",
+      "layout": {
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:102"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC165Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol:41"
+          },
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:247"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/ERC1967/ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol:107"
+          },
+          {
+            "label": "submittedData",
+            "offset": 0,
+            "slot": "301",
+            "type": "t_array(t_struct(SubmittedData)19878_storage)dyn_storage",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:38"
+          },
+          {
+            "label": "minSigns",
+            "offset": 0,
+            "slot": "302",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:40"
+          },
+          {
+            "label": "timeLock",
+            "offset": 0,
+            "slot": "303",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:41"
+          },
+          {
+            "label": "firstInQueueData",
+            "offset": 0,
+            "slot": "304",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:43"
+          },
+          {
+            "label": "gnosis",
+            "offset": 0,
+            "slot": "305",
+            "type": "t_address",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:45"
+          },
+          {
+            "label": "locker",
+            "offset": 0,
+            "slot": "306",
+            "type": "t_address",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:46"
+          },
+          {
+            "label": "anyCallAddress",
+            "offset": 0,
+            "slot": "307",
+            "type": "t_address",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:47"
+          },
+          {
+            "label": "polygonExecutor",
+            "offset": 0,
+            "slot": "308",
+            "type": "t_address",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:48"
+          },
+          {
+            "label": "upgradeStatus",
+            "offset": 20,
+            "slot": "308",
+            "type": "t_bool",
+            "contract": "VoteExecutorMasterNew",
+            "src": "contracts/layer2messaging/VoteExecutorMasterNew.sol:50"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes_storage)dyn_storage": {
+            "label": "bytes[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(SubmittedData)19878_storage)dyn_storage": {
+            "label": "struct VoteExecutorMasterNew.SubmittedData[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_bytes_storage": {
+            "label": "bytes",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(SubmittedData)19878_storage": {
+            "label": "struct VoteExecutorMasterNew.SubmittedData",
+            "members": [
+              {
+                "label": "data",
+                "type": "t_bytes_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "time",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "signs",
+                "type": "t_array(t_bytes_storage)dyn_storage",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        }
+      }
+    }
+  }
+}
