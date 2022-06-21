@@ -1,158 +1,187 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
 import "../interfaces/IAlluoToken.sol";
 import "../interfaces/ILocker.sol";
 import "../interfaces/IGnosis.sol";
-import "hardhat/console.sol";
 
-interface IAnyCall {
-    function anyCall( address _to, bytes calldata _data, address _fallback, uint256 _toChainID, uint256 _flags ) external;
-}
 contract VoteExecutorMaster is
     Initializable,
     PausableUpgradeable,
     AccessControlUpgradeable,
     UUPSUpgradeable {
 
-    using ECDSA for bytes32;
-    using Address for address;
-    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.Bytes32Set;
+    using ECDSAUpgradeable for bytes32;
+    using AddressUpgradeable for address;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-    bool public upgradeStatus;
+    address public constant ALLUO = 0x1E5193ccC53f25638Aa22a940af899B692e10B09;
 
     struct Message {
-        uint256 CommandIndex;
-        bytes CommandData;
+        uint256 commandIndex;
+        bytes commandData;
     }
 
-    struct SubmitedData {
+    struct SubmittedData {
         bytes data;
         uint256 time;
         bytes[] signs;
     }
 
-    uint256 minSigns;
+    SubmittedData[] private submittedData;
 
-    SubmitedData[] private submitedData;
+    uint256 public minSigns;
+    uint256 public timeLock;
 
-    uint firstNotExecutedData;
+    uint256 public firstInQueueData;
     
     address public gnosis;
-    address public alluoToken;
     address public locker;
     address public anyCallAddress;
     address public polygonExecutor;
 
+    bool public upgradeStatus;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(address _multiSigWallet) public initializer {
+    function initialize(
+        address _multiSigWallet, 
+        address _locker, 
+        address _anyCall,
+        uint256 _timeLock
+    ) public initializer {
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        require(_multiSigWallet.isContract(), "Handler: Not contract");
+        //require(_multiSigWallet.isContract(), "Handler: Not contract");
         gnosis = _multiSigWallet;
         minSigns = 2;
+        timeLock = _timeLock;
+        locker = _locker;
+        anyCallAddress = _anyCall;
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
     }
 
-    function submitData(bytes memory data) public {
-        SubmitedData memory newSubmitedData;
-        newSubmitedData.data = data;
-        newSubmitedData.time = block.timestamp;
-        submitedData.push(newSubmitedData);
+    function submitData(bytes memory data) external {
+
+        (bytes32 hashed, Message[] memory _messages) = abi.decode(data, (bytes32, Message[]));
+
+        require(hashed == keccak256(abi.encode(_messages)), "Hash doesn't match the plaintext messages");
+
+        SubmittedData memory newSubmittedData;
+        newSubmittedData.data = data;
+        newSubmittedData.time = block.timestamp;
+        submittedData.push(newSubmittedData);
     }
 
-//check for existing sign
-    function approveSubmitedData(uint256 dataId, bytes[] memory signs) public {
+    function approveSubmitedData(uint256 _dataId, bytes[] memory _signs) external {
+        (bytes32 dataHash,) = abi.decode(submittedData[_dataId].data, (bytes32, Message[]));
+
         address[] memory owners = IGnosis(gnosis).getOwners();
-        (bytes32 dataHash,) = abi.decode(submitedData[dataId].data, (bytes32, Message[]));
-        for (uint256 i; i < signs.length; i++) {
+        address[] memory uniqueSigners = new address[](owners.length);
+        uint256 numberOfSigns;
+        for (uint256 i; i < _signs.length; i++) {
             for (uint256 j; j < owners.length; j++) {
-                if(_verify(dataHash, signs[i], owners[j])){
-                    submitedData[dataId].signs.push(signs[i]);
+                if(_verify(dataHash, _signs[i], owners[j]) && _checkUniqueSignature(uniqueSigners, owners[j])){
+                    submittedData[_dataId].signs.push(_signs[i]);
+                    uniqueSigners[numberOfSigns] = owners[j];
+                    numberOfSigns++;
                     break;
                 }
             }
         }
     }
-//check for existing sign for single address
-    function singleApproveSubmitedData(uint256 dataId, bytes memory sign) public {
-        address[] memory owners = IGnosis(gnosis).getOwners();
-        (bytes32 dataHash,) = abi.decode(submitedData[dataId].data, (bytes32, Message[]));
-            for (uint256 j; j < owners.length; j++) {
-                if(_verify(dataHash, sign, owners[j])){
-                    submitedData[dataId].signs.push(sign);
-                    break;
-                }
+
+    function _checkUniqueSignature(address[] memory _uniqueSigners, address _signer) public pure returns (bool) {
+        for (uint256 k; k< _uniqueSigners.length; k++) {
+            if (_uniqueSigners[k] ==_signer) {
+                return false;
             }
         }
+        return true;
+    }
     
-//how to deal with other networks
-    function execute() public {
-        for (uint256 i = firstNotExecutedData; i <= submitedData.length; i++) {
-            if(submitedData[i].time + 86400 > block.timestamp && submitedData[i].signs.length >= minSigns){
-                (,Message[] memory messages) = abi.decode(submitedData[i].data, (bytes32, Message[]));
+    function execute() external {
+        for (uint256 i = firstInQueueData; i <= submittedData.length; i++) {
+            require(submittedData[i].time + timeLock > block.timestamp, "time has not come yet");
+            if(submittedData[i].signs.length >= minSigns){
+                (,Message[] memory messages) = abi.decode(submittedData[i].data, (bytes32, Message[]));
                 for (uint256 j; j < messages.length; j++) {
-                    if(messages[i].CommandIndex == 1){
-                        (uint256 mintAmount,uint256 reward) = abi.decode(messages[i].CommandData, (uint256, uint256));
-                        _setLockerReward(mintAmount, reward);
+                    if(messages[i].commandIndex == 1){
+                        (uint256 mintAmount, uint256 period) = abi.decode(messages[i].commandData, (uint256, uint256));
+                        IAlluoToken(ALLUO).mint(locker, mintAmount);
+                        ILocker(locker).setReward(mintAmount / (period * 1 days));
                     }
                 }
-                bytes memory finalData = abi.encode(submitedData[i].data, submitedData[i].signs);
+                bytes memory finalData = abi.encode(submittedData[i].data, submittedData[i].signs);
+                // need to change chain id before test deploy
                 IAnyCall(anyCallAddress).anyCall(polygonExecutor, finalData, address(0), 137, 0);
-                firstNotExecutedData++;
             }
-
+            firstInQueueData++;
         }
-
     }
 
-   function encodeData(bytes32 _messagesHash, Message[] memory _messages) public pure  returns (bytes memory data) {
-        data = abi.encode(
-                _messagesHash,
-                _messages
-            );
-    }
-
-    function encodeAllCommands(uint256[] memory _commandIndexes, bytes[] memory _commands) public pure  returns (bytes32 messagesHash, Message[] memory messages) {
+    function encodeAllCommands(uint256[] memory _commandIndexes, bytes[] memory _commands) public pure  
+    returns (
+        bytes32 messagesHash, 
+        Message[] memory messages,
+        bytes memory inputData
+    ) {
         require(_commandIndexes.length == _commands.length, "Array length mismatch");
         messages = new Message[](_commandIndexes.length);
         for (uint256 i; i < _commandIndexes.length; i++) {
             messages[i] = Message(_commandIndexes[i], _commands[i]);
         }
         messagesHash = keccak256(abi.encode(messages));
+
+        inputData = abi.encode(
+                messagesHash,
+                messages
+            );
     }
+
+    function decodeData(bytes memory _data) public pure returns(bytes32, Message[] memory){
+        (bytes32 dataHash, Message[] memory messages) = abi.decode(_data, (bytes32, Message[]));
+        return (dataHash, messages);
+    } 
 
     function encodeApyCommand(
         string memory _ibAlluoName, 
         uint256 _newAnnualInterest, 
         uint256 _newInterestPerSecond
     ) public pure  returns (uint256, bytes memory) {
-        bytes memory hashedComand = abi.encode(_ibAlluoName, _newAnnualInterest, _newInterestPerSecond);
-        return (0, hashedComand);
+        bytes memory encodedCommand = abi.encode(_ibAlluoName, _newAnnualInterest, _newInterestPerSecond);
+        return (0, encodedCommand);
+    }
+
+    function decodeApyCommand(
+        bytes memory _data
+    ) public pure returns (string memory, uint256, uint256) {
+        return abi.decode(_data, (string, uint256, uint256));
     }
 
     function encodeMintCommand(
-        uint256 _newMintAmount, 
-        uint256 _newRewardPerDistribution
+        uint256 _newMintAmount,
+        uint256 _period
     ) public pure  returns (uint256, bytes memory) {
-        bytes memory hashedComand = abi.encode(_newMintAmount, _newRewardPerDistribution);
-        return (1, hashedComand);
+        bytes memory encodedCommand = abi.encode(_newMintAmount, _period);
+        return (1, encodedCommand);
+    }
+
+    function decodeMintCommand(
+        bytes memory _data
+    ) public pure returns (uint256, uint256) {
+        return abi.decode(_data, (uint256, uint256));
     }
 
     function grantRole(bytes32 role, address account)
@@ -171,9 +200,10 @@ contract VoteExecutorMaster is
         upgradeStatus = _status;
     }
 
-    function _setLockerReward(uint256 _mintAmount, uint256 _rewardAmount) internal {
-        IAlluoToken(alluoToken).mint(locker, _mintAmount);
-        ILocker(locker).setReward(_rewardAmount);
+    function changeTimeLock(uint256 _newTimeLock)
+    external
+    onlyRole(DEFAULT_ADMIN_ROLE) {
+        timeLock = _newTimeLock;
     }
 
     function _verify(bytes32 data, bytes memory signature, address account) internal pure returns (bool) {
@@ -182,6 +212,35 @@ contract VoteExecutorMaster is
             .recover(signature) == account;
     }
 
+    /// Admin functions 
+
+    /**
+    * @notice Set the address of the multisig.
+    * @param _gnosisAddress  
+    **/
+    function setGnosis(address _gnosisAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        gnosis = _gnosisAddress;
+    }
+
+    function setLocker(address _lockerAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        locker = _lockerAddress;
+    }
+
+    /// @notice Sets the minimum required signatures before data is accepted on L2.
+    /// @param _minSigns New value
+    function setMinSigns(uint256 _minSigns) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        minSigns = _minSigns;
+    }
+    
+    function setAnyCallAddresses(address _newAnyCallAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        anyCallAddress = _newAnyCallAddress;
+    }
+
+    function setVoteExecutorSlave(address _newAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        polygonExecutor = _newAddress;
+    }
+
+
     function _authorizeUpgrade(address newImplementation)
     internal
     onlyRole(UPGRADER_ROLE)
@@ -189,4 +248,9 @@ contract VoteExecutorMaster is
         require(upgradeStatus, "Handler: Upgrade not allowed");
         upgradeStatus = false;
     }
+}
+
+
+interface IAnyCall {
+    function anyCall( address _to, bytes calldata _data, address _fallback, uint256 _toChainID, uint256 _flags ) external;
 }
