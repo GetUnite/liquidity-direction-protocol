@@ -33,10 +33,10 @@ contract VoteExecutorSlave is
     using Address for address;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-    bool upgradeStatus;
+    bool public upgradeStatus;
     string public lastMessage;
     address public lastCaller;
-    address public VoteExecutorMaster;
+    address public voteExecutorMaster;
     bytes[] public executionHistory;
 
 
@@ -46,13 +46,15 @@ contract VoteExecutorSlave is
 
     ILiquidityHandler public handler;
     address public gnosis;
-    uint256 minSigns;
+    uint256 public  minSigns;
 
-    mapping(string => IIbAlluo) IbAlluoSymbolToAddress;
-    
+    mapping(string => IIbAlluo) public ibAlluoSymbolToAddress;
+
+    mapping(bytes32 => uint256) public hashExecutionTime;
+
     struct Message {
-        uint256 CommandIndex;
-        bytes CommandData;
+        uint256 commandIndex;
+        bytes commandData;
     }
 
     struct APYData {
@@ -99,13 +101,15 @@ contract VoteExecutorSlave is
         (bytes memory message, bytes[] memory signs) = abi.decode(_data, (bytes, bytes[]));
         (bytes32 hashed, Message[] memory _messages) = abi.decode(message, (bytes32, Message[]));
 
-        require(hashed == keccak256(abi.encode(_messages)), "Hash doesn't match the plaintext messages");
+        require(hashed == keccak256(abi.encode(_messages)), "Hash doesn't match");
         require(_checkSignedHashes(signs, hashed), "Hash has not been approved");
         // Comment this line for local tests
-        // require(IAnyCallExecutor(anyCallExecutorAddress).context().from == VoteExecutorMaster, "Origin of message invalid");
-
+        require(IAnyCallExecutor(anyCallExecutorAddress).context().from == voteExecutorMaster, "Origin of message invalid");
+        require(hashExecutionTime[hashed] ==0 || block.timestamp >= hashExecutionTime[hashed] + 2 days, "Duplicate hash" );
+        
         execute(_messages);
         executionHistory.push(_data);
+        hashExecutionTime[hashed] = block.timestamp;
         success=true;
         result="";
         emit MessageReceived(hashed);
@@ -118,8 +122,8 @@ contract VoteExecutorSlave is
     function execute(Message[] memory _messages) internal {
         for (uint256 i; i < _messages.length; i++) {
             Message memory currentMessage =  _messages[i];
-            if (currentMessage.CommandIndex == 0) {
-                (string memory ibAlluoSymbol, uint256 newAnnualInterest, uint256 newInterestPerSecond) = abi.decode(currentMessage.CommandData, (string, uint256, uint256));
+            if (currentMessage.commandIndex == 0) {
+                (string memory ibAlluoSymbol, uint256 newAnnualInterest, uint256 newInterestPerSecond) = abi.decode(currentMessage.commandData, (string, uint256, uint256));
                 _changeAPY(newAnnualInterest, newInterestPerSecond, ibAlluoSymbol);
             }
         }
@@ -129,7 +133,7 @@ contract VoteExecutorSlave is
     // We could save the list of ibAlluos in this contract. But at the moment, this is the only way to set interest through the handler 
     // using only the symbol of the ibAlluo.
     function _changeAPY(uint256 _newAnnualInterest, uint256 _newInterestPerSecond, string memory _ibAlluoSymbol) internal {
-        IbAlluoSymbolToAddress[_ibAlluoSymbol].setInterest(_newAnnualInterest, _newInterestPerSecond);
+        ibAlluoSymbolToAddress[_ibAlluoSymbol].setInterest(_newAnnualInterest, _newInterestPerSecond);
     }
 
     function _reallocate(bytes memory data) internal {
@@ -181,14 +185,22 @@ contract VoteExecutorSlave is
         minSigns = _minSigns;
     }
     
-    function updateIbAlluoAddresses() public {
+    /// @notice Updates all the ibAlluo addresses used when setting APY
+    function updateAllIbAlluoAddresses() public {
         address[] memory ibAlluoAddressList = handler.getListOfIbAlluos();
         for (uint256 i; i< ibAlluoAddressList.length; i++) {
             IIbAlluo ibAlluo = IIbAlluo(ibAlluoAddressList[i]);
-            IbAlluoSymbolToAddress[ibAlluo.symbol()] = IIbAlluo(ibAlluoAddressList[i]);
+            ibAlluoSymbolToAddress[ibAlluo.symbol()] = IIbAlluo(ibAlluoAddressList[i]);
         }
     }
 
+
+    /// @notice Updates specific ibAlluo addresses for symbols when setting APY
+    /// @param _ibAlluoAddress Address of the ibAlluo you want to add to the mapping
+    function updateSpecificIbAlluoAddress(address _ibAlluoAddress) public {
+        IIbAlluo ibAlluo = IIbAlluo(_ibAlluoAddress);
+        ibAlluoSymbolToAddress[ibAlluo.symbol()] = ibAlluo;
+    }
 
     // Helper to simulate L1 Encoding
     /// @notice Simulates what gnosis is doing when calling VoteExecutorMaster
@@ -245,7 +257,7 @@ contract VoteExecutorSlave is
     }
 
     function setVoteExecutorMaster(address _newAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        VoteExecutorMaster = _newAddress;
+        voteExecutorMaster = _newAddress;
     }
 
 

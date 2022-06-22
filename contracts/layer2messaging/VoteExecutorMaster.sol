@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
 import "../interfaces/IAlluoToken.sol";
 import "../interfaces/ILocker.sol";
@@ -36,6 +37,7 @@ contract VoteExecutorMaster is
     }
 
     SubmittedData[] public submittedData;
+    mapping(bytes32 => uint256) public hashExecutionTime;
 
     uint256 public minSigns;
     uint256 public timeLock;
@@ -76,11 +78,16 @@ contract VoteExecutorMaster is
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
+
+    /// @notice Allows anyone to submit data for execution of votes
+    /// @dev Attempts to parse at high level and then confirm hash before submitting to queue
+    /// @param data Payload fully encoded as required (see formatting using encoding functions below)
+
     function submitData(bytes memory data) external {
 
         (bytes32 hashed, Message[] memory _messages) = abi.decode(data, (bytes32, Message[]));
 
-        require(hashed == keccak256(abi.encode(_messages)), "Hash doesn't match the plaintext messages");
+        require(hashed == keccak256(abi.encode(_messages)), "Hash doesn't match");
 
         SubmittedData memory newSubmittedData;
         newSubmittedData.data = data;
@@ -88,12 +95,27 @@ contract VoteExecutorMaster is
         submittedData.push(newSubmittedData);
     }
 
+
+    /// @notice Allow anyone to approve data for execution given off-chain signatures
+    /// @dev Checks against existing sigs submitted and only allow non-duplicate multisig owner signatures to approve the payload
+    /// @param _dataId Id of data payload to be approved
+    /// @param _signs Array of off-chain EOA signatures to approve the payload.
+
     function approveSubmitedData(uint256 _dataId, bytes[] memory _signs) external {
         (bytes32 dataHash,) = abi.decode(submittedData[_dataId].data, (bytes32, Message[]));
 
         address[] memory owners = IGnosis(gnosis).getOwners();
+
+        bytes[] memory signs = submittedData[_dataId].signs;
         address[] memory uniqueSigners = new address[](owners.length);
         uint256 numberOfSigns;
+
+        for (uint256 i; i< signs.length; i++) {
+            numberOfSigns++;
+            uniqueSigners[i]= _getSignerAddress(dataHash, signs[i]);
+        }
+
+
         for (uint256 i; i < _signs.length; i++) {
             for (uint256 j; j < owners.length; j++) {
                 if(_verify(dataHash, _signs[i], owners[j]) && _checkUniqueSignature(uniqueSigners, owners[j])){
@@ -105,21 +127,18 @@ contract VoteExecutorMaster is
             }
         }
     }
+        
+    /// @notice Iterates through all data in queue and executes votes if conditions are met
+    /// @dev Only allow execution if timelock has passed, is not a duplicate hash and is approved.
 
-    function _checkUniqueSignature(address[] memory _uniqueSigners, address _signer) public pure returns (bool) {
-        for (uint256 k; k< _uniqueSigners.length; k++) {
-            if (_uniqueSigners[k] ==_signer) {
-                return false;
-            }
-        }
-        return true;
-    }
-    
     function execute() external {
         for (uint256 i = firstInQueueData; i < submittedData.length; i++) {
-            require(submittedData[i].time + timeLock < block.timestamp, "time has not come yet");
+            (bytes32 hashed, Message[] memory messages) = abi.decode(submittedData[i].data, (bytes32, Message[]));
+
+            require(submittedData[i].time + timeLock < block.timestamp, "Under timelock");
+            require(hashExecutionTime[hashed] == 0 || block.timestamp > hashExecutionTime[hashed]+ 3 days, "DuplicateHash");
+
             if(submittedData[i].signs.length >= minSigns){
-                (,Message[] memory messages) = abi.decode(submittedData[i].data, (bytes32, Message[]));
                 for (uint256 j; j < messages.length; j++) {
                     if(messages[i].commandIndex == 1){
                         (uint256 mintAmount, uint256 period) = abi.decode(messages[i].commandData, (uint256, uint256));
@@ -127,6 +146,7 @@ contract VoteExecutorMaster is
                         ILocker(locker).setReward(mintAmount / (period * 1 days));
                     }
                 }
+                hashExecutionTime[hashed] = block.timestamp;
                 bytes memory finalData = abi.encode(submittedData[i].data, submittedData[i].signs);
                 // need to change chain id before test deploy
                 IAnyCall(anyCallAddress).anyCall(polygonExecutor, finalData, address(0), 4002, 0);
@@ -135,7 +155,7 @@ contract VoteExecutorMaster is
         }
     }
 
-    function encodeAllCommands(uint256[] memory _commandIndexes, bytes[] memory _commands) public pure  
+    function encodeAllMessages(uint256[] memory _commandIndexes, bytes[] memory _commands) public pure  
     returns (
         bytes32 messagesHash, 
         Message[] memory messages,
@@ -198,7 +218,7 @@ contract VoteExecutorMaster is
     override
     onlyRole(getRoleAdmin(role)) {
         if (role == DEFAULT_ADMIN_ROLE) {
-            // require(account.isContract(), "Handler: Not contract");
+            require(account.isContract(), "Handler: Not contract");
         }
         _grantRole(role, account);
     }
@@ -220,7 +240,20 @@ contract VoteExecutorMaster is
             .toEthSignedMessageHash()
             .recover(signature) == account;
     }
-
+    function _getSignerAddress(bytes32 data, bytes memory signature) internal pure returns (address) {
+        return data
+            .toEthSignedMessageHash()
+            .recover(signature);
+    }
+    
+    function _checkUniqueSignature(address[] memory _uniqueSigners, address _signer) internal pure returns (bool) {
+        for (uint256 k; k< _uniqueSigners.length; k++) {
+            if (_uniqueSigners[k] ==_signer) {
+                return false;
+            }
+        }
+        return true;
+    }
     /// Admin functions 
 
     /**
