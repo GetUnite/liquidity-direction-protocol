@@ -8,10 +8,13 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import "../interfaces/IAlluoToken.sol";
 import "../interfaces/ILocker.sol";
 import "../interfaces/IGnosis.sol";
+import "../interfaces/IAlluoStrategy.sol";
 
 contract VoteExecutorMaster is
     Initializable,
@@ -21,7 +24,8 @@ contract VoteExecutorMaster is
 
     using ECDSAUpgradeable for bytes32;
     using AddressUpgradeable for address;
-
+    using SafeERC20Upgradeable for IERC20Upgradeable;
+    
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     address public constant ALLUO = 0x1E5193ccC53f25638Aa22a940af899B692e10B09;
 
@@ -34,6 +38,15 @@ contract VoteExecutorMaster is
         bytes data;
         uint256 time;
         bytes[] signs;
+    }
+
+    struct Deposit {
+        address strategyAddress;
+        uint256 amount;
+    }
+    struct DepositQueue {
+        Deposit[] depositList;
+        uint256 depositNumber;
     }
 
     SubmittedData[] public submittedData;
@@ -50,6 +63,15 @@ contract VoteExecutorMaster is
     address public polygonExecutor;
 
     bool public upgradeStatus;
+    uint256 public currentChain;
+
+    mapping(address => address) public strategyToToken;
+
+    mapping(address => DepositQueue) public tokenToDepositQueue;
+    address[] public primaryTokens;
+    // Primary Currencies: USD, ETH, EUR
+    // USD --> USDC     ETH --> WETH   EUR --> EURT or something
+    bytes[] public reallocationArray;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -106,13 +128,13 @@ contract VoteExecutorMaster is
 
         address[] memory owners = IGnosis(gnosis).getOwners();
 
-        bytes[] memory signs = submittedData[_dataId].signs;
+        bytes[] memory submittedSigns = submittedData[_dataId].signs;
         address[] memory uniqueSigners = new address[](owners.length);
         uint256 numberOfSigns;
 
-        for (uint256 i; i< signs.length; i++) {
+        for (uint256 i; i< submittedSigns.length; i++) {
             numberOfSigns++;
-            uniqueSigners[i]= _getSignerAddress(dataHash, signs[i]);
+            uniqueSigners[i]= _getSignerAddress(dataHash, submittedSigns[i]);
         }
 
 
@@ -136,22 +158,111 @@ contract VoteExecutorMaster is
             (bytes32 hashed, Message[] memory messages) = abi.decode(submittedData[i].data, (bytes32, Message[]));
 
             require(submittedData[i].time + timeLock < block.timestamp, "Under timelock");
-            require(hashExecutionTime[hashed] == 0 || block.timestamp > hashExecutionTime[hashed]+ 3 days, "DuplicateHash");
+            require(hashExecutionTime[hashed] == 0 || block.timestamp > hashExecutionTime[hashed]+ 3 days, "Duplicate Hash");
 
             if(submittedData[i].signs.length >= minSigns){
+
+
                 for (uint256 j; j < messages.length; j++) {
                     if(messages[i].commandIndex == 1){
                         (uint256 mintAmount, uint256 period) = abi.decode(messages[i].commandData, (uint256, uint256));
                         IAlluoToken(ALLUO).mint(locker, mintAmount);
                         ILocker(locker).setReward(mintAmount / (period * 1 days));
                     }
+
+                    if(messages[i].commandIndex == 2) {
+                        // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
+                        (address strategyAddress, uint256 newAmount, uint256 chainId) = abi.decode(messages[i].commandData, (address, uint256, uint256));
+                        uint256 strategyBalance = _getStrategyBalance(strategyAddress);
+                        if (strategyBalance >= newAmount && chainId == currentChain) {
+                            // all withdrawals
+                            uint256 delta = strategyBalance - newAmount;
+                            _withdrawStrategy(strategyAddress, delta);
+                        } else if (strategyBalance < newAmount && chainId == currentChain) {
+                            // Deposits
+                            reallocationArray.push(messages[i].commandData);
+                        }
+                    }
                 }
+                if (reallocationArray.length > 0 ) {_redistributeLiquidity(reallocationArray);}
+
+
+
                 hashExecutionTime[hashed] = block.timestamp;
                 bytes memory finalData = abi.encode(submittedData[i].data, submittedData[i].signs);
                 // need to change chain id before test deploy
                 IAnyCall(anyCallAddress).anyCall(polygonExecutor, finalData, address(0), 4002, 0);
             }
             firstInQueueData++;
+        }
+    }
+
+    function _redistributeLiquidity(bytes[] storage CommandArray) internal returns (bytes[] memory) {
+        uint256 delta;
+        // All withdrawals were complete during execute. 
+        // Now attempt to deposit if there is enough cash,
+        for (uint256 i; i < CommandArray.length; i++) {
+            (address strategyAddress, uint256 newAmount,) = abi.decode(CommandArray[i], (address, uint256, uint256));
+                uint256 strategyBalance = _getStrategyBalance(strategyAddress);
+                if (strategyBalance < newAmount) {
+                    // Deposit queue
+                    delta = newAmount - strategyBalance;
+                    _depositStrategy(strategyAddress, delta, true);
+                }
+        }
+
+        // Now, only if there are no outstanding withdrawals for that particular token, you bridge it to the next layer.
+        _bridgeFunds();
+        delete reallocationArray;
+    }
+
+
+    function executeDeposits() public {
+        for (uint256 i; i < primaryTokens.length; i++) {
+            DepositQueue memory depositQueue = tokenToDepositQueue[primaryTokens[i]];
+            Deposit[] memory depositList = depositQueue.depositList;
+            uint256 depositNumber = depositQueue.depositNumber;
+            uint256 iters = depositList.length - depositNumber;
+            for (uint256 j; j < iters; j++) {
+                Deposit memory depositInfo = depositList[depositNumber + i];
+                _depositStrategy(depositInfo.strategyAddress, depositInfo.amount, false);
+            }
+        }
+    }
+
+    function _getStrategyBalance(address _strategy) internal returns (uint256 balance) {
+        // IAlluoStrategy(_strategy).getBalance();
+    }
+
+    function _depositStrategy(address _strategy, uint256 _amount, bool _initial) internal {
+        // Below, try deposit into strategy, otherwise add to deposit queue
+        // No partial deposits for a single strategy to optimise gas. Do deposits in bulk.
+
+        address token = strategyToToken[_strategy];
+        if (IERC20Upgradeable(token).balanceOf(address(this)) > _amount && !_initial) {
+            // Add investing logic here
+            tokenToDepositQueue[token].depositNumber++;
+
+        }
+        else if (_initial) {
+            tokenToDepositQueue[token].depositList.push(Deposit(_strategy, _amount));
+        }
+    }
+
+    function _withdrawStrategy(address _strategy, uint256 _amount) internal {
+        // Add withdrawing logic here
+        // USD in 10**18
+    }
+
+
+
+    function _bridgeFunds() internal {
+        // primaryTokens = eth, usd, eur
+        for (uint256 i; i < primaryTokens.length; i++) {
+            // If all deposits are satisfied for that particular token, bridge it over to the next chain
+            if ( tokenToDepositQueue[primaryTokens[i]].depositList.length ==  tokenToDepositQueue[primaryTokens[i]].depositNumber + 1) {
+                // Add bridging logic here.
+            }
         }
     }
 
@@ -212,6 +323,37 @@ contract VoteExecutorMaster is
     ) public pure returns (uint256, uint256) {
         return abi.decode(_data, (uint256, uint256));
     }
+
+    function encodeLiquidityCommand(
+        address _strategyAddress,
+        uint256 _newAmount,
+        string memory _chain
+    ) public pure  returns (uint256, bytes memory) {
+        bytes memory encodedCommand = abi.encode(_strategyAddress, _newAmount, _chain);
+        return (2, encodedCommand);
+    }
+
+    function decodeLiquidityCommand(
+        bytes memory _data
+    ) public pure returns (address, uint256, string memory) {
+        return abi.decode(_data, (address, uint256, string));
+    }
+
+    function encodeBridgeCommand(
+        uint256 _amount,
+        address _token,
+        string memory _chain
+    ) public pure  returns (uint256, bytes memory) {
+        bytes memory encodedCommand = abi.encode(_amount, _token,_chain);
+        return (3, encodedCommand);
+    }
+
+    function decodeBridgeCommand(
+        bytes memory _data
+    ) public pure returns (uint256, string memory) {
+        return abi.decode(_data, (uint256, string));
+    }
+
 
     function grantRole(bytes32 role, address account)
     public
