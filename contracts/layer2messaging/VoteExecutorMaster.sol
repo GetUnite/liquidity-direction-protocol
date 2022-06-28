@@ -49,6 +49,14 @@ contract VoteExecutorMaster is
         uint256 depositNumber;
     }
 
+    struct LiquidityDirection {
+        uint96 chainId;
+        address strategyAddress;
+        bytes data;
+    }
+
+    mapping(string => LiquidityDirection) public liquidityDirection;
+
     SubmittedData[] public submittedData;
     mapping(bytes32 => uint256) public hashExecutionTime;
 
@@ -172,16 +180,21 @@ contract VoteExecutorMaster is
 
                     if(messages[i].commandIndex == 2) {
                         // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
-                        (address strategyAddress, uint256 newAmount, uint256 chainId) = abi.decode(messages[i].commandData, (address, uint256, uint256));
-                        uint256 strategyBalance = _getStrategyBalance(strategyAddress);
-                        if (strategyBalance >= newAmount && chainId == currentChain) {
-                            // all withdrawals
-                            uint256 delta = strategyBalance - newAmount;
-                            _withdrawStrategy(strategyAddress, delta);
-                        } else if (strategyBalance < newAmount && chainId == currentChain) {
-                            // Deposits
-                            reallocationArray.push(messages[i].commandData);
+                        // (address strategyAddress, uint256 newAmount, uint256 chainId) = abi.decode(messages[i].commandData, (address, uint256, uint256));
+                        (uint96 chainId, address strategyAddress, bytes memory data, uint256 newAmount) = abi.decode(messages[i].commandData, (uint96, address, bytes, uint256));
+                        // (address strategyAddress, uint256 newAmount, uint256 chainId) = abi.decode(messages[i].commandData, (address, uint256, uint256));
+                        if(chainId == currentChain){
+                            uint256 strategyBalance = _getStrategyBalance(strategyAddress);
+                            if (strategyBalance >= newAmount) {
+                                // all withdrawals
+                                uint256 delta = strategyBalance - newAmount;
+                                _withdrawStrategy(strategyAddress, delta);
+                            } else if (strategyBalance < newAmount) {
+                                // Deposits
+                                reallocationArray.push(messages[i].commandData);
+                            }
                         }
+
                     }
                 }
                 if (reallocationArray.length > 0 ) {_redistributeLiquidity(reallocationArray);}
@@ -330,6 +343,15 @@ contract VoteExecutorMaster is
         string memory _chain
     ) public pure  returns (uint256, bytes memory) {
         bytes memory encodedCommand = abi.encode(_strategyAddress, _newAmount, _chain);
+        return (2, encodedCommand);
+    }
+
+    function encodeLiquidityCommandNew(
+        string memory _codeName,
+        uint256 _newAmount
+    ) public view  returns (uint256, bytes memory) {
+        LiquidityDirection memory direction = liquidityDirection[_codeName];
+        bytes memory encodedCommand = abi.encode(direction.chainId, direction.strategyAddress, direction.data, _newAmount);
         return (2, encodedCommand);
     }
 
