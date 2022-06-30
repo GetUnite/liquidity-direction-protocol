@@ -88,7 +88,7 @@ describe("Test L2 Contracts", function() {
         await ibAlluoETH.connect(admin).grantRole(DEFAULT_ADMIN_ROLE, VoteExecutorSlave.address)
         await ibAlluoBTC.connect(admin).grantRole(DEFAULT_ADMIN_ROLE, VoteExecutorSlave.address)
 
-        await VoteExecutorSlave.updateIbAlluoAddresses();
+        await VoteExecutorSlave.updateAllIbAlluoAddresses();
         
 
         owners = [signers[3].address, signers[4].address, signers[5].address]
@@ -276,7 +276,138 @@ describe("Test L2 Contracts", function() {
 
         let entryData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes[]"], [fakeEncodedMessages, sigsArray])
 
-        await expect(VoteExecutorSlave.anyExecute(entryData)).to.be.revertedWith("Hash doesn't match the plaintext messages");
+        await expect(VoteExecutorSlave.anyExecute(entryData)).to.be.revertedWith("Hash doesn't match");
 
+    })
+
+    it("Reallocation should work, ", async function() {
+        
+        if (typeof mneumonic !== "string") {
+            return
+        }
+
+        let USDList = await ibAlluoUSD.getListSupportedTokens()
+        await VoteExecutorSlave.updatePrimaryToken(USDList[0])
+        await VoteExecutorSlave.updateStrategyToToken(signers[0].address, USDList[0])
+        await VoteExecutorSlave.updateStrategyToToken(signers[1].address, USDList[0])
+        await VoteExecutorSlave.setLiquidityDirection(signers[0].address,0,ethers.utils.defaultAbiCoder.encode(["string"],["check0"]), "Signer0")
+        await VoteExecutorSlave.setLiquidityDirection(signers[1].address,0,ethers.utils.defaultAbiCoder.encode(["string"],["check1"]), "Signer1")
+
+        let EURList = await ibAlluoEUR.getListSupportedTokens()
+        await VoteExecutorSlave.updatePrimaryToken(EURList[0])
+        await VoteExecutorSlave.updateStrategyToToken(signers[2].address, EURList[0])
+        await VoteExecutorSlave.updateStrategyToToken(signers[3].address, USDList[0])
+        await VoteExecutorSlave.setLiquidityDirection(signers[2].address,0,ethers.utils.defaultAbiCoder.encode(["string"],["check2"]), "Signer2")
+        await VoteExecutorSlave.setLiquidityDirection(signers[3].address,0,ethers.utils.defaultAbiCoder.encode(["string"],["check3"]), "Signer3")
+        
+        let ETHList = await ibAlluoETH.getListSupportedTokens()
+        await VoteExecutorSlave.updatePrimaryToken(ETHList[0])
+        await VoteExecutorSlave.updateStrategyToToken(signers[4].address, ETHList[0])
+        await VoteExecutorSlave.updateStrategyToToken(signers[5].address, ETHList[0])
+        await VoteExecutorSlave.setLiquidityDirection(signers[4].address,0,ethers.utils.defaultAbiCoder.encode(["string"],["check4"]), "Signer4")
+        await VoteExecutorSlave.setLiquidityDirection(signers[5].address,0,ethers.utils.defaultAbiCoder.encode(["string"],["check5"]), "Signer5")
+        
+
+        let encodedAPYETH = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoETH",800, getInterestPerSecond(1.08));
+        let encodedAPYUSD = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoUSD",1600, getInterestPerSecond(1.16));
+        let encodedAPYEUR = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoEUR",2400, getInterestPerSecond(1.24));
+        let encodedAPYBTC = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoBTC",0, getInterestPerSecond(1));
+
+        let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeDepositCommand("Signer0", 1000)
+        let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeDepositCommand("Signer1", 500)
+        let encodedDeposit3 = await VoteExecutorSlave.callStatic.encodeDepositCommand("Signer2", 1500)
+
+        let encodedWithdrawal1 = await VoteExecutorSlave.callStatic.encodeWithdrawCommand("Signer3", 2000)
+        let encodedWithdrawal2 = await VoteExecutorSlave.callStatic.encodeWithdrawCommand("Signer4", 300)
+        let encodedWithdrawal3 = await VoteExecutorSlave.callStatic.encodeWithdrawCommand("Signer5", 700)
+
+        let commandIndexes = [encodedAPYETH[0], encodedAPYUSD[0], encodedAPYEUR[0], encodedAPYBTC[0], encodedDeposit1[0],encodedDeposit2[0],encodedDeposit3[0], 
+                                encodedWithdrawal1[0], encodedWithdrawal2[0], encodedWithdrawal3[0]];
+        let commandDatas = [encodedAPYETH[1], encodedAPYUSD[1], encodedAPYEUR[1], encodedAPYBTC[1], encodedDeposit1[1], encodedDeposit2[1], encodedDeposit3[1],
+                            encodedWithdrawal1[1], encodedWithdrawal2[1], encodedWithdrawal3[1]];
+
+        let messages = await VoteExecutorSlave.callStatic.encodeAllMessages(commandIndexes, commandDatas);
+        let encodedMessages = await VoteExecutorSlave.callStatic.encodeData( messages.messagesHash, messages.messages)
+        let sigsArray = [];
+        for (let i=0; i<owners.length; i++) {
+            let currentOwner = await getImpersonatedSigner(owners[i]);
+            let currentSig = await currentOwner.signMessage(ethers.utils.arrayify(messages.messagesHash))
+            sigsArray.push(currentSig);
+        }
+        let entryData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes[]"], [encodedMessages, sigsArray])
+        await expect(VoteExecutorSlave.anyExecute(entryData)).to.emit(VoteExecutorSlave, "MessageReceived").withArgs(messages.messagesHash);
+
+        expect(await ibAlluoETH.interestPerSecond()).equal(getInterestPerSecond(1.08).mul(10**10))
+        expect(await ibAlluoUSD.interestPerSecond()).equal(getInterestPerSecond(1.16).mul(10**10))
+        expect(await ibAlluoEUR.interestPerSecond()).equal(getInterestPerSecond(1.24).mul(10**10))
+        expect(await ibAlluoBTC.interestPerSecond()).equal(getInterestPerSecond(1).mul(10**10))
+        await VoteExecutorSlave.executeDeposits();
+
+        // (10**27) representation of APY per second on ibAlluos
+    })
+
+    it("Reallocation should work, chain ID must match. ", async function() {
+        
+        if (typeof mneumonic !== "string") {
+            return
+        }
+
+        let USDList = await ibAlluoUSD.getListSupportedTokens()
+        await VoteExecutorSlave.updatePrimaryToken(USDList[0])
+        await VoteExecutorSlave.updateStrategyToToken(signers[0].address, USDList[0])
+        await VoteExecutorSlave.updateStrategyToToken(signers[1].address, USDList[0])
+        await VoteExecutorSlave.setLiquidityDirection(signers[0].address,0,ethers.utils.defaultAbiCoder.encode(["string"],["check0"]), "Signer0")
+        await VoteExecutorSlave.setLiquidityDirection(signers[1].address,1,ethers.utils.defaultAbiCoder.encode(["string"],["check1"]), "Signer1")
+
+        let EURList = await ibAlluoEUR.getListSupportedTokens()
+        await VoteExecutorSlave.updatePrimaryToken(EURList[0])
+        await VoteExecutorSlave.updateStrategyToToken(signers[2].address, EURList[0])
+        await VoteExecutorSlave.updateStrategyToToken(signers[3].address, USDList[0])
+        await VoteExecutorSlave.setLiquidityDirection(signers[2].address,0,ethers.utils.defaultAbiCoder.encode(["string"],["check2"]), "Signer2")
+        await VoteExecutorSlave.setLiquidityDirection(signers[3].address,1,ethers.utils.defaultAbiCoder.encode(["string"],["check3"]), "Signer3")
+        
+        let ETHList = await ibAlluoETH.getListSupportedTokens()
+        await VoteExecutorSlave.updatePrimaryToken(ETHList[0])
+        await VoteExecutorSlave.updateStrategyToToken(signers[4].address, ETHList[0])
+        await VoteExecutorSlave.updateStrategyToToken(signers[5].address, ETHList[0])
+        await VoteExecutorSlave.setLiquidityDirection(signers[4].address,2,ethers.utils.defaultAbiCoder.encode(["string"],["check4"]), "Signer4")
+        await VoteExecutorSlave.setLiquidityDirection(signers[5].address,0,ethers.utils.defaultAbiCoder.encode(["string"],["check5"]), "Signer5")
+        
+
+        let encodedAPYETH = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoETH",800, getInterestPerSecond(1.08));
+        let encodedAPYUSD = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoUSD",1600, getInterestPerSecond(1.16));
+        let encodedAPYEUR = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoEUR",2400, getInterestPerSecond(1.24));
+        let encodedAPYBTC = await VoteExecutorSlave.callStatic.encodeApyCommand("IbAlluoBTC",0, getInterestPerSecond(1));
+
+        let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeDepositCommand("Signer0", 1000)
+        let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeDepositCommand("Signer1", 500)
+        let encodedDeposit3 = await VoteExecutorSlave.callStatic.encodeDepositCommand("Signer2", 1500)
+
+        let encodedWithdrawal1 = await VoteExecutorSlave.callStatic.encodeWithdrawCommand("Signer3", 2000)
+        let encodedWithdrawal2 = await VoteExecutorSlave.callStatic.encodeWithdrawCommand("Signer4", 300)
+        let encodedWithdrawal3 = await VoteExecutorSlave.callStatic.encodeWithdrawCommand("Signer5", 700)
+
+        let commandIndexes = [encodedAPYETH[0], encodedAPYUSD[0], encodedAPYEUR[0], encodedAPYBTC[0], encodedDeposit1[0],encodedDeposit2[0],encodedDeposit3[0], 
+                                encodedWithdrawal1[0], encodedWithdrawal2[0], encodedWithdrawal3[0]];
+        let commandDatas = [encodedAPYETH[1], encodedAPYUSD[1], encodedAPYEUR[1], encodedAPYBTC[1], encodedDeposit1[1], encodedDeposit2[1], encodedDeposit3[1],
+                            encodedWithdrawal1[1], encodedWithdrawal2[1], encodedWithdrawal3[1]];
+
+        let messages = await VoteExecutorSlave.callStatic.encodeAllMessages(commandIndexes, commandDatas);
+        let encodedMessages = await VoteExecutorSlave.callStatic.encodeData( messages.messagesHash, messages.messages)
+        let sigsArray = [];
+        for (let i=0; i<owners.length; i++) {
+            let currentOwner = await getImpersonatedSigner(owners[i]);
+            let currentSig = await currentOwner.signMessage(ethers.utils.arrayify(messages.messagesHash))
+            sigsArray.push(currentSig);
+        }
+        let entryData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes[]"], [encodedMessages, sigsArray])
+        await expect(VoteExecutorSlave.anyExecute(entryData)).to.emit(VoteExecutorSlave, "MessageReceived").withArgs(messages.messagesHash);
+
+        expect(await ibAlluoETH.interestPerSecond()).equal(getInterestPerSecond(1.08).mul(10**10))
+        expect(await ibAlluoUSD.interestPerSecond()).equal(getInterestPerSecond(1.16).mul(10**10))
+        expect(await ibAlluoEUR.interestPerSecond()).equal(getInterestPerSecond(1.24).mul(10**10))
+        expect(await ibAlluoBTC.interestPerSecond()).equal(getInterestPerSecond(1).mul(10**10))
+        // (10**27) representation of APY per second on ibAlluos
+        await VoteExecutorSlave.executeDeposits();
     })
 })
