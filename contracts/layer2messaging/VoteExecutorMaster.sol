@@ -57,6 +57,8 @@ contract VoteExecutorMaster is
         bytes data;
     }
 
+    mapping(string => LiquidityDirection) public liquidityDirection;
+
     SubmittedData[] public submittedData;
     mapping(bytes32 => uint256) public hashExecutionTime;
 
@@ -74,7 +76,7 @@ contract VoteExecutorMaster is
     uint256 public currentChain;
     uint256 public nextChain;
 
-    address multichainRouter;
+    address public multichainRouter;
 
     // Mapping that goes from native token --> anyCall token required in bridge call
     mapping(address => address) public tokenToAnyToken;
@@ -85,9 +87,7 @@ contract VoteExecutorMaster is
     address[] public primaryTokens;
     // Primary Currencies: USD, ETH, EUR
     // USD --> USDC     ETH --> WETH   EUR --> EURT or something
-    Deposit[] public reallocationArray;
     uint256 public slippage;
-    mapping(string => LiquidityDirection) public liquidityDirection;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -190,6 +190,7 @@ contract VoteExecutorMaster is
                         if (chainId == currentChain) {
                             _withdrawStrategy(strategyAddress, delta, data);
                         }
+
                     }
                     if(messages[i].commandIndex == 3) {
                         // Add all deposits to the queue.
