@@ -5,6 +5,8 @@ import "./AlluoERC20Upgradable.sol";
 import "../interfaces/ILiquidityHandler.sol";
 import "../mock/interestHelper/Interest.sol";
 import "../interfaces/IExchange.sol";
+import "../interfaces/superfluid/ISuperfluidToken.sol";
+import "../interfaces/superfluid/IAlluoSuperToken.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -63,6 +65,7 @@ contract IbAlluo is
     address public trustedForwarder;
     
     address public exchangeAddress;
+    address superToken;
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
@@ -343,7 +346,8 @@ contract IbAlluo is
             interestPerSecond,
             lastInterestCompound
         );
-        return (balanceOf(_address) * _growingRatio) / multiplier;
+        uint256 fullBalance = balanceOf(_address) + IAlluoSuperToken(superToken).balanceOf(_address);
+        return (fullBalance* _growingRatio) / multiplier;
     }
 
     /// @notice  Returns balance in asset value with correct info from update
@@ -354,15 +358,17 @@ contract IbAlluo is
         view
         returns (uint256)
     {
+        uint256 fullBalance = balanceOf(_address) + IAlluoSuperToken(superToken).balanceOf(_address);
         if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
             uint256 _growingRatio = changeRatio(
                 growingRatio,
                 interestPerSecond,
                 lastInterestCompound
             );
-            return (balanceOf(_address) * _growingRatio) / multiplier;
+            
+            return (fullBalance * _growingRatio) / multiplier;
         } else {
-            return (balanceOf(_address) * growingRatio) / multiplier;
+            return (fullBalance * growingRatio) / multiplier;
         }
     }
 
@@ -502,6 +508,10 @@ contract IbAlluo is
         trustedForwarder = newTrustedForwarder;
     }
 
+    function setSuperToken(address _superToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        superToken = _superToken;
+    }
+
     function changeUpgradeStatus(bool _status)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
@@ -526,6 +536,26 @@ contract IbAlluo is
             require(account.isContract(), "IbAlluo: Not contract");
         }
         _grantRole(role, account);
+    }
+
+
+    function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override {
+        if (amount > balanceOf(from)) {
+            IAlluoSuperToken(superToken).alluoWithdraw(from, amount - balanceOf(from));
+        }
+        super._transfer(from, to, amount);
+    }
+
+    function _burn(address account, uint256 amount) internal override {
+         // Calculations for superfluid.
+        if (amount > balanceOf(account)) {
+            IAlluoSuperToken(superToken).alluoWithdraw(account, amount - balanceOf(account));
+        }
+        super._burn(account, amount);
     }
 
     function _beforeTokenTransfer(
