@@ -165,13 +165,6 @@ describe("IbAlluoUSD and Handler", function () {
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoCurrent.address, lastAdapterId)
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoCurrent.address)
 
-        // const superFactory = await ethers.getContractAt("ISuperTokenFactory", "0x2C90719f25B10Fc5646c82DA3240C76Fa5BcCF34");
-        // await superFactory.getSuperTokenLogic()
-
-        // const superTokenAddress = await superFactory.callStatic.createERC20Wrapper(ibAlluoCurrent.address,0, "StIbAlluoUSD", "StIbAlluoUSD");
-        // await superFactory.createERC20Wrapper(ibAlluoCurrent.address,0, "StIbAlluoUSD", "StIbAlluoUSD");
-        // console.log(superTokenAddress);
-        // superToken = await ethers.getContractAt("IERC20Metadata", superTokenAddress);
 
         const StIbAlluoFactory = await ethers.getContractFactory("StIbAlluo") as StIbAlluo__factory;
 
@@ -191,7 +184,67 @@ describe("IbAlluoUSD and Handler", function () {
     });
 
     describe('Handler integration with IbAlluo', function () {
+        it("Call agreement CFA", async function() {
+            await deposit(signers[1], dai, parseUnits("100000", 18));
+            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
 
+            await ibAlluoCurrent.connect(signers[1]).approve(StIbAlluo.address, parseEther("100000"));
+            await StIbAlluo.connect(signers[1]).upgrade(parseEther("100000"))
+
+
+            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
+            let CFA = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C");
+
+            let encodeData = await ibAlluoCurrent.callStatic.createFlow(signers[2].address, "1", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
+
+            await superhost.connect(signers[1]).callAgreement(
+                "0x6EeE6060f715257b970700bc2656De21dEdF074C",
+                encodeData,
+                "0x"
+            )
+
+
+            await skipDays(1)
+            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
+            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
+        })
+        it("Call agreement with CFA, and then withdraws from ibAlluo should pull StIbAlluo", async function() {
+            await deposit(signers[1], dai, parseUnits("1000000", 18));
+            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
+
+            await ibAlluoCurrent.connect(signers[1]).approve(StIbAlluo.address, parseEther("1000000"));
+            await StIbAlluo.connect(signers[1]).upgrade(parseEther("1000000"))
+
+            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
+            let CFA = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C");
+
+            let encodeData = await ibAlluoCurrent.callStatic.createFlow(signers[2].address, "10000000000000", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
+            await superhost.connect(signers[1]).callAgreement(
+                "0x6EeE6060f715257b970700bc2656De21dEdF074C",
+                encodeData,
+                "0x"
+            )
+
+
+            await skipDays(100)
+            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
+
+            await ibAlluoCurrent.connect(signers[2]).withdraw(dai.address, parseEther("10"));
+            expect(Number(await dai.connect(signers[2]).balanceOf(signers[2].address))).greaterThanOrEqual(0);
+            console.log(await dai.connect(signers[2]).balanceOf(signers[2].address));
+        })
+        it("Should convert StIbAlluo to IbAlluo when needed automatically", async function() {
+            await deposit(signers[1], dai, parseUnits("100000", 18));
+
+            await ibAlluoCurrent.connect(signers[1]).approve(StIbAlluo.address, parseEther("50000"));
+            await StIbAlluo.connect(signers[1]).upgrade(parseEther("50000"))
+
+            // Just some dust.
+            // expect(await ibAlluoCurrent.connect(signers[1]).getBalance(signers[1].address)).equal((parseUnits("100000", 18)))
+            await ibAlluoCurrent.connect(signers[1]).withdraw(dai.address, parseEther("100000"));
+            expect(Number(await dai.balanceOf(signers[1].address))).greaterThanOrEqual(0);
+            console.log(await dai.balanceOf(signers[1].address));
+        })
         it("Simulation with random deposits and withdrawals", async function () {
             let numberOfDeposits = getRandomArbitrary(4, 5);
             let i = 0;

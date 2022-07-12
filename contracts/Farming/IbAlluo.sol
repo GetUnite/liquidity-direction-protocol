@@ -6,6 +6,10 @@ import "../interfaces/ILiquidityHandler.sol";
 import "../mock/interestHelper/Interest.sol";
 import "../interfaces/IExchange.sol";
 import "../interfaces/superfluid/ISuperfluidToken.sol";
+import "../interfaces/superfluid/ISuperfluid.sol";
+import "../interfaces/superfluid/IConstantFlowAgreementV1.sol";
+import "../interfaces/superfluid/IInstantDistributionAgreementV1.sol";
+
 import "../interfaces/superfluid/IAlluoSuperToken.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -284,7 +288,30 @@ contract IbAlluo is
         withdrawTo(_msgSender(), _targetToken, _amount);
     }
 
+    function createFlow(address receiver, uint256 flowRate, address agreement) external view returns (bytes memory) {
+        address host = IAlluoSuperToken(superToken).getHost();
+        IConstantFlowAgreementV1 superAgreement = IConstantFlowAgreementV1(agreement);
+        // ISuperfluid(host).callAgreement(
+        //     superAgreement,
+        //     abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0)),
+        //     "0x"
+        // );
+        return abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0));
+    }
 
+    // function createCFA(address receiver, uint256 flowRate, address agreement) external  {
+    //     address host = IAlluoSuperToken(superToken).getHost();
+    //     IConstantFlowAgreementV1 superAgreement = IConstantFlowAgreementV1(agreement);
+       
+    //     // ISuperfluid(host).callAgreement(
+    //     //     superAgreement,
+    //     //     abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0)),
+    //     //     "0x"
+    //     // );
+    //     // return abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0));
+    // }
+
+    
     /**
      * @dev See {IERC20-transfer}.
      *
