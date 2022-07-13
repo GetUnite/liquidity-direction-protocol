@@ -14,10 +14,8 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "../interfaces/IGnosis.sol";
 import "../interfaces/ILiquidityHandler.sol";
 import "../interfaces/IIbAlluo.sol";
-import "../interfaces/IMultichain.sol";
 import "../interfaces/IAlluoStrategy.sol";
 
-import "hardhat/console.sol";
 
 interface IAnyCallExecutor {
     struct Context {
@@ -59,12 +57,7 @@ contract VoteExecutorSlave is
     uint256 public  minSigns;
 
     uint256 public currentChain;
-    bytes[] public reallocationArray;
-    mapping(address => address) public tokenToAnyToken;
-    mapping(address => address) public strategyToToken;
-    mapping(address => DepositQueue) public tokenToDepositQueue;
-    address[] public primaryTokens;
-    address public multichainRouter;
+    
     uint256 public nextChain;
     address public nextChainExecutor;
     uint256 public previousChain;
@@ -74,10 +67,6 @@ contract VoteExecutorSlave is
 
     mapping(bytes32 => uint256) public hashExecutionTime;
 
-    mapping(address => bool) public activeStrategies;
-    uint256 public slippage;
-    // USD => strategy addresses => prev funds
-    // USD => list of active strategies
 
     struct Message {
         uint256 commandIndex;
@@ -89,24 +78,7 @@ contract VoteExecutorSlave is
         uint256 newInterestPerSecond;
         string ibAlluo;
     }
-    struct Deposit {
-        address strategyAddress;
-        uint256 amount;
-        bytes data;
-    }
-    struct DepositQueue {
-        Deposit[] depositList;
-        uint256 depositNumber;
-    }
-
-    struct LiquidityDirection {
-        address strategyAddress;
-        uint256 chainId;
-        bytes data;
-    }
-
-    mapping(string => LiquidityDirection) public liquidityDirection;
-
+   
     event MessageReceived(bytes32 indexed messagesHash);
 
 
@@ -120,7 +92,6 @@ contract VoteExecutorSlave is
             handler = ILiquidityHandler(_handlerAddress);
             gnosis  = _multiSigWallet;
             minSigns = 1;
-            slippage = 97000;
             require(_multiSigWallet.isContract(), "Handler: Not contract");
 
             _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
@@ -145,9 +116,8 @@ contract VoteExecutorSlave is
         (bytes32 hashed, Message[] memory _messages) = abi.decode(message, (bytes32, Message[]));
         require(hashed == keccak256(abi.encode(_messages)), "Hash doesn't match");
         require(_checkSignedHashes(signs, hashed), "Hash has not been approved");
-        // Comment this line for local tests
         require(IAnyCallExecutor(anyCallExecutorAddress).context().from == voteExecutorMaster, "Origin of message invalid");
-        require(hashExecutionTime[hashed] ==0 || block.timestamp >= hashExecutionTime[hashed] + 2 days, "Duplicate hash" );
+        require(hashExecutionTime[hashed] ==0 || block.timestamp >= hashExecutionTime[hashed] + 1 days, "Duplicate hash" );
         
         execute(_messages);
         executionHistory.push(_data);
@@ -158,9 +128,6 @@ contract VoteExecutorSlave is
         success=true;
         result="";
         emit MessageReceived(hashed);
-        // Gelato should listen out for messageReceived and start calling checkExecuteDeposits()
-        // If it returns true, it can trigger it. Then stop listening.
-        
     }
 
 
@@ -244,13 +211,7 @@ contract VoteExecutorSlave is
         ibAlluoSymbolToAddress[ibAlluo.symbol()] = ibAlluo;
     }
 
-    function updateStrategyToToken(address _strategy, address _token) public {
-        strategyToToken[_strategy] = _token;
-    }
-
-    function updatePrimaryToken(address _token) public {
-        primaryTokens.push(_token);
-    }
+   
 
     // Helper to simulate L1 Encoding
     /// @notice Simulates what gnosis is doing when calling VoteExecutorMaster
@@ -296,33 +257,7 @@ contract VoteExecutorSlave is
         return (0, encodedComand);
     }
 
-    function encodeWithdrawCommand(
-        string memory _codeName,
-        uint256 _delta
-    ) public view  returns (uint256, bytes memory) {
-        LiquidityDirection memory direction = liquidityDirection[_codeName];
-        bytes memory encodedCommand = abi.encode(direction.strategyAddress, _delta, direction.chainId, direction.data);
-        return (2, encodedCommand);
-    }
-
-    function encodeDepositCommand(
-        string memory _codeName,
-        uint256 _delta
-    ) public view  returns (uint256, bytes memory) {
-        LiquidityDirection memory direction = liquidityDirection[_codeName];
-        bytes memory encodedCommand = abi.encode(direction.strategyAddress, _delta, direction.chainId, direction.data);
-        return (3, encodedCommand);
-    }
-
-    function setLiquidityDirection(
-        address _strategyAddress,
-        uint256 _chainId,
-        bytes memory _data,
-        string memory _codeName
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        liquidityDirection[_codeName] = LiquidityDirection(_strategyAddress, _chainId, _data);
-    }
-
+   
     function _verify(bytes32 data, bytes memory signature, address account) internal pure returns (bool) {
         return data.toEthSignedMessageHash().recover(signature) == account;
     }

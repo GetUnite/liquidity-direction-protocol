@@ -46,18 +46,7 @@ contract VoteExecutorMaster is
         uint256 depositNumber;
     }
 
-    struct LiquidityDirection {
-        address strategyAddress;
-        address primaryToken;
-        uint256 chainId;
-        bytes data;
-    }
-
-    mapping(string => LiquidityDirection) public liquidityDirection;
-
     SubmittedData[] public submittedData;
-
-    uint256 public firstInQueueData;
 
     uint256 public minSigns;
     uint256 public timeLock;
@@ -79,10 +68,6 @@ contract VoteExecutorMaster is
 
     bool public upgradeStatus;
 
-    mapping(address => address) public tokenToAnyToken;
-    mapping(address => DepositQueue) public tokenToDepositQueue;
-    address[] public primaryTokens;
-    uint256 public slippage;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -130,7 +115,7 @@ contract VoteExecutorMaster is
     /// @param _dataId Id of data payload to be approved
     /// @param _signs Array of off-chain EOA signatures to approve the payload.
 
-    function approveSubmitedData(uint256 _dataId, bytes[] memory _signs) external {
+    function approveSubmittedData(uint256 _dataId, bytes[] memory _signs) external {
         (bytes32 dataHash,) = abi.decode(submittedData[_dataId].data, (bytes32, Message[]));
 
         address[] memory owners = IGnosis(gnosis).getOwners();
@@ -155,37 +140,11 @@ contract VoteExecutorMaster is
             }
         }
     }
-        
-    /// @notice Iterates through all data in queue and executes votes if conditions are met
-    /// @dev Only allow execution if timelock has passed, is not a duplicate hash and is approved.
-
-    function execute() external {
-        for (uint256 i = firstInQueueData; i < submittedData.length; i++) {
-            (bytes32 hashed, Message[] memory messages) = abi.decode(submittedData[i].data, (bytes32, Message[]));
-
-            require(submittedData[i].time + timeLock < block.timestamp, "Under timelock");
-            require(hashExecutionTime[hashed] == 0 || block.timestamp >= hashExecutionTime[hashed]+ 1 days, "Duplicate Hash");
-
-            if(submittedData[i].signs.length >= minSigns){
-                for (uint256 j; j < messages.length; j++) {
-                    if(messages[j].commandIndex == 1){
-                        (uint256 mintAmount, uint256 period) = abi.decode(messages[j].commandData, (uint256, uint256));
-                        IAlluoToken(ALLUO).mint(locker, mintAmount);
-                        ILocker(locker).setReward(mintAmount / (period * 1 days));
-                    }
-                }
-                hashExecutionTime[hashed] = block.timestamp;
-                bytes memory finalData = abi.encode(submittedData[i].data, submittedData[i].signs);
-                IAnyCall(bridgingInfo.anyCallAddress).anyCall(bridgingInfo.nextChainExecutor, finalData, address(0), bridgingInfo.nextChain, 0);
-            }
-            firstInQueueData++;
-        }
-    }
 
     function executeSpecificData(uint256 index) external {
             (bytes32 hashed, Message[] memory messages) = abi.decode(submittedData[index].data, (bytes32, Message[]));
             require(submittedData[index].time + timeLock < block.timestamp, "Under timelock");
-            require(hashExecutionTime[hashed] == 0 || block.timestamp >= hashExecutionTime[hashed]+ 1 days, "Duplicate Hash");
+            require(hashExecutionTime[hashed] == 0 || block.timestamp >= hashExecutionTime[hashed] + 1 days, "Duplicate Hash");
 
             if(submittedData[index].signs.length >= minSigns){
                 for (uint256 j; j < messages.length; j++) {
@@ -221,7 +180,7 @@ contract VoteExecutorMaster is
             );
     }
 
-    function getSubmitedData(uint256 _dataId) external view returns(bytes memory, uint256, bytes[] memory){
+    function getSubmittedData(uint256 _dataId) external view returns(bytes memory, uint256, bytes[] memory){
         SubmittedData memory submittedDataExact = submittedData[_dataId];
         return(submittedDataExact.data, submittedDataExact.time, submittedDataExact.signs);
     }
@@ -258,43 +217,6 @@ contract VoteExecutorMaster is
         bytes memory _data
     ) public pure returns (uint256, uint256) {
         return abi.decode(_data, (uint256, uint256));
-    }
-
-    function encodeLiquidityCommand(
-        string memory _codeName,
-        uint256 _delta,
-        bool _isDeposit
-    ) public view  returns (uint256, bytes memory) {
-        LiquidityDirection memory direction = liquidityDirection[_codeName];
-        bytes memory encodedCommand = abi.encode(direction.strategyAddress, direction.primaryToken, _delta, direction.chainId, direction.data);
-        if(!_isDeposit){
-            return (2, encodedCommand);
-        }
-        else{
-            return (3, encodedCommand);
-        }
-    }
-
-    function decodeLiquidityCommand(
-        bytes memory _data
-    ) public pure returns (address, address, uint256, uint256, bytes memory) {
-
-        return abi.decode(_data, (address, address, uint256, uint256, bytes));
-    }
-
-    function encodeBridgeCommand(
-        uint256 _amount,
-        address _token,
-        string memory _chain
-    ) public pure  returns (uint256, bytes memory) {
-        bytes memory encodedCommand = abi.encode(_amount, _token,_chain);
-        return (3, encodedCommand);
-    }
-
-    function decodeBridgeCommand(
-        bytes memory _data
-    ) public pure returns (uint256, string memory) {
-        return abi.decode(_data, (uint256, string));
     }
 
 
@@ -363,12 +285,9 @@ contract VoteExecutorMaster is
         bridgingInfo.anyCallAddress = _newAnyCallAddress;
     }
 
-    function setVoteExecutorSlave(address _newAddress, uint256 chainNumber) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setNextChainExecutor(address _newAddress, uint256 chainNumber) public onlyRole(DEFAULT_ADMIN_ROLE) {
         bridgingInfo.nextChainExecutor = _newAddress;
         bridgingInfo.nextChain = chainNumber;
-    }
-    function incrementFirstInQueue() public onlyRole(DEFAULT_ADMIN_ROLE) {
-        firstInQueueData++;
     }
 
     function _authorizeUpgrade(address newImplementation)
