@@ -119,14 +119,13 @@ contract VoteExecutorSlave is
             anyCallExecutorAddress = 0xe3aee52608Db94F2691a7F9Aba30235B14B7Bb70;
             handler = ILiquidityHandler(_handlerAddress);
             gnosis  = _multiSigWallet;
-            minSigns = 3;
+            minSigns = 1;
             slippage = 97000;
             require(_multiSigWallet.isContract(), "Handler: Not contract");
 
             _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
-            // Only enable for tests!
-            _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
             _grantRole(UPGRADER_ROLE, _multiSigWallet);
+    
         }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -147,7 +146,7 @@ contract VoteExecutorSlave is
         require(hashed == keccak256(abi.encode(_messages)), "Hash doesn't match");
         require(_checkSignedHashes(signs, hashed), "Hash has not been approved");
         // Comment this line for local tests
-        // require(IAnyCallExecutor(anyCallExecutorAddress).context().from == voteExecutorMaster, "Origin of message invalid");
+        require(IAnyCallExecutor(anyCallExecutorAddress).context().from == voteExecutorMaster, "Origin of message invalid");
         require(hashExecutionTime[hashed] ==0 || block.timestamp >= hashExecutionTime[hashed] + 2 days, "Duplicate hash" );
         
         execute(_messages);
@@ -175,107 +174,12 @@ contract VoteExecutorSlave is
                 (string memory ibAlluoSymbol, uint256 newAnnualInterest, uint256 newInterestPerSecond) = abi.decode(currentMessage.commandData, (string, uint256, uint256));
                 _changeAPY(newAnnualInterest, newInterestPerSecond, ibAlluoSymbol);
             }
-
-            if(currentMessage.commandIndex == 2) {
-                // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
-                (address strategyAddress, uint256 delta, uint256 chainId, bytes memory data) = abi.decode(currentMessage.commandData, (address, uint256, uint256, bytes));
-                if (chainId == currentChain) {
-                    console.log("Withdraw strategy", strategyAddress, delta);
-                    _withdrawStrategy(strategyAddress, delta, data);
-                }
-            }
-            if(currentMessage.commandIndex == 3) {
-                // Add all deposits to the queue.
-                (address strategyAddress, uint256 delta, uint256 chainId, bytes memory data) = abi.decode(currentMessage.commandData, (address, uint256, uint256, bytes));
-                if (chainId == currentChain) {
-                    address token = strategyToToken[strategyAddress];
-                    console.log("Deposit added", strategyAddress, delta);
-                    tokenToDepositQueue[token].depositList.push(Deposit(strategyAddress, delta, data));
-                }
-            }
         }
-        _executeDeposits(true);
-
     }
-    function _executeDeposits(bool forward) internal {
-        for (uint256 i; i < primaryTokens.length; i++) {
-            DepositQueue memory depositQueue = tokenToDepositQueue[primaryTokens[i]];
-            Deposit[] memory depositList = depositQueue.depositList;
-            uint256 depositNumber = depositQueue.depositNumber;
-            uint256 iters = depositList.length - depositNumber;
-            for (uint256 j; j < iters; j++) {
-                Deposit memory depositInfo = depositList[depositNumber + j];
-                console.log("Inside executeDeposits", depositInfo.strategyAddress, depositInfo.amount);
-                _depositStrategy(depositInfo.strategyAddress, depositInfo.amount, depositInfo.data);
-            }
-        }
-        _bridgeFunds(forward);
-    }
-
-    // Public can only executeDeposits by bridging funds backwards.
-    function executeDeposits() public {
-        _executeDeposits(false);
-    }
-
-    // This function checks if executeDeposits() can be called without being reverted.
-    // We can put a flag to set as true for gelato to start listening , such as when we receive 
-    function checkExecuteDeposits() public view returns (bool) {
-        for (uint256 i; i < primaryTokens.length; i++) {
-            DepositQueue memory depositQueue = tokenToDepositQueue[primaryTokens[i]];
-            Deposit[] memory depositList = depositQueue.depositList;
-            uint256 depositNumber = depositQueue.depositNumber;
-            uint256 iters = depositList.length - depositNumber;
-            for (uint256 j; j < iters; j++) {
-                Deposit memory depositInfo = depositList[depositNumber + i];
-                if (IERC20MetadataUpgradeable(strategyToToken[depositInfo.strategyAddress]).balanceOf(address(this)) < depositInfo.amount) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
+  
     function _changeAPY(uint256 _newAnnualInterest, uint256 _newInterestPerSecond, string memory _ibAlluoSymbol) internal {
         ibAlluoSymbolToAddress[_ibAlluoSymbol].setInterest(_newAnnualInterest, _newInterestPerSecond);
     }
-
-
-    function _depositStrategy(address _strategy, uint256 _amount, bytes memory _data) internal {
-        // Below, try deposit into strategy, otherwise add to deposit queue
-        // No partial deposits for a single strategy to optimise gas. Do deposits in bulk.
-        // Amount in 10**18
-        address token = strategyToToken[_strategy];
-        uint256 tokenBalance = IERC20MetadataUpgradeable(token).balanceOf(address(this));
-        uint256 tokenBalance18 = tokenBalance * 10**(18- IERC20MetadataUpgradeable(token).decimals());
-        if (tokenBalance18 > _amount * slippage/100000) {
-            // Add investing logic here
-            IAlluoStrategy(_strategy).invest(_data, _amount * slippage/100000);
-            tokenToDepositQueue[token].depositNumber++;
-        }
-    }
-
-    function _withdrawStrategy(address _strategy, uint256 _amount, bytes memory _data) internal {
-        // Add withdrawing logic here
-        // USD in 10**18
-        // Issue 1: unwindPercent, but we need to use absolute amounts
-        // Issue 2: Need output token (strategyToToken[_strategy],) in the primaryToken (usdc for usd etc)
-        // Need to exchange it to the primaryToken
-        IAlluoStrategy(_strategy).exitAll(_data, _amount, strategyToToken[_strategy], address(this), true);
-    }
-
-    function _bridgeFunds(bool forward) internal {
-        // primaryTokens = eth, usd, eur
-        for (uint256 i; i < primaryTokens.length; i++) {
-            uint256 tokenBalance = IERC20MetadataUpgradeable(primaryTokens[i]).balanceOf(address(this));
-            if ( tokenToDepositQueue[primaryTokens[i]].depositList.length ==  tokenToDepositQueue[primaryTokens[i]].depositNumber && tokenBalance >= 1000 && forward) {
-                IMultichain(multichainRouter).anySwapOutUnderlying(tokenToAnyToken[primaryTokens[i]], nextChainExecutor, tokenBalance, nextChain);
-            }
-            if ( tokenToDepositQueue[primaryTokens[i]].depositList.length ==  tokenToDepositQueue[primaryTokens[i]].depositNumber && tokenBalance >= 1000 && !forward) {
-                IMultichain(multichainRouter).anySwapOutUnderlying(tokenToAnyToken[primaryTokens[i]], previousChainExecutor, tokenBalance, previousChain);
-            }
-        }
-    }
-
 
     /// @notice Checks the array of signatures from L1 for authentication
     /// @dev Grabs list of approved multisig signers and loops through eth_sign recovery and returns true if it exceeds minimum signs.

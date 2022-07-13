@@ -79,13 +79,9 @@ contract VoteExecutorMaster is
 
     bool public upgradeStatus;
 
-    // Mapping that goes from native token --> anyCall token required in bridge call
     mapping(address => address) public tokenToAnyToken;
-
     mapping(address => DepositQueue) public tokenToDepositQueue;
     address[] public primaryTokens;
-    // Primary Currencies: USD, ETH, EUR
-    // USD --> USDC     ETH --> WETH   EUR --> EURT or something
     uint256 public slippage;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -101,7 +97,7 @@ contract VoteExecutorMaster is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        //require(_multiSigWallet.isContract(), "Handler: Not contract");
+        require(_multiSigWallet.isContract(), "Handler: Not contract");
         gnosis = _multiSigWallet;
         minSigns = 2;
         timeLock = _timeLock;
@@ -109,10 +105,6 @@ contract VoteExecutorMaster is
         bridgingInfo.anyCallAddress = _anyCall;
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
-
-        // Just leave in for tests!!!###########
-        _grantRole(UPGRADER_ROLE, msg.sender);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
 
@@ -172,35 +164,16 @@ contract VoteExecutorMaster is
             (bytes32 hashed, Message[] memory messages) = abi.decode(submittedData[i].data, (bytes32, Message[]));
 
             require(submittedData[i].time + timeLock < block.timestamp, "Under timelock");
-            require(hashExecutionTime[hashed] == 0 || block.timestamp > hashExecutionTime[hashed]+ 3 days, "Duplicate Hash");
+            require(hashExecutionTime[hashed] == 0 || block.timestamp >= hashExecutionTime[hashed]+ 1 days, "Duplicate Hash");
 
             if(submittedData[i].signs.length >= minSigns){
                 for (uint256 j; j < messages.length; j++) {
-                    if(messages[i].commandIndex == 1){
-                        (uint256 mintAmount, uint256 period) = abi.decode(messages[i].commandData, (uint256, uint256));
+                    if(messages[j].commandIndex == 1){
+                        (uint256 mintAmount, uint256 period) = abi.decode(messages[j].commandData, (uint256, uint256));
                         IAlluoToken(ALLUO).mint(locker, mintAmount);
                         ILocker(locker).setReward(mintAmount / (period * 1 days));
                     }
-
-                   if(messages[i].commandIndex == 2) {
-                        // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
-                        (address strategyAddress, address primaryToken, uint256 delta, uint256 chainId, bytes memory data) = abi.decode(messages[i].commandData, (address, address, uint256, uint256, bytes));
-                        if (chainId == bridgingInfo.currentChain) {
-                            IAlluoStrategyNew(strategyAddress).exit(data, delta, primaryToken);
-                        }
-
-                    }
-                    if(messages[i].commandIndex == 3) {
-                        // Add all deposits to the queue.
-                        (, address primaryToken, , uint256 chainId, bytes memory data) = abi.decode(messages[i].commandData, (address, address, uint256, uint256, bytes));
-                        if (chainId == bridgingInfo.currentChain) {
-                            tokenToDepositQueue[primaryToken].depositData.push(data);
-                        }
-                    }
-            
                 }
-                // Execute deposits. Only executes if we have sufficient balances.
-                _executeDeposits(true);
                 hashExecutionTime[hashed] = block.timestamp;
                 bytes memory finalData = abi.encode(submittedData[i].data, submittedData[i].signs);
                 IAnyCall(bridgingInfo.anyCallAddress).anyCall(bridgingInfo.nextChainExecutor, finalData, address(0), bridgingInfo.nextChain, 0);
@@ -209,52 +182,26 @@ contract VoteExecutorMaster is
         }
     }
 
+    function executeSpecificData(uint256 index) external {
+            (bytes32 hashed, Message[] memory messages) = abi.decode(submittedData[index].data, (bytes32, Message[]));
+            require(submittedData[index].time + timeLock < block.timestamp, "Under timelock");
+            require(hashExecutionTime[hashed] == 0 || block.timestamp >= hashExecutionTime[hashed]+ 1 days, "Duplicate Hash");
 
-
-    function _executeDeposits(bool forward) internal {
-        for (uint256 i; i < primaryTokens.length; i++) {
-            DepositQueue memory depositQueue = tokenToDepositQueue[primaryTokens[i]];
-            bytes[] memory depositData = depositQueue.depositData;
-            uint256 depositNumber = depositQueue.depositNumber;
-            uint256 iters = depositData.length - depositNumber;
-            for (uint256 j; j < iters; j++) {
-                (address strategyAddress, address primaryToken, uint256 delta, , bytes memory data) = abi.decode(depositData[depositNumber + j], (address, address, uint256, uint256, bytes));
-                _depositStrategy(strategyAddress, primaryToken, delta, data);
-            }
-        }
-        _bridgeFunds(forward);
+            if(submittedData[index].signs.length >= minSigns){
+                for (uint256 j; j < messages.length; j++) {
+                    if(messages[i].commandIndex == 1){
+                        (uint256 mintAmount, uint256 period) = abi.decode(messages[j].commandData, (uint256, uint256));
+                        IAlluoToken(ALLUO).mint(locker, mintAmount);
+                        ILocker(locker).setReward(mintAmount / (period * 1 days));
+                    }
+                }
+                hashExecutionTime[hashed] = block.timestamp;
+                bytes memory finalData = abi.encode(submittedData[index].data, submittedData[index].signs);
+                IAnyCall(bridgingInfo.anyCallAddress).anyCall(bridgingInfo.nextChainExecutor, finalData, address(0), bridgingInfo.nextChain, 0);
+            }     
     }
 
-    function executeDeposits() public {
-        _executeDeposits(false);
-    }
-
-
-    function _depositStrategy(address _strategy, address primaryToken, uint256 _amount, bytes memory _data) internal {
-        // Below, try deposit into strategy, otherwise add to deposit queue
-        // No partial deposits for a single strategy to optimise gas. Do deposits in bulk.
-        // Amount in 10**18
-        uint256 tokenBalance = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
-        uint256 tokenBalance18 = tokenBalance * 10**(18- IERC20MetadataUpgradeable(primaryToken).decimals());
-        if (tokenBalance18 > _amount * slippage/100000) {
-            IAlluoStrategyNew(_strategy).invest(_data, _amount * slippage/100000);
-            tokenToDepositQueue[primaryToken].depositNumber++;
-        }
-    }
-
-
-    function _bridgeFunds(bool forward) internal {
-        // primaryTokens = eth, usd, eur
-        for (uint256 i; i < primaryTokens.length; i++) {
-            uint256 tokenBalance = IERC20MetadataUpgradeable(primaryTokens[i]).balanceOf(address(this));
-            if ( tokenToDepositQueue[primaryTokens[i]].depositData.length ==  tokenToDepositQueue[primaryTokens[i]].depositNumber && tokenBalance >= 1000 && forward) {
-                IERC20MetadataUpgradeable(primaryTokens[i]).approve(bridgingInfo.multichainRouter, tokenBalance);
-                IMultichain(bridgingInfo.multichainRouter).anySwapOutUnderlying(tokenToAnyToken[primaryTokens[i]], bridgingInfo.nextChainExecutor, tokenBalance, bridgingInfo.nextChain);
-            }
-        }
-    }
-
-
+   
     function encodeAllMessages(uint256[] memory _commandIndexes, bytes[] memory _commands) public pure  
     returns (
         bytes32 messagesHash, 
@@ -416,10 +363,13 @@ contract VoteExecutorMaster is
         bridgingInfo.anyCallAddress = _newAnyCallAddress;
     }
 
-    function setVoteExecutorSlave(address _newAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setVoteExecutorSlave(address _newAddress, uint256 chainNumber) public onlyRole(DEFAULT_ADMIN_ROLE) {
         bridgingInfo.nextChainExecutor = _newAddress;
+        bridgingInfo.nextChain = chainNumber;
     }
-
+    function incrementFirstInQueue() public onlyRole(DEFAULT_ADMIN_ROLE) {
+        firstInQueueData++;
+    }
 
     function _authorizeUpgrade(address newImplementation)
     internal
