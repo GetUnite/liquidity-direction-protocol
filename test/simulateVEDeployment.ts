@@ -165,9 +165,9 @@ describe("Test L2 Contracts", function() {
     
     console.log("All set, now check if we can add and execute data correctly");
 
-    await VoteExecutorMaster.submitData(messages[2])
+    await(await VoteExecutorMaster.submitData(messages[2])).wait()
     console.log("Messages submitted")
-
+    
     let mneumonic  = process.env.MNEMONIC
     if (typeof mneumonic !== "string") {
         return
@@ -177,8 +177,10 @@ describe("Test L2 Contracts", function() {
     console.log(messages[0])
     let signedData = await wallet.signMessage(ethers.utils.arrayify(messages[0]))
     console.log(signedData);
-    await VoteExecutorMaster.approveSubmitedData(0, [signedData])
-    await VoteExecutorMaster.execute();
+    await(await VoteExecutorMaster.approveSubmitedData(0, [signedData])).wait();
+    const tx = await VoteExecutorMaster.execute();
+    console.log(await VoteExecutorMaster.firstInQueueData());
+    expect(await VoteExecutorMaster.firstInQueueData()).equal(1)
     console.log("All complete fully!")
     
     }

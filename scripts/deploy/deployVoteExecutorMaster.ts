@@ -20,7 +20,9 @@ async function main() {
     await VoteExecutorMaster.setMinSigns(MinSigns);
 
     console.log("Address:", VoteExecutorMaster.address);
-    console.log("Completed deployment of VoteExecutorMaster , please now deployVoteExecutorSlave by putting",VoteExecutorMaster.address )
+    console.log("Step 1: Completed deployment of VoteExecutorMaster")
+    console.log("Step 2: Please grantRole to VoteExecutorMaster for minting Alluo")
+    console.log("Move to Step 3: Please now deployVoteExecutorSlave by putting",VoteExecutorMaster.address , "as voteexecutorMaster address")")
 }
 main()
   .then(() => process.exit(0))

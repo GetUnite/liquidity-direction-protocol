@@ -21,26 +21,27 @@ async function main() {
     await VoteExecutorSlave.setAnyCallAddresses(anyCallProxy, anyCallExecutor);
     await VoteExecutorSlave.setVoteExecutorMaster(VoteExecutorMasterAddress);
 
-    // Make sure this is run by the multisig later on.
+    // Make sure this is run by the multisig later on!!!
     // Please double check ibAlluo addresses
-    const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000"
-    let ibAlluoUSD = await ethers.getContractAt("IbAlluo","0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6")
-    await ibAlluoUSD.grantRole(DEFAULT_ADMIN_ROLE, VoteExecutorSlave.address)
+    // const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000"
+    // let ibAlluoUSD = await ethers.getContractAt("IbAlluo","0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6")
+    // await ibAlluoUSD.grantRole(DEFAULT_ADMIN_ROLE, VoteExecutorSlave.address)
 
-    let ibAlluoEUR = await ethers.getContractAt("IbAlluo","0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92")
-    await ibAlluoEUR.grantRole(DEFAULT_ADMIN_ROLE, VoteExecutorSlave.address)
+    // let ibAlluoEUR = await ethers.getContractAt("IbAlluo","0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92")
+    // await ibAlluoEUR.grantRole(DEFAULT_ADMIN_ROLE, VoteExecutorSlave.address)
 
-    let ibAlluoETH = await ethers.getContractAt("IbAlluo","0xc677B0918a96ad258A68785C2a3955428DeA7e50")
-    await ibAlluoETH.grantRole(DEFAULT_ADMIN_ROLE, VoteExecutorSlave.address)
+    // let ibAlluoETH = await ethers.getContractAt("IbAlluo","0xc677B0918a96ad258A68785C2a3955428DeA7e50")
+    // await ibAlluoETH.grantRole(DEFAULT_ADMIN_ROLE, VoteExecutorSlave.address)
 
     
-    let ibAlluoBTC = await ethers.getContractAt("IbAlluo","0xf272Ff86c86529504f0d074b210e95fc4cFCDce2")
-    await ibAlluoBTC.grantRole(DEFAULT_ADMIN_ROLE, VoteExecutorSlave.address)
+    // let ibAlluoBTC = await ethers.getContractAt("IbAlluo","0xf272Ff86c86529504f0d074b210e95fc4cFCDce2")
+    // await ibAlluoBTC.grantRole(DEFAULT_ADMIN_ROLE, VoteExecutorSlave.address)
 
 
 
     console.log("Address:", VoteExecutorSlave.address);
-    console.log("Completed deployment of VoteExecutorSlave , please run setVoteExecutorSlave using", VoteExecutorSlave.address)
+    console.log("Step 3: Completed deployment of VoteExecutorSlave , please run setVoteExecutorSlave using", VoteExecutorSlave.address)
+    console.log("Please grantRole to VoteExecutorSlave for ibAlluo : EUR, USD, ETH, BTC so it can call admin functions");
 }
 main()
   .then(() => process.exit(0))
