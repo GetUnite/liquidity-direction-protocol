@@ -10,9 +10,9 @@ async function main() {
     let VoteExecutorMasterAddress = "0x3AD74BAce624451D8eD6499c6eAfC660757b3DD5"
     const VoteExecutorMaster = await ethers.getContractAt("VoteExecutorMaster", VoteExecutorMasterAddress);
 
-    let encodedAPYETH = await VoteExecutorMaster.callStatic.encodeApyCommand("IbAlluoETH",4000, getInterestPerSecond(1.40));
-    let encodedAPYUSD = await VoteExecutorMaster.callStatic.encodeApyCommand("IbAlluoUSD",6000, getInterestPerSecond(1.60));
-    let encodedAPYEUR = await VoteExecutorMaster.callStatic.encodeApyCommand("IbAlluoEUR",9000, getInterestPerSecond(1.90));
+    let encodedAPYETH = await VoteExecutorMaster.callStatic.encodeApyCommand("IbAlluoETH",3000, getInterestPerSecond(1.30));
+    let encodedAPYUSD = await VoteExecutorMaster.callStatic.encodeApyCommand("IbAlluoUSD",2000, getInterestPerSecond(1.20));
+    let encodedAPYEUR = await VoteExecutorMaster.callStatic.encodeApyCommand("IbAlluoEUR",1000, getInterestPerSecond(1.1));
 
     let commandIndexes = [encodedAPYETH[0], encodedAPYUSD[0], encodedAPYEUR[0]];
     let commandDatas = [encodedAPYETH[1], encodedAPYUSD[1], encodedAPYEUR[1]];
