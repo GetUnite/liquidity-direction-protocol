@@ -189,7 +189,7 @@ contract VoteExecutorMaster is
 
             if(submittedData[index].signs.length >= minSigns){
                 for (uint256 j; j < messages.length; j++) {
-                    if(messages[i].commandIndex == 1){
+                    if(messages[j].commandIndex == 1){
                         (uint256 mintAmount, uint256 period) = abi.decode(messages[j].commandData, (uint256, uint256));
                         IAlluoToken(ALLUO).mint(locker, mintAmount);
                         ILocker(locker).setReward(mintAmount / (period * 1 days));
