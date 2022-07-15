@@ -140,6 +140,21 @@ contract StIbAlluo is
 
 
     /**************************************************************************
+     * Alluo custom functions
+     *************************************************************************/
+    // //@dev Alluo custom functions"
+    
+    function alluoWithdraw(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _downgrade(account, account, amount, "","");
+    }
+
+
+
+
+
+
+
+    /**************************************************************************
      * ERC20 Token Info
      *************************************************************************/
 
@@ -382,10 +397,6 @@ contract StIbAlluo is
     /**************************************************************************
      * ERC20 Implementations
      *************************************************************************/
-    // //@dev Alluo custom functions"
-    function alluoWithdraw(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _downgrade(account, account, amount, "","");
-    }
 
     function totalSupply()
         public view override returns (uint256)
