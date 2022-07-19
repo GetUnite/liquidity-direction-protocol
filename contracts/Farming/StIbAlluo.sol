@@ -91,14 +91,6 @@ contract StIbAlluo is
     address ibAlluo;
     bool upgradeStatus;
 
-    // constructor(
-    //     ISuperfluid host
-    // )
-    //     SuperfluidToken(host)
-    //     // solhint-disable-next-line no-empty-blocks
-    // {
-    // }
-
     function initialize(
         IERC20 underlyingToken,
         uint8 underlyingDecimals,

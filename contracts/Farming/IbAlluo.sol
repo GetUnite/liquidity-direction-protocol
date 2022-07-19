@@ -291,27 +291,10 @@ contract IbAlluo is
     function createFlow(address receiver, uint256 flowRate, address agreement) external view returns (bytes memory) {
         address host = IAlluoSuperToken(superToken).getHost();
         IConstantFlowAgreementV1 superAgreement = IConstantFlowAgreementV1(agreement);
-        // ISuperfluid(host).callAgreement(
-        //     superAgreement,
-        //     abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0)),
-        //     "0x"
-        // );
         return abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0));
     }
 
-    // function createCFA(address receiver, uint256 flowRate, address agreement) external  {
-    //     address host = IAlluoSuperToken(superToken).getHost();
-    //     IConstantFlowAgreementV1 superAgreement = IConstantFlowAgreementV1(agreement);
-       
-    //     // ISuperfluid(host).callAgreement(
-    //     //     superAgreement,
-    //     //     abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0)),
-    //     //     "0x"
-    //     // );
-    //     // return abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0));
-    // }
-
-    
+  
     /**
      * @dev See {IERC20-transfer}.
      *
@@ -564,7 +547,6 @@ contract IbAlluo is
         }
         _grantRole(role, account);
     }
-
 
     function _transfer(
         address from,
