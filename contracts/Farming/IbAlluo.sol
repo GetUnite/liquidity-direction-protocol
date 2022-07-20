@@ -69,7 +69,7 @@ contract IbAlluo is
     address public trustedForwarder;
     
     address public exchangeAddress;
-    address superToken;
+    address public superToken;
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
@@ -289,7 +289,6 @@ contract IbAlluo is
     }
 
     function createFlow(address receiver, uint256 flowRate, address agreement) external view returns (bytes memory) {
-        address host = IAlluoSuperToken(superToken).getHost();
         IConstantFlowAgreementV1 superAgreement = IConstantFlowAgreementV1(agreement);
         return abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0));
     }

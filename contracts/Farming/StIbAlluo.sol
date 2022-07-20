@@ -88,8 +88,8 @@ contract StIbAlluo is
     uint256 private _reserve30;
     uint256 internal _reserve31;
 
-    address ibAlluo;
-    bool upgradeStatus;
+    address public ibAlluo;
+    bool public upgradeStatus;
 
     function initialize(
         IERC20 underlyingToken,
@@ -139,11 +139,6 @@ contract StIbAlluo is
     function alluoWithdraw(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _downgrade(account, account, amount, "","");
     }
-
-
-
-
-
 
 
     /**************************************************************************
