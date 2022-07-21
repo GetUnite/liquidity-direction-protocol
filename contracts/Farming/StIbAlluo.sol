@@ -89,8 +89,8 @@ contract StIbAlluo is
     uint256 private _reserve30;
     uint256 internal _reserve31;
 
-    address ibAlluo;
-    bool upgradeStatus;
+    address public ibAlluo;
+    bool public upgradeStatus;
 
     function initialize(
         IERC20 underlyingToken,

@@ -73,7 +73,7 @@ contract IbAlluo is
     address public trustedForwarder;
     
     address public exchangeAddress;
-    address superToken;
+    address public superToken;
 
     CFAv1Library.InitData public cfaV1Lib;
     bytes32 public constant CFA_ID = keccak256("org.superfluid-finance.agreements.ConstantFlowAgreement.v1");
