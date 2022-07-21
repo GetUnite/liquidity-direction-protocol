@@ -30,6 +30,7 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+import "hardhat/console.sol";
 
 /**
  * @title Superfluid's super token implementation
@@ -107,12 +108,14 @@ contract StIbAlluo is
         uint8 underlyingDecimals,
         string calldata n,
         string calldata s,
-        address host
+        address host,
+        address[] memory operators
     )
         external 
         initializer // OpenZeppelin Initializable
     {
         AlluoSuperfluidToken._host = ISuperfluid(host);
+        AlluoSuperfluidToken._underlying = IERC20(underlyingToken);
         _underlyingToken = IERC20(underlyingToken);
         _underlyingDecimals = underlyingDecimals;
 
@@ -123,6 +126,7 @@ contract StIbAlluo is
         
         // register interfaces
         ERC777Helper.register(address(this));
+        _setupDefaultOperators(operators);
     }
 
 
@@ -135,16 +139,13 @@ contract StIbAlluo is
      * Alluo custom functions
      *************************************************************************/
     // //@dev Alluo custom functions"
-    
-    function alluoWithdraw(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _downgrade(account, account, amount, "","");
+
+    function alluoDeposit(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        (, uint256 adjustedAmount) = _toUnderlyingAmount(amount);
+        // Tokens are already received
+        _mint(account, account, adjustedAmount, account != account, "", "");
+        emit TokenUpgraded(account, adjustedAmount);
     }
-
-
-
-
-
-
 
     /**************************************************************************
      * ERC20 Token Info

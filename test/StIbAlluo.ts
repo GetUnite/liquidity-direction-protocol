@@ -169,7 +169,7 @@ describe("IbAlluoUSD and Handler", function () {
         const StIbAlluoFactory = await ethers.getContractFactory("StIbAlluo") as StIbAlluo__factory;
 
         StIbAlluo = await upgrades.deployProxy(StIbAlluoFactory,
-            [ibAlluoCurrent.address, 18, "Streaming IbAlluo USD", "StIbAlluoUSD", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7"
+            [ibAlluoCurrent.address, 18, "Streaming IbAlluo USD", "StIbAlluoUSD", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", [ibAlluoCurrent.address]
             ], {
                 initializer: 'alluoInitialize',
                 kind: 'uups'
@@ -181,10 +181,83 @@ describe("IbAlluoUSD and Handler", function () {
         let calldata = iface.encodeFunctionData("setSuperToken", [StIbAlluo.address]);
 
         await multisig.executeCall(ibAlluoCurrent.address, calldata);
+        await ibAlluoCurrent.setCFA();
     });
 
     describe('Handler integration with IbAlluo', function () {
-        it("Call agreement CFA", async function() {
+        it("Create flow through contract", async function() {
+            await deposit(signers[1], dai, parseUnits("100000", 18));
+            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
+            let encodeData = await ibAlluoCurrent.connect(signers[1]).formatPermissions();
+            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
+            await superhost.connect(signers[1]).callAgreement(
+                "0x6EeE6060f715257b970700bc2656De21dEdF074C",
+                encodeData,
+                "0x"
+            )
+            await ibAlluoCurrent.connect(signers[1]).increaseAllowance(ibAlluoCurrent.address, parseEther("10000"))
+            await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
+
+            await skipDays(1)
+            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
+            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
+        })
+
+        it("Create flow through contract then delete flow", async function() {
+            await deposit(signers[1], dai, parseUnits("100000", 18));
+            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
+            let encodeData = await ibAlluoCurrent.connect(signers[1]).formatPermissions();
+            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
+            await superhost.connect(signers[1]).callAgreement(
+                "0x6EeE6060f715257b970700bc2656De21dEdF074C",
+                encodeData,
+                "0x"
+            )
+            await ibAlluoCurrent.connect(signers[1]).increaseAllowance(ibAlluoCurrent.address, parseEther("10000"))
+            await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
+
+            await skipDays(1)
+            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
+            let balanceAfter = await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address);
+
+            await ibAlluoCurrent.connect(signers[1]).deleteFlow(signers[2].address);
+            await skipDays(1)
+            // There is slight inaccuracy because of the time it takes to execute.
+            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThan(Number(balanceAfter));
+            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).lessThan(Number(balanceAfter) * 1.01);
+
+        })
+        it("Create flow through contract then update flow to give 10x the money", async function() {
+            await deposit(signers[1], dai, parseUnits("100000", 18));
+            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
+            let encodeData = await ibAlluoCurrent.connect(signers[1]).formatPermissions();
+            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
+            await superhost.connect(signers[1]).callAgreement(
+                "0x6EeE6060f715257b970700bc2656De21dEdF074C",
+                encodeData,
+                "0x"
+            )
+            await ibAlluoCurrent.connect(signers[1]).increaseAllowance(ibAlluoCurrent.address, parseEther("10000"))
+            await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
+
+            await skipDays(1)
+            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
+            console.log("Before update flow", await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
+
+            // 10x the value of the flow.
+            await ibAlluoCurrent.connect(signers[1]).updateFlow(signers[2].address, "10", "0")
+
+            let balanceAfterDay1 = Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
+
+            await skipDays(1)
+            console.log("After update flow", await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
+
+            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThan(balanceAfterDay1);
+        })
+
+
+
+        it("Call agreement CFA directly to host", async function() {
             await deposit(signers[1], dai, parseUnits("100000", 18));
             let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
 
@@ -195,7 +268,7 @@ describe("IbAlluoUSD and Handler", function () {
             let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
             let CFA = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C");
 
-            let encodeData = await ibAlluoCurrent.callStatic.createFlow(signers[2].address, "1", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
+            let encodeData = await ibAlluoCurrent.callStatic.formatFlow(signers[2].address, "1", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
 
             await superhost.connect(signers[1]).callAgreement(
                 "0x6EeE6060f715257b970700bc2656De21dEdF074C",
@@ -208,7 +281,7 @@ describe("IbAlluoUSD and Handler", function () {
             expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
             console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
         })
-        it("Call agreement with CFA, and then withdraws from ibAlluo should pull StIbAlluo", async function() {
+        it("Call agreement directly with CFA, and then withdraws from ibAlluo should pull StIbAlluo", async function() {
             await deposit(signers[1], dai, parseUnits("1000000", 18));
             let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
 
@@ -218,7 +291,7 @@ describe("IbAlluoUSD and Handler", function () {
             let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
             let CFA = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C");
 
-            let encodeData = await ibAlluoCurrent.callStatic.createFlow(signers[2].address, "10000000000000", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
+            let encodeData = await ibAlluoCurrent.callStatic.formatFlow(signers[2].address, "10000000000000", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
             await superhost.connect(signers[1]).callAgreement(
                 "0x6EeE6060f715257b970700bc2656De21dEdF074C",
                 encodeData,

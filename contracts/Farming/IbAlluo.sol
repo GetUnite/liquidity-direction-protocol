@@ -20,6 +20,9 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
+
+import {CFAv1Library} from "./superfluid/libs/CFAv1Library.sol";
+
 contract IbAlluo is
     Initializable,
     PausableUpgradeable,
@@ -32,6 +35,7 @@ contract IbAlluo is
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
+    using CFAv1Library for CFAv1Library.InitData;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
@@ -70,6 +74,23 @@ contract IbAlluo is
     
     address public exchangeAddress;
     address superToken;
+
+    CFAv1Library.InitData public cfaV1Lib;
+    bytes32 public constant CFA_ID = keccak256("org.superfluid-finance.agreements.ConstantFlowAgreement.v1");
+
+    struct Context {
+        uint8 appLevel;
+        uint8 callType;
+        uint256 timestamp;
+        address msgSender;
+        bytes4 agreementSelector;
+        bytes userData;
+        uint256 appAllowanceGranted;
+        uint256 appAllowanceWanted;
+        int256 appAllowanceUsed;
+        address appAddress;
+        ISuperfluidToken appAllowanceToken;
+    }
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
     event Deposited(address indexed user, address token, uint256 amount);
@@ -287,14 +308,69 @@ contract IbAlluo is
     function withdraw(address _targetToken, uint256 _amount) external {
         withdrawTo(_msgSender(), _targetToken, _amount);
     }
+    function _updateContext(Context memory context)
+        public pure
+        returns (bytes memory ctx)
+    {
+        uint256 callInfo = ContextDefinitions.encodeCallInfo(context.appLevel, context.callType);
+        uint256 allowanceIO =
+            uint128(context.appAllowanceGranted)|
+            (uint256(uint128(context.appAllowanceWanted)) << 128);
+        // NOTE: nested encoding done due to stack too deep error when decoding in _decodeCtx
+        ctx = abi.encode(
+            abi.encode(
+                callInfo,
+                context.timestamp,
+                context.msgSender,
+                context.agreementSelector,
+                context.userData
+            ),
+            abi.encode(
+                allowanceIO,
+                context.appAllowanceUsed,
+                context.appAddress,
+                context.appAllowanceToken
+            )
+        );
+    }
+    function createFlow(address receiver, int96 flowRate, uint256 toWrap) external {
+        _transfer(msg.sender, superToken, toWrap);
+        IAlluoSuperToken(superToken).alluoDeposit(msg.sender , toWrap);
+        cfaV1Lib.createFlowByOperator( msg.sender, receiver, ISuperfluidToken(superToken),flowRate);
+    }
+    function deleteFlow(address receiver) external {
+        cfaV1Lib.deleteFlowByOperator(msg.sender, receiver, ISuperfluidToken(superToken));
+    }
+    function updateFlow(address receiver, int96 flowRate, uint256 toWrap) external {
+        _transfer(msg.sender, superToken, toWrap);
+        IAlluoSuperToken(superToken).alluoDeposit(msg.sender , toWrap);
+        cfaV1Lib.updateFlowByOperator(msg.sender, receiver,  ISuperfluidToken(superToken),flowRate);
+    }
 
-    function createFlow(address receiver, uint256 flowRate, address agreement) external view returns (bytes memory) {
-        address host = IAlluoSuperToken(superToken).getHost();
+
+    function formatPermissions() public view returns (bytes memory) {
+         return abi.encodeCall(
+                cfaV1Lib.cfa.authorizeFlowOperatorWithFullControl,
+                (
+                    ISuperfluidToken(superToken),
+                    address(this),
+                    new bytes(0)
+                )
+            );
+    }
+ 
+    function formatFlow(address receiver, int96 flowRate, address agreement) external view returns (bytes memory) {
         IConstantFlowAgreementV1 superAgreement = IConstantFlowAgreementV1(agreement);
         return abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0));
     }
 
-  
+    function setCFA() external {
+        ISuperfluid host = ISuperfluid(IAlluoSuperToken(superToken).getHost());
+        cfaV1Lib = CFAv1Library.InitData(
+            host,
+            IConstantFlowAgreementV1(address(host.getAgreementClass(CFA_ID)))
+        );
+    }
     /**
      * @dev See {IERC20-transfer}.
      *
@@ -554,7 +630,7 @@ contract IbAlluo is
         uint256 amount
     ) internal override {
         if (amount > balanceOf(from)) {
-            IAlluoSuperToken(superToken).alluoWithdraw(from, amount - balanceOf(from));
+            IAlluoSuperToken(superToken).operatorBurn(from, amount - balanceOf(from), "", "");
         }
         super._transfer(from, to, amount);
     }
@@ -562,7 +638,7 @@ contract IbAlluo is
     function _burn(address account, uint256 amount) internal override {
          // Calculations for superfluid.
         if (amount > balanceOf(account)) {
-            IAlluoSuperToken(superToken).alluoWithdraw(account, amount - balanceOf(account));
+            IAlluoSuperToken(superToken).operatorBurn(account, amount - balanceOf(account), "", "");
         }
         super._burn(account, amount);
     }

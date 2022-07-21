@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPLv3
 pragma solidity ^0.8.11;
 
-import { ISuperfluid } from "../../interfaces/superfluid/ISuperfluid.sol";
+import { ISuperfluid, IERC20} from "../../interfaces/superfluid/ISuperfluid.sol";
 import { ISuperAgreement } from "../../interfaces/superfluid/ISuperAgreement.sol";
 import { ISuperfluidGovernance } from "../../interfaces/superfluid/ISuperfluidGovernance.sol";
 import { ISuperfluidToken } from "../../interfaces/superfluid/ISuperfluidToken.sol";
@@ -9,6 +9,8 @@ import { ISuperfluidToken } from "../../interfaces/superfluid/ISuperfluidToken.s
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { EventsEmitter } from "./libs/EventsEmitter.sol";
 import { FixedSizeData } from "./libs/FixedSizeData.sol";
+
+import "hardhat/console.sol";
 
 /**
  * @title Superfluid's token implementation
@@ -50,21 +52,28 @@ abstract contract AlluoSuperfluidToken is ISuperfluidToken
     uint256 private _reserve12;
     uint256 internal _reserve13;
 
+    IERC20 public _underlying;
+
     // constructor(
     //     ISuperfluid host
     // ) {
     //     _host = host;
     // }
 
-    /// @dev ISuperfluidToken.getHost implementation
+    struct FlowData {
+        uint256 timestamp; // stored as uint32
+        int96 flowRate; // stored also as int96
+        uint256 deposit; // stored as int96 with lower 32 bits clipped to 0
+        uint256 owedDeposit; // stored as int96 with lower 32 bits clipped to 0
+    }
+     /// @dev ISuperfluidToken.getHost implementation
+     
     function getHost()
        external view
-       override(ISuperfluidToken)
        returns(address host)
     {
        return address(_host);
     }
-
     /**************************************************************************
      * Real-time balance functions
      *************************************************************************/
@@ -284,7 +293,7 @@ abstract contract AlluoSuperfluidToken is ISuperfluidToken
         uint256 slotId,
         bytes32[] calldata slotData
     )
-        external override
+        public override virtual
     {
         bytes32 slot = keccak256(abi.encode("AgreementState", msg.sender, account, slotId));
         FixedSizeData.storeData(slot, slotData);
