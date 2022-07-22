@@ -308,39 +308,28 @@ contract IbAlluo is
     function withdraw(address _targetToken, uint256 _amount) external {
         withdrawTo(_msgSender(), _targetToken, _amount);
     }
-    function _updateContext(Context memory context)
-        public pure
-        returns (bytes memory ctx)
-    {
-        uint256 callInfo = ContextDefinitions.encodeCallInfo(context.appLevel, context.callType);
-        uint256 allowanceIO =
-            uint128(context.appAllowanceGranted)|
-            (uint256(uint128(context.appAllowanceWanted)) << 128);
-        // NOTE: nested encoding done due to stack too deep error when decoding in _decodeCtx
-        ctx = abi.encode(
-            abi.encode(
-                callInfo,
-                context.timestamp,
-                context.msgSender,
-                context.agreementSelector,
-                context.userData
-            ),
-            abi.encode(
-                allowanceIO,
-                context.appAllowanceUsed,
-                context.appAddress,
-                context.appAllowanceToken
-            )
-        );
-    }
+    /// @notice Wraps and creates flow 
+    /// @dev Forces transfer of ibAlluo to the StIbAlluo contract then mints StIbAlluos to circumvent having to sign multiple transactions to create streams
+    /// @param receiver The recipient of the streamed flow
+    /// @param flowRate The amount of ibAlluos per second to be streamed (decimals 10**18)
+    /// @param toWrap The amount of ibAlluos to automatically wrap (recommend wrapping entire ibALluo balance initially)
     function createFlow(address receiver, int96 flowRate, uint256 toWrap) external {
         _transfer(msg.sender, superToken, toWrap);
         IAlluoSuperToken(superToken).alluoDeposit(msg.sender , toWrap);
         cfaV1Lib.createFlowByOperator( msg.sender, receiver, ISuperfluidToken(superToken),flowRate);
     }
+
+    /// @notice Deletes the flow
+    /// @dev Deletes an existing stream
+    /// @param receiver The recipient of the streamed flow
     function deleteFlow(address receiver) external {
         cfaV1Lib.deleteFlowByOperator(msg.sender, receiver, ISuperfluidToken(superToken));
     }
+    /// @notice Wraps and updates flow
+    /// @dev Wraps an amount of tokens (not necessary!) and updates the flow rate.
+    /// @param receiver The recipient of the streamed flow
+    /// @param flowRate The new amount of ibAlluos per second to be streamed (decimals 10**18)
+    /// @param toWrap The amount of ibAlluos to automatically wrap (recommend wrapping entire ibALluo balance)
     function updateFlow(address receiver, int96 flowRate, uint256 toWrap) external {
         _transfer(msg.sender, superToken, toWrap);
         IAlluoSuperToken(superToken).alluoDeposit(msg.sender , toWrap);
@@ -348,6 +337,8 @@ contract IbAlluo is
     }
 
 
+    /// @notice Formats permissios so users can approve the ibAlluo contract as an operator of streams
+    /// @dev This can be removed once the frontend hardcodes the function call / does it inside ethers.js.
     function formatPermissions() public view returns (bytes memory) {
          return abi.encodeCall(
                 cfaV1Lib.cfa.authorizeFlowOperatorWithFullControl,
@@ -359,11 +350,17 @@ contract IbAlluo is
             );
     }
  
+ 
+    /// @notice Formats the function call needed to create flow directly through superfluid
+    /// @dev This can be removed once the frontend hardcodes the function call / does it inside ethers.js.
+    /// Also, this function is only used when calling superfluid directly, and NOT createFlow().
     function formatFlow(address receiver, int96 flowRate, address agreement) external view returns (bytes memory) {
         IConstantFlowAgreementV1 superAgreement = IConstantFlowAgreementV1(agreement);
         return abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0));
     }
 
+    /// @notice Initialises the superfluid CFA library;
+    /// @dev Necessary as we need to upgrade contracts. We can add it to the initializer if we ever redeploy the contracts.
     function setCFA() external {
         ISuperfluid host = ISuperfluid(IAlluoSuperToken(superToken).getHost());
         cfaV1Lib = CFAv1Library.InitData(
