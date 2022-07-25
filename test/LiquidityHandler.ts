@@ -343,13 +343,6 @@ describe("Handler and different adapters", function () {
         await ibAlluoUsd.connect(admin).setSuperToken(StIbAlluoUsd.address);
         await ibAlluoEur.connect(admin).setSuperToken(StIbAlluoEur.address);
         await ibAlluoEth.connect(admin).setSuperToken(StIbAlluoEth.address);
-
-
-        await ibAlluoUsd.setCFA();
-        await ibAlluoEur.setCFA();
-        await ibAlluoBtc.setCFA();
-        await ibAlluoEth.setCFA();
-
     });
 
 

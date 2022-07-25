@@ -381,15 +381,6 @@ contract IbAlluo is
         return abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0));
     }
 
-    /// @notice Initialises the superfluid CFA library;
-    /// @dev Necessary as we need to upgrade contracts. We can add it to the initializer if we ever redeploy the contracts.
-    function setCFA() external {
-        ISuperfluid host = ISuperfluid(IAlluoSuperToken(superToken).getHost());
-        cfaV1Lib = CFAv1Library.InitData(
-            host,
-            IConstantFlowAgreementV1(address(host.getAgreementClass(CFA_ID)))
-        );
-    }
     /**
      * @dev See {IERC20-transfer}.
      *
@@ -445,14 +436,15 @@ contract IbAlluo is
     /// @notice  Returns balance in asset value
     /// @param _address address of user
 
-    function getBalance(address _address) public view returns (uint256) {
+    function getBalance(address _address) public view returns (int256) {
         uint256 _growingRatio = changeRatio(
             growingRatio,
             interestPerSecond,
             lastInterestCompound
         );
-        uint256 fullBalance = balanceOf(_address) + IAlluoSuperToken(superToken).balanceOf(_address);
-        return (fullBalance* _growingRatio) / multiplier;
+        (int256 StIbAlluoBalance,,,) = IAlluoSuperToken(superToken).realtimeBalanceOfNow(_address);
+        int256 fullBalance = int256(balanceOf(_address)) + StIbAlluoBalance;
+        return (fullBalance * int256(_growingRatio) / int256(multiplier));
     }
 
     /// @notice  Returns balance in asset value with correct info from update
@@ -461,9 +453,10 @@ contract IbAlluo is
     function getBalanceForTransfer(address _address)
         public
         view
-        returns (uint256)
+        returns (int256)
     {
-        uint256 fullBalance = balanceOf(_address) + IAlluoSuperToken(superToken).balanceOf(_address);
+        (int256 StIbAlluoBalance,,,) = IAlluoSuperToken(superToken).realtimeBalanceOfNow(_address);
+        int256 fullBalance = int256(balanceOf(_address)) + StIbAlluoBalance;
         if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
             uint256 _growingRatio = changeRatio(
                 growingRatio,
@@ -471,9 +464,9 @@ contract IbAlluo is
                 lastInterestCompound
             );
             
-            return (fullBalance * _growingRatio) / multiplier;
+            return (fullBalance * int256(_growingRatio) / int256(multiplier));
         } else {
-            return (fullBalance * growingRatio) / multiplier;
+            return (fullBalance * int256(growingRatio) / int256(multiplier));
         }
     }
 
@@ -615,6 +608,11 @@ contract IbAlluo is
 
     function setSuperToken(address _superToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
         superToken = _superToken;
+        ISuperfluid host = ISuperfluid(IAlluoSuperToken(superToken).getHost());
+        cfaV1Lib = CFAv1Library.InitData(
+            host,
+            IConstantFlowAgreementV1(address(host.getAgreementClass(CFA_ID)))
+        );
     }
 
     function changeUpgradeStatus(bool _status)

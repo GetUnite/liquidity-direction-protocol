@@ -181,7 +181,6 @@ describe("IbAlluoUSD and Handler", function () {
         let calldata = iface.encodeFunctionData("setSuperToken", [StIbAlluo.address]);
 
         await multisig.executeCall(ibAlluoCurrent.address, calldata);
-        await ibAlluoCurrent.setCFA();
     });
 
     describe('All IbAlluo tests with StIbAlluo integration', function () {
@@ -206,7 +205,6 @@ describe("IbAlluoUSD and Handler", function () {
                 encodeData,
                 "0x"
             )
-            await ibAlluoCurrent.connect(signers[1]).increaseAllowance(ibAlluoCurrent.address, parseEther("10000"))
             await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
 
             await skipDays(1)
@@ -224,7 +222,6 @@ describe("IbAlluoUSD and Handler", function () {
                 encodeData,
                 "0x"
             )
-            await ibAlluoCurrent.connect(signers[1]).increaseAllowance(ibAlluoCurrent.address, parseEther("10000"))
             await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
 
             await skipDays(1)
@@ -248,7 +245,6 @@ describe("IbAlluoUSD and Handler", function () {
                 encodeData,
                 "0x"
             )
-            await ibAlluoCurrent.connect(signers[1]).increaseAllowance(ibAlluoCurrent.address, parseEther("10000"))
             await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
 
             await skipDays(1)
