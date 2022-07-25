@@ -113,6 +113,25 @@ contract IbAlluo is
         uint256 growingRatio
     );
 
+    event CreateFlow(
+        address indexed from,
+        address indexed to,
+        int96 amountPerSecond
+    );
+
+    event UpdatedFlow(
+        address indexed from,
+        address indexed to,
+        int96 amountPerSecond
+    );
+
+    event DeletedFlow(
+        address indexed from,
+        address indexed to
+    );
+
+
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
@@ -317,6 +336,7 @@ contract IbAlluo is
         _transfer(msg.sender, superToken, toWrap);
         IAlluoSuperToken(superToken).alluoDeposit(msg.sender , toWrap);
         cfaV1Lib.createFlowByOperator( msg.sender, receiver, ISuperfluidToken(superToken),flowRate);
+        emit CreateFlow(msg.sender, receiver, flowRate);
     }
 
     /// @notice Deletes the flow
@@ -324,6 +344,7 @@ contract IbAlluo is
     /// @param receiver The recipient of the streamed flow
     function deleteFlow(address receiver) external {
         cfaV1Lib.deleteFlowByOperator(msg.sender, receiver, ISuperfluidToken(superToken));
+        emit DeletedFlow(msg.sender, receiver);
     }
     /// @notice Wraps and updates flow
     /// @dev Wraps an amount of tokens (not necessary!) and updates the flow rate.
@@ -334,6 +355,7 @@ contract IbAlluo is
         _transfer(msg.sender, superToken, toWrap);
         IAlluoSuperToken(superToken).alluoDeposit(msg.sender , toWrap);
         cfaV1Lib.updateFlowByOperator(msg.sender, receiver,  ISuperfluidToken(superToken),flowRate);
+        emit UpdatedFlow(msg.sender, receiver, flowRate);
     }
 
 

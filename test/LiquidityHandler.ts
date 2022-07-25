@@ -305,7 +305,7 @@ describe("Handler and different adapters", function () {
         const StIbAlluoFactory = await ethers.getContractFactory("StIbAlluo") as StIbAlluo__factory;
 
         StIbAlluoUsd = await upgrades.deployProxy(StIbAlluoFactory,
-            [ibAlluoUsd.address, 18, "Streaming IbAlluo USD", "StIbAlluoUSD", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", [ibAlluoUsd.address]
+            [ibAlluoUsd.address, 18, "Streaming IbAlluo USD", "StIbAlluoUSD", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", admin.address,[ibAlluoUsd.address]
             ], {
                 initializer: 'alluoInitialize',
                 kind: 'uups'
@@ -313,7 +313,7 @@ describe("Handler and different adapters", function () {
         ) as StIbAlluo;
 
         StIbAlluoEth = await upgrades.deployProxy(StIbAlluoFactory,
-            [ibAlluoEth.address, 18, "Streaming IbAlluo ETH", "StIbAlluoEth", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", [ibAlluoEth.address]
+            [ibAlluoEth.address, 18, "Streaming IbAlluo ETH", "StIbAlluoEth", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7",admin.address, [ibAlluoEth.address]
             ], {
                 initializer: 'alluoInitialize',
                 kind: 'uups'
@@ -322,7 +322,7 @@ describe("Handler and different adapters", function () {
 
 
         StIbAlluoEur = await upgrades.deployProxy(StIbAlluoFactory,
-            [ibAlluoEur.address, 18, "Streaming IbAlluo Eur", "StIbAlluoEUR", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", [ibAlluoEur.address]
+            [ibAlluoEur.address, 18, "Streaming IbAlluo Eur", "StIbAlluoEUR", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", admin.address,[ibAlluoEur.address]
             ], {
                 initializer: 'alluoInitialize',
                 kind: 'uups'
@@ -331,7 +331,7 @@ describe("Handler and different adapters", function () {
 
 
         StIbAlluoBtc = await upgrades.deployProxy(StIbAlluoFactory,
-            [ibAlluoBtc.address, 18, "Streaming IbAlluo Btc", "StIbAlluoBTC", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", [ibAlluoBtc.address]
+            [ibAlluoBtc.address, 18, "Streaming IbAlluo Btc", "StIbAlluoBTC", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", admin.address,[ibAlluoBtc.address]
             ], {
                 initializer: 'alluoInitialize',
                 kind: 'uups'

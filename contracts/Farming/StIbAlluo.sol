@@ -109,6 +109,7 @@ contract StIbAlluo is
         string calldata n,
         string calldata s,
         address host,
+        address multisig,
         address[] memory operators
     )
         external 
@@ -123,7 +124,7 @@ contract StIbAlluo is
         _symbol = s;
 
         _grantRole(DEFAULT_ADMIN_ROLE, underlyingToken);
-        
+        _grantRole(DEFAULT_ADMIN_ROLE, multisig);
         // register interfaces
         ERC777Helper.register(address(this));
         _setupDefaultOperators(operators);
@@ -140,7 +141,12 @@ contract StIbAlluo is
      *************************************************************************/
     // //@dev Alluo custom functions"
 
-    function alluoDeposit(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    /// @notice Function that allows minting of StIbAlluos only by the underlying contract
+    /// @dev This is used when we want to force upgrade ibAlluos so that we can avoid the user needing to sign 3 transactions to create a flow.
+    /// @param account Address of account to mint to
+    /// @param amount Amount of StIbAlluos to mint
+    function alluoDeposit(address account, uint256 amount) external {
+        require(msg.sender ==  address(_underlyingToken));
         (, uint256 adjustedAmount) = _toUnderlyingAmount(amount);
         // Tokens are already received
         _mint(account, account, adjustedAmount, account != account, "", "");

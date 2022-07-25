@@ -169,7 +169,7 @@ describe("IbAlluoUSD and Handler", function () {
         const StIbAlluoFactory = await ethers.getContractFactory("StIbAlluo") as StIbAlluo__factory;
 
         StIbAlluo = await upgrades.deployProxy(StIbAlluoFactory,
-            [ibAlluoCurrent.address, 18, "Streaming IbAlluo USD", "StIbAlluoUSD", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", [ibAlluoCurrent.address]
+            [ibAlluoCurrent.address, 18, "Streaming IbAlluo USD", "StIbAlluoUSD", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", multisig.address, [ibAlluoCurrent.address]
             ], {
                 initializer: 'alluoInitialize',
                 kind: 'uups'
@@ -184,7 +184,18 @@ describe("IbAlluoUSD and Handler", function () {
         await ibAlluoCurrent.setCFA();
     });
 
-    describe('Handler integration with IbAlluo', function () {
+    describe('All IbAlluo tests with StIbAlluo integration', function () {
+        it("Test upgradeability of original ibAlluo contract", async function() {
+
+            let ibAlluoCurrentUsd = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
+            await ibAlluoCurrentUsd.connect(admin).grantRole("0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3", "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266")
+            await ibAlluoCurrentUsd.connect(admin).changeUpgradeStatus(true);
+
+            const IbAlluoNew = await ethers.getContractFactory("IbAlluo");
+            let IbAlluoUsd = await upgrades.forceImport("0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6", IbAlluoNew);
+            await upgrades.upgradeProxy(IbAlluoUsd.address, IbAlluoNew);
+            console.log("Upgrade complete")
+        })
         it("Create flow through contract", async function() {
             await deposit(signers[1], dai, parseUnits("10000", 18));
             let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
