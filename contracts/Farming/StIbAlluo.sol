@@ -153,6 +153,14 @@ contract StIbAlluo is
         emit TokenUpgraded(account, adjustedAmount);
     }
 
+    /// @notice Force unwraps tokens to ibAlluos
+    /// @dev Backdoor to unwrap user tokens. Unlikely to be ever used and no risk of losing user tokens.
+    /// @param account Address of account to unwrap.
+    /// @param amount Amount of StIbAlluos to unwrap.
+    function alluoWithdraw(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _downgrade(account, account, amount, "","");
+    }
+
     /**************************************************************************
      * ERC20 Token Info
      *************************************************************************/
