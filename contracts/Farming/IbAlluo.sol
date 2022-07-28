@@ -36,7 +36,7 @@ contract IbAlluo is
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
     using CFAv1Library for CFAv1Library.InitData;
-
+    
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     // variable which grow after any action from user
@@ -327,6 +327,8 @@ contract IbAlluo is
     function withdraw(address _targetToken, uint256 _amount) external {
         withdrawTo(_msgSender(), _targetToken, _amount);
     }
+
+
     /// @notice Wraps and creates flow 
     /// @dev Forces transfer of ibAlluo to the StIbAlluo contract then mints StIbAlluos to circumvent having to sign multiple transactions to create streams
     /// @param receiver The recipient of the streamed flow
@@ -335,7 +337,7 @@ contract IbAlluo is
     function createFlow(address receiver, int96 flowRate, uint256 toWrap) external {
         _transfer(msg.sender, superToken, toWrap);
         IAlluoSuperToken(superToken).alluoDeposit(msg.sender , toWrap);
-        cfaV1Lib.createFlowByOperator( msg.sender, receiver, ISuperfluidToken(superToken),flowRate);
+        cfaV1Lib.createFlowByOperator( msg.sender, receiver, ISuperfluidToken(superToken), flowRate);
         emit CreateFlow(msg.sender, receiver, flowRate);
     }
 
@@ -358,6 +360,9 @@ contract IbAlluo is
         emit UpdatedFlow(msg.sender, receiver, flowRate);
     }
 
+    function pauseFlow(address sender, address receiver) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        cfaV1Lib.updateFlowByOperator(sender, receiver,  ISuperfluidToken(superToken),0);
+    }
 
     /// @notice Formats permissios so users can approve the ibAlluo contract as an operator of streams
     /// @dev This can be removed once the frontend hardcodes the function call / does it inside ethers.js.
