@@ -5,31 +5,7 @@ import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
 import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory } from "../typechain";
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-async function skipDays(d: number) {
-    ethers.provider.send('evm_increaseTime', [d * 86400]);
-    ethers.provider.send('evm_mine', []);
-}
 
-function getRandomArbitrary(min: number, max: number) {
-    return Math.floor(Math.random() * (max - min) + min);
-}
-
-async function prepareCallData(type: string, parameters: any[]): Promise < BytesLike > {
-    if (type == "status") {
-        let ABI = ["function changeUpgradeStatus(bool _status)"];
-        let iface = new ethers.utils.Interface(ABI);
-        let calldata = iface.encodeFunctionData("changeUpgradeStatus", [parameters[0]]);
-        return calldata;
-    } else if (type == "role") {
-        let ABI = ["function grantRole(bytes32 role, address account)"];
-        let iface = new ethers.utils.Interface(ABI);
-        let calldata = iface.encodeFunctionData("grantRole", [parameters[0], parameters[1]]);
-        return calldata;
-    } else {
-        return ethers.utils.randomBytes(0);
-    }
-}
 async function getLastWithdrawalInfo(token: IbAlluo, handler: LiquidityHandler) {
     let request = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastWithdrawalRequest
     let satisfied = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastSatisfiedWithdrawal
@@ -58,7 +34,7 @@ async function sendEth(users: SignerWithAddress[]) {
     }
 }
 
-describe("IbAlluo and handler", function () {
+describe("Handler and different adapters", function () {
     let signers: SignerWithAddress[];
     let admin: SignerWithAddress;
 
@@ -72,7 +48,6 @@ describe("IbAlluo and handler", function () {
     let ethAdapter: EthNoPoolAdapter;
     let btcAdapter: BtcCurveAdapter;
 
-    let multisig: PseudoMultisigWallet;
     let handler: LiquidityHandler;
 
     let dai: IERC20, usdc: IERC20, usdt: IERC20;
@@ -167,11 +142,9 @@ describe("IbAlluo and handler", function () {
 
 
     beforeEach(async function () {
-        const exchangeAddress = ZERO_ADDRESS; // Temp for polygon
+        const exchangeAddress = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773"; 
         const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
         //We are using this contract to simulate Gnosis multisig wallet
-        const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
-        multisig = await Multisig.deploy(true);
 
         const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
         // Temp values for exchange stuff.
@@ -308,7 +281,8 @@ describe("IbAlluo and handler", function () {
                 ],
                 BigNumber.from("100000000470636740"),
                 1600,
-                "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8"
+                "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
+                exchangeAddress
             ], {
                 initializer: 'initialize',
                 kind: 'uups'
