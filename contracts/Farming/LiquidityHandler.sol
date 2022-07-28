@@ -491,6 +491,21 @@ contract LiquidityHandler is
         return ibAlluoToWithdrawalSystems[_ibAlluo].withdrawals[_id];
     }
 
+    function isUserWaiting(address _ibAlluo, address _user) external view returns(bool){
+        WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[_ibAlluo];
+        uint256 lastWithdrawalRequest = withdrawalSystem.lastWithdrawalRequest;
+        uint256 lastSatisfiedWithdrawal = withdrawalSystem.lastSatisfiedWithdrawal;
+        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
+            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
+                if(withdrawalSystem.withdrawals[i].user == _user){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+
     /* ========== ADMIN CONFIGURATION ========== */
 
     function setIbAlluoToAdapterId(address _ibAlluo, uint256 _adapterId)
