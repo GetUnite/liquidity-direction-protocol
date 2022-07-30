@@ -1,7 +1,7 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { constants } from "ethers";
-import { formatUnits } from "ethers/lib/utils";
+import { BigNumberish, constants } from "ethers";
+import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { ethers, network } from "hardhat";
 import { ChainlinkFeedStrategy, CurvePoolReferenceFeedStrategy, IERC20Metadata, IFeedStrategy, PriceFeedRouter } from "../typechain";
 import { CurvePoolReferenceFeedStrategyInterface } from "../typechain/CurvePoolReferenceFeedStrategy";
@@ -20,7 +20,7 @@ describe("Price Feed Router", function () {
     }
     type CurveRoute = {
         outIndex: number,
-        outDecimals: number,
+        oneTokenAmount: BigNumberish,
         coin: string,
         strategy?: CurvePoolReferenceFeedStrategy
     }
@@ -38,7 +38,7 @@ describe("Price Feed Router", function () {
 
     const curvePoolAddress = "0xAd326c253A84e9805559b73A08724e11E49ca651";
     const curveReferenceCoinIndex = 3; // EURT index in pool ^
-    const curveReferenceCoinOne = 1000000; // 1.0 EURT with decimals
+    const curveReferenceCoinDecimals = 6; // 1.0 EURT with decimals
 
     before(async function () {
         await network.provider.request({
@@ -119,18 +119,18 @@ describe("Price Feed Router", function () {
             {
                 // jEUR
                 coin: jeur.address,
-                outDecimals: await jeur.decimals(),
+                oneTokenAmount: parseUnits("1.0", await jeur.decimals()),
                 outIndex: 0
             },
             {
                 // PAR
                 coin: par.address,
-                outDecimals: await par.decimals(),
+                oneTokenAmount: parseUnits("1.0", await par.decimals()),
                 outIndex: 1
             }, {
                 // EURS
                 coin: eurs.address,
-                outDecimals: await eurs.decimals(),
+                oneTokenAmount: parseUnits("1.0", await eurs.decimals()),
                 outIndex: 2
             },
         ]
@@ -204,8 +204,8 @@ describe("Price Feed Router", function () {
                 curvePoolAddress,
                 curveReferenceCoinIndex,
                 curveRoute.outIndex,
-                curveRoute.outDecimals,
-                curveReferenceCoinOne
+                curveReferenceCoinDecimals,
+                curveRoute.oneTokenAmount
             );
 
             await router.setCrytoStrategy(curveStrategy.address, curveRoute.coin);
@@ -242,8 +242,8 @@ describe("Price Feed Router", function () {
                     curvePoolAddress,
                     curveReferenceCoinIndex,
                     element.outIndex,
-                    element.outDecimals,
-                    curveReferenceCoinOne
+                    curveReferenceCoinDecimals,
+                    element.oneTokenAmount
                 )
                 element.strategy = strategy;
                 await router.setCrytoStrategy(strategy.address, element.coin);
@@ -279,8 +279,8 @@ describe("Price Feed Router", function () {
                 expect(await strategy?.curvePool()).to.be.equal(curvePoolAddress);
                 expect(await strategy?.referenceCoinIndex()).to.be.equal(curveReferenceCoinIndex);
                 expect(await strategy?.outputCoinIndex()).to.be.equal(element.outIndex);
-                expect(await strategy?.outputCoinDecimals()).to.be.equal(element.outDecimals);
-                expect(await strategy?.oneToken()).to.be.equal(curveReferenceCoinOne);
+                expect(await strategy?.inputCoinDecimals()).to.be.equal(curveReferenceCoinDecimals);
+                expect(await strategy?.oneToken()).to.be.equal(element.oneTokenAmount);
             }
         })
 
