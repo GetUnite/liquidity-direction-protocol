@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 contract PseudoMultisigWallet {
     using Address for address;
+    address[] public owners;
 
     constructor(bool _isFork) {
         uint256 id;
@@ -28,5 +29,13 @@ contract PseudoMultisigWallet {
         returns (bytes memory)
     {
         return destination.functionCall(_calldata);
+    }
+
+    function addOwners(address _newOwner) external {
+        owners.push(_newOwner);
+    }
+    
+    function getOwners() external view returns (address[] memory) {
+        return owners;
     }
 }

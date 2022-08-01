@@ -32,6 +32,8 @@ interface IIbAlluo is IERC20, IAccessControl{
   function updateRatio (  ) external;
   function updateTimeLimit (  ) external view returns ( uint256 );
   function upgradeStatus (  ) external view returns ( bool );
-  function withdraw ( address _targetToken, uint256 _amount ) external;
+  function withdraw ( address _targetToken, uint256 _amount ) external; 
   function withdrawTo ( address _recipient, address _targetToken, uint256 _amount ) external;
+  function symbol (  ) external view returns ( string memory symbol );
+
 }
