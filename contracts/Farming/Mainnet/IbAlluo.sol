@@ -48,7 +48,6 @@ contract IbAlluo is
     uint256 public annualInterest;
 
     // contract that will distribute money between the pool and the wallet
-    /// @custom:oz-renamed-from liquidityBuffer
     address public liquidityHandler;
 
     // flag for upgrades availability
@@ -231,7 +230,7 @@ contract IbAlluo is
     /// @dev When called, immediately check for new interest index. Then find the adjusted amount in IbAlluo tokens
     ///      Then burn appropriate amount of IbAlluo tokens to receive asset token
     /// @param _targetToken Asset token
-    /// @param _amount Amount (parsed 10**18) in ibAlluo****
+    /// @param _amount Amount (parsed 10**18) in asset value
 
     function withdrawTo(
         address _recipient,
@@ -274,6 +273,49 @@ contract IbAlluo is
         withdrawTo(msg.sender, _targetToken, _amount);
     }
 
+    /// @notice  Withdraws accuratel
+    /// @param _targetToken Asset token
+    /// @param _amount Amount (parsed 10**18) in ibAlluo**** value
+
+    function withdrawTokenValueTo(
+        address _recipient,
+        address _targetToken,
+        uint256 _amount
+    ) public {
+        _burn(msg.sender, _amount);
+        updateRatio();
+        uint256 assetAmount = (_amount * growingRatio) / multiplier;
+
+        ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
+        if (supportedTokens.contains(_targetToken) == false) {
+            (address liquidToken,) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
+            // This just is used to revert if there is no active route.
+            require(IExchange(exchangeAddress).buildRoute(liquidToken, _targetToken).length > 0, "!Supported");
+            handler.withdraw(
+            _recipient,
+            liquidToken,
+            assetAmount,
+            _targetToken
+            );
+        } else {
+            handler.withdraw(
+            _recipient,
+            _targetToken,
+            assetAmount
+            );
+        }
+
+        emit TransferAssetValue(msg.sender, address(0), _amount, assetAmount, growingRatio);
+        emit BurnedForWithdraw(msg.sender, _amount);
+    }
+
+    /// @notice  Withdraws accuratel
+    /// @param _targetToken Asset token
+    /// @param _amount Amount of ibAlluos (10**18)
+
+    function withdrawTokenValue(address _targetToken, uint256 _amount) external {
+        withdrawTokenValueTo(msg.sender, _targetToken, _amount);
+    }
 
     /**
      * @dev See {IERC20-transfer}.
