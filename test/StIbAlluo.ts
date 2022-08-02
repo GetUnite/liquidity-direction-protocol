@@ -205,6 +205,9 @@ describe("IbAlluoUSD and Handler", function () {
                 encodeData,
                 "0x"
             )
+
+            console.log("encoded data", encodeData);
+
             await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
 
             await skipDays(1)
@@ -276,6 +279,7 @@ describe("IbAlluoUSD and Handler", function () {
             let CFA = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C");
 
             let encodeData = await ibAlluoCurrent.callStatic.formatFlow(signers[2].address, "1", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
+
 
             await superhost.connect(signers[1]).callAgreement(
                 "0x6EeE6060f715257b970700bc2656De21dEdF074C",

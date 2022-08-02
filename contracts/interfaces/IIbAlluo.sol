@@ -34,5 +34,7 @@ interface IIbAlluo is IERC20, IAccessControl{
   function upgradeStatus (  ) external view returns ( bool );
   function withdraw ( address _targetToken, uint256 _amount ) external;
   function withdrawTo ( address _recipient, address _targetToken, uint256 _amount ) external;
-  function pauseFlow(address sender, address receiver) external {
+  function stopFlowWhenCritical(address sender, address receiver) external;
+  function forceWrap(address sender) external;
+  function superToken() external view returns (address);
 }

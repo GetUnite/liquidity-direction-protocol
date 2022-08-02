@@ -11,6 +11,7 @@ import "../interfaces/superfluid/IConstantFlowAgreementV1.sol";
 import "../interfaces/superfluid/IInstantDistributionAgreementV1.sol";
 
 import "../interfaces/superfluid/IAlluoSuperToken.sol";
+import "../interfaces/ISuperfluidResolver.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -77,6 +78,8 @@ contract IbAlluo is
 
     CFAv1Library.InitData public cfaV1Lib;
     bytes32 public constant CFA_ID = keccak256("org.superfluid-finance.agreements.ConstantFlowAgreement.v1");
+
+    address public superfluidResolver;
 
     struct Context {
         uint8 appLevel;
@@ -338,6 +341,7 @@ contract IbAlluo is
         _transfer(msg.sender, superToken, toWrap);
         IAlluoSuperToken(superToken).alluoDeposit(msg.sender , toWrap);
         cfaV1Lib.createFlowByOperator( msg.sender, receiver, ISuperfluidToken(superToken), flowRate);
+        ISuperfluidResolver(superfluidResolver).addToChecker(msg.sender, receiver);
         emit CreateFlow(msg.sender, receiver, flowRate);
     }
 
@@ -346,6 +350,7 @@ contract IbAlluo is
     /// @param receiver The recipient of the streamed flow
     function deleteFlow(address receiver) external {
         cfaV1Lib.deleteFlowByOperator(msg.sender, receiver, ISuperfluidToken(superToken));
+        ISuperfluidResolver(superfluidResolver).removeFromChecker(msg.sender, receiver);
         emit DeletedFlow(msg.sender, receiver);
     }
     /// @notice Wraps and updates flow
@@ -360,8 +365,15 @@ contract IbAlluo is
         emit UpdatedFlow(msg.sender, receiver, flowRate);
     }
 
-    function pauseFlow(address sender, address receiver) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        cfaV1Lib.updateFlowByOperator(sender, receiver,  ISuperfluidToken(superToken),0);
+    function stopFlowWhenCritical(address sender, address receiver) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        cfaV1Lib.deleteFlowByOperator(sender, receiver, ISuperfluidToken(superToken));
+        emit DeletedFlow(sender, receiver);
+    }
+
+    function forceWrap(address sender) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 balance = balanceOf(address(sender));
+        _transfer(sender, superToken, balance);
+        IAlluoSuperToken(superToken).alluoDeposit(sender , balance);
     }
 
     /// @notice Formats permissios so users can approve the ibAlluo contract as an operator of streams
@@ -385,6 +397,7 @@ contract IbAlluo is
         IConstantFlowAgreementV1 superAgreement = IConstantFlowAgreementV1(agreement);
         return abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0));
     }
+
 
     /**
      * @dev See {IERC20-transfer}.
@@ -541,6 +554,11 @@ contract IbAlluo is
         uint256 assetValue = (amount * growingRatio) / multiplier;
         emit TransferAssetValue(_msgSender(), address(0), amount, assetValue, growingRatio);
     }
+
+    function setSuperfluidResolver(address _superfluidResolver) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        superfluidResolver = _superfluidResolver;
+    }
+
 
     /// @notice  Sets the new interest rate
     /// @dev When called, it sets the new interest rate after updating the index.
