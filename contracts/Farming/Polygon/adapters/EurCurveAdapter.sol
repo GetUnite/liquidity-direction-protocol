@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "../../interfaces/curve/ICurvePoolEUR.sol";
+import "../../../interfaces/curve/ICurvePoolEUR.sol";
 
 contract EurCurveAdapter is AccessControl {
     using Address for address;

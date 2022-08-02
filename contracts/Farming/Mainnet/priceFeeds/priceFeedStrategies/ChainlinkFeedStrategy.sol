@@ -2,7 +2,7 @@
 pragma solidity ^0.8.9;
 
 import "./../IFeedStrategy.sol";
-import "./../../../interfaces/IChainlinkPriceFeed.sol";
+import "./../../../../interfaces/IChainlinkPriceFeed.sol";
 
 contract ChainlinkFeedStrategy is IFeedStrategy {
     IChainlinkPriceFeed public immutable chainlinkFeed;

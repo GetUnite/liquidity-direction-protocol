@@ -11,9 +11,9 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeable.sol";
 
-import "../interfaces/IIbAlluo.sol";
-import "../interfaces/IHandlerAdapter.sol";
-import "../interfaces/IExchange.sol";
+import "../../interfaces/IIbAlluo.sol";
+import "../../interfaces/IHandlerAdapter.sol";
+import "../../interfaces/IExchange.sol";
 import "hardhat/console.sol";
 
 contract LiquidityHandler is

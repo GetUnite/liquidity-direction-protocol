@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../../interfaces/ILiquidityHandler.sol";
-import "../../interfaces/IIbAlluo.sol";
+import "../../../interfaces/ILiquidityHandler.sol";
+import "../../../interfaces/IIbAlluo.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract WithdrawalRequestResolver is AccessControl{

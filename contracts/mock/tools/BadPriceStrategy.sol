@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import "./../../Farming/priceFeeds/IFeedStrategy.sol";
+import "./../../Farming/Polygon/priceFeeds/IFeedStrategy.sol";
 
 contract BadPriceStrategy is IFeedStrategy {
     int256 private _value;
