@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.9;
 
 import "./AlluoERC20Upgradable.sol";
 import "../../interfaces/ILiquidityHandler.sol";
@@ -21,7 +21,6 @@ contract IbAlluo is
     AccessControlUpgradeable,
     UUPSUpgradeable,
     Interest
-    // ERC2771ContextUpgradeable(0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8) - injected in code directly
 {
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -57,9 +56,6 @@ contract IbAlluo is
 
     // list of tokens from which deposit available
     EnumerableSetUpgradeable.AddressSet private supportedTokens;
-
-    // trusted forwarder address, see EIP-2771
-    address public trustedForwarder;
     
     address public exchangeAddress;
 
@@ -95,7 +91,6 @@ contract IbAlluo is
         address[] memory _supportedTokens,
         uint256 _interestPerSecond,
         uint256 _annualInterest,
-        address _trustedForwarder,
         address _exchangeAddress
     ) public initializer {
         __ERC20_init(_name, _symbol);
@@ -122,7 +117,6 @@ contract IbAlluo is
         lastInterestCompound = block.timestamp;
         exchangeAddress = _exchangeAddress;
         liquidityHandler = _handler;
-        trustedForwarder = _trustedForwarder;
 
         emit NewHandlerSet(address(0), liquidityHandler);
     }
@@ -157,7 +151,7 @@ contract IbAlluo is
         whenNotPaused
         returns (bool)
     {
-        address owner = _msgSender();
+        address owner = msg.sender;
         updateRatio();
         uint256 adjustedAmount = (amount * multiplier) / growingRatio;
         _approve(owner, spender, adjustedAmount);
@@ -173,7 +167,7 @@ contract IbAlluo is
         whenNotPaused
         returns (bool)
     {
-        address owner = _msgSender();
+        address owner = msg.sender;
         updateRatio();
         uint256 adjustedAmount = (amount * multiplier) / growingRatio;
         _transfer(owner, to, adjustedAmount);
@@ -196,7 +190,7 @@ contract IbAlluo is
         address to,
         uint256 amount
     ) public whenNotPaused returns (bool) {
-        address spender = _msgSender();
+        address spender = msg.sender;
         updateRatio();
         uint256 adjustedAmount = (amount * multiplier) / growingRatio;
         _spendAllowance(from, spender, adjustedAmount);
@@ -215,22 +209,22 @@ contract IbAlluo is
         // The main token is the one which isn't converted to primary tokens.
         // Small issue with deposits and withdrawals though. Need to approve.
         if (supportedTokens.contains(_token) == false) {
-            IERC20Upgradeable(_token).safeTransferFrom(_msgSender(), address(this), _amount);
+            IERC20Upgradeable(_token).safeTransferFrom(msg.sender, address(this), _amount);
             (, address primaryToken) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
             IERC20Upgradeable(_token).safeIncreaseAllowance(exchangeAddress, _amount);
             _amount = IExchange(exchangeAddress).exchange(_token, primaryToken, _amount, 0);
             _token = primaryToken;
             IERC20Upgradeable(primaryToken).safeTransfer(address(liquidityHandler), _amount);
         } else {
-            IERC20Upgradeable(_token).safeTransferFrom(_msgSender(),address(liquidityHandler),_amount);
+            IERC20Upgradeable(_token).safeTransferFrom(msg.sender,address(liquidityHandler),_amount);
         }
         updateRatio();
         ILiquidityHandler(liquidityHandler).deposit(_token, _amount);
         uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = (amountIn18 * multiplier) / growingRatio;
-        _mint(_msgSender(), adjustedAmount);
-        emit TransferAssetValue(address(0), _msgSender(), adjustedAmount, amountIn18, growingRatio);
-        emit Deposited(_msgSender(), _token, _amount);
+        _mint(msg.sender, adjustedAmount);
+        emit TransferAssetValue(address(0), msg.sender, adjustedAmount, amountIn18, growingRatio);
+        emit Deposited(msg.sender, _token, _amount);
     }
 
     /// @notice  Withdraws accuratel
@@ -246,7 +240,7 @@ contract IbAlluo is
     ) public {
         updateRatio();
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
-        _burn(_msgSender(), adjustedAmount);
+        _burn(msg.sender, adjustedAmount);
         ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
         if (supportedTokens.contains(_targetToken) == false) {
             (address liquidToken,) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
@@ -266,8 +260,8 @@ contract IbAlluo is
             );
         }
 
-        emit TransferAssetValue(_msgSender(), address(0), adjustedAmount, _amount, growingRatio);
-        emit BurnedForWithdraw(_msgSender(), adjustedAmount);
+        emit TransferAssetValue(msg.sender, address(0), adjustedAmount, _amount, growingRatio);
+        emit BurnedForWithdraw(msg.sender, adjustedAmount);
     }
 
     /// @notice  Withdraws accuratel
@@ -277,7 +271,7 @@ contract IbAlluo is
     /// @param _amount Amount (parsed 10**18)
 
     function withdraw(address _targetToken, uint256 _amount) external {
-        withdrawTo(_msgSender(), _targetToken, _amount);
+        withdrawTo(msg.sender, _targetToken, _amount);
     }
 
 
@@ -290,7 +284,7 @@ contract IbAlluo is
      * - the caller must have a balance of at least `amount`.
      */
     function transfer(address to, uint256 amount) public override whenNotPaused returns (bool) {
-        address owner = _msgSender();
+        address owner = msg.sender;
         _transfer(owner, to, amount);
         if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
             updateRatio();
@@ -321,7 +315,7 @@ contract IbAlluo is
         address to,
         uint256 amount
     ) public override whenNotPaused returns (bool) {
-        address spender = _msgSender();
+        address spender = msg.sender;
         _spendAllowance(from, spender, amount);
         _transfer(from, to, amount);
         if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
@@ -397,15 +391,6 @@ contract IbAlluo is
         return supportedTokens.values();
     }
 
-    function isTrustedForwarder(address forwarder)
-        public
-        view
-        virtual
-        returns (bool)
-    {
-        return forwarder == trustedForwarder;
-    }
-
     /* ========== ADMIN CONFIGURATION ========== */
 
     function mint(address account, uint256 amount)
@@ -417,7 +402,7 @@ contract IbAlluo is
             updateRatio();
         }
         uint256 assetValue = (amount * growingRatio) / multiplier;
-        emit TransferAssetValue(address(0), _msgSender(), amount, assetValue, growingRatio);
+        emit TransferAssetValue(address(0), msg.sender, amount, assetValue, growingRatio);
     }
 
     function burn(address account, uint256 amount)
@@ -429,7 +414,7 @@ contract IbAlluo is
             updateRatio();
         }
         uint256 assetValue = (amount * growingRatio) / multiplier;
-        emit TransferAssetValue(_msgSender(), address(0), amount, assetValue, growingRatio);
+        emit TransferAssetValue(msg.sender, address(0), amount, assetValue, growingRatio);
     }
 
     /// @notice  Sets the new interest rate
@@ -494,13 +479,6 @@ contract IbAlluo is
         exchangeAddress = newExchangeAddress;
     }
 
-    function setTrustedForwarder(address newTrustedForwarder)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        trustedForwarder = newTrustedForwarder;
-    }
-
     function changeUpgradeStatus(bool _status)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
@@ -533,37 +511,6 @@ contract IbAlluo is
         uint256 amount
     ) internal override {
         super._beforeTokenTransfer(from, to, amount);
-    }
-
-    function _msgSender()
-        internal
-        view
-        virtual
-        override
-        returns (address sender)
-    {
-        if (isTrustedForwarder(msg.sender)) {
-            // The assembly code is more direct than the Solidity version using `abi.decode`.
-            assembly {
-                sender := shr(96, calldataload(sub(calldatasize(), 20)))
-            }
-        } else {
-            return super._msgSender();
-        }
-    }
-
-    function _msgData()
-        internal
-        view
-        virtual
-        override
-        returns (bytes calldata)
-    {
-        if (isTrustedForwarder(msg.sender)) {
-            return msg.data[:msg.data.length - 20];
-        } else {
-            return super._msgData();
-        }
     }
     
     function _authorizeUpgrade(address)
