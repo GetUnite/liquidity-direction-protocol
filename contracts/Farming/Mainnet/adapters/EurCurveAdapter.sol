@@ -1,16 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "../../../interfaces/curve/ICurvePoolEUR.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract EurCurveAdapter is AccessControl {
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+import "../../../interfaces/curve/mainnet/ICurvePoolEUR.sol";
+
+contract EurCurveAdapterMainnet is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
     using Address for address;
     using SafeERC20 for IERC20;
+
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     address public constant jEUR = 0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c;
     address public constant PAR = 0xE2Aa7db6dA1dAE97C5f5C6914d285fBfCC32A128;
@@ -18,6 +24,7 @@ contract EurCurveAdapter is AccessControl {
     address public constant EURT = 0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f;
     address public constant curvePool = 0xAd326c253A84e9805559b73A08724e11E49ca651;
     address public wallet;
+    bool public upgradeStatus;
     uint64 public slippage;
 
     uint64 public primaryTokenIndex;
@@ -25,8 +32,14 @@ contract EurCurveAdapter is AccessControl {
 
     mapping(address => uint128) public indexes;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() initializer {}
+
     // 0 = jEUR-18dec, 1 = PAR-18dec , 2 = EURS-2dec, 3 = EURT-6dec
-    constructor (address _multiSigWallet, address _liquidityHandler, uint64 _slippage) {
+   function initialize(address _multiSigWallet, address _liquidityHandler, uint64 _slippage) public initializer {
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
@@ -163,5 +176,21 @@ contract EurCurveAdapter is AccessControl {
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         IERC20(_address).safeTransfer(_to, _amount);
+    }
+
+    function changeUpgradeStatus(bool _status)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        upgradeStatus = _status;
+    }
+    
+    function _authorizeUpgrade(address)
+        internal
+        override
+        onlyRole(UPGRADER_ROLE)
+    {
+        require(upgradeStatus, "Adapter: Upgrade not allowed");
+        upgradeStatus = false;
     }
 }

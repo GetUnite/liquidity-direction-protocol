@@ -1,25 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import "../../../interfaces/curve/ICurvePoolUSD.sol";
+import "../../../interfaces/curve/mainnet/ICurvePoolUSD.sol";
 
-contract UsdCurveAdapter is AccessControl {
+contract UsdCurveAdapterMainnet is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
     using Address for address;
     using SafeERC20 for IERC20;
 
-    // All address are Polygon addresses.
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+
     address public constant DAI = 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063;
     address public constant USDC = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
     address public constant USDT = 0xc2132D05D31c914a87C6611C10748AEb04B58e8F;
     address public constant curvePool = 0x445FE580eF8d70FF569aB36e80c647af338db351;
     address public constant curveLp = 0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171;
     address public wallet;
+    bool public upgradeStatus;
     uint64 public slippage;
 
     uint64 public primaryTokenIndex;
@@ -27,7 +32,13 @@ contract UsdCurveAdapter is AccessControl {
     
     mapping(address => uint128) public indexes;
 
-    constructor (address _multiSigWallet, address _liquidityHandler, uint64 _slippage) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() initializer {}
+
+   function initialize(address _multiSigWallet, address _liquidityHandler, uint64 _slippage) public initializer {
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
@@ -165,5 +176,22 @@ contract UsdCurveAdapter is AccessControl {
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         IERC20(_address).safeTransfer(_to, _amount);
+    }
+
+
+    function changeUpgradeStatus(bool _status)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        upgradeStatus = _status;
+    }
+    
+    function _authorizeUpgrade(address)
+        internal
+        override
+        onlyRole(UPGRADER_ROLE)
+    {
+        require(upgradeStatus, "Adapter: Upgrade not allowed");
+        upgradeStatus = false;
     }
 }
