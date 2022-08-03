@@ -362,17 +362,20 @@ describe("Handler and different adapters", function () {
         describe('BTC Mass deposits and withdrawal test cases', function () {
             it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
                 let walletBalance = await wbtc.balanceOf(admin.address);
-                let userBalanceAtStart = await wbtc.balanceOf(signers[0].address);
+                let userBalanceAtStart = await wbtc.balanceOf(signers[1].address);
 
-                await deposit(signers[0], wbtc, parseUnits("1", 8));
+                await deposit(signers[1], wbtc, parseUnits("1", 8));
                 expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
                 walletBalance = await wbtc.balanceOf(admin.address);
 
-                await ibAlluoBtc.connect(signers[0]).withdraw(wbtc.address, parseUnits("0.5", 18));
+                await ibAlluoBtc.connect(signers[1]).withdraw(wbtc.address, parseUnits("0.5", 18));
                 let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+                
+                await deposit(signers[2], wbtc, parseUnits("3", 8));
+                await handler.satisfyAdapterWithdrawals(ibAlluoBtc.address);
 
-                let delta = (await wbtc.balanceOf(signers[0].address)).sub(userBalanceAtStart)
+                let delta = (await wbtc.balanceOf(signers[1].address)).sub(userBalanceAtStart)
 
                 expect(Number(delta)).lessThan(Number(parseUnits("0.51", 8)))
                 expect(Number(delta)).greaterThanOrEqual(Number(parseUnits("0.49", 8)))
