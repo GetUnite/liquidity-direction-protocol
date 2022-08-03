@@ -82,8 +82,6 @@ contract UsdCurveAdapterMainnet is Initializable, AccessControlUpgradeable, UUPS
             uint256[3] memory amounts;
             amounts[indexes[_token]] = _fullAmount / 10**(18 - IERC20Metadata(_token).decimals());
 
-            //usually curve return lp amount on add_liquidity
-            // but it is not the case so need to check slippage
             uint256 lpAmountBefore = IERC20(curveLp).balanceOf(address(this));
             ICurvePoolUSD(curvePool).add_liquidity(amounts, 0);
             uint256 delta = IERC20(curveLp).balanceOf(address(this)) - lpAmountBefore;
@@ -125,14 +123,13 @@ contract UsdCurveAdapterMainnet is Initializable, AccessControlUpgradeable, UUPS
             // and passes this burned amount to get tokens
             uint256 toBurn = ICurvePoolUSD(curvePool).calc_token_amount(amounts, false);
             uint256 minAmountOut = _amount / 10**(18 - IERC20Metadata(_token).decimals());
+            uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
             ICurvePoolUSD(curvePool).remove_liquidity_one_coin(
                     toBurn, 
                     int128(indexes[_token]), 
                     minAmountOut * (10000 - slippage) / 10000
                 );
-            //same problem here with return
-            //!!!!
-            uint256 toUser = IERC20(_token).balanceOf(address(this));
+            uint256 toUser = IERC20(_token).balanceOf(address(this)) - balanceBefore;
             IERC20(_token).safeTransfer(_user, toUser);
         }
     }
