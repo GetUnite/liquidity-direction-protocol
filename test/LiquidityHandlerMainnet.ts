@@ -312,117 +312,73 @@ describe("Handler and different adapters", function () {
     });
 
 
-    // describe('BTC Adaptor with IbAlluo: Test cases', function () {
-    //     it("Depositing 1 wbtc and immediately attempting to withdraw 0.5 should put you in the waiting list", async function () {
-    //         await deposit(signers[0], wbtc, parseUnits("1", 8));
-    //         await ibAlluoBtc.connect(signers[0]).withdraw(wbtc.address, parseUnits("0.5", 18));
-    //         let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
-    //         expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
-    //     })
-    //     it("Depositing 1 wbtc, attempt to withdraw 0.5 and then only get paid after there is a deposit", async function () {
-    //         await deposit(signers[0], wbtc, parseUnits("1", 8));
-    //         await ibAlluoBtc.connect(signers[0]).withdraw(wbtc.address, parseUnits("0.5", 18));
-    //         let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
-    //         expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+    describe('BTC Adaptor with IbAlluo: Test cases', function () {
+        it("Depositing 1 wbtc and immediately attempting to withdraw 0.5 should put you in the waiting list", async function () {
+            await deposit(signers[0], wbtc, parseUnits("1", 8));
+            await ibAlluoBtc.connect(signers[0]).withdraw(wbtc.address, parseUnits("0.5", 18));
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
+            expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+        })
+        it("Depositing 1 wbtc, attempt to withdraw 0.5 and then only get paid after there is a deposit", async function () {
+            await deposit(signers[0], wbtc, parseUnits("1", 8));
+            await ibAlluoBtc.connect(signers[0]).withdraw(wbtc.address, parseUnits("0.5", 18));
+            let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
+            expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
 
-    //         await deposit(signers[1], wbtc, parseUnits("1", 8));
-    //         await handler.satisfyAdapterWithdrawals(ibAlluoBtc.address);
-    //         // Loss from slippage makes tests awkward.
+            await deposit(signers[1], wbtc, parseUnits("1", 8));
+            await handler.satisfyAdapterWithdrawals(ibAlluoBtc.address);
+            // Loss from slippage makes tests awkward.
 
-    //         expect(Number(await wbtc.balanceOf(signers[0].address))).lessThan(Number(parseUnits("0.51", 8)))
-    //         expect(Number(await wbtc.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("0.49", 8)))
-    //     })
+            expect(Number(await wbtc.balanceOf(signers[0].address))).lessThan(Number(parseUnits("0.51", 8)))
+            expect(Number(await wbtc.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("0.49", 8)))
+        })
 
-    //     it("Depositing 0.1 renBtc and immediately attempting to withdraw 0.05 should put you in the waiting list", async function () {
-    //         await deposit(signers[0], renBtc, parseUnits("0.1", 8));
-    //         await ibAlluoBtc.connect(signers[0]).withdraw(renBtc.address, parseUnits("0.05", 18));
-    //         let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
-    //         expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
-    //     })
-    //     it("Depositing 0.1 renBtc, attempt to withdraw 0.05 and then only get paid after there is a deposit", async function () {
-    //         await deposit(signers[0], renBtc, parseUnits("0.1", 8));
-    //         await ibAlluoBtc.connect(signers[0]).withdraw(renBtc.address, parseUnits("0.05", 18));
-    //         let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
-    //         expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
 
-    //         await deposit(signers[1], renBtc, parseUnits("0.1", 8));
-    //         await handler.satisfyAdapterWithdrawals(ibAlluoBtc.address);
-    //         // Loss from slippage makes tests awkward.
+        it("The balance of the multisig wallet should increase with deposits.", async function () {
+            let walletBalance = await wbtc.balanceOf(admin.address);
 
-    //         expect(Number(await renBtc.balanceOf(signers[0].address))).lessThan(Number(parseUnits("0.051", 8)))
-    //         expect(Number(await renBtc.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("0.049", 8)))
-    //     })
+            await deposit(signers[0], wbtc, parseUnits("1", 8));
+            expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+            walletBalance = await wbtc.balanceOf(admin.address);
 
-    //     it("The balance of the multisig wallet should increase with deposits.", async function () {
-    //         let walletBalance = await wbtc.balanceOf(admin.address);
+            await deposit(signers[0], wbtc, parseUnits("1", 8));
+            expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+            walletBalance = await wbtc.balanceOf(admin.address);
 
-    //         await deposit(signers[0], wbtc, parseUnits("1", 8));
-    //         expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-    //         walletBalance = await wbtc.balanceOf(admin.address);
 
-    //         await deposit(signers[0], renBtc, parseUnits("0.1", 8));
-    //         expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-    //         walletBalance = await wbtc.balanceOf(admin.address);
+            await deposit(signers[0], wbtc, parseUnits("1", 8));
+            expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+            walletBalance = await wbtc.balanceOf(admin.address);
 
-    //         await deposit(signers[0], wbtc, parseUnits("1", 8));
-    //         expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-    //         walletBalance = await wbtc.balanceOf(admin.address);
+            console.log("Final multisig balance:", walletBalance);
 
-    //         await deposit(signers[0], renBtc, parseUnits("0.1", 8));
-    //         expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-    //         walletBalance = await wbtc.balanceOf(admin.address);
+        })
+        it("Attemping to withdraw more than allowed causes revert.", async function () {
+            let walletBalance = await wbtc.balanceOf(admin.address);
+            await deposit(signers[1], wbtc, parseUnits("1", 8));
+            expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+            await expect(ibAlluoBtc.connect(signers[1]).withdraw(wbtc.address, parseUnits("2", 18))).to.be.revertedWith('ERC20: burn amount exceeds balance')
+        })
+        describe('BTC Mass deposits and withdrawal test cases', function () {
+            it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
+                let walletBalance = await wbtc.balanceOf(admin.address);
+                let userBalanceAtStart = await wbtc.balanceOf(signers[0].address);
 
-    //         await deposit(signers[0], wbtc, parseUnits("1", 8));
-    //         expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-    //         walletBalance = await wbtc.balanceOf(admin.address);
+                await deposit(signers[0], wbtc, parseUnits("1", 8));
+                expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                walletBalance = await wbtc.balanceOf(admin.address);
 
-    //         await deposit(signers[0], renBtc, parseUnits("0.1", 8));
-    //         expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-    //         walletBalance = await wbtc.balanceOf(admin.address);
-    //         console.log("Final multisig balance:", walletBalance);
+                await ibAlluoBtc.connect(signers[0]).withdraw(wbtc.address, parseUnits("0.5", 18));
+                let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
+                expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
 
-    //     })
-    //     it("Attemping to withdraw more than allowed causes revert.", async function () {
-    //         let walletBalance = await wbtc.balanceOf(admin.address);
-    //         await deposit(signers[1], wbtc, parseUnits("1", 8));
-    //         expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-    //         await expect(ibAlluoBtc.connect(signers[1]).withdraw(wbtc.address, parseUnits("2", 18))).to.be.revertedWith('ERC20: burn amount exceeds balance')
-    //     })
-    //     describe('BTC Mass deposits and withdrawal test cases', function () {
-    //         it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
-    //             let walletBalance = await wbtc.balanceOf(admin.address);
-    //             let userBalanceAtStart = await wbtc.balanceOf(signers[0].address);
+                let delta = (await wbtc.balanceOf(signers[0].address)).sub(userBalanceAtStart)
 
-    //             await deposit(signers[0], wbtc, parseUnits("1", 8));
-    //             expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-    //             walletBalance = await wbtc.balanceOf(admin.address);
-
-    //             await deposit(signers[2], renBtc, parseUnits("0.1", 8));
-    //             expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-    //             walletBalance = await wbtc.balanceOf(admin.address);
-
-    //             await ibAlluoBtc.connect(signers[0]).withdraw(wbtc.address, parseUnits("0.5", 18));
-    //             let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
-    //             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
-
-    //             await ibAlluoBtc.connect(signers[2]).withdraw(renBtc.address, parseUnits("0.05", 18));
-    //             withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
-    //             expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
-
-    //             // When there are deposits, should pay everyone back.
-    //             await deposit(signers[2], renBtc, parseUnits("2", 8));
-    //             await handler.satisfyAdapterWithdrawals(ibAlluoBtc.address);
-    //             expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-
-    //             let delta = (await wbtc.balanceOf(signers[0].address)).sub(userBalanceAtStart)
-
-    //             expect(Number(delta)).lessThan(Number(parseUnits("0.51", 8)))
-    //             expect(Number(delta)).greaterThanOrEqual(Number(parseUnits("0.49", 8)))
-    //             expect(Number(await renBtc.balanceOf(signers[2].address))).lessThan(Number(parseUnits("0.051", 8)))
-    //             expect(Number(await renBtc.balanceOf(signers[2].address))).greaterThanOrEqual(Number(parseUnits("0.049", 8)))
-    //         })
-    //     })
-    // })
+                expect(Number(delta)).lessThan(Number(parseUnits("0.51", 8)))
+                expect(Number(delta)).greaterThanOrEqual(Number(parseUnits("0.49", 8)))
+            })
+        })
+    })
 
 
     describe("EThAdapter no pool: Test cases", function () {
