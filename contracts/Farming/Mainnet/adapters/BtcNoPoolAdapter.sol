@@ -16,7 +16,7 @@ contract BtcNoPoolAdapterMainnet is Initializable, AccessControlUpgradeable, UUP
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    address public constant WBTC = 0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6;
+    address public constant WBTC = 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599;
     address public wallet;
     bool public upgradeStatus;
 
