@@ -31,6 +31,8 @@ contract BtcNoPoolAdapterMainnet is Initializable, AccessControlUpgradeable, UUP
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(UPGRADER_ROLE, _multiSigWallet);
         wallet = _multiSigWallet;
     }
 
