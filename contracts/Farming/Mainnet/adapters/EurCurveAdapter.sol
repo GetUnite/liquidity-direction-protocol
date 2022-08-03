@@ -18,11 +18,10 @@ contract EurCurveAdapterMainnet is Initializable, AccessControlUpgradeable, UUPS
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    address public constant jEUR = 0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c;
-    address public constant PAR = 0xE2Aa7db6dA1dAE97C5f5C6914d285fBfCC32A128;
-    address public constant EURS = 0xE111178A87A3BFf0c8d18DECBa5798827539Ae99;
-    address public constant EURT = 0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f;
-    address public constant curvePool = 0xAd326c253A84e9805559b73A08724e11E49ca651;
+    address public constant agEUR = 0x1a7e4e63778B4f12a199C062f3eFdD288afCBce8;
+    address public constant EURT = 0xC581b735A1688071A1746c968e0798D642EDE491;
+    address public constant EURS = 0xdB25f211AB05b1c97D595516F45794528a807ad8;
+    address public constant curvePool = 0xb9446c4Ef5EBE66268dA6700D26f96273DE3d571;
     address public wallet;
     bool public upgradeStatus;
     uint64 public slippage;
@@ -35,7 +34,7 @@ contract EurCurveAdapterMainnet is Initializable, AccessControlUpgradeable, UUPS
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    // 0 = jEUR-18dec, 1 = PAR-18dec , 2 = EURS-2dec, 3 = EURT-6dec
+    // 0 = agEUR-18dec, 1 = EURT-16ec , 2 = EURS-2dec
    function initialize(address _multiSigWallet, address _liquidityHandler, uint64 _slippage) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -47,20 +46,18 @@ contract EurCurveAdapterMainnet is Initializable, AccessControlUpgradeable, UUPS
         wallet = _multiSigWallet;
         slippage = _slippage;
 
-        indexes[jEUR] = 0;
-        indexes[PAR] = 1;
+        indexes[agEUR] = 0;
+        indexes[EURT] = 1;
         indexes[EURS] = 2;
-        indexes[EURT] = 3;
 
         liquidTokenIndex = 2;
-        primaryTokenIndex = 3;
+        primaryTokenIndex = 1;
     }
 
     function adapterApproveAll() external onlyRole(DEFAULT_ADMIN_ROLE){
-        IERC20(jEUR).safeApprove(curvePool, type(uint256).max);
-        IERC20(PAR).safeApprove(curvePool, type(uint256).max);
-        IERC20(EURS).safeApprove(curvePool, type(uint256).max);
+        IERC20(agEUR).safeApprove(curvePool, type(uint256).max);
         IERC20(EURT).safeApprove(curvePool, type(uint256).max);
+        IERC20(EURS).safeApprove(curvePool, type(uint256).max);
         IERC20(curvePool).safeApprove(curvePool, type(uint256).max);
     }
 
@@ -76,13 +73,13 @@ contract EurCurveAdapterMainnet is Initializable, AccessControlUpgradeable, UUPS
                 IERC20(primaryToken).safeTransfer(wallet, toSend / 10**(18 - IERC20Metadata(primaryToken).decimals()));
             }
             if (_leaveInPool != 0) {
-                uint256[4] memory amounts;
+                uint256[3] memory amounts;
                 amounts[primaryTokenIndex] = _leaveInPool / 10**(18 - IERC20Metadata(primaryToken).decimals());
                 ICurvePoolEUR(curvePool).add_liquidity(amounts, 0);
             }
         }
         else{
-            uint256[4] memory amounts;
+            uint256[3] memory amounts;
             amounts[indexes[_token]] = _fullAmount / 10**(18 - IERC20Metadata(_token).decimals());
 
             uint256 lpAmount = ICurvePoolEUR(curvePool).add_liquidity(amounts, 0);
@@ -105,7 +102,7 @@ contract EurCurveAdapterMainnet is Initializable, AccessControlUpgradeable, UUPS
     /// @param _amount  Amount to be withdrawn in 10*18
     function withdraw (address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         
-        uint256[4] memory amounts;
+        uint256[3] memory amounts;
         address liquidToken = ICurvePoolEUR(curvePool).coins(liquidTokenIndex);
         uint256 amount = _amount / 10**(18 - IERC20Metadata(liquidToken).decimals());
         amounts[liquidTokenIndex] = amount;
