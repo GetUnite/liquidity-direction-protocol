@@ -80,20 +80,21 @@ contract UsdCurveAdapterMainnet is Initializable, AccessControlUpgradeable, UUPS
         }
         else{
             uint256[3] memory amounts;
-            uint amount = _fullAmount / 10**(18 - IERC20Metadata(_token).decimals());
-            amounts[indexes[_token]] = amount;
+            amounts[indexes[_token]] = _fullAmount / 10**(18 - IERC20Metadata(_token).decimals());
 
-
-            ICurvePoolUSD(curvePool).add_liquidity(amounts, 0);
             //usually curve return lp amount on add_liquidity
             // but it is not the case so need to check slippage
+            uint256 lpAmountBefore = IERC20(curveLp).balanceOf(address(this));
+            ICurvePoolUSD(curvePool).add_liquidity(amounts, 0);
+            uint256 delta = IERC20(curveLp).balanceOf(address(this)) - lpAmountBefore;
+
             delete amounts;
             if (toSend != 0) {
                 toSend = toSend / 10**(18 - IERC20Metadata(primaryToken).decimals());
                 amounts[primaryTokenIndex] = toSend;
                 ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
                             amounts, 
-                            amount * (10000+slippage)/10000);
+                            delta * (10000+slippage)/10000);
                 IERC20(primaryToken).safeTransfer(wallet, toSend);
             }
         }
