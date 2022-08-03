@@ -83,7 +83,7 @@ describe("Handler and different adapters", function () {
                     enabled: true,
                     jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
                     //you can fork from last block by commenting next line
-                    blockNumber: 28729129,
+                    blockNumber: 28955535,
                 },
             }, ],
         });
