@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { Address } from "cluster";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter, ISuperTokenFactory, StIbAlluo, StIbAlluo__factory } from "../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter, ISuperTokenFactory, StIbAlluo, StIbAlluo__factory, SuperfluidResolver } from "../typechain";
 
 async function skipDays(d: number) {
     ethers.provider.send('evm_increaseTime', [d * 86400]);
@@ -74,7 +74,7 @@ describe("IbAlluoUSD and Handler", function () {
 
     let exchangeAddress: string;
     let superFactory: ISuperTokenFactory;
-
+    let resolver: SuperfluidResolver;
     before(async function () {
 
         //We are forking Polygon mainnet, please set Alchemy key in .env
@@ -181,6 +181,15 @@ describe("IbAlluoUSD and Handler", function () {
         let calldata = iface.encodeFunctionData("setSuperToken", [StIbAlluo.address]);
 
         await multisig.executeCall(ibAlluoCurrent.address, calldata);
+
+        const SuperfluidResolver = await ethers.getContractFactory("SuperfluidResolver");
+        resolver = await SuperfluidResolver.deploy([ibAlluoCurrent.address], "0x6EeE6060f715257b970700bc2656De21dEdF074C", signers[0].address);
+
+        ABI = ["function setSuperfluidResolver(address _superfluidResolver)"];
+        iface = new ethers.utils.Interface(ABI);
+        calldata = iface.encodeFunctionData("setSuperfluidResolver", [resolver.address]);
+        await multisig.executeCall(ibAlluoCurrent.address, calldata);
+
     });
 
     describe('All IbAlluo tests with StIbAlluo integration', function () {

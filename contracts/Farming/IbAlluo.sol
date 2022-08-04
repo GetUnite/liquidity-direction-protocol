@@ -338,8 +338,9 @@ contract IbAlluo is
     /// @param flowRate The amount of ibAlluos per second to be streamed (decimals 10**18)
     /// @param toWrap The amount of ibAlluos to automatically wrap (recommend wrapping entire ibALluo balance initially)
     function createFlow(address receiver, int96 flowRate, uint256 toWrap) external {
-        _transfer(msg.sender, superToken, toWrap);
-        IAlluoSuperToken(superToken).alluoDeposit(msg.sender , toWrap);
+        _transfer(msg.sender, address(this), toWrap);
+        _approve(address(this), superToken, toWrap);
+        IAlluoSuperToken(superToken).upgradeTo(msg.sender, toWrap, "");
         cfaV1Lib.createFlowByOperator( msg.sender, receiver, ISuperfluidToken(superToken), flowRate);
         ISuperfluidResolver(superfluidResolver).addToChecker(msg.sender, receiver);
         emit CreateFlow(msg.sender, receiver, flowRate);
@@ -359,8 +360,9 @@ contract IbAlluo is
     /// @param flowRate The new amount of ibAlluos per second to be streamed (decimals 10**18)
     /// @param toWrap The amount of ibAlluos to automatically wrap (recommend wrapping entire ibALluo balance)
     function updateFlow(address receiver, int96 flowRate, uint256 toWrap) external {
-        _transfer(msg.sender, superToken, toWrap);
-        IAlluoSuperToken(superToken).alluoDeposit(msg.sender , toWrap);
+        _transfer(msg.sender, address(this), toWrap);
+        _approve(address(this), superToken, toWrap);
+        IAlluoSuperToken(superToken).upgradeTo(msg.sender, toWrap, "");
         cfaV1Lib.updateFlowByOperator(msg.sender, receiver,  ISuperfluidToken(superToken),flowRate);
         emit UpdatedFlow(msg.sender, receiver, flowRate);
     }
@@ -372,8 +374,9 @@ contract IbAlluo is
 
     function forceWrap(address sender) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 balance = balanceOf(address(sender));
-        _transfer(sender, superToken, balance);
-        IAlluoSuperToken(superToken).alluoDeposit(sender , balance);
+        _transfer(sender, address(this), balance);
+        _approve(address(this), superToken, balance);
+        IAlluoSuperToken(superToken).upgradeTo(sender, balance, "");
     }
 
     /// @notice Formats permissios so users can approve the ibAlluo contract as an operator of streams
