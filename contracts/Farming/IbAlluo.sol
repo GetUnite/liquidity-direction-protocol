@@ -468,6 +468,12 @@ contract IbAlluo is
         return (fullBalance * int256(_growingRatio) / int256(multiplier));
     }
 
+
+    function combinedBalanceOf(address _address) public view returns (int256) {
+        (int256 StIbAlluoBalance,,,) = IAlluoSuperToken(superToken).realtimeBalanceOfNow(_address);
+        return int256(balanceOf(_address)) + StIbAlluoBalance;
+    }
+    
     /// @notice  Returns balance in asset value with correct info from update
     /// @param _address address of user
 
