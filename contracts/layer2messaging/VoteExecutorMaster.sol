@@ -16,6 +16,8 @@ import "../interfaces/ILocker.sol";
 import "../interfaces/IGnosis.sol";
 import "../interfaces/IAlluoStrategyNew.sol";
 import "../interfaces/IMultichain.sol";
+import "../interfaces/IIbAlluo.sol";
+import "../interfaces/ILiquidityHandler.sol";
 
 contract VoteExecutorMaster is
     Initializable,
@@ -68,6 +70,9 @@ contract VoteExecutorMaster is
 
     bool public upgradeStatus;
 
+    address public handler;
+    mapping(string => address) public ibAlluoSymbolToAddress;
+
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -82,7 +87,7 @@ contract VoteExecutorMaster is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        require(_multiSigWallet.isContract(), "Handler: Not contract");
+        require(_multiSigWallet.isContract(), "Executor: Not contract");
         gnosis = _multiSigWallet;
         minSigns = 2;
         timeLock = _timeLock;
@@ -148,10 +153,17 @@ contract VoteExecutorMaster is
 
             if(submittedData[index].signs.length >= minSigns){
                 for (uint256 j; j < messages.length; j++) {
-                    if(messages[j].commandIndex == 1){
+                    if(messages[j].commandIndex == 0){
+                        (string memory ibAlluoSymbol, uint256 newAnnualInterest, uint256 newInterestPerSecond) = abi.decode(messages[j].commandData, (string, uint256, uint256));
+                        IIbAlluo ibAlluo = IIbAlluo(ibAlluoSymbolToAddress[ibAlluoSymbol]);
+                        if(ibAlluo.annualInterest() != newAnnualInterest){
+                           ibAlluo.setInterest(newAnnualInterest, newInterestPerSecond);
+                        }
+                    }
+                    else if(messages[j].commandIndex == 1){
                         (uint256 mintAmount, uint256 period) = abi.decode(messages[j].commandData, (uint256, uint256));
                         IAlluoToken(ALLUO).mint(locker, mintAmount);
-                        ILocker(locker).setReward(mintAmount / (period * 1 days));
+                        ILocker(locker).setReward(mintAmount / period);
                     }
                 }
                 hashExecutionTime[hashed] = block.timestamp;
@@ -160,7 +172,15 @@ contract VoteExecutorMaster is
             }     
     }
 
-   
+
+    /// @notice Updates all the ibAlluo addresses used when setting APY
+    function updateAllIbAlluoAddresses() public {
+        address[] memory ibAlluoAddressList = ILiquidityHandler(handler).getListOfIbAlluos();
+        for (uint256 i; i< ibAlluoAddressList.length; i++) {
+            ibAlluoSymbolToAddress[IIbAlluo(ibAlluoAddressList[i]).symbol()] = ibAlluoAddressList[i];
+        }
+    }
+
     function encodeAllMessages(uint256[] memory _commandIndexes, bytes[] memory _commands) public pure  
     returns (
         bytes32 messagesHash, 
@@ -225,7 +245,7 @@ contract VoteExecutorMaster is
     override
     onlyRole(getRoleAdmin(role)) {
         if (role == DEFAULT_ADMIN_ROLE) {
-            require(account.isContract(), "Handler: Not contract");
+            require(account.isContract(), "Executor: Not contract");
         }
         _grantRole(role, account);
     }
@@ -261,7 +281,15 @@ contract VoteExecutorMaster is
         }
         return true;
     }
+
     /// Admin functions 
+    function setHandler(address newHandler)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(newHandler.isContract(), "Executor: Not contract");
+        handler = newHandler;
+    }
 
     /**
     * @notice Set the address of the multisig.
@@ -294,7 +322,7 @@ contract VoteExecutorMaster is
     internal
     onlyRole(UPGRADER_ROLE)
     override {
-        require(upgradeStatus, "Handler: Upgrade not allowed");
+        require(upgradeStatus, "Executor: Upgrade not allowed");
         upgradeStatus = false;
     }
 }
