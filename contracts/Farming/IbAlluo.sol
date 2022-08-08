@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.9;
 
 import "./AlluoERC20Upgradable.sol";
 import "../interfaces/ILiquidityHandler.sol";
@@ -368,6 +368,11 @@ contract IbAlluo is
         int96 flowRate,
         uint256 toWrap
     ) external {
+        updateRatio();
+        flowRate = int96(
+            int256((uint256(int256(flowRate)) * multiplier) / growingRatio)
+        );
+        toWrap = (toWrap * multiplier) / growingRatio;
         _transfer(msg.sender, superToken, toWrap);
         IAlluoSuperToken(superToken).alluoDeposit(msg.sender, toWrap);
         cfaV1Lib.createFlowByOperator(
