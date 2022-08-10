@@ -459,6 +459,10 @@ contract IbAlluoMainnet is
         emit TransferAssetValue(msg.sender, address(0), amount, assetValue, growingRatio);
     }
 
+    function setSymbol(string memory _newSymbol) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setSymbol(_newSymbol);
+    }
+
     /// @notice  Sets the new interest rate
     /// @dev When called, it sets the new interest rate after updating the index.
     /// @param _newAnnualInterest New annual interest rate with 2 decimals 850 == 8.50%

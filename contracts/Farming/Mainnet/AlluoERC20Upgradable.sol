@@ -77,6 +77,10 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
         return _symbol;
     }
 
+    function _setSymbol(string memory _newSymbol) internal {
+        _symbol = _newSymbol;
+    }
+
     /**
      * @dev Returns the number of decimals used to get its user representation.
      * For example, if `decimals` equals `2`, a balance of `505` tokens should
