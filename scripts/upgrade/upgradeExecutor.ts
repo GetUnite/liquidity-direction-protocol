@@ -4,7 +4,7 @@ async function main() {
 
   const Executor = await ethers.getContractFactory("VoteExecutorMaster");
 
-  await upgrades.upgradeProxy('0xf9734B32E10178f0fa89f2CEb947B1a0b2d6c0E4', Executor);
+  await upgrades.upgradeProxy('0x4Fd58328C2e0dDa1Ea8f4C70321C91B366582eA2', Executor);
   console.log('Executor upgraded');
 
 }
