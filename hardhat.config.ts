@@ -40,9 +40,7 @@ const config: HardhatUserConfig = {
     rinkeby: {
       url: process.env.RINKEBY_URL,
       gasPrice: 25000000000,
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
+      accounts: [typeof process.env.PRIVATE_KEY == "string" ? process.env.PRIVATE_KEY : ""],
     },
     goerli: {
       url: process.env.GOERLI_URL,
@@ -51,13 +49,7 @@ const config: HardhatUserConfig = {
         mnemonic: process.env.MNEMONIC,
       },
     },
-    kovan: {
-      url: process.env.KOVAN_URL,
-      gasPrice: "auto",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-    },
+
     polygon: {
       url: process.env.POLYGON_URL,
       gasPrice: "auto",
@@ -72,13 +64,7 @@ const config: HardhatUserConfig = {
         mnemonic: process.env.MNEMONIC,
       },
     },
-    fantom: {
-      url: process.env.FANTOM_URL,
-      gasPrice: "auto",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-    },
+
   },
 
   gasReporter: {
