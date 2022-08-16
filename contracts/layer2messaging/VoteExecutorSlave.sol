@@ -181,7 +181,7 @@ contract VoteExecutorSlave is
                 // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
                 (address strategyAddress, uint256 delta, uint256 chainId, address strategyPrimaryToken, address exitToken, bytes memory data) = abi.decode(currentMessage.commandData, (address, uint256, uint256, address,address, bytes));
                 if (chainId == currentChain) {
-                    console.log("Withdraw strategy", strategyAddress, delta);
+                    console.log("Withdraw strategy", strategyPrimaryToken, delta);
                     console.log("Balance before", IERC20MetadataUpgradeable(strategyPrimaryToken).balanceOf(address(this)));
                     IAlluoStrategy(strategyAddress).exitAll(data, delta, strategyPrimaryToken, address(this), false);
                     console.log("Balance After", IERC20MetadataUpgradeable(strategyPrimaryToken).balanceOf(address(this)));
@@ -207,21 +207,23 @@ contract VoteExecutorSlave is
             Deposit[] memory depositList = depositQueue.depositList;
             uint256 depositNumber = depositQueue.depositNumber;    
             uint256 iters = depositList.length - depositNumber;
+            console.log("DEPOSIT NUMBER AND LENGTH", depositNumber, depositList.length);
             for (uint256 j; j < iters; j++) {
                 Deposit memory depositInfo = depositList[depositNumber + j];
                 address strategyPrimaryToken = depositInfo.strategyPrimaryToken;
                 uint256 tokenAmount = depositInfo.amount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
+                console.log("Deposit 18 amount", depositInfo.amount, tokenAmount);
                 if (depositInfo.entryToken != strategyPrimaryToken) {
-                    console.log("Before", tokenAmount);
+                    console.log("Before exchanging", tokenAmount);
                     IERC20MetadataUpgradeable(strategyPrimaryToken).approve(0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec, tokenAmount);
                     tokenAmount = IExchange(0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec).exchange(strategyPrimaryToken, depositInfo.entryToken, tokenAmount, tokenAmount * slippage/100000);
                     strategyPrimaryToken = depositInfo.entryToken;
-                    console.log("After", tokenAmount);
+                    console.log("After exchanging", tokenAmount);
                 }
         
                 IERC20MetadataUpgradeable(strategyPrimaryToken).safeTransfer(depositInfo.strategyAddress, tokenAmount);
                 IAlluoStrategy(depositInfo.strategyAddress).invest(depositInfo.data, tokenAmount);
-                tokenToDepositQueue[strategyPrimaryToken].depositNumber++;
+                tokenToDepositQueue[depositInfo.strategyPrimaryToken].depositNumber++;
             }
         }
     }
