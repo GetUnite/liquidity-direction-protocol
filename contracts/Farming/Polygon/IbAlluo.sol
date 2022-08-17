@@ -2,9 +2,9 @@
 pragma solidity ^0.8.11;
 
 import "./AlluoERC20Upgradable.sol";
-import "../interfaces/ILiquidityHandler.sol";
-import "../mock/interestHelper/Interest.sol";
-import "../interfaces/IExchange.sol";
+import "../../interfaces/ILiquidityHandler.sol";
+import "../../mock/interestHelper/Interest.sol";
+import "../../interfaces/IExchange.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -47,7 +47,6 @@ contract IbAlluo is
 
     // current annual interest rate with 2 decimals
     uint256 public annualInterest;
-
 
     // contract that will distribute money between the pool and the wallet
     /// @custom:oz-renamed-from liquidityBuffer

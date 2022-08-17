@@ -3,8 +3,8 @@ pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
-import "./../../interfaces/IIbAlluo.sol";
-import "./../../interfaces/ILiquidityHandler.sol";
+import "./../../../interfaces/IIbAlluo.sol";
+import "./../../../interfaces/ILiquidityHandler.sol";
 
 contract IbAlluoPriceResolver{
     address public alluoBank;

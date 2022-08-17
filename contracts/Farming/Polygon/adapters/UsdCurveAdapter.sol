@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import "../../interfaces/curve/ICurvePoolUSD.sol";
+import "../../../interfaces/curve/ICurvePoolUSD.sol";
 
 contract UsdCurveAdapter is AccessControl {
     using Address for address;

@@ -1,9 +1,9 @@
 import { ethers, upgrades } from "hardhat"
 
 async function main() {
-  const IbAlluoNew = await ethers.getContractFactory("IbAlluo");
+  const IbAlluoNew = await ethers.getContractFactory("IbAlluoMainnet");
 
-  await upgrades.upgradeProxy('0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6', IbAlluoNew);
+  await upgrades.upgradeProxy('0xF555B595D04ee62f0EA9D0e72001D926a736A0f6', IbAlluoNew);
   console.log('IbAlluo upgraded');
 }
 
