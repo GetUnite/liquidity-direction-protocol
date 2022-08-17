@@ -5,8 +5,8 @@ import { Contract, ContractFactory } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { parseEther } from "@ethersproject/units";
 import { keccak256 } from "ethers/lib/utils";
-import { AlluoLockedV3, IAlluoToken, PseudoMultisigWallet, TestERC20, AlluoLockedV2Final } from '../typechain';
-import { getLockers } from "../scripts/dev/getLockers";
+import { AlluoLockedV3, IAlluoToken, PseudoMultisigWallet, TestERC20, AlluoLockedV2Final } from '../../typechain';
+import { getLockers } from "../../scripts/dev/getLockers";
 import { writeFileSync } from 'fs';
 import { join } from "path";
 
