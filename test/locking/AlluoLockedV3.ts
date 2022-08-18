@@ -186,7 +186,7 @@ describe("Locking contract", function () {
 
         //     let OldFinalState = await ethers.getContractFactory("AlluoLockedV2Final")
 
-        //     oldLockerFinal = await upgrades.upgradeProxy(oldLocker.address, OldFinalState) as AlluoLockedV2Final
+            // oldLockerFinal = await upgrades.upgradeProxy(oldLocker.address, OldFinalState) as AlluoLockedV2Final
 
 
         //     let amountOfLp = await balancerAlluoLp.balanceOf(oldLockerFinal.address)

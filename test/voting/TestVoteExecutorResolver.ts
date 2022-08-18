@@ -5,7 +5,7 @@ import { BigNumber, BigNumberish, BytesLike, Wallet } from "ethers";
 import { defaultAbiCoder } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { ERC20, IbAlluo, IbAlluo__factory, PseudoMultisigWallet, VoteExecutorSlave, VoteExecutorSlave__factory, VoteExecutorMaster, PseudoMultisigWallet__factory, VoteExecutorResolver__factory} from "../typechain";
+import { ERC20, IbAlluo, IbAlluo__factory, PseudoMultisigWallet, VoteExecutorSlave, VoteExecutorSlave__factory, VoteExecutorMaster, PseudoMultisigWallet__factory, VoteExecutorResolver__factory} from "../../typechain";
 
 function getInterestPerSecond(apyDecimal: number): BigNumber {
     return BigNumber.from(String(Math.round(Math.pow(apyDecimal, 1/31536000)*10**17)))

@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory, IbAlluoMainnet, UsdCurveAdapterMainnet, EurCurveAdapterMainnet, EthNoPoolAdapterMainnet, BtcNoPoolAdapterMainnet, IbAlluoMainnet__factory, UsdCurveAdapterMainnet__factory, BtcNoPoolAdapterMainnet__factory, EurCurveAdapterMainnet__factory, EthNoPoolAdapterMainnet__factory } from "../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory, IbAlluoMainnet, UsdCurveAdapterMainnet, EurCurveAdapterMainnet, EthNoPoolAdapterMainnet, BtcNoPoolAdapterMainnet, IbAlluoMainnet__factory, UsdCurveAdapterMainnet__factory, BtcNoPoolAdapterMainnet__factory, EurCurveAdapterMainnet__factory, EthNoPoolAdapterMainnet__factory } from "../../typechain";
 
 async function getLastWithdrawalInfo(token: IbAlluoMainnet, handler: LiquidityHandler) {
     let request = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastWithdrawalRequest
@@ -34,7 +34,7 @@ async function sendEth(users: SignerWithAddress[]) {
     }
 }
 
-describe("Handler and different adapters", function () {
+describe("Mainnet Handler and different adapters", function () {
     let signers: SignerWithAddress[];
     let admin: SignerWithAddress;
 
@@ -73,7 +73,6 @@ describe("Handler and different adapters", function () {
 
     before(async function () {
 
-        //We are forking Polygon mainnet, please set Alchemy key in .env
         await network.provider.request({
             method: "hardhat_reset",
             params: [{
@@ -118,14 +117,14 @@ describe("Handler and different adapters", function () {
         wbtc = await ethers.getContractAt("IERC20", "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599");
 
         console.log("We are forking ETH mainnet\n");
-        expect(await dai.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Polygon");
-        expect(await usdc.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDC, or you are not forking Polygon");
-        expect(await usdt.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDT, or you are not forking Polygon");
-        expect(await ageur.balanceOf(ageurWhale.address)).to.be.gt(0, "Whale has no ageur, or you are not forking Polygon");
-        expect(await eurt.balanceOf(eurtWhale.address)).to.be.gt(0, "Whale has no eurt, or you are not forking Polygon");
-        expect(await eurs.balanceOf(eursWhale.address)).to.be.gt(0, "Whale has no eurs, or you are not forking Polygon");
-        expect(await weth.balanceOf(wethWhale.address)).to.be.gt(0, "Whale has no weth, or you are not forking Polygon");
-        expect(await wbtc.balanceOf(wbtcWhale.address)).to.be.gt(0, "Whale has no wbtc, or you are not forking Polygon");
+        expect(await dai.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Mainnet");
+        expect(await usdc.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDC, or you are not forking Mainnet");
+        expect(await usdt.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDT, or you are not forking Mainnet");
+        expect(await ageur.balanceOf(ageurWhale.address)).to.be.gt(0, "Whale has no ageur, or you are not forking Mainnet");
+        expect(await eurt.balanceOf(eurtWhale.address)).to.be.gt(0, "Whale has no eurt, or you are not forking Mainnet");
+        expect(await eurs.balanceOf(eursWhale.address)).to.be.gt(0, "Whale has no eurs, or you are not forking Mainnet");
+        expect(await weth.balanceOf(wethWhale.address)).to.be.gt(0, "Whale has no weth, or you are not forking Mainnet");
+        expect(await wbtc.balanceOf(wbtcWhale.address)).to.be.gt(0, "Whale has no wbtc, or you are not forking Mainnet");
 
         await sendEth([usdWhale, ageurWhale, eurtWhale, eursWhale, wethWhale, wbtcWhale])
     });

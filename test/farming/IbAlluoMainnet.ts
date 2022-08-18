@@ -53,7 +53,7 @@ async function prepareCallData(type: string, parameters: any[]): Promise<BytesLi
         return ethers.utils.randomBytes(0);
     }
 }
-describe("IbAlluoUSD and Handler", function () {
+describe("IbAlluoUSD and Handler Mainnet", function () {
     let signers: SignerWithAddress[];
     let admin: SignerWithAddress;
 
@@ -74,7 +74,6 @@ describe("IbAlluoUSD and Handler", function () {
 
     before(async function () {
 
-        //We are forking Polygon mainnet, please set Alchemy key in .env
         await network.provider.request({
             method: "hardhat_reset",
             params: [{
@@ -103,9 +102,9 @@ describe("IbAlluoUSD and Handler", function () {
         curveLpUSD = await ethers.getContractAt("IERC20", "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490");
 
         console.log("We are forking ETH mainnet\n");
-        expect(await dai.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Polygon");
-        expect(await usdc.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDC, or you are not forking Polygon");
-        expect(await usdt.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDT, or you are not forking Polygon");
+        expect(await dai.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Mainnet");
+        expect(await usdc.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDC, or you are not forking Mainnet");
+        expect(await usdt.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDT, or you are not forking Mainnet");
 
         await sendEth([usdWhale])
     });

@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory } from "../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory } from "../../typechain";
 
 async function getLastWithdrawalInfo(token: IbAlluo, handler: LiquidityHandler) {
     let request = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastWithdrawalRequest
