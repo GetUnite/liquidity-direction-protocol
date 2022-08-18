@@ -11,6 +11,7 @@ import "../interfaces/superfluid/IConstantFlowAgreementV1.sol";
 import "../interfaces/superfluid/IInstantDistributionAgreementV1.sol";
 
 import "../interfaces/superfluid/IAlluoSuperToken.sol";
+import "../interfaces/ISuperfluidResolver.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -36,7 +37,7 @@ contract IbAlluo is
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
     using CFAv1Library for CFAv1Library.InitData;
-
+    
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     // variable which grow after any action from user
@@ -77,6 +78,8 @@ contract IbAlluo is
 
     CFAv1Library.InitData public cfaV1Lib;
     bytes32 public constant CFA_ID = keccak256("org.superfluid-finance.agreements.ConstantFlowAgreement.v1");
+
+    address public superfluidResolver;
 
     struct Context {
         uint8 appLevel;
@@ -327,15 +330,19 @@ contract IbAlluo is
     function withdraw(address _targetToken, uint256 _amount) external {
         withdrawTo(_msgSender(), _targetToken, _amount);
     }
+
+
     /// @notice Wraps and creates flow 
     /// @dev Forces transfer of ibAlluo to the StIbAlluo contract then mints StIbAlluos to circumvent having to sign multiple transactions to create streams
     /// @param receiver The recipient of the streamed flow
     /// @param flowRate The amount of ibAlluos per second to be streamed (decimals 10**18)
     /// @param toWrap The amount of ibAlluos to automatically wrap (recommend wrapping entire ibALluo balance initially)
     function createFlow(address receiver, int96 flowRate, uint256 toWrap) external {
-        _transfer(msg.sender, superToken, toWrap);
-        IAlluoSuperToken(superToken).alluoDeposit(msg.sender , toWrap);
-        cfaV1Lib.createFlowByOperator( msg.sender, receiver, ISuperfluidToken(superToken),flowRate);
+        _transfer(msg.sender, address(this), toWrap);
+        _approve(address(this), superToken, toWrap);
+        IAlluoSuperToken(superToken).upgradeTo(msg.sender, toWrap, "");
+        cfaV1Lib.createFlowByOperator( msg.sender, receiver, ISuperfluidToken(superToken), flowRate);
+        ISuperfluidResolver(superfluidResolver).addToChecker(msg.sender, receiver);
         emit CreateFlow(msg.sender, receiver, flowRate);
     }
 
@@ -344,6 +351,7 @@ contract IbAlluo is
     /// @param receiver The recipient of the streamed flow
     function deleteFlow(address receiver) external {
         cfaV1Lib.deleteFlowByOperator(msg.sender, receiver, ISuperfluidToken(superToken));
+        ISuperfluidResolver(superfluidResolver).removeFromChecker(msg.sender, receiver);
         emit DeletedFlow(msg.sender, receiver);
     }
     /// @notice Wraps and updates flow
@@ -352,12 +360,24 @@ contract IbAlluo is
     /// @param flowRate The new amount of ibAlluos per second to be streamed (decimals 10**18)
     /// @param toWrap The amount of ibAlluos to automatically wrap (recommend wrapping entire ibALluo balance)
     function updateFlow(address receiver, int96 flowRate, uint256 toWrap) external {
-        _transfer(msg.sender, superToken, toWrap);
-        IAlluoSuperToken(superToken).alluoDeposit(msg.sender , toWrap);
+        _transfer(msg.sender, address(this), toWrap);
+        _approve(address(this), superToken, toWrap);
+        IAlluoSuperToken(superToken).upgradeTo(msg.sender, toWrap, "");
         cfaV1Lib.updateFlowByOperator(msg.sender, receiver,  ISuperfluidToken(superToken),flowRate);
         emit UpdatedFlow(msg.sender, receiver, flowRate);
     }
 
+    function stopFlowWhenCritical(address sender, address receiver) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        cfaV1Lib.deleteFlowByOperator(sender, receiver, ISuperfluidToken(superToken));
+        emit DeletedFlow(sender, receiver);
+    }
+
+    function forceWrap(address sender) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 balance = balanceOf(address(sender));
+        _transfer(sender, address(this), balance);
+        _approve(address(this), superToken, balance);
+        IAlluoSuperToken(superToken).upgradeTo(sender, balance, "");
+    }
 
     /// @notice Formats permissios so users can approve the ibAlluo contract as an operator of streams
     /// @dev This can be removed once the frontend hardcodes the function call / does it inside ethers.js.
@@ -380,6 +400,7 @@ contract IbAlluo is
         IConstantFlowAgreementV1 superAgreement = IConstantFlowAgreementV1(agreement);
         return abi.encodeWithSelector(superAgreement.createFlow.selector, superToken, receiver, flowRate, new bytes(0));
     }
+
 
     /**
      * @dev See {IERC20-transfer}.
@@ -447,6 +468,12 @@ contract IbAlluo is
         return (fullBalance * int256(_growingRatio) / int256(multiplier));
     }
 
+
+    function combinedBalanceOf(address _address) public view returns (int256) {
+        (int256 StIbAlluoBalance,,,) = IAlluoSuperToken(superToken).realtimeBalanceOfNow(_address);
+        return int256(balanceOf(_address)) + StIbAlluoBalance;
+    }
+    
     /// @notice  Returns balance in asset value with correct info from update
     /// @param _address address of user
 
@@ -536,6 +563,11 @@ contract IbAlluo is
         uint256 assetValue = (amount * growingRatio) / multiplier;
         emit TransferAssetValue(_msgSender(), address(0), amount, assetValue, growingRatio);
     }
+
+    function setSuperfluidResolver(address _superfluidResolver) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        superfluidResolver = _superfluidResolver;
+    }
+
 
     /// @notice  Sets the new interest rate
     /// @dev When called, it sets the new interest rate after updating the index.
