@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPLv3
 pragma solidity ^0.8.11;
 
-import { UUPSProxiable } from "./upgradability/UUPSProxiable.sol";
+import { UUPSProxiable } from "./superfluid/upgradability/UUPSProxiable.sol";
 
 import {
     ISuperfluid,
@@ -12,9 +12,12 @@ import {
     IERC777,
     TokenInfo
 } from "../../interfaces/superfluid/ISuperfluid.sol";
-import { ISuperfluidToken, SuperfluidToken } from "./SuperfluidToken.sol";
 
-import { ERC777Helper } from "./libs/ERC777Helper.sol";
+import { IAlluoSuperToken } from "../../interfaces/superfluid/IAlluoSuperToken.sol";
+
+import { ISuperfluidToken, AlluoSuperfluidToken } from "./superfluid/AlluoSuperfluidToken.sol";
+
+import { ERC777Helper } from "./superfluid/libs/ERC777Helper.sol";
 
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { SafeMath } from "@openzeppelin/contracts/utils/math/SafeMath.sol";
@@ -23,16 +26,23 @@ import { IERC777Recipient } from "@openzeppelin/contracts/token/ERC777/IERC777Re
 import { IERC777Sender } from "@openzeppelin/contracts/token/ERC777/IERC777Sender.sol";
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+import "hardhat/console.sol";
 
 /**
  * @title Superfluid's super token implementation
  *
  * @author Superfluid
  */
-contract SuperToken is
-    UUPSProxiable,
-    SuperfluidToken,
-    ISuperToken
+contract StIbAlluo is
+    PausableUpgradeable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable,
+    AlluoSuperfluidToken,
+    IAlluoSuperToken
 {
 
     using SafeMath for uint256;
@@ -79,13 +89,8 @@ contract SuperToken is
     uint256 private _reserve30;
     uint256 internal _reserve31;
 
-    constructor(
-        ISuperfluid host
-    )
-        SuperfluidToken(host)
-        // solhint-disable-next-line no-empty-blocks
-    {
-    }
+    address public ibAlluo;
+    bool public upgradeStatus;
 
     function initialize(
         IERC20 underlyingToken,
@@ -96,23 +101,52 @@ contract SuperToken is
         external override
         initializer // OpenZeppelin Initializable
     {
-        _underlyingToken = underlyingToken;
+    }
+
+    function alluoInitialize(
+        address underlyingToken,
+        uint8 underlyingDecimals,
+        string calldata n,
+        string calldata s,
+        address host,
+        address multisig,
+        address[] memory operators
+    )
+        external 
+        initializer // OpenZeppelin Initializable
+    {
+        AlluoSuperfluidToken._host = ISuperfluid(host);
+        AlluoSuperfluidToken._underlying = IERC20(underlyingToken);
+        _underlyingToken = IERC20(underlyingToken);
         _underlyingDecimals = underlyingDecimals;
 
         _name = n;
         _symbol = s;
 
+        _grantRole(DEFAULT_ADMIN_ROLE, underlyingToken);
+        _grantRole(DEFAULT_ADMIN_ROLE, multisig);
         // register interfaces
         ERC777Helper.register(address(this));
+        _setupDefaultOperators(operators);
     }
+
 
     function proxiableUUID() public pure override returns (bytes32) {
         return keccak256("org.superfluid-finance.contracts.SuperToken.implementation");
     }
 
-    function updateCode(address newAddress) external override {
-        require(msg.sender == address(_host), "SuperToken: only host can update code");
-        UUPSProxiable._updateCodeAddress(newAddress);
+
+    /**************************************************************************
+     * Alluo custom functions
+     *************************************************************************/
+    // //@dev Alluo custom functions"
+
+    /// @notice Force unwraps tokens to ibAlluos
+    /// @dev Backdoor to unwrap user tokens. Unlikely to be ever used and no risk of losing user tokens.
+    /// @param account Address of account to unwrap.
+    /// @param amount Amount of StIbAlluos to unwrap.
+    function alluoWithdraw(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _downgrade(account, account, amount, "","");
     }
 
     /**************************************************************************
@@ -204,7 +238,7 @@ contract SuperToken is
     )
         private
     {
-        SuperfluidToken._move(from, to, amount.toInt256());
+        AlluoSuperfluidToken._move(from, to, amount.toInt256());
 
         emit Sent(operator, from, to, amount, userData, operatorData);
         emit Transfer(from, to, amount);
@@ -239,7 +273,7 @@ contract SuperToken is
     {
         require(account != address(0), "SuperToken: mint to zero address");
 
-        SuperfluidToken._mint(account, amount);
+        AlluoSuperfluidToken._mint(account, amount);
 
         _callTokensReceived(operator, address(0), account, amount, userData, operatorData, requireReceptionAck);
 
@@ -267,7 +301,7 @@ contract SuperToken is
 
         _callTokensToSend(operator, from, address(0), amount, userData, operatorData);
 
-        SuperfluidToken._burn(from, amount);
+        AlluoSuperfluidToken._burn(from, amount);
 
         emit Burned(operator, from, amount, userData, operatorData);
         emit Transfer(from, address(0), amount);
@@ -679,7 +713,22 @@ contract SuperToken is
     {
         _downgrade(msg.sender, account, amount, "", "");
     }
+    
+    function _authorizeUpgrade(address)
+        internal
+        override
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(upgradeStatus, "IbAlluo: Upgrade not allowed");
+        upgradeStatus = false;
+    }
 
+    function changeUpgradeStatus(bool _status)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        upgradeStatus = _status;
+    }
     /**************************************************************************
     * Modifiers
     *************************************************************************/

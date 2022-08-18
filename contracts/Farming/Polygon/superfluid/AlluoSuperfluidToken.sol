@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPLv3
 pragma solidity ^0.8.11;
 
-import { ISuperfluid, IERC20} from "../../interfaces/superfluid/ISuperfluid.sol";
-import { ISuperAgreement } from "../../interfaces/superfluid/ISuperAgreement.sol";
-import { ISuperfluidGovernance } from "../../interfaces/superfluid/ISuperfluidGovernance.sol";
-import { ISuperfluidToken } from "../../interfaces/superfluid/ISuperfluidToken.sol";
+import { ISuperfluid, IERC20} from "../../../interfaces/superfluid/ISuperfluid.sol";
+import { ISuperAgreement } from "../../../interfaces/superfluid/ISuperAgreement.sol";
+import { ISuperfluidGovernance } from "../../../interfaces/superfluid/ISuperfluidGovernance.sol";
+import { ISuperfluidToken } from "../../../interfaces/superfluid/ISuperfluidToken.sol";
 
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { EventsEmitter } from "./libs/EventsEmitter.sol";

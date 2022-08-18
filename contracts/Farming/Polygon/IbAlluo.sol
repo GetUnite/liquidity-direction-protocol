@@ -22,7 +22,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
 
-import {CFAv1Library} from "../superfluid/libs/CFAv1Library.sol";
+import {CFAv1Library} from "./superfluid/libs/CFAv1Library.sol";
 
 contract IbAlluo is
     Initializable,

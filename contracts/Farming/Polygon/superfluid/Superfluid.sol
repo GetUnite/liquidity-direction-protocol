@@ -19,7 +19,7 @@ import {
     ISuperToken,
     ISuperTokenFactory,
     IERC20
-} from "../../interfaces/superfluid/ISuperfluid.sol";
+} from "../../../interfaces/superfluid/ISuperfluid.sol";
 
 import { CallUtils } from "./libs/CallUtils.sol";
 import { BaseRelayRecipient } from "./libs/BaseRelayRecipient.sol";

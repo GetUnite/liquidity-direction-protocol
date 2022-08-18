@@ -3,8 +3,8 @@ pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "./../../interfaces/superfluid/IConstantFlowAgreementV1.sol";
-import "./../../interfaces/IIbAlluo.sol";
+import "../../../interfaces/superfluid/IConstantFlowAgreementV1.sol";
+import "../../../interfaces/IIbAlluo.sol";
 import "hardhat/console.sol";
 
 contract SuperfluidResolver is AccessControl {

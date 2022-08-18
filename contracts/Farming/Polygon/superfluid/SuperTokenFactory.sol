@@ -6,9 +6,9 @@ import {
     ISuperToken,
     IERC20,
     ERC20WithTokenInfo
-} from "../../interfaces/superfluid/ISuperTokenFactory.sol";
+} from "../../../interfaces/superfluid/ISuperTokenFactory.sol";
 
-import { ISuperfluid } from "../../interfaces/superfluid/ISuperfluid.sol";
+import { ISuperfluid } from "../../../interfaces/superfluid/ISuperfluid.sol";
 
 import { UUPSProxy } from "./upgradability/UUPSProxy.sol";
 import { UUPSProxiable } from "./upgradability/UUPSProxiable.sol";

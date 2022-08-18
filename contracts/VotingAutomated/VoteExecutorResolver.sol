@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "../../interfaces/IVoteExecutorMaster.sol";
+import "../interfaces/IVoteExecutorMaster.sol";
 import "hardhat/console.sol";
 
 contract VoteExecutorResolver {

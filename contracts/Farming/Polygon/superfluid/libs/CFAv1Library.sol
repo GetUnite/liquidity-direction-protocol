@@ -4,12 +4,12 @@ pragma solidity >= 0.8.0;
 import {
     ISuperfluid,
     ISuperfluidToken
-} from "../../../interfaces/superfluid/ISuperfluid.sol";
+} from "../../../../interfaces/superfluid/ISuperfluid.sol";
 
 
 import {
     IConstantFlowAgreementV1
-} from "../../../interfaces/superfluid/IConstantFlowAgreementV1.sol";
+} from "../../../../interfaces/superfluid/IConstantFlowAgreementV1.sol";
 
 /**
  * @title Constant flow agreement v1 library
