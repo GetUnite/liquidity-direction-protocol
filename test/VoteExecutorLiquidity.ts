@@ -5,8 +5,7 @@ import { BigNumber, BigNumberish, BytesLike, Wallet } from "ethers";
 import { defaultAbiCoder } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { CurveConvexStrategyTest } from "../typechain";
-import { CurveConvexStrategy, ERC20, IbAlluo, IbAlluo__factory, IERC20, PseudoMultisigWallet, UsdCurveAdapter, VoteExecutorSlave, VoteExecutorSlave__factory,} from "../typechain";
+import { CurveConvexStrategyTest, ERC20, IbAlluo, IbAlluo__factory, IERC20, PseudoMultisigWallet, UsdCurveAdapter, VoteExecutorSlave, VoteExecutorSlave__factory,} from "../typechain";
 const ZERO_ADDR = ethers.constants.AddressZero;
 
 function getInterestPerSecond(apyDecimal: number): BigNumber {
@@ -50,7 +49,7 @@ describe("Test L2 Contracts", function() {
     let weth: IERC20;
     let wbtc: IERC20;
     let frax:IERC20;
-    let strategy: CurveConvexStrategy;
+    let strategy: CurveConvexStrategyTest;
     before(async function () {
         //We are forking Polygon mainnet, please set Alchemy key in .env
         await network.provider.request({
@@ -117,164 +116,177 @@ describe("Test L2 Contracts", function() {
         wbtc.connect(whale4).transfer(VoteExecutorSlave.address, parseUnits("10", "8"));
         frax = await ethers.getContractAt("IERC20", "0x853d955aCEf822Db058eb8505911ED77F175b99e");
         usdt = await ethers.getContractAt("IERC20", "0xdAC17F958D2ee523a2206206994597C13D831ec7")
+        let nativeETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
 
+        // if (curvePool == 0xD51a44d3FaE010294C616388b506AcdA1bfAAE46 || curvePool == 0x9838eCcC42659FA8AA7daF2aD134b53984c9427b) {
 
-
+        let uint256 = ethers.utils.toUtf8Bytes("uint256");
+        let int128 = ethers.utils.toUtf8Bytes("int128");
         // Add data for USD pools
         let entryCall = await strategy.callStatic.encodeEntryParams("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46", "0xc4AD29ba4B3c580e6D59105FFf484999997675Ff", usdt.address,3,0,38 )
-        let exitCall = await strategy.callStatic.encodeExitParams("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46",usdt.address,  "0xc4AD29ba4B3c580e6D59105FFf484999997675Ff",0,38 )
-        await VoteExecutorSlave.setLiquidityDirection("CurveFrax3CRV", strategy.address, 0, "0x000000000000000000000000d632f22692fac7611d2aa1c0d552930d43caed3b000000000000000000000000d632f22692fac7611d2aa1c0d552930d43caed3b000000000000000000000000853d955acef822db058eb8505911ed77f175b99e000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020", "0x000000000000000000000000d632f22692fac7611d2aa1c0d552930d43caed3b000000000000000000000000853d955acef822db058eb8505911ed77f175b99e000000000000000000000000d632f22692fac7611d2aa1c0d552930d43caed3b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020")
+        let exitCall = await strategy.callStatic.encodeExitParams("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46","0xc4AD29ba4B3c580e6D59105FFf484999997675Ff",usdt.address,uint256,0,38)
         await VoteExecutorSlave.setLiquidityDirection("CurveCRVCrypto", strategy.address, 0,entryCall, exitCall)
+
+        entryCall = await strategy.callStatic.encodeEntryParams("0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B", "0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B", frax.address,2,0,32 )
+        exitCall = await strategy.callStatic.encodeExitParams("0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B","0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B",frax.address, int128,0,32)
+        await VoteExecutorSlave.setLiquidityDirection("CurveFrax3CRV", strategy.address, 0, entryCall,exitCall);
         await VoteExecutorSlave.addPrimaryToken(usdc.address)
         // 
 
 
         // Add data for EUR pools
-        entryCall = await strategy.callStatic.encodeEntryParams("0x9838eCcC42659FA8AA7daF2aD134b53984c9427b", "0x3b6831c0077a1e44ED0a21841C3bC4dC11bCE833", "0xC581b735A1688071A1746c968e0798D642EDE491",2,0,55 )
-        exitCall = await strategy.callStatic.encodeExitParams("0x9838eCcC42659FA8AA7daF2aD134b53984c9427b", "0xC581b735A1688071A1746c968e0798D642EDE491", "0x3b6831c0077a1e44ED0a21841C3bC4dC11bCE833",0,55)
+        entryCall = await strategy.callStatic.encodeEntryParams("0x9838eCcC42659FA8AA7daF2aD134b53984c9427b", "0x3b6831c0077a1e44ED0a21841C3bC4dC11bCE833", eurt.address,2,0,55 )
+        exitCall = await strategy.callStatic.encodeExitParams("0x9838eCcC42659FA8AA7daF2aD134b53984c9427b", "0x3b6831c0077a1e44ED0a21841C3bC4dC11bCE833",eurt.address,uint256,0,55)
         await VoteExecutorSlave.setLiquidityDirection("CurveEurtUSD", strategy.address, 0, entryCall, exitCall)
 
-        entryCall = await strategy.callStatic.encodeEntryParams("0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890", "0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890", "0xC581b735A1688071A1746c968e0798D642EDE491",2,0,39 )
-        exitCall = await strategy.callStatic.encodeExitParams("0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890", "0xC581b735A1688071A1746c968e0798D642EDE491", "0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890",0,39)
+        entryCall = await strategy.callStatic.encodeEntryParams("0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890", "0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890", eurt.address,2,0,39 )
+        exitCall = await strategy.callStatic.encodeExitParams("0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890", "0xFD5dB7463a3aB53fD211b4af195c5BCCC1A03890", eurt.address, int128 ,0,39)
         await VoteExecutorSlave.setLiquidityDirection("CurveEurt", strategy.address, 0,entryCall, exitCall)
-        await VoteExecutorSlave.addPrimaryToken("0xC581b735A1688071A1746c968e0798D642EDE491")
+        await VoteExecutorSlave.addPrimaryToken(eurt.address)
         // 
 
 
         // Add data for WETH pools
-        entryCall = await strategy.callStatic.encodeEntryParams("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46", "0xc4AD29ba4B3c580e6D59105FFf484999997675Ff", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",3,2,38 )
-        exitCall = await strategy.callStatic.encodeExitParams("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46","0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",  "0xc4AD29ba4B3c580e6D59105FFf484999997675Ff",2,38 )
+        entryCall = await strategy.callStatic.encodeEntryParams("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46", "0xc4AD29ba4B3c580e6D59105FFf484999997675Ff", weth.address,3,2,38  )
+        exitCall = await strategy.callStatic.encodeExitParams("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46","0xc4AD29ba4B3c580e6D59105FFf484999997675Ff",weth.address, uint256,2,38  )
         await VoteExecutorSlave.setLiquidityDirection("CurveCRVCryptoETH", strategy.address, 0, entryCall, exitCall)
 
-        // entryCall = await strategy.callStatic.encodeEntryParams()
-        // exitCall = await strategy.callStatic.encodeExitParams()
-        // await VoteExecutorSlave.setLiquidityDirection("CurveEurt", strategy.address, 0,entryCall, exitCall)
-        await VoteExecutorSlave.addPrimaryToken("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+        entryCall = await strategy.callStatic.encodeEntryParams("0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511", "0xEd4064f376cB8d68F770FB1Ff088a3d0F3FF5c4d", weth.address, 2, 0, 61)
+        exitCall = await strategy.callStatic.encodeExitParams("0x8301AE4fc9c624d1D396cbDAa1ed877821D7C511", "0xEd4064f376cB8d68F770FB1Ff088a3d0F3FF5c4d", weth.address, uint256, 0, 61)
+        await VoteExecutorSlave.setLiquidityDirection("CurveETHCRV", strategy.address, 0,entryCall, exitCall)
+
+        entryCall = await strategy.callStatic.encodeEntryParams("0xDC24316b9AE028F1497c275EB9192a3Ea0f67022", "0x06325440D014e39736583c165C2963BA99fAf14E", nativeETH, 2, 0, 25)
+        exitCall = await strategy.callStatic.encodeExitParams("0xDC24316b9AE028F1497c275EB9192a3Ea0f67022", "0x06325440D014e39736583c165C2963BA99fAf14E", nativeETH, int128, 0, 25)
+        await VoteExecutorSlave.setLiquidityDirection("CurveETHLido", strategy.address, 0,entryCall, exitCall)
+        await VoteExecutorSlave.addPrimaryToken(weth.address)
         // 
 
 
         // Add data for BTC pools
-        entryCall = await strategy.callStatic.encodeEntryParams("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46", "0xc4AD29ba4B3c580e6D59105FFf484999997675Ff", "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",3,1,38 )
-        exitCall = await strategy.callStatic.encodeExitParams("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46","0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",  "0xc4AD29ba4B3c580e6D59105FFf484999997675Ff",1,38 )
+        entryCall = await strategy.callStatic.encodeEntryParams("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46", "0xc4AD29ba4B3c580e6D59105FFf484999997675Ff", wbtc.address,3,1,38 )
+        exitCall = await strategy.callStatic.encodeExitParams("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46","0xc4AD29ba4B3c580e6D59105FFf484999997675Ff", wbtc.address, uint256,1,38 )
         await VoteExecutorSlave.setLiquidityDirection("CurveCRVCryptoBTC", strategy.address, 0, entryCall, exitCall)
 
-        entryCall = await strategy.callStatic.encodeEntryParams("0x93054188d876f558f4a66B2EF1d97d16eDf0895B", "0x49849C98ae39Fff122806C06791Fa73784FB3675", "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",2,1,6 )
-        exitCall = await strategy.callStatic.encodeExitParams("0x93054188d876f558f4a66B2EF1d97d16eDf0895B", "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", "0x49849C98ae39Fff122806C06791Fa73784FB3675",1,6)
+        entryCall = await strategy.callStatic.encodeEntryParams("0x93054188d876f558f4a66B2EF1d97d16eDf0895B", "0x49849C98ae39Fff122806C06791Fa73784FB3675", wbtc.address,2,1,6 )
+        exitCall = await strategy.callStatic.encodeExitParams("0x93054188d876f558f4a66B2EF1d97d16eDf0895B","0x49849C98ae39Fff122806C06791Fa73784FB3675", wbtc.address,int128 ,1,6)
         await VoteExecutorSlave.setLiquidityDirection("CurveRen", strategy.address, 0,entryCall, exitCall)
-        await VoteExecutorSlave.addPrimaryToken("0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599")
+        await VoteExecutorSlave.addPrimaryToken(wbtc.address)
         // 
 
     });
-
+   
     describe("Tests for USD,EUR,WETH,WBTC allocations in isolation", function() {
-        it("Deposit into CurveEurtUSD and CurveEurt", async function() {
-             
-             if (typeof mneumonic !== "string") {
-                 return
-             }
-             let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurtUSD", eurt.address , eurt.address, parseEther("700000"), true)
-             let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurt", eurt.address ,eurt.address , parseEther("300000"), true)
-             await executeVote([encodedDeposit1, encodedDeposit2])
-             await VoteExecutorSlave.executeDeposits();
-         })
-         it("Then withdraw some after an initial deposited state", async function() {
- 
-             if (typeof mneumonic !== "string") {
-                 return
-             }
-             // Do an intiial deposit
-             let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurtUSD", eurt.address , eurt.address, parseEther("700000"), true)
-             let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurt", eurt.address ,eurt.address , parseEther("300000"), true)
-             await executeVote([encodedDeposit1, encodedDeposit2])
-             await VoteExecutorSlave.executeDeposits();
- 
-             // Do withdrawals
- 
-             let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurtUSD", eurt.address , eurt.address, 7000, false);
-             let encodedWithdraw2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurt", eurt.address , eurt.address, 5000, false);
-             await executeVote([encodedWithdraw1, encodedWithdraw2])
-             await VoteExecutorSlave.executeDeposits();
-             console.log(await eurt.balanceOf(VoteExecutorSlave.address), "THis is the current balance")
-             expect(Number(await eurt.balanceOf(VoteExecutorSlave.address))).greaterThan(0);
-         })
-         it("Deposit initial capital. Withdraw and reallocate to different pool.", async function() {
- 
-             if (typeof mneumonic !== "string") {
-                 return
-             }
-             // Deposit into Frax 3CRV first
-             let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurtUSD", eurt.address , eurt.address, parseEther("1000000"), true)
-             await executeVote([encodedDeposit1]);
-             await VoteExecutorSlave.executeDeposits();
- 
- 
-             // Withdraw 100% of the tokens in CurveFrax3CRV and deposit all of it back into CurveCRVCrypto.
- 
-             let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurtUSD", eurt.address , eurt.address, 10000, false);
-             let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurt", eurt.address ,eurt.address , parseUnits("996249062265", 12), true)
-             await executeVote([encodedWithdraw1, encodedDeposit2])
-             await VoteExecutorSlave.executeDeposits();
-             console.log(await eurt.balanceOf(VoteExecutorSlave.address), "THis is the current balance")
-         })
+        // it("Deposit into CurveEurtUSD and CurveEurt", async function() {
+        //      if (typeof mneumonic !== "string") {
+        //          return
+        //      }
+        //      let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurtUSD", eurt.address , eurt.address, parseEther("700000"), true)
+        //      let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurt", eurt.address ,eurt.address , parseEther("300000"), true)
+        //      await executeVote([encodedDeposit1, encodedDeposit2])
+        //      await VoteExecutorSlave.executeDeposits();        
 
-         it("Deposit into Frax3CRV and CRV3Crypto", async function() {
+        //  })
+        //  it("Then withdraw some after an initial deposited state", async function() {
+ 
+        //      if (typeof mneumonic !== "string") {
+        //          return
+        //      }
+        //      // Do an intiial deposit
+        //      let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurtUSD", eurt.address , eurt.address, parseEther("700000"), true)
+        //      let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurt", eurt.address ,eurt.address , parseEther("300000"), true)
+        //      await executeVote([encodedDeposit1, encodedDeposit2])
+        //      await VoteExecutorSlave.executeDeposits();
+ 
+        //      // Do withdrawals
+ 
+        //      let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurtUSD", eurt.address , eurt.address, 7000, false);
+        //      let encodedWithdraw2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurt", eurt.address , eurt.address, 5000, false);
+        //      await executeVote([encodedWithdraw1, encodedWithdraw2])
+        //      await VoteExecutorSlave.executeDeposits();
+        //      console.log(await eurt.balanceOf(VoteExecutorSlave.address), "THis is the current balance")
+        //      expect(Number(await eurt.balanceOf(VoteExecutorSlave.address))).greaterThan(0);
+        //  })
+        //  it("Deposit initial capital. Withdraw and reallocate to different pool.", async function() {
+ 
+        //      if (typeof mneumonic !== "string") {
+        //          return
+        //      }
+        //      // Deposit into Frax 3CRV first
+        //      let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurtUSD", eurt.address , eurt.address, parseEther("1000000"), true)
+        //      await executeVote([encodedDeposit1]);
+        //      await VoteExecutorSlave.executeDeposits();
+ 
+ 
+        //      // Withdraw 100% of the tokens in CurveFrax3CRV and deposit all of it back into CurveCRVCrypto.
+ 
+        //      let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurtUSD", eurt.address , eurt.address, 10000, false);
+        //      let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurt", eurt.address ,eurt.address , parseUnits("996249062265", 12), true)
+        //      await executeVote([encodedWithdraw1, encodedDeposit2])
+        //      await VoteExecutorSlave.executeDeposits();
+        //      console.log(await eurt.balanceOf(VoteExecutorSlave.address), "THis is the current balance")
+        //  })
+
+        //  it("Deposit into Frax3CRV and CRV3Crypto", async function() {
+            
+        //     if (typeof mneumonic !== "string") {
+        //         return
+        //     }
+        //     let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveFrax3CRV", usdc.address, frax.address, parseEther("700000"), true)
+        //     let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCrypto", usdc.address, usdt.address, parseEther("300000"), true)
+        //     await executeVote([encodedDeposit1, encodedDeposit2])
+        //     await VoteExecutorSlave.executeDeposits();
+        // })
+
+        // it("Then withdraw some USDC after an initial deposited state", async function() {
+
+        //     if (typeof mneumonic !== "string") {
+        //         return
+        //     }
+        //     // Do an intiial deposit
+        //     let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveFrax3CRV", usdc.address, frax.address, parseEther("700000"), true)
+        //     let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCrypto", usdc.address, usdt.address, parseEther("300000"), true)
+
+        //     await executeVote([encodedDeposit1, encodedDeposit2])
+        //     await VoteExecutorSlave.executeDeposits();
+
+        //     // Do withdrawals
+
+        //     let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveFrax3CRV", usdc.address, frax.address, 7000, false);
+        //     let encodedWithdraw2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCrypto", usdc.address, usdt.address, 5000, false);
+        //     await executeVote([encodedWithdraw1, encodedWithdraw2])
+        //     await VoteExecutorSlave.executeDeposits();
+        //     console.log(await usdc.balanceOf(VoteExecutorSlave.address), "THis is the current balance")
+        //     expect(Number(await usdc.balanceOf(VoteExecutorSlave.address))).greaterThan(0);
+        // })
+        // it("Deposit initial capital in USDC. Withdraw and reallocate to different pool.", async function() {
+
+        //     if (typeof mneumonic !== "string") {
+        //         return
+        //     }
+        //     // Deposit into Frax 3CRV first
+        //     let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveFrax3CRV", usdc.address, frax.address, parseEther("1000000"), true)
+        //     await executeVote([encodedDeposit1]);
+        //     await VoteExecutorSlave.executeDeposits();
+
+
+        //     // Withdraw 100% of the tokens in CurveFrax3CRV and deposit all of it back into CurveCRVCrypto.
+        //     let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveFrax3CRV", usdc.address, frax.address, 10000, false);
+        //     let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCrypto", usdc.address, usdt.address, parseUnits("998780981925", 12), true)
+        //     await executeVote([encodedWithdraw1, encodedDeposit2])
+        //     await VoteExecutorSlave.executeDeposits();
+        //     console.log(await usdc.balanceOf(VoteExecutorSlave.address), "THis is the current balance")
+        // })
+
+        it("Deposit into CurveCRVCryptoETH, CurveETHCRV and CurveETHLido", async function() {
             
             if (typeof mneumonic !== "string") {
                 return
             }
-            let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveFrax3CRV", usdc.address, frax.address, parseEther("700000"), true)
-            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCrypto", usdc.address, usdt.address, parseEther("300000"), true)
-            await executeVote([encodedDeposit1, encodedDeposit2])
-            await VoteExecutorSlave.executeDeposits();
-        })
+            let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, parseEther("33"), true)
+            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveETHCRV", weth.address , weth.address, parseEther("33"), true)
+            let encodedDeposit3 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveETHLido", weth.address , weth.address, parseEther("33"), true)
 
-        it("Then withdraw some USDC after an initial deposited state", async function() {
-
-            if (typeof mneumonic !== "string") {
-                return
-            }
-            // Do an intiial deposit
-            let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveFrax3CRV", usdc.address, frax.address, parseEther("700000"), true)
-            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCrypto", usdc.address, usdt.address, parseEther("300000"), true)
-
-            await executeVote([encodedDeposit1, encodedDeposit2])
-            await VoteExecutorSlave.executeDeposits();
-
-            // Do withdrawals
-
-            let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveFrax3CRV", usdc.address, frax.address, 7000, false);
-            let encodedWithdraw2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCrypto", usdc.address, usdt.address, 5000, false);
-            await executeVote([encodedWithdraw1, encodedWithdraw2])
-            await VoteExecutorSlave.executeDeposits();
-            console.log(await usdc.balanceOf(VoteExecutorSlave.address), "THis is the current balance")
-            expect(Number(await usdc.balanceOf(VoteExecutorSlave.address))).greaterThan(0);
-        })
-        it("Deposit initial capital in USDC. Withdraw and reallocate to different pool.", async function() {
-
-            if (typeof mneumonic !== "string") {
-                return
-            }
-            // Deposit into Frax 3CRV first
-            let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveFrax3CRV", usdc.address, frax.address, parseEther("1000000"), true)
-            await executeVote([encodedDeposit1]);
-            await VoteExecutorSlave.executeDeposits();
-
-
-            // Withdraw 100% of the tokens in CurveFrax3CRV and deposit all of it back into CurveCRVCrypto.
-            let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveFrax3CRV", usdc.address, frax.address, 10000, false);
-            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCrypto", usdc.address, usdt.address, parseUnits("998780981925", 12), true)
-            await executeVote([encodedWithdraw1, encodedDeposit2])
-            await VoteExecutorSlave.executeDeposits();
-            console.log(await usdc.balanceOf(VoteExecutorSlave.address), "THis is the current balance")
-        })
-
-        it("Deposit into CurveCRVCryptoETH", async function() {
-            
-            if (typeof mneumonic !== "string") {
-                return
-            }
-            let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, parseEther("100"), true)
-            await executeVote([encodedDeposit1])
+            await executeVote([encodedDeposit1, encodedDeposit2, encodedDeposit3])
             await VoteExecutorSlave.executeDeposits();
         })
         it("Then withdraw some WETH after an initial deposited state", async function() {
@@ -283,26 +295,32 @@ describe("Test L2 Contracts", function() {
                 return
             }
             // Do an intiial deposit
-            let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, parseEther("100"), true)
+            let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, parseEther("33"), true)
+            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveETHCRV", weth.address , weth.address, parseEther("33"), true)
+            let encodedDeposit3 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveETHLido", weth.address , weth.address, parseEther("33"), true)
 
-            await executeVote([encodedDeposit1])
+            await executeVote([encodedDeposit1, encodedDeposit2, encodedDeposit3])
             await VoteExecutorSlave.executeDeposits();
 
             // Do withdrawals
 
-            let encodedWithdraw2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, 7000, false)
-            await executeVote([encodedWithdraw2])
+            let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, 7000, false)
+            let encodedWithdraw2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveETHCRV", weth.address , weth.address, 7000, false)
+            let encodedWithdraw3 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveETHCRV", weth.address , weth.address, 7000, false)
+
+            await executeVote([encodedWithdraw1, encodedWithdraw2, encodedWithdraw3])
             await VoteExecutorSlave.executeDeposits();
             console.log(await weth.balanceOf(VoteExecutorSlave.address), "THis is the current balance")
             expect(Number(await weth.balanceOf(VoteExecutorSlave.address))).greaterThan(0);
         })
-        it("Deposit initial capital WETH. Withdraw and redeposit into the same pool", async function() {
+        it("Deposit initial capital WETH into CRVCrypto. Withdraw and redeposit into CurveETHCRV", async function() {
 
             if (typeof mneumonic !== "string") {
                 return
             }
             // Deposit into Frax 3CRV first
             let encodedDeposit1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, parseEther("100"), true)
+
             await executeVote([encodedDeposit1])
             await VoteExecutorSlave.executeDeposits();
 
@@ -310,7 +328,8 @@ describe("Test L2 Contracts", function() {
             // Withdraw 100% of the tokens in CurveFrax3CRV and deposit all of it back into CurveCRVCrypto.
 
             let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, 10000, false)
-            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, "99877162419466985437", true)
+            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveETHCRV", weth.address , weth.address, "99876162419466985437", true)
+
             await executeVote([encodedWithdraw1, encodedDeposit2])
             await VoteExecutorSlave.executeDeposits();
             console.log(await weth.balanceOf(VoteExecutorSlave.address), "THis is the current balance")
@@ -359,7 +378,7 @@ describe("Test L2 Contracts", function() {
             // Withdraw 100% of the tokens in CurveCRVCryptoBTC and deposit all of it back into CurveRen.
 
             let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoBTC", wbtc.address , wbtc.address, 10000, false);
-            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveRen", wbtc.address ,wbtc.address , parseUnits("998989153", 10), true)
+            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveRen", wbtc.address ,wbtc.address , parseUnits("998953315", 10), true)
             await executeVote([encodedWithdraw1, encodedDeposit2])
             await VoteExecutorSlave.executeDeposits();
             console.log(await wbtc.balanceOf(VoteExecutorSlave.address), "THis is the current balance")
@@ -445,8 +464,8 @@ describe("Test L2 Contracts", function() {
             await VoteExecutorSlave.executeDeposits();
 
             let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurt", eurt.address ,eurt.address , parseUnits("996062272781",12), true)
-            let encodedDeposit4 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCrypto", usdc.address, usdt.address, parseUnits("998780852889",12), true)
-            encodedDeposit5 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, "99898409278027785950", true)
+            let encodedDeposit4 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCrypto", usdc.address, usdt.address, parseUnits("997780852889",12), true)
+            encodedDeposit5 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, "99798409278027785950", true)
             let encodedDeposit6 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoBTC", wbtc.address , wbtc.address,  parseUnits("999797306",10), true)
 
             // 40 eur loss

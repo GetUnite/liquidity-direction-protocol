@@ -45,41 +45,37 @@ contract VoteExecutorSlave is
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-    bool public upgradeStatus;
-    string public lastMessage;
-    address public lastCaller;
-    address public voteExecutorMaster;
     bytes[] public executionHistory;
 
+    bool public upgradeStatus;
 
     // Anycall V6 Fantom Address
     address public anyCallAddress;
     address public anyCallExecutorAddress;
+    address public exchangeAddress;
+    address public gnosis;
+
+    uint256 public  minSigns;
+    uint256 public slippage;
 
     ILiquidityHandler public handler;
-    address public gnosis;
-    uint256 public  minSigns;
-
-    uint256 public currentChain;
-    
-    uint256 public nextChain;
-    address public nextChainExecutor;
-    uint256 public previousChain;
-    address public previousChainExecutor;
+    EnumerableSetUpgradeable.AddressSet private primaryTokens;
+    Bridging public bridgingInfo;
 
     mapping(string => IIbAlluo) public ibAlluoSymbolToAddress;
-
     mapping(bytes32 => uint256) public hashExecutionTime;
-
-
-
     mapping(address => address) public tokenToAnyToken;
-    mapping(address => EnumerableSetUpgradeable.AddressSet) private strategyToEntryTokens;
     mapping(address => DepositQueue) public tokenToDepositQueue;
-    EnumerableSetUpgradeable.AddressSet private primaryTokens;
-    address public multichainRouter;
     mapping(string => LiquidityDirection) public liquidityDirection;
-    uint256 public slippage;
+
+    struct Bridging{
+        address anyCallAddress;
+        address multichainRouter;
+        address nextChainExecutor;
+        uint256 currentChain;
+        uint256 nextChain;
+    }
+
 
     struct Message {
         uint256 commandIndex;
@@ -119,8 +115,8 @@ contract VoteExecutorSlave is
             __AccessControl_init();
             __UUPSUpgradeable_init();
 
-            anyCallAddress = 0xD7c295E399CA928A3a14b01D760E794f1AdF8990;
-            anyCallExecutorAddress = 0xe3aee52608Db94F2691a7F9Aba30235B14B7Bb70;
+            anyCallAddress = 0xC10Ef9F491C9B59f936957026020C321651ac078;
+            anyCallExecutorAddress = 0x0C9f0ea6317038c9D7180Cf4A0aEeB58478D13A4;
             handler = ILiquidityHandler(_handlerAddress);
             gnosis  = _multiSigWallet;
             minSigns = 1;
@@ -129,7 +125,7 @@ contract VoteExecutorSlave is
             _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
             _grantRole(UPGRADER_ROLE, _multiSigWallet);
 
-            
+            exchangeAddress = 0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec;
             _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
             _grantRole(UPGRADER_ROLE, msg.sender);
     
@@ -150,15 +146,15 @@ contract VoteExecutorSlave is
     function anyExecute(bytes memory _data) external returns (bool success, bytes memory result) {
         (bytes memory message, bytes[] memory signs) = abi.decode(_data, (bytes, bytes[]));
         (bytes32 hashed, Message[] memory _messages) = abi.decode(message, (bytes32, Message[]));
-        // require(hashed == keccak256(abi.encode(_messages)), "Hash doesn't match");
-        // require(_checkSignedHashes(signs, hashed), "Hash has not been approved");
+        require(hashed == keccak256(abi.encode(_messages)), "Hash doesn't match");
+        require(_checkSignedHashes(signs, hashed), "Hash has not been approved");
         // require(IAnyCallExecutor(anyCallExecutorAddress).context().from == voteExecutorMaster, "Origin of message invalid");
         // require(hashExecutionTime[hashed] ==0 || block.timestamp >= hashExecutionTime[hashed] + 1 days, "Duplicate hash" );
         execute(_messages);
         executionHistory.push(_data);
         hashExecutionTime[hashed] = block.timestamp;
-        if (nextChain != 0) {
-            IAnyCall(anyCallAddress).anyCall(nextChainExecutor, _data, address(0), nextChain, 0);
+        if (bridgingInfo.nextChain != 0) {
+            IAnyCall(anyCallAddress).anyCall(bridgingInfo.nextChainExecutor, _data, address(0), bridgingInfo.nextChain, 0);
         }
         success=true;
         result="";
@@ -180,7 +176,7 @@ contract VoteExecutorSlave is
             if(currentMessage.commandIndex == 2) {
                 // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
                 (address strategyAddress, uint256 delta, uint256 chainId, address strategyPrimaryToken, address exitToken, bytes memory data) = abi.decode(currentMessage.commandData, (address, uint256, uint256, address,address, bytes));
-                if (chainId == currentChain) {
+                if (chainId == bridgingInfo.currentChain) {
                     console.log("Withdraw strategy", strategyPrimaryToken, delta);
                     console.log("Balance before", IERC20MetadataUpgradeable(strategyPrimaryToken).balanceOf(address(this)));
                     IAlluoStrategy(strategyAddress).exitAll(data, delta, strategyPrimaryToken, address(this), false);
@@ -192,7 +188,7 @@ contract VoteExecutorSlave is
             if(currentMessage.commandIndex == 3) {
                 // Add all deposits to the queue.
                 (address strategyAddress, uint256 delta, uint256 chainId, address strategyPrimaryToken, address entryToken, bytes memory data) = abi.decode(currentMessage.commandData, (address, uint256, uint256, address,address, bytes));
-                if (chainId == currentChain) {
+                if (chainId == bridgingInfo.currentChain) {
                     console.log("Deposit added", strategyAddress, delta);
                     tokenToDepositQueue[strategyPrimaryToken].depositList.push(Deposit(strategyAddress, delta, strategyPrimaryToken, entryToken, data));
                 }
@@ -236,23 +232,23 @@ contract VoteExecutorSlave is
         _executeDeposits(false);
     }
 
-    // This function checks if executeDeposits() can be called without being reverted.
-    // We can put a flag to set as true for gelato to start listening , such as when we receive 
-    function checkExecuteDeposits() public view returns (bool) {
-        for (uint256 i; i < primaryTokens.length(); i++) {
-            DepositQueue memory depositQueue = tokenToDepositQueue[primaryTokens.at(i)];
-            Deposit[] memory depositList = depositQueue.depositList;
-            uint256 depositNumber = depositQueue.depositNumber;
-            uint256 iters = depositList.length - depositNumber;
-            for (uint256 j; j < iters; j++) {
-                Deposit memory depositInfo = depositList[depositNumber + i];
-                if (IERC20MetadataUpgradeable(strategyToEntryTokens[depositInfo.strategyAddress].at(0)).balanceOf(address(this)) < depositInfo.amount) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
+    // // This function checks if executeDeposits() can be called without being reverted.
+    // // We can put a flag to set as true for gelato to start listening , such as when we receive 
+    // function checkExecuteDeposits() public view returns (bool) {
+    //     for (uint256 i; i < primaryTokens.length(); i++) {
+    //         DepositQueue memory depositQueue = tokenToDepositQueue[primaryTokens.at(i)];
+    //         Deposit[] memory depositList = depositQueue.depositList;
+    //         uint256 depositNumber = depositQueue.depositNumber;
+    //         uint256 iters = depositList.length - depositNumber;
+    //         for (uint256 j; j < iters; j++) {
+    //             Deposit memory depositInfo = depositList[depositNumber + i];
+    //             if (IERC20MetadataUpgradeable(strategyToEntryTokens[depositInfo.strategyAddress].at(0)).balanceOf(address(this)) < depositInfo.amount) {
+    //                 return false;
+    //             }
+    //         }
+    //     }
+    //     return true;
+    // }
 
     function _changeAPY(uint256 _newAnnualInterest, uint256 _newInterestPerSecond, string memory _ibAlluoSymbol) internal {
         ibAlluoSymbolToAddress[_ibAlluoSymbol].setInterest(_newAnnualInterest, _newInterestPerSecond);
@@ -280,10 +276,7 @@ contract VoteExecutorSlave is
         for (uint256 i; i < primaryTokens.length(); i++) {
             uint256 tokenBalance = IERC20MetadataUpgradeable(primaryTokens.at(i)).balanceOf(address(this));
             if ( tokenToDepositQueue[primaryTokens.at(i)].depositList.length ==  tokenToDepositQueue[primaryTokens.at(i)].depositNumber && tokenBalance >= 1000 && forward) {
-                IMultichain(multichainRouter).anySwapOutUnderlying(tokenToAnyToken[primaryTokens.at(i)], nextChainExecutor, tokenBalance, nextChain);
-            }
-            if ( tokenToDepositQueue[primaryTokens.at(i)].depositList.length ==  tokenToDepositQueue[primaryTokens.at(i)].depositNumber && tokenBalance >= 1000 && !forward) {
-                IMultichain(multichainRouter).anySwapOutUnderlying(tokenToAnyToken[primaryTokens.at(i)], previousChainExecutor, tokenBalance, previousChain);
+                IMultichain(bridgingInfo.multichainRouter).anySwapOutUnderlying(tokenToAnyToken[primaryTokens.at(i)], bridgingInfo.nextChainExecutor, tokenBalance, bridgingInfo.nextChain);
             }
         }
     }
@@ -438,17 +431,21 @@ contract VoteExecutorSlave is
         anyCallExecutorAddress = _newExecutorAddress;
     }
 
-    function setVoteExecutorMaster(address _newAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        voteExecutorMaster = _newAddress;
+    function setBridgingInfo(address _anyCallAddress, address _multichainRouter,address _nextChainExecutor,uint256 _currentChain, uint256 _nextChain) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        bridgingInfo = Bridging(_anyCallAddress, _multichainRouter, _nextChainExecutor, _currentChain, _nextChain);
     }
 
+    
+    function setTokenToAnyToken(address _token, address _anyToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        tokenToAnyToken[_token] = _anyToken;
+    }
 
     function grantRole(bytes32 role, address account)
     public
     override
     onlyRole(getRoleAdmin(role)) {
         if (role == DEFAULT_ADMIN_ROLE) {
-            require(account.isContract(), "Handler: Not contract");
+            require(account.isContract());
         }
         _grantRole(role, account);
     }
@@ -463,7 +460,16 @@ contract VoteExecutorSlave is
     internal
     onlyRole(UPGRADER_ROLE)
     override {
-        require(upgradeStatus, "Handler: Upgrade not allowed");
+        require(upgradeStatus);
         upgradeStatus = false;
+    }
+    function multicall(
+        address[] calldata destinations,
+        bytes[] calldata calldatas
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 length = destinations.length;
+        for (uint256 i = 0; i < length; i++) {
+            destinations[i].functionCall(calldatas[i]);
+        }
     }
 }

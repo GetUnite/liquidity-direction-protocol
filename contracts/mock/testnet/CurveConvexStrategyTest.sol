@@ -5,8 +5,11 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 import "../../interfaces/IExchange.sol";
+import "../../interfaces/IWrappedEther.sol";
+
 import "hardhat/console.sol";
 
 interface IAlluoStrategy {
@@ -289,9 +292,20 @@ interface ICvxBaseRewardPool {
         external
         returns (bool);
 }
+
+    interface ICurve2Pool {
+    // add liquidity (dai or usdc) to receive back DAI+USDC
+    function add_liquidity(uint256[2] memory _deposit_amounts, uint256 _min_mint_amount) external returns(uint256);
+    // remove liquidity (DAI+USDC) to recieve back dai or usdc
+    function remove_liquidity_one_coin(uint256 _burn_amount, int128 i, uint256 _min_amount) external returns(uint256);
+    function calc_withdraw_one_coin(uint256 _burn_amount, int128 i) external view returns(uint256);
+    function coins(uint256 index) external view returns(address);
+}
 contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
     using Address for address;
     using SafeERC20 for IERC20;
+    // For polygon remember to change these constants
+
 
     ICvxBooster public constant cvxBooster =
         ICvxBooster(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
@@ -299,9 +313,17 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
         IExchange(0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec);
     IERC20 public constant cvxRewards =
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
+    // IERC20 public constant crvRewards =
+    //     IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 public constant crvRewards =
-        IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
+        IERC20(0x1E4F97b9f9F913c46F1632781732927B9019C68b);
+
     uint8 public constant unwindDecimals = 2;
+    IWrappedEther public constant wETH =
+        IWrappedEther(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+
+        
+
 
     constructor(
         address voteExecutor,
@@ -320,6 +342,9 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
         }
     }
 
+    receive() external payable {
+    }
+
     function invest(bytes calldata data, uint256 amount)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
@@ -333,24 +358,26 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
             uint8 tokenIndexInCurve,
             uint256 poolId
         ) = decodeEntryParams(data);
-
-        // prepare amounts array for curve
+        uint256 valueETH;
+        
+        if (address(poolToken) == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) {
+            wETH.withdraw(amount);
+            valueETH = amount;
+        } else {
+            poolToken.safeIncreaseAllowance(curvePool, amount);
+        }
         uint256[4] memory fourPoolTokensAmount;
         fourPoolTokensAmount[tokenIndexInCurve] = amount;
-
-        // approve tokens to curve pool
-        poolToken.safeIncreaseAllowance(curvePool, amount);
-
-        // encode call to curve - this ugly code handles different curve pool
-        // sizes and function selectors
         bytes memory curveCall;
-        if (poolSize == 2) {
+      
+
+      if (poolSize == 2 ) {
             curveCall = abi.encodeWithSelector(
                 0x0b4c7e4d,
                 uint256[2]([fourPoolTokensAmount[0], fourPoolTokensAmount[1]]),
                 0
             );
-        } else if (poolSize == 3) {
+        }  else if (poolSize == 3) {
             curveCall = abi.encodeWithSelector(
                 0x4515cef3,
                 uint256[3](
@@ -370,8 +397,7 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
             );
         }
 
-        // execute call
-        curvePool.functionCall(curveCall);
+        curvePool.functionCallWithValue(curveCall, valueETH);
 
         // skip investment in convex, if poolId is uint256 max value
         if (poolId != type(uint256).max) {
@@ -384,13 +410,16 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
         return
             encodeExitParams(
                 curvePool,
-                address(poolToken),
                 address(lpToken),
+                address(poolToken),
+                // Placeholder! Make sure to change.
+                "int128",
                 tokenIndexInCurve,
                 poolId
             );
     }
 
+    
     function exitAll(
         bytes calldata data,
         uint256 unwindPercent,
@@ -400,12 +429,12 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         (
             address curvePool,
-            IERC20 poolToken,
             IERC20 lpToken,
+            IERC20 poolToken,
+            bytes memory typeOfTokenIndex,
             uint8 tokenIndexInCurve,
             uint256 convexPoolId
         ) = decodeExitParams(data);
-
         uint256 lpAmount;
         if (convexPoolId != type(uint256).max) {
             ICvxBaseRewardPool rewards = getCvxRewardPool(convexPoolId);
@@ -416,30 +445,24 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
             // withdraw Curve LPs and all rewards
             rewards.withdrawAndUnwrap(lpAmount, true);
         } else {
-            lpAmount = lpToken.balanceOf(address(this));
+            lpAmount = lpToken.balanceOf(address(this)) * unwindPercent / (10**(2+unwindDecimals));
         }
 
         if (lpAmount == 0) return;
-
         // exit with coin that we used for entry
         bytes memory curveCall = abi.encodeWithSignature(
-            "remove_liquidity_one_coin(uint256,int128,uint256)",
+            string(bytes.concat("remove_liquidity_one_coin(uint256,", typeOfTokenIndex,",uint256)")),
             lpAmount,
             tokenIndexInCurve,
             0
         );
-        if (curvePool == 0xD51a44d3FaE010294C616388b506AcdA1bfAAE46 || curvePool == 0x9838eCcC42659FA8AA7daF2aD134b53984c9427b) {
-            curveCall = abi.encodeWithSignature(
-            "remove_liquidity_one_coin(uint256,uint256,uint256)",
-            lpAmount,
-            tokenIndexInCurve,
-            0
-        );
-        }
-
+        uint256  valueETHBefore = address(this).balance;
         curvePool.functionCall(curveCall);
-
-
+        uint256 ethDelta = address(this).balance - valueETHBefore;
+        if (ethDelta > 0) {
+            wETH.deposit{value: ethDelta}();
+            poolToken = IERC20(address(wETH));
+        } 
         // execute exchanges and transfer all tokens to receiver
         exchangeAll(poolToken, IERC20(outputCoin));
         manageRewardsAndWithdraw(swapRewards, IERC20(outputCoin), receiver);
@@ -451,7 +474,7 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
         address receiver,
         bool swapRewards
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        (, , , , uint256 convexPoolId) = decodeExitParams(data);
+        (, , , , , uint256 convexPoolId) = decodeExitParams(data);
         ICvxBaseRewardPool rewards = getCvxRewardPool(convexPoolId);
         rewards.getReward(address(this), true);
 
@@ -490,16 +513,18 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
 
     function encodeExitParams(
         address curvePool,
-        address poolToken,
         address lpToken,
+        address poolToken,
+        bytes memory typeOfTokenIndex,
         uint8 tokenIndexInCurve,
         uint256 convexPoolId
     ) public pure returns (bytes memory) {
         return
             abi.encode(
                 curvePool,
-                poolToken,
                 lpToken,
+                poolToken,
+                typeOfTokenIndex,
                 tokenIndexInCurve,
                 convexPoolId
             );
@@ -529,12 +554,13 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
             address,
             IERC20,
             IERC20,
+            bytes memory,
             uint8,
             uint256
         )
     {
-        require(data.length == 32 * 5, "CurveConvexStrategy: length ex");
-        return abi.decode(data, (address, IERC20, IERC20, uint8, uint256));
+        require(data.length == 32 * 8, "CurveConvexStrategy: length ex");
+        return abi.decode(data, (address, IERC20, IERC20, bytes, uint8, uint256));
     }
 
     function exchangeAll(IERC20 fromCoin, IERC20 toCoin) private {
@@ -555,10 +581,10 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
             exchangeAll(cvxRewards, outputCoin);
             exchangeAll(crvRewards, outputCoin);
         } else {
-            cvxRewards.safeTransfer(
-                receiver,
-                cvxRewards.balanceOf(address(this))
-            );
+            // cvxRewards.safeTransfer(
+            //     receiver,
+            //     cvxRewards.balanceOf(address(this))
+            // );
             crvRewards.safeTransfer(
                 receiver,
                 crvRewards.balanceOf(address(this))
