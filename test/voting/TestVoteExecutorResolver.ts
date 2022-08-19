@@ -45,7 +45,12 @@ describe("VoteExecutorResolver", function() {
         const pseudoMultisigWallet = await PseudoMultisigWallet.deploy(true)
         await pseudoMultisigWallet.addOwners(signers[0].address)
         await pseudoMultisigWallet.addOwners(signers[1].address)
-        const gnosis = pseudoMultisigWallet.address
+
+        let gnosis = await getImpersonatedSigner(pseudoMultisigWallet.address)
+
+        await (await (await ethers.getContractFactory("ForceSender")).deploy({
+            value: parseEther("10.0")
+        })).forceSend(gnosis.address);
 
         // Please double check the addresses below and MinSigns
         let locker = "0xf295ee9f1fa3df84493ae21e08ec2e1ca9debbaf";
@@ -55,13 +60,13 @@ describe("VoteExecutorResolver", function() {
 
         const VoteExecutorMasterFactory = await ethers.getContractFactory("VoteExecutorMaster");
         const VoteExecutorMaster = await upgrades.deployProxy(VoteExecutorMasterFactory, 
-            [gnosis, locker, anyCall, timelock],
+            [gnosis.address, locker, anyCall, timelock],
             { initializer: 'initialize', kind: 'uups' }
         ) as VoteExecutorMaster
 
-        await VoteExecutorMaster.setMinSigns(MinSigns);
-        await VoteExecutorMaster.setNextChainExecutor("0x1D147031b6B4998bE7D446DecF7028678aeb732A", "137");
 
+        await VoteExecutorMaster.connect(gnosis).setMinSigns(MinSigns);
+        await VoteExecutorMaster.connect(gnosis).setNextChainExecutor("0x1D147031b6B4998bE7D446DecF7028678aeb732A", "137");
 
 
         const message0 = await VoteExecutorMaster.encodeApyCommand("IbAlluoUSD", 1000, 1000);
