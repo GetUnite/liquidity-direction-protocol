@@ -149,7 +149,7 @@ contract VoteExecutorMaster is
     function executeSpecificData(uint256 index) external {
             (bytes32 hashed, Message[] memory messages) = abi.decode(submittedData[index].data, (bytes32, Message[]));
             require(submittedData[index].time + timeLock < block.timestamp, "Under timelock");
-            require(hashExecutionTime[hashed] == 0 || block.timestamp >= hashExecutionTime[hashed] + 1 days, "Duplicate Hash");
+            require(hashExecutionTime[hashed] == 0, "Duplicate Hash");
 
             if(submittedData[index].signs.length >= minSigns){
                 for (uint256 j; j < messages.length; j++) {
@@ -239,7 +239,11 @@ contract VoteExecutorMaster is
         return abi.decode(_data, (uint256, uint256));
     }
 
-
+    function clearExecutionHash(bytes32 hashed)
+    public
+    onlyRole(DEFAULT_ADMIN_ROLE) {
+        hashExecutionTime[hashed]=0;
+    }
     function grantRole(bytes32 role, address account)
     public
     override
