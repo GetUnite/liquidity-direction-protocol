@@ -44,7 +44,7 @@ contract VoteExecutorMaster is
     bool public upgradeStatus;
 
     SubmittedData[] public submittedData;
-    Bridging public bridgingInfo;
+    GeneralBridging public generalBridgingInfo;
     EnumerableSetUpgradeable.AddressSet private primaryTokens;
 
     mapping(string => LiquidityDirection) public liquidityDirection;
@@ -60,14 +60,20 @@ contract VoteExecutorMaster is
         bytes data;
     }
     
-    struct Bridging{
+    struct GeneralBridging{
         address anyCallAddress;
-        address multichainRouter;
+        // address multichainRouter;
         address nextChainExecutor;
         uint256 currentChain;
         uint256 nextChain;
     }
 
+    struct TokenBridging{
+        bytes4 functionSignature;
+        address multichainRouter;
+    }
+
+    mapping(address => TokenBridging) public tokenBridgingInfo;
     
     struct Message {
         uint256 commandIndex;
@@ -180,7 +186,7 @@ contract VoteExecutorMaster is
                     if(messages[j].commandIndex == 2) {
                         // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
                         (address strategyAddress, uint256 delta, uint256 chainId, address strategyPrimaryToken, address exitToken, bytes memory data) = abi.decode(messages[j].commandData, (address, uint256, uint256, address,address, bytes));
-                        if (chainId == bridgingInfo.currentChain) {
+                        if (chainId == generalBridgingInfo.currentChain) {
                             IAlluoStrategy(strategyAddress).exitAll(data, delta, strategyPrimaryToken, address(this), false);
                         }
 
@@ -188,7 +194,7 @@ contract VoteExecutorMaster is
                     if(messages[j].commandIndex == 3) {
                         // Add all deposits to the queue.
                         (address strategyAddress, uint256 delta, uint256 chainId, address strategyPrimaryToken, address entryToken, bytes memory data) = abi.decode(messages[j].commandData, (address, uint256, uint256, address,address, bytes));
-                        if (chainId == bridgingInfo.currentChain) {
+                        if (chainId == generalBridgingInfo.currentChain) {
                             tokenToDepositQueue[strategyPrimaryToken].depositList.push(Deposit(strategyAddress, delta, strategyPrimaryToken, entryToken, data));
                         }
                     }
@@ -196,7 +202,7 @@ contract VoteExecutorMaster is
                 // Execute deposits. Only executes if we have sufficient balances.
                 hashExecutionTime[hashed] = block.timestamp;
                 bytes memory finalData = abi.encode(submittedData[index].data, submittedData[index].signs);
-                IAnyCall(bridgingInfo.anyCallAddress).anyCall(bridgingInfo.nextChainExecutor, finalData, address(0), bridgingInfo.nextChain, 0);
+                IAnyCall(generalBridgingInfo.anyCallAddress).anyCall(generalBridgingInfo.nextChainExecutor, finalData, address(0), generalBridgingInfo.nextChain, 0);
             }     
     }
 
@@ -220,6 +226,7 @@ contract VoteExecutorMaster is
             }
         }
     }
+
     function incrementDepositNumber(address primaryToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
         tokenToDepositQueue[primaryToken].depositNumber++;
     }
@@ -232,11 +239,20 @@ contract VoteExecutorMaster is
     function _bridgeFunds() internal {
         // primaryTokens = eth, usd, eur
         for (uint256 i; i < primaryTokens.length(); i++) {
-            uint256 tokenBalance = IERC20MetadataUpgradeable(primaryTokens.at(i)).balanceOf(address(this));
-            if ( tokenToDepositQueue[primaryTokens.at(i)].depositList.length ==  tokenToDepositQueue[primaryTokens.at(i)].depositNumber) {
+            address primaryToken = primaryTokens.at(i);
+            uint256 tokenBalance = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
+            if ( tokenToDepositQueue[primaryToken].depositList.length ==  tokenToDepositQueue[primaryToken].depositNumber) {
                 // Need to approvehere!!!
-                IERC20MetadataUpgradeable(primaryTokens.at(i)).approve(bridgingInfo.multichainRouter, tokenBalance);
-                IMultichain(bridgingInfo.multichainRouter).anySwapOutUnderlying(tokenToAnyToken[primaryTokens.at(i)], bridgingInfo.nextChainExecutor, tokenBalance, bridgingInfo.nextChain);
+                IERC20MetadataUpgradeable(primaryToken).approve(tokenBridgingInfo[primaryToken].multichainRouter, tokenBalance);
+                // IMultichain(bridgingInfo.multichainRouter).anySwapOutUnderlying(tokenToAnyToken[primaryToken], bridgingInfo.nextChainExecutor, tokenBalance, bridgingInfo.nextChain);
+                bytes memory data = abi.encodeWithSelector(
+                    tokenBridgingInfo[primaryToken].functionSignature, 
+                    tokenToAnyToken[primaryToken], 
+                    generalBridgingInfo.nextChainExecutor, 
+                    tokenBalance, generalBridgingInfo.nextChain
+                );
+
+                tokenBridgingInfo[primaryToken].multichainRouter.call(data);
                 // Mapping  USDC --> anySwapoutUnderlying,  multichianRouter
                 //          EURS --> anySwapout  multichainRouterv2
                 // mapping(address -> struct)
@@ -311,6 +327,7 @@ contract VoteExecutorMaster is
             return (3, abi.encode(direction.strategyAddress, _delta, direction.chainId, _strategyPrimaryToken, _entryToken, direction.entryData));
         }
     }
+    
     function encodeAllMessages(uint256[] memory _commandIndexes, bytes[] memory _messages) public pure  returns (bytes32 messagesHash, Message[] memory messages, bytes memory inputData) {
         require(_commandIndexes.length == _messages.length, "Array length mismatch");
         messages = new Message[](_commandIndexes.length);
@@ -353,6 +370,11 @@ contract VoteExecutorMaster is
     }
     /// Admin functions 
 
+    function setTokenBridgingInfo(address _tokenAddress, bytes4 _selector, address _router) external onlyRole(DEFAULT_ADMIN_ROLE){
+        tokenBridgingInfo[_tokenAddress].functionSignature = _selector;
+        tokenBridgingInfo[_tokenAddress].multichainRouter = _router;
+    }
+
     /**
     * @notice Set the address of the multisig.
     * @param _gnosisAddress  
@@ -372,7 +394,8 @@ contract VoteExecutorMaster is
     }
 
     function setBridgingInfo(address _anyCallAddress, address _multichainRouter,address _nextChainExecutor,uint256 _currentChain, uint256 _nextChain) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        bridgingInfo = Bridging(_anyCallAddress, _multichainRouter, _nextChainExecutor, _currentChain, _nextChain);
+        // generalBridgingInfo = GeneralBridging(_anyCallAddress, _multichainRouter, _nextChainExecutor, _currentChain, _nextChain);
+        generalBridgingInfo = GeneralBridging(_anyCallAddress, _nextChainExecutor, _currentChain, _nextChain);
     }
 
     function setTokenToAnyToken(address _token, address _anyToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
