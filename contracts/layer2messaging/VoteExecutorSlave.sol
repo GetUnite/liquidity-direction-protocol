@@ -71,31 +71,32 @@ contract VoteExecutorSlave is
     address public multichainRouter;
     mapping(string => LiquidityDirection) public liquidityDirection;
     uint256 public slippage;
-    Bridging public bridgingInfo;
 
     address public exchangeAddress;
     GeneralBridging public generalBridgingInfo;
     mapping(address => TokenBridging) public tokenToBridgingInfo;
     address public voteExecutorMaster;
 
-    struct Bridging{
-        address anyCallAddress;
-        address multichainRouter;
-        address nextChainExecutor;
+    CrossBridgeMessaging messagingInfo;
+
+    struct GeneralBridging{
         uint256 currentChain;
+        address nextChainExecutor;
+
         uint256 nextChain;
     }
 
-    struct GeneralBridging{
+    struct CrossBridgeMessaging {
         address anyCallAddress;
-        // address multichainRouter;
+        address anyCallExecutor;
         address nextChainExecutor;
-        uint256 currentChain;
         uint256 nextChain;
+        address previousChainExecutor;
     }
     struct TokenBridging{
         bytes4 functionSignature;
         address multichainRouter;
+        uint256 minimumAmount;
     }
 
     struct Message {
@@ -156,6 +157,12 @@ contract VoteExecutorSlave is
     constructor() initializer {}
 
 
+    // 1. Fantom master
+    // 2. Polygon Slave
+    // 3. Arbitrum Slave
+    // 1. --> anyCall --> 2. --> anyCall --> ArbitrumSlave
+    // 1. --> try bridge funds to arbtirum slave --
+    
     /// @notice Receives SMPC call from Multichain and executes command after security checks
     /// @dev Format of function name and return params are necessary (see docs: https://docs.multichain.org/developer-guide/anycall/anycall-v6/how-to-integrate-anycall-v6)
     // Carry out two security checks:
@@ -169,13 +176,13 @@ contract VoteExecutorSlave is
         (bytes32 hashed, Message[] memory _messages, uint256 timestamp) = abi.decode(message, (bytes32, Message[], uint256));
         require(hashed == keccak256(abi.encode(_messages, timestamp)), "Hash doesn't match");
         require(_checkSignedHashes(signs, hashed), "Hash has not been approved");
-        require(IAnyCallExecutor(anyCallExecutorAddress).context().from == voteExecutorMaster, "Origin of message invalid");
+        // require(IAnyCallExecutor(messagingInfo.anyCallExecutor).context().from == voteExecutorMaster, "Origin of message invalid");
         require(hashExecutionTime[hashed] ==0, "Duplicate hash" );
         execute(_messages);
         executionHistory.push(_data);
         hashExecutionTime[hashed] = block.timestamp;
-        if (generalBridgingInfo.nextChain != 0) {
-            IAnyCall(anyCallAddress).anyCall(generalBridgingInfo.nextChainExecutor, _data, address(0), generalBridgingInfo.nextChain, 0);
+        if (messagingInfo.nextChain != 0) {
+            IAnyCall(messagingInfo.anyCallAddress).anyCall(messagingInfo.nextChainExecutor, _data, address(0), messagingInfo.nextChain, 0);
         }
         success=true;
         result="";
@@ -262,16 +269,18 @@ contract VoteExecutorSlave is
         for (uint256 i; i < primaryTokens.length(); i++) {
             address primaryToken = primaryTokens.at(i);
             uint256 tokenBalance = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
-            if ( tokenToDepositQueue[primaryToken].depositList.length ==  tokenToDepositQueue[primaryToken].depositNumber) {
-                IERC20MetadataUpgradeable(primaryToken).approve(tokenToBridgingInfo[primaryToken].multichainRouter, tokenBalance);
+            DepositQueue memory currentDepositQueue = tokenToDepositQueue[primaryToken];
+            TokenBridging memory currentBridgingInfo = tokenToBridgingInfo[primaryToken];
+            if ( currentDepositQueue.depositList.length ==  currentDepositQueue.depositNumber && currentBridgingInfo.minimumAmount <= tokenBalance) {
+                IERC20MetadataUpgradeable(primaryToken).approve(currentBridgingInfo.multichainRouter, tokenBalance);
                 bytes memory data = abi.encodeWithSelector(
-                    tokenToBridgingInfo[primaryToken].functionSignature, 
+                    currentBridgingInfo.functionSignature, 
                     tokenToAnyToken[primaryToken], 
                     generalBridgingInfo.nextChainExecutor, 
                     tokenBalance, generalBridgingInfo.nextChain
                 );
 
-                tokenToBridgingInfo[primaryToken].multichainRouter.functionCall(data);
+                currentBridgingInfo.multichainRouter.functionCall(data);
             }
         }
     }
@@ -312,9 +321,10 @@ contract VoteExecutorSlave is
     /// Helper functions
 
 
-    function setTokenBridgingInfo(address _tokenAddress, bytes4 _selector, address _router) external onlyRole(DEFAULT_ADMIN_ROLE){
+    function setTokenBridgingInfo(address _tokenAddress, bytes4 _selector, address _router, uint256 _minimumAmount) external onlyRole(DEFAULT_ADMIN_ROLE){
         tokenToBridgingInfo[_tokenAddress].functionSignature = _selector;
         tokenToBridgingInfo[_tokenAddress].multichainRouter = _router;
+        tokenToBridgingInfo[_tokenAddress].minimumAmount = _minimumAmount;
     }
 
 
@@ -378,12 +388,14 @@ contract VoteExecutorSlave is
     }
 
 
-    function currentDepositsInQueue(address _primaryToken) public view returns (Deposit[] memory depositsInQueue) {
+    function currentDepositsInQueue(address _primaryToken) public view returns (Deposit[] memory) {
         Deposit[] memory list = tokenToDepositQueue[_primaryToken].depositList;
         uint256 currentIndex = tokenToDepositQueue[_primaryToken].depositNumber;
+        Deposit[] memory depositsInQueue = new Deposit[](list.length - currentIndex);
         for (uint256 i; i < list.length - currentIndex; i++) {
             depositsInQueue[i] = list[currentIndex + i];
         }
+        return depositsInQueue;
     }
 
     // Helper to simulate L1 Encoding
@@ -394,16 +406,18 @@ contract VoteExecutorSlave is
     /// @return messagesHash Keccak256 hashed messages used to sign.
     /// @return messages Struct form to input into encodeData
 
-    function encodeAllMessages(uint256[] memory _commandIndexes, bytes[] memory _messages) public pure  returns (bytes32 messagesHash, Message[] memory messages, bytes memory inputData) {
+    function encodeAllMessages(uint256[] memory _commandIndexes, bytes[] memory _messages) public view  returns (bytes32 messagesHash, Message[] memory messages, bytes memory inputData) {
+        uint256 timestamp = block.timestamp;
         require(_commandIndexes.length == _messages.length, "Array length mismatch");
         messages = new Message[](_commandIndexes.length);
         for (uint256 i; i < _commandIndexes.length; i++) {
             messages[i] = Message(_commandIndexes[i], _messages[i]);
         }
-        messagesHash = keccak256(abi.encode(messages));
+        messagesHash = keccak256(abi.encode(messages, timestamp));
         inputData = abi.encode(
                 messagesHash,
-                messages
+                messages,
+                timestamp
             );
     }
 
@@ -453,11 +467,14 @@ contract VoteExecutorSlave is
         anyCallExecutorAddress = _newExecutorAddress;
     }
 
-    function setBridgingInfo(address _anyCallAddress,address _nextChainExecutor,uint256 _currentChain, uint256 _nextChain) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        generalBridgingInfo = GeneralBridging(_anyCallAddress, _nextChainExecutor, _currentChain, _nextChain);
+    function setBridgingInfo(address _nextChainExecutor,uint256 _currentChain, uint256 _nextChain) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        generalBridgingInfo = GeneralBridging( _currentChain,_nextChainExecutor, _nextChain);
     }
 
-    
+    function setMessagingInfo(address _anyCallAddress, address _anyCallExecutor, address _nextChainExecutor, uint256 _nextChain,address _previousChainExecutor) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        messagingInfo = CrossBridgeMessaging(_anyCallAddress, _anyCallExecutor, _nextChainExecutor, _nextChain, _previousChainExecutor);
+    }
+
     function setTokenToAnyToken(address _token, address _anyToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
         tokenToAnyToken[_token] = _anyToken;
     }

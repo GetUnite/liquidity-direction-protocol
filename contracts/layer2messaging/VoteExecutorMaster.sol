@@ -54,7 +54,8 @@ contract VoteExecutorMaster is
     mapping(bytes32 => uint256) public hashExecutionTime;
 
     GeneralBridging public generalBridgingInfo;
-    mapping(address => TokenBridging) public tokenBridgingInfo;
+    mapping(address => TokenBridging) public tokenToBridgingInfo;
+    CrossBridgeMessaging messagingInfo;
 
     struct Deposit {
         address strategyAddress;
@@ -65,13 +66,19 @@ contract VoteExecutorMaster is
     }
     
     struct GeneralBridging{
-        address anyCallAddress;
-        // address multichainRouter;
         address nextChainExecutor;
         uint256 currentChain;
         uint256 nextChain;
     }
     
+    struct CrossBridgeMessaging {
+        address anyCallAddress;
+        address anyCallExecutor;
+        address nextChainExecutor;
+        uint256 nextChain;
+        address previousChainExecutor;
+    }
+
     struct Bridging{
         address anyCallAddress;
         address multichainRouter;
@@ -81,8 +88,9 @@ contract VoteExecutorMaster is
     }
 
     struct TokenBridging{
-        bytes4 functionSelector;
+        bytes4 functionSignature;
         address multichainRouter;
+        uint256 minimumAmount;
     }
     
     struct Message {
@@ -212,7 +220,7 @@ contract VoteExecutorMaster is
                 // Execute deposits. Only executes if we have sufficient balances.
                 hashExecutionTime[hashed] = block.timestamp;
                 bytes memory finalData = abi.encode(submittedData[index].data, submittedData[index].signs);
-                IAnyCall(generalBridgingInfo.anyCallAddress).anyCall(generalBridgingInfo.nextChainExecutor, finalData, address(0), generalBridgingInfo.nextChain, 0);
+                IAnyCall(messagingInfo.anyCallAddress).anyCall(messagingInfo.nextChainExecutor, finalData, address(0), messagingInfo.nextChain, 0);
             }     
     }
 
@@ -246,33 +254,22 @@ contract VoteExecutorMaster is
         _executeDeposits(false);
     }
 
-    function _bridgeFunds() internal {
+   function _bridgeFunds() internal {
         // primaryTokens = eth, usd, eur
         for (uint256 i; i < primaryTokens.length(); i++) {
             address primaryToken = primaryTokens.at(i);
             uint256 tokenBalance = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
-            if ( tokenToDepositQueue[primaryToken].depositList.length ==  tokenToDepositQueue[primaryToken].depositNumber) {
-                TokenBridging memory tokenInfo = tokenBridgingInfo[primaryToken];
-                IERC20MetadataUpgradeable(primaryToken).approve(tokenInfo.multichainRouter, tokenBalance);
+            DepositQueue memory currentDepositQueue = tokenToDepositQueue[primaryToken];
+            TokenBridging memory currentBridgingInfo = tokenToBridgingInfo[primaryToken];
+            if ( currentDepositQueue.depositList.length ==  currentDepositQueue.depositNumber && currentBridgingInfo.minimumAmount <= tokenBalance) {
+                IERC20MetadataUpgradeable(primaryToken).approve(currentBridgingInfo.multichainRouter, tokenBalance);
                 bytes memory data = abi.encodeWithSelector(
-                    tokenInfo.functionSelector, 
+                    currentBridgingInfo.functionSignature, 
                     tokenToAnyToken[primaryToken], 
                     generalBridgingInfo.nextChainExecutor, 
                     tokenBalance, generalBridgingInfo.nextChain
                 );
-
-                tokenBridgingInfo[primaryToken].multichainRouter.functionCall(data);
-                // Mapping  USDC --> anySwapoutUnderlying,  multichianRouter
-                //          EURS --> anySwapout  multichainRouterv2
-                // mapping(address -> struct)
-                // struct = {functionSelector, multichainRouter address}
-                // 
-                // Certain tokens --> different Router address
-                //  --> .anySwapOut
-                // usdc anyUSDC ---> eurs (anySwapOut)
-                // https://bridgeapi.anyswap.exchange/v4/tokenlistv4/250 Fantom
-                // https://bridgeapi.anyswap.exchange/v4/tokenlistv4/137 Polygon
-                // USDC, EURT, WETH, WBTC
+                currentBridgingInfo.multichainRouter.functionCall(data);
             }
         }
     }
@@ -357,20 +354,27 @@ contract VoteExecutorMaster is
         return true;
     }
 
-    function currentDepositsInQueue(address _primaryToken) public view returns (Deposit[] memory depositsInQueue) {
+    function currentDepositsInQueue(address _primaryToken) public view returns (Deposit[] memory) {
         Deposit[] memory list = tokenToDepositQueue[_primaryToken].depositList;
         uint256 currentIndex = tokenToDepositQueue[_primaryToken].depositNumber;
+        Deposit[] memory depositsInQueue = new Deposit[](list.length - currentIndex);
         for (uint256 i; i < list.length - currentIndex; i++) {
             depositsInQueue[i] = list[currentIndex + i];
         }
+        return depositsInQueue;
     }
 
 
     /// Admin functions 
 
-    function setTokenBridgingInfo(address _tokenAddress, bytes4 _selector, address _router) external onlyRole(DEFAULT_ADMIN_ROLE){
-        tokenBridgingInfo[_tokenAddress].functionSelector = _selector;
-        tokenBridgingInfo[_tokenAddress].multichainRouter = _router;
+     function setTokenBridgingInfo(address _tokenAddress, bytes4 _selector, address _router, uint256 _minimumAmount) external onlyRole(DEFAULT_ADMIN_ROLE){
+        tokenToBridgingInfo[_tokenAddress].functionSignature = _selector;
+        tokenToBridgingInfo[_tokenAddress].multichainRouter = _router;
+        tokenToBridgingInfo[_tokenAddress].minimumAmount = _minimumAmount;
+    }
+
+    function setMessagingInfo(address _anyCallAddress, address _anyCallExecutor, address _nextChainExecutor, uint256 _nextChain,address _previousChainExecutor) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        messagingInfo = CrossBridgeMessaging(_anyCallAddress, _anyCallExecutor, _nextChainExecutor, _nextChain, _previousChainExecutor);
     }
 
     /**
@@ -391,9 +395,8 @@ contract VoteExecutorMaster is
         minSigns = _minSigns;
     }
 
-    function setBridgingInfo(address _anyCallAddress,address _nextChainExecutor,uint256 _currentChain, uint256 _nextChain) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        // generalBridgingInfo = GeneralBridging(_anyCallAddress, _multichainRouter, _nextChainExecutor, _currentChain, _nextChain);
-        generalBridgingInfo = GeneralBridging(_anyCallAddress, _nextChainExecutor, _currentChain, _nextChain);
+    function setBridgingInfo(address _nextChainExecutor,uint256 _currentChain, uint256 _nextChain) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        generalBridgingInfo = GeneralBridging(_nextChainExecutor, _currentChain, _nextChain);
     }
 
     function setTokenToAnyToken(address _token, address _anyToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
