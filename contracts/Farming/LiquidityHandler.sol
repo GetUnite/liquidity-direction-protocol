@@ -107,7 +107,6 @@ contract LiquidityHandler is
         exchangeAddress = _exchangeAddress;
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     /** @notice Called by ibAlluo, deposits tokens into the adapter.
