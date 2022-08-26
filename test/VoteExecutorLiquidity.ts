@@ -329,7 +329,7 @@ describe("Test L2 Contracts", function() {
             // Withdraw 100% of the tokens in CurveFrax3CRV and deposit all of it back into CurveCRVCrypto.
 
             let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, 10000, false)
-            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveETHCRV", weth.address , weth.address, "99876162419466985437", true)
+            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveETHCRV", weth.address , weth.address, "99776162419466985437", true)
 
             await executeVote([encodedWithdraw1, encodedDeposit2])
             await VoteExecutorSlave.executeDeposits();
@@ -379,7 +379,7 @@ describe("Test L2 Contracts", function() {
             // Withdraw 100% of the tokens in CurveCRVCryptoBTC and deposit all of it back into CurveRen.
 
             let encodedWithdraw1 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoBTC", wbtc.address , wbtc.address, 10000, false);
-            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveRen", wbtc.address ,wbtc.address , parseUnits("998953315", 10), true)
+            let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveRen", wbtc.address ,wbtc.address , parseUnits("997953315", 10), true)
             await executeVote([encodedWithdraw1, encodedDeposit2])
             await VoteExecutorSlave.executeDeposits();
             console.log(await wbtc.balanceOf(VoteExecutorSlave.address), "THis is the current balance")
@@ -466,8 +466,8 @@ describe("Test L2 Contracts", function() {
 
             let encodedDeposit2 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveEurt", eurt.address ,eurt.address , parseUnits("996062272781",12), true)
             let encodedDeposit4 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCrypto", usdc.address, usdt.address, parseUnits("997780852889",12), true)
-            encodedDeposit5 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, "99798409278027785950", true)
-            let encodedDeposit6 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoBTC", wbtc.address , wbtc.address,  parseUnits("999797306",10), true)
+            encodedDeposit5 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoETH", weth.address , weth.address, "99598409278027785950", true)
+            let encodedDeposit6 = await VoteExecutorSlave.callStatic.encodeLiquidityCommand("CurveCRVCryptoBTC", wbtc.address , wbtc.address,  parseUnits("997797306",10), true)
 
             // 40 eur loss
             // 12 usd loss

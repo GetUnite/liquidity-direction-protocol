@@ -39,7 +39,7 @@ contract VoteExecutorMaster is
 
     address public gnosis;
     address public locker;
-    address public exchangeAddress = 0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec;
+    address public exchangeAddress;
 
     bool public upgradeStatus;
 
@@ -128,6 +128,7 @@ contract VoteExecutorMaster is
         require(_multiSigWallet.isContract(), "Handler: Not contract");
         gnosis = _multiSigWallet;
         minSigns = 1;
+        exchangeAddress = 0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec;
         // timeLock = _timeLock;
         // bridgingInfo.anyCallAddress = _anyCall;
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);

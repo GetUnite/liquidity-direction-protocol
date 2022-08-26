@@ -10,6 +10,11 @@
       "address": "0xF295EE9F1FA3Df84493Ae21e08eC2e1Ca9DebbAf",
       "txHash": "0xf4b75eec088bdcd075670a32274af7fe4bce2e657c28c0bd34338530b3aa1d10",
       "kind": "uups"
+    },
+    {
+      "address": "0x53D0d72E80012cE864D1644d0F305B4574500fa3",
+      "txHash": "0x8fb0dd7c57498cd01a1bcb0fdae0e36b29c3871c6895eebe95fd75025b1a5412",
+      "kind": "uups"
     }
   ],
   "impls": {
@@ -1417,6 +1422,588 @@
           "t_uint8": {
             "label": "uint8",
             "numberOfBytes": "1"
+          }
+        }
+      }
+    },
+    "f7471079e3baf1ffa7b53083c67a8d8fa5bbca3e27e803fcc33973f0e9fe80f0": {
+      "address": "0xECE4504bBC107b650579F8d961837E8672dc9527",
+      "txHash": "0xf90f3a5885c019f1e434056546a03774a1cc99c6cb0b52c05d5447d2781825b7",
+      "layout": {
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\security\\PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\security\\PausableUpgradeable.sol:102"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC165Upgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\introspection\\ERC165Upgradeable.sol:41"
+          },
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\AccessControlUpgradeable.sol:61"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\AccessControlUpgradeable.sol:247"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\ERC1967\\ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\UUPSUpgradeable.sol:107"
+          },
+          {
+            "label": "minSigns",
+            "offset": 0,
+            "slot": "301",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:37"
+          },
+          {
+            "label": "timeLock",
+            "offset": 0,
+            "slot": "302",
+            "type": "t_uint256",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:38"
+          },
+          {
+            "label": "gnosis",
+            "offset": 0,
+            "slot": "303",
+            "type": "t_address",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:40"
+          },
+          {
+            "label": "locker",
+            "offset": 0,
+            "slot": "304",
+            "type": "t_address",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:41"
+          },
+          {
+            "label": "exchangeAddress",
+            "offset": 0,
+            "slot": "305",
+            "type": "t_address",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:42"
+          },
+          {
+            "label": "upgradeStatus",
+            "offset": 20,
+            "slot": "305",
+            "type": "t_bool",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:44"
+          },
+          {
+            "label": "submittedData",
+            "offset": 0,
+            "slot": "306",
+            "type": "t_array(t_struct(SubmittedData)23507_storage)dyn_storage",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:46"
+          },
+          {
+            "label": "bridgingInfo",
+            "offset": 0,
+            "slot": "307",
+            "type": "t_struct(Bridging)23487_storage",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:47"
+          },
+          {
+            "label": "primaryTokens",
+            "offset": 0,
+            "slot": "312",
+            "type": "t_struct(AddressSet)4239_storage",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:48"
+          },
+          {
+            "label": "liquidityDirection",
+            "offset": 0,
+            "slot": "314",
+            "type": "t_mapping(t_string_memory_ptr,t_struct(LiquidityDirection)23523_storage)",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:50"
+          },
+          {
+            "label": "tokenToAnyToken",
+            "offset": 0,
+            "slot": "315",
+            "type": "t_mapping(t_address,t_address)",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:51"
+          },
+          {
+            "label": "tokenToDepositQueue",
+            "offset": 0,
+            "slot": "316",
+            "type": "t_mapping(t_address,t_struct(DepositQueue)23514_storage)",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:52"
+          },
+          {
+            "label": "hashExecutionTime",
+            "offset": 0,
+            "slot": "317",
+            "type": "t_mapping(t_bytes32,t_uint256)",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:53"
+          },
+          {
+            "label": "generalBridgingInfo",
+            "offset": 0,
+            "slot": "318",
+            "type": "t_struct(GeneralBridging)23465_storage",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:55"
+          },
+          {
+            "label": "tokenToBridgingInfo",
+            "offset": 0,
+            "slot": "321",
+            "type": "t_mapping(t_address,t_struct(TokenBridging)23494_storage)",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:56"
+          },
+          {
+            "label": "messagingInfo",
+            "offset": 0,
+            "slot": "322",
+            "type": "t_struct(CrossChainMessaging)23476_storage",
+            "contract": "VoteExecutorMaster",
+            "src": "contracts\\layer2messaging\\VoteExecutorMaster.sol:57"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_bytes_storage)dyn_storage": {
+            "label": "bytes[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(Deposit)23458_storage)dyn_storage": {
+            "label": "struct VoteExecutorMaster.Deposit[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(SubmittedData)23507_storage)dyn_storage": {
+            "label": "struct VoteExecutorMaster.SubmittedData[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_bytes4": {
+            "label": "bytes4",
+            "numberOfBytes": "4"
+          },
+          "t_bytes_storage": {
+            "label": "bytes",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_address)": {
+            "label": "mapping(address => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(DepositQueue)23514_storage)": {
+            "label": "mapping(address => struct VoteExecutorMaster.DepositQueue)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(TokenBridging)23494_storage)": {
+            "label": "mapping(address => struct VoteExecutorMaster.TokenBridging)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_string_memory_ptr,t_struct(LiquidityDirection)23523_storage)": {
+            "label": "mapping(string => struct VoteExecutorMaster.LiquidityDirection)",
+            "numberOfBytes": "32"
+          },
+          "t_string_memory_ptr": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AddressSet)4239_storage": {
+            "label": "struct EnumerableSetUpgradeable.AddressSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)3938_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Bridging)23487_storage": {
+            "label": "struct VoteExecutorMaster.Bridging",
+            "members": [
+              {
+                "label": "anyCallAddress",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "multichainRouter",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "nextChainExecutor",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "currentChain",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "nextChain",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(CrossChainMessaging)23476_storage": {
+            "label": "struct VoteExecutorMaster.CrossChainMessaging",
+            "members": [
+              {
+                "label": "anyCallAddress",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "anyCallExecutor",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "nextChainExecutor",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "nextChain",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "previousChainExecutor",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(Deposit)23458_storage": {
+            "label": "struct VoteExecutorMaster.Deposit",
+            "members": [
+              {
+                "label": "strategyAddress",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "strategyPrimaryToken",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "entryToken",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "data",
+                "type": "t_bytes_storage",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(DepositQueue)23514_storage": {
+            "label": "struct VoteExecutorMaster.DepositQueue",
+            "members": [
+              {
+                "label": "depositList",
+                "type": "t_array(t_struct(Deposit)23458_storage)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "depositNumber",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(GeneralBridging)23465_storage": {
+            "label": "struct VoteExecutorMaster.GeneralBridging",
+            "members": [
+              {
+                "label": "nextChainExecutor",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "currentChain",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "nextChain",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_struct(LiquidityDirection)23523_storage": {
+            "label": "struct VoteExecutorMaster.LiquidityDirection",
+            "members": [
+              {
+                "label": "strategyAddress",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "chainId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "entryData",
+                "type": "t_bytes_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "exitData",
+                "type": "t_bytes_storage",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Set)3938_storage": {
+            "label": "struct EnumerableSetUpgradeable.Set",
+            "members": [
+              {
+                "label": "_values",
+                "type": "t_array(t_bytes32)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_indexes",
+                "type": "t_mapping(t_bytes32,t_uint256)",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(SubmittedData)23507_storage": {
+            "label": "struct VoteExecutorMaster.SubmittedData",
+            "members": [
+              {
+                "label": "data",
+                "type": "t_bytes_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "time",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "signs",
+                "type": "t_array(t_bytes_storage)dyn_storage",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_struct(TokenBridging)23494_storage": {
+            "label": "struct VoteExecutorMaster.TokenBridging",
+            "members": [
+              {
+                "label": "functionSignature",
+                "type": "t_bytes4",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "multichainRouter",
+                "type": "t_address",
+                "offset": 4,
+                "slot": "0"
+              },
+              {
+                "label": "minimumAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          },
+          "t_string_storage": {
+            "label": "string"
           }
         }
       }
