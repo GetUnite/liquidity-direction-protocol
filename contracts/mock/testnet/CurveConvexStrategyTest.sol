@@ -313,18 +313,14 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
         IExchange(0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec);
     IERC20 public constant cvxRewards =
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
-    // IERC20 public constant crvRewards =
-    //     IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20 public constant crvRewards =
-        IERC20(0x1E4F97b9f9F913c46F1632781732927B9019C68b);
+        IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
+    // IERC20 public constant crvRewards =
+    //     IERC20(0x1E4F97b9f9F913c46F1632781732927B9019C68b);
 
-    uint8 public constant unwindDecimals = 2;
     IWrappedEther public constant wETH =
         IWrappedEther(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-
         
-
-
     constructor(
         address voteExecutor,
         address gnosis,
@@ -439,13 +435,12 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
         if (convexPoolId != type(uint256).max) {
             ICvxBaseRewardPool rewards = getCvxRewardPool(convexPoolId);
             lpAmount =
-                (rewards.balanceOf(address(this)) * unwindPercent) /
-                (10**(2 + unwindDecimals));
+                (rewards.balanceOf(address(this)) * unwindPercent) / 10000;
 
             // withdraw Curve LPs and all rewards
             rewards.withdrawAndUnwrap(lpAmount, true);
         } else {
-            lpAmount = lpToken.balanceOf(address(this)) * unwindPercent / (10**(2+unwindDecimals));
+            lpAmount = lpToken.balanceOf(address(this)) * unwindPercent / 10000;
         }
 
         if (lpAmount == 0) return;
@@ -581,10 +576,10 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
             exchangeAll(cvxRewards, outputCoin);
             exchangeAll(crvRewards, outputCoin);
         } else {
-            // cvxRewards.safeTransfer(
-            //     receiver,
-            //     cvxRewards.balanceOf(address(this))
-            // );
+            cvxRewards.safeTransfer(
+                receiver,
+                cvxRewards.balanceOf(address(this))
+            );
             crvRewards.safeTransfer(
                 receiver,
                 crvRewards.balanceOf(address(this))
