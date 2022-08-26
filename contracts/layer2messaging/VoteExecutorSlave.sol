@@ -70,14 +70,13 @@ contract VoteExecutorSlave is
     EnumerableSetUpgradeable.AddressSet private primaryTokens;
     address public multichainRouter;
     mapping(string => LiquidityDirection) public liquidityDirection;
-    uint256 public slippage;
 
     address public exchangeAddress;
     GeneralBridging public generalBridgingInfo;
     mapping(address => TokenBridging) public tokenToBridgingInfo;
     address public voteExecutorMaster;
 
-    CrossBridgeMessaging messagingInfo;
+    CrossChainMessaging public messagingInfo;
 
     struct GeneralBridging{
         uint256 currentChain;
@@ -86,7 +85,7 @@ contract VoteExecutorSlave is
         uint256 nextChain;
     }
 
-    struct CrossBridgeMessaging {
+    struct CrossChainMessaging {
         address anyCallAddress;
         address anyCallExecutor;
         address nextChainExecutor;
@@ -201,7 +200,7 @@ contract VoteExecutorSlave is
                 _changeAPY(newAnnualInterest, newInterestPerSecond, ibAlluoSymbol);
             }
 
-            if(currentMessage.commandIndex == 2) {
+            else if(currentMessage.commandIndex == 2) {
                 // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
                 (address strategyAddress, uint256 delta, uint256 chainId, address strategyPrimaryToken, address exitToken, bytes memory data) = abi.decode(currentMessage.commandData, (address, uint256, uint256, address,address, bytes));
                 if (chainId == generalBridgingInfo.currentChain) {
@@ -213,7 +212,7 @@ contract VoteExecutorSlave is
 
                 }
             }
-            if(currentMessage.commandIndex == 3) {
+            else if(currentMessage.commandIndex == 3) {
                 // Add all deposits to the queue.
                 (address strategyAddress, uint256 delta, uint256 chainId, address strategyPrimaryToken, address entryToken, bytes memory data) = abi.decode(currentMessage.commandData, (address, uint256, uint256, address,address, bytes));
                 if (chainId == generalBridgingInfo.currentChain) {
@@ -225,7 +224,7 @@ contract VoteExecutorSlave is
         // _executeDeposits(true);
 
     }
-    function _executeDeposits(bool forward) internal {
+    function _executeDeposits() internal {
         for (uint256 i; i < primaryTokens.length(); i++) {
             DepositQueue memory depositQueue = tokenToDepositQueue[primaryTokens.at(i)];
             Deposit[] memory depositList = depositQueue.depositList;
@@ -240,7 +239,7 @@ contract VoteExecutorSlave is
                 if (depositInfo.entryToken != strategyPrimaryToken) {
                     console.log("Before exchanging", tokenAmount);
                     IERC20MetadataUpgradeable(strategyPrimaryToken).approve(exchangeAddress, tokenAmount);
-                    tokenAmount = IExchange(exchangeAddress).exchange(strategyPrimaryToken, depositInfo.entryToken, tokenAmount, tokenAmount * slippage/100000);
+                    tokenAmount = IExchange(exchangeAddress).exchange(strategyPrimaryToken, depositInfo.entryToken, tokenAmount, 0);
                     strategyPrimaryToken = depositInfo.entryToken;
                     console.log("After exchanging", tokenAmount);
                 }
@@ -257,7 +256,7 @@ contract VoteExecutorSlave is
     
     // Public can only executeDeposits by bridging funds backwards.
     function executeDeposits() public {
-        _executeDeposits(false);
+        _executeDeposits();
     }
 
     function _changeAPY(uint256 _newAnnualInterest, uint256 _newInterestPerSecond, string memory _ibAlluoSymbol) internal {
@@ -472,7 +471,7 @@ contract VoteExecutorSlave is
     }
 
     function setMessagingInfo(address _anyCallAddress, address _anyCallExecutor, address _nextChainExecutor, uint256 _nextChain,address _previousChainExecutor) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        messagingInfo = CrossBridgeMessaging(_anyCallAddress, _anyCallExecutor, _nextChainExecutor, _nextChain, _previousChainExecutor);
+        messagingInfo = CrossChainMessaging(_anyCallAddress, _anyCallExecutor, _nextChainExecutor, _nextChain, _previousChainExecutor);
     }
 
     function setTokenToAnyToken(address _token, address _anyToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -483,9 +482,9 @@ contract VoteExecutorSlave is
     public
     override
     onlyRole(getRoleAdmin(role)) {
-        if (role == DEFAULT_ADMIN_ROLE) {
-            require(account.isContract());
-        }
+        // if (role == DEFAULT_ADMIN_ROLE) {
+        //     require(account.isContract());
+        // }
         _grantRole(role, account);
     }
 

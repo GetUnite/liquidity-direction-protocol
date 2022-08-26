@@ -36,11 +36,10 @@ contract VoteExecutorMaster is
     address public constant ALLUO = 0x1E5193ccC53f25638Aa22a940af899B692e10B09;
     uint256 public minSigns;
     uint256 public timeLock;
-    uint256 public slippage;
 
     address public gnosis;
     address public locker;
-    address public exchangeAddress;
+    address public exchangeAddress = 0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec;
 
     bool public upgradeStatus;
 
@@ -55,9 +54,9 @@ contract VoteExecutorMaster is
 
     GeneralBridging public generalBridgingInfo;
     mapping(address => TokenBridging) public tokenToBridgingInfo;
-    CrossBridgeMessaging messagingInfo;
+    CrossChainMessaging public messagingInfo;
 
-    struct Deposit {
+    struct Deposit{
         address strategyAddress;
         uint256 amount;
         address strategyPrimaryToken;
@@ -71,7 +70,7 @@ contract VoteExecutorMaster is
         uint256 nextChain;
     }
     
-    struct CrossBridgeMessaging {
+    struct CrossChainMessaging {
         address anyCallAddress;
         address anyCallExecutor;
         address nextChainExecutor;
@@ -120,7 +119,7 @@ contract VoteExecutorMaster is
 
     function initialize(
         address _multiSigWallet, 
-        address _locker
+        address _secondAdmin
     ) public initializer {
         __Pausable_init();
         __AccessControl_init();
@@ -128,9 +127,8 @@ contract VoteExecutorMaster is
 
         require(_multiSigWallet.isContract(), "Handler: Not contract");
         gnosis = _multiSigWallet;
-        minSigns = 2;
+        minSigns = 1;
         // timeLock = _timeLock;
-        locker = _locker;
         // bridgingInfo.anyCallAddress = _anyCall;
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
@@ -138,6 +136,9 @@ contract VoteExecutorMaster is
         // For tests only
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
+
+        _grantRole(DEFAULT_ADMIN_ROLE, _secondAdmin);
+        _grantRole(UPGRADER_ROLE, _secondAdmin);
     }
 
 
@@ -156,7 +157,6 @@ contract VoteExecutorMaster is
         newSubmittedData.time = block.timestamp;
         submittedData.push(newSubmittedData);
     }
-
 
     /// @notice Allow anyone to approve data for execution given off-chain signatures
     /// @dev Checks against existing sigs submitted and only allow non-duplicate multisig owner signatures to approve the payload
@@ -190,53 +190,55 @@ contract VoteExecutorMaster is
     }
 
     function executeSpecificData(uint256 index) external {
-            (bytes32 hashed, Message[] memory messages, uint256 timestamp) = abi.decode(submittedData[index].data, (bytes32, Message[], uint256));
-            require(submittedData[index].time + timeLock < block.timestamp, "Under timelock");
+            SubmittedData memory exactData = submittedData[index];
+            (bytes32 hashed, Message[] memory messages,) = abi.decode(exactData.data, (bytes32, Message[], uint256));
+            require(exactData.time + timeLock < block.timestamp, "Under timelock");
             require(hashExecutionTime[hashed] == 0, "Duplicate Hash");
 
-            if(submittedData[index].signs.length >= minSigns){
+            if(exactData.signs.length >= minSigns){
+                uint256 currentChain = generalBridgingInfo.currentChain;
                 for (uint256 j; j < messages.length; j++) {
-                    if(messages[j].commandIndex == 1){
-                        (uint256 mintAmount, uint256 period) = abi.decode(messages[j].commandData, (uint256, uint256));
-                        IAlluoToken(ALLUO).mint(locker, mintAmount);
-                        ILocker(locker).setReward(mintAmount / (period * 1 days));
-                    }
+                    // if(messages[j].commandIndex == 1){
+                    //     (uint256 mintAmount, uint256 period) = abi.decode(messages[j].commandData, (uint256, uint256));
+                    //     IAlluoToken(ALLUO).mint(locker, mintAmount);
+                    //     ILocker(locker).setReward(mintAmount / (period));
+                    // }
                     if(messages[j].commandIndex == 2) {
                         // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
-                        (address strategyAddress, uint256 delta, uint256 chainId, address strategyPrimaryToken, address exitToken, bytes memory data) = abi.decode(messages[j].commandData, (address, uint256, uint256, address,address, bytes));
-                        if (chainId == generalBridgingInfo.currentChain) {
+                        (address strategyAddress, uint256 delta, uint256 chainId, address strategyPrimaryToken,, bytes memory data) = abi.decode(messages[j].commandData, (address, uint256, uint256, address,address, bytes));
+                        if (chainId == currentChain) {
                             IAlluoStrategy(strategyAddress).exitAll(data, delta, strategyPrimaryToken, address(this), false);
                         }
-
                     }
-                    if(messages[j].commandIndex == 3) {
+                    else if(messages[j].commandIndex == 3) {
                         // Add all deposits to the queue.
                         (address strategyAddress, uint256 delta, uint256 chainId, address strategyPrimaryToken, address entryToken, bytes memory data) = abi.decode(messages[j].commandData, (address, uint256, uint256, address,address, bytes));
-                        if (chainId == generalBridgingInfo.currentChain) {
+                        if (chainId == currentChain) {
                             tokenToDepositQueue[strategyPrimaryToken].depositList.push(Deposit(strategyAddress, delta, strategyPrimaryToken, entryToken, data));
                         }
                     }
                 }
                 // Execute deposits. Only executes if we have sufficient balances.
                 hashExecutionTime[hashed] = block.timestamp;
-                bytes memory finalData = abi.encode(submittedData[index].data, submittedData[index].signs);
+                bytes memory finalData = abi.encode(exactData.data, exactData.signs);
                 IAnyCall(messagingInfo.anyCallAddress).anyCall(messagingInfo.nextChainExecutor, finalData, address(0), messagingInfo.nextChain, 0);
             }     
     }
 
-    function _executeDeposits(bool forward) internal {
+    function _executeDeposits() internal {
         for (uint256 i; i < primaryTokens.length(); i++) {
             DepositQueue memory depositQueue = tokenToDepositQueue[primaryTokens.at(i)];
             Deposit[] memory depositList = depositQueue.depositList;
             uint256 depositNumber = depositQueue.depositNumber;    
             uint256 iters = depositList.length - depositNumber;
+            address exchange = exchangeAddress;
             for (uint256 j; j < iters; j++) {
                 Deposit memory depositInfo = depositList[depositNumber + j];
                 address strategyPrimaryToken = depositInfo.strategyPrimaryToken;
                 uint256 tokenAmount = depositInfo.amount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
                 if (depositInfo.entryToken != strategyPrimaryToken) {
-                    IERC20MetadataUpgradeable(strategyPrimaryToken).approve(exchangeAddress, tokenAmount);
-                    tokenAmount = IExchange(exchangeAddress).exchange(strategyPrimaryToken, depositInfo.entryToken, tokenAmount, tokenAmount * slippage/100000);
+                    IERC20MetadataUpgradeable(strategyPrimaryToken).approve(exchange, tokenAmount);
+                    tokenAmount = IExchange(exchange).exchange(strategyPrimaryToken, depositInfo.entryToken, tokenAmount, 0);
                 }
                 IERC20MetadataUpgradeable(strategyPrimaryToken).safeTransfer(depositInfo.strategyAddress, tokenAmount);
                 IAlluoStrategy(depositInfo.strategyAddress).invest(depositInfo.data, tokenAmount);
@@ -251,23 +253,24 @@ contract VoteExecutorMaster is
     
     // Public can only executeDeposits by bridging funds backwards.
     function executeDeposits() public {
-        _executeDeposits(false);
+        _executeDeposits();
     }
 
    function _bridgeFunds() internal {
         // primaryTokens = eth, usd, eur
+        GeneralBridging memory bridgingInfoMemory = generalBridgingInfo;
         for (uint256 i; i < primaryTokens.length(); i++) {
             address primaryToken = primaryTokens.at(i);
             uint256 tokenBalance = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
-            DepositQueue memory currentDepositQueue = tokenToDepositQueue[primaryToken];
             TokenBridging memory currentBridgingInfo = tokenToBridgingInfo[primaryToken];
-            if ( currentDepositQueue.depositList.length ==  currentDepositQueue.depositNumber && currentBridgingInfo.minimumAmount <= tokenBalance) {
+            if (tokenToDepositQueue[primaryToken].depositList.length == tokenToDepositQueue[primaryToken].depositNumber && currentBridgingInfo.minimumAmount <= tokenBalance) {
                 IERC20MetadataUpgradeable(primaryToken).approve(currentBridgingInfo.multichainRouter, tokenBalance);
                 bytes memory data = abi.encodeWithSelector(
                     currentBridgingInfo.functionSignature, 
                     tokenToAnyToken[primaryToken], 
-                    generalBridgingInfo.nextChainExecutor, 
-                    tokenBalance, generalBridgingInfo.nextChain
+                    bridgingInfoMemory.nextChainExecutor, 
+                    tokenBalance, 
+                    bridgingInfoMemory.nextChain
                 );
                 currentBridgingInfo.multichainRouter.functionCall(data);
             }
@@ -277,7 +280,6 @@ contract VoteExecutorMaster is
     function bridgeFunds() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _bridgeFunds();
     }
-
 
     function getSubmittedData(uint256 _dataId) external view returns(bytes memory, uint256, bytes[] memory){
         SubmittedData memory submittedDataExact = submittedData[_dataId];
@@ -293,15 +295,13 @@ contract VoteExecutorMaster is
         return (0, encodedCommand);
     }
 
-
-
-    function encodeMintCommand(
-        uint256 _newMintAmount,
-        uint256 _period
-    ) public pure  returns (uint256, bytes memory) {
-        bytes memory encodedCommand = abi.encode(_newMintAmount, _period);
-        return (1, encodedCommand);
-    }
+    // function encodeMintCommand(
+    //     uint256 _newMintAmount,
+    //     uint256 _period
+    // ) public pure  returns (uint256, bytes memory) {
+    //     bytes memory encodedCommand = abi.encode(_newMintAmount, _period);
+    //     return (1, encodedCommand);
+    // }
 
    function encodeLiquidityCommand(
         string memory _codeName,
@@ -374,7 +374,7 @@ contract VoteExecutorMaster is
     }
 
     function setMessagingInfo(address _anyCallAddress, address _anyCallExecutor, address _nextChainExecutor, uint256 _nextChain,address _previousChainExecutor) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        messagingInfo = CrossBridgeMessaging(_anyCallAddress, _anyCallExecutor, _nextChainExecutor, _nextChain, _previousChainExecutor);
+        messagingInfo = CrossChainMessaging(_anyCallAddress, _anyCallExecutor, _nextChainExecutor, _nextChain, _previousChainExecutor);
     }
 
     /**
@@ -422,9 +422,9 @@ contract VoteExecutorMaster is
     public
     override
     onlyRole(getRoleAdmin(role)) {
-        if (role == DEFAULT_ADMIN_ROLE) {
-            require(account.isContract(), "Handler: Not contract");
-        }
+        // if (role == DEFAULT_ADMIN_ROLE) {
+        //     require(account.isContract(), "Handler: Not contract");
+        // }
         _grantRole(role, account);
     }
 
