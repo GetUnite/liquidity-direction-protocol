@@ -18,7 +18,7 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 1000000,
+        runs: 200,
       },
     },
   },
@@ -37,15 +37,23 @@ const config: HardhatUserConfig = {
         mnemonic: process.env.MNEMONIC,
       },
     },
-    rinkeby: {
-      url: process.env.RINKEBY_URL,
-      gasPrice: 25000000000,
+    polygon: {
+      url: process.env.POLYGON_URL,
+      gasPrice: "auto",
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
     },
-    goerli: {
-      url: process.env.GOERLI_URL,
+    fantom: {
+      url: process.env.FANTOM_URL,
+      gasPrice: "auto",
+      accounts: {
+        mnemonic: process.env.MNEMONIC,
+      },
+    },
+    // TESTNETS
+    mumbai: {
+      url: process.env.MUMBAI_URL,
       gasPrice: "auto",
       accounts: {
         mnemonic: process.env.MNEMONIC,
@@ -58,22 +66,15 @@ const config: HardhatUserConfig = {
         mnemonic: process.env.MNEMONIC,
       },
     },
-    polygon: {
-      url: process.env.POLYGON_URL,
-      gasPrice: "auto",
+    rinkeby: {
+      url: process.env.RINKEBY_URL,
+      gasPrice: 25000000000,
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
     },
-    mumbai: {
-      url: process.env.MUMBAI_URL,
-      gasPrice: "auto",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-    },
-    fantom: {
-      url: process.env.FANTOM_URL,
+    goerli: {
+      url: process.env.GOERLI_URL,
       gasPrice: "auto",
       accounts: {
         mnemonic: process.env.MNEMONIC,

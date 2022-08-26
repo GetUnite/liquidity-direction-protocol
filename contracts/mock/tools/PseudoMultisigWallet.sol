@@ -38,4 +38,6 @@ contract PseudoMultisigWallet {
     function getOwners() external view returns (address[] memory) {
         return owners;
     }
+    receive() external payable {
+    }
 }
