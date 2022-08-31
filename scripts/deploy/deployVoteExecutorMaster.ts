@@ -17,12 +17,12 @@ async function main() {
         { initializer: 'initialize', kind: 'uups' }
     ) as VoteExecutorMaster
 
-    await VoteExecutorMaster.setMinSigns(MinSigns);
+    //await VoteExecutorMaster.setMinSigns(MinSigns);
 
     console.log("Address:", VoteExecutorMaster.address);
     console.log("Step 1: Completed deployment of VoteExecutorMaster")
     console.log("Step 2: Please grantRole to VoteExecutorMaster for minting Alluo")
-    console.log("Move to Step 3: Please now deployVoteExecutorSlave by putting",VoteExecutorMaster.address , "as voteexecutorMaster address")")
+    console.log("Move to Step 3: Please now deployVoteExecutorSlave by putting",VoteExecutorMaster.address , "as voteexecutorMaster address")
 }
 main()
   .then(() => process.exit(0))
