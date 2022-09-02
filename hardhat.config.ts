@@ -18,7 +18,7 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 50,
       },
     },
   },
@@ -62,10 +62,6 @@ const config: HardhatUserConfig = {
     kovan: {
       url: process.env.KOVAN_URL,
       gasPrice: "auto",
-=======
-    kovan: {
-      url: process.env.KOVAN_URL,
-      gasPrice: "auto",
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
@@ -91,7 +87,9 @@ const config: HardhatUserConfig = {
     currency: "USD",
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    // apiKey: process.env.ETHERSCAN_API_KEY,
+        apiKey: process.env.POLYGONSCAN_API_KEY,
+
   },
   // etherscan: {
   //   apiKey: process.env.POLYGONSCAN_API_KEY,
