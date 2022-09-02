@@ -166,7 +166,6 @@ describe("IbAlluoUSD and Handler", function () {
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoCurrent.address, lastAdapterId)
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoCurrent.address)
 
-
         const StIbAlluoFactory = await ethers.getContractFactory("StIbAlluo") as StIbAlluo__factory;
 
         StIbAlluo = await upgrades.deployProxy(StIbAlluoFactory,
@@ -190,6 +189,17 @@ describe("IbAlluoUSD and Handler", function () {
         iface = new ethers.utils.Interface(ABI);
         calldata = iface.encodeFunctionData("setSuperfluidResolver", [resolver.address]);
         await multisig.executeCall(ibAlluoCurrent.address, calldata);
+
+        
+        const SuperfluidEndResolver = await ethers.getContractFactory("SuperfluidEndResolver");
+        let ndresolver = await SuperfluidEndResolver.deploy([ibAlluoCurrent.address], signers[0].address);
+
+        ABI = ["function setSuperfluidEndResolver(address _superfluidEndResolver)"];
+        iface = new ethers.utils.Interface(ABI);
+        calldata = iface.encodeFunctionData("setSuperfluidEndResolver", [ndresolver.address]);
+        await multisig.executeCall(ibAlluoCurrent.address, calldata);
+
+
 
     });
 
@@ -218,8 +228,7 @@ describe("IbAlluoUSD and Handler", function () {
 
             console.log("encoded data", encodeData);
 
-            await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
-
+            await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256)"](signers[2].address, "1", parseEther("10000"))
             await skipDays(1)
             expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
             console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
@@ -235,7 +244,7 @@ describe("IbAlluoUSD and Handler", function () {
                 encodeData,
                 "0x"
             )
-            await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
+            await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256)"](signers[2].address, "1", parseEther("10000"))
 
             await skipDays(1)
             expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
@@ -258,7 +267,7 @@ describe("IbAlluoUSD and Handler", function () {
                 encodeData,
                 "0x"
             )
-            await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
+            await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256)"](signers[2].address, "1", parseEther("10000"))
 
             await skipDays(1)
             expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
