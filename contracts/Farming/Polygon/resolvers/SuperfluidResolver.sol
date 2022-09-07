@@ -12,7 +12,7 @@ contract SuperfluidResolver is AccessControl {
     mapping(address => mapping(address=>EnumerableSet.AddressSet)) private ibAlluoToStreamingData;
     mapping(address => EnumerableSet.AddressSet) private ibAlluoToActiveStreamers;
     address[] public ibAlluoAddresses;
-    address CFAContract;
+    address public CFAContract;
     bytes32 public constant GELATO = keccak256("GELATO");
 
     event WrappedTokenToPreventLiquidation(address indexed sender, address indexed receiver);
@@ -53,7 +53,7 @@ contract SuperfluidResolver is AccessControl {
                 if (_isUserCloseToLiquidation(sender, ibAlluo)) {
                     address[] memory receivers = ibAlluoToStreamingData[ibAlluo][sender].values();
                     // Liquidate all streams that belong to the sender
-                    return(true, abi.encodeWithSelector(SuperfluidResolver.liquidateSender.selector, sender, receivers));
+                    return(true, abi.encodeWithSelector(SuperfluidResolver.liquidateSender.selector, sender, receivers, ibAlluo));
                 }
             }
         }
@@ -79,7 +79,13 @@ contract SuperfluidResolver is AccessControl {
     function liquidateSender(address _sender, address[] memory _receivers, address _token) external onlyRole(GELATO) {
         for (uint256 i; i < _receivers.length; i++) {
             if(_isUserCloseToLiquidationAfterWrapping(_sender, _token)) {
-                IIbAlluo(_token).stopFlowWhenCritical(_sender, _receivers[i]);
+                try IIbAlluo(_token).stopFlowWhenCritical(_sender, _receivers[i]) {
+                } catch {
+                    ibAlluoToStreamingData[_token][_sender].remove(_receivers[i]);
+                    if (ibAlluoToStreamingData[_token][_sender].length() == 0) {
+                        ibAlluoToActiveStreamers[_token].remove(_sender);
+                    }
+                }
                 emit ClosedStreamToPreventLiquidation(_sender, _receivers[i]);
             } else {
                 IIbAlluo(_token).forceWrap(_sender);
