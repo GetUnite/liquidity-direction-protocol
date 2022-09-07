@@ -204,6 +204,21 @@ describe("IbAlluoUSD and Handler", function () {
     });
 
     describe('All IbAlluo tests with StIbAlluo integration', function () {
+        it("Format call for frontend", async function() {
+            let cfaAddress = "0x6EeE6060f715257b970700bc2656De21dEdF074C"
+            let realIbAlluo = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6" )
+            let permissions = await realIbAlluo.connect(signers[1]).formatPermissions();
+            let userData = "0x"
+
+            let operationData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"],[permissions,userData])
+
+            let operation = {operationType: 201, target: cfaAddress, data: operationData}
+            let operationArray = [operation];
+            console.log(operationArray);
+
+            // https://dashboard.tenderly.co/pentatonictritones/project/simulator/fd708bad-b2d9-4e7b-8949-93a07834fdd7
+        })
+
         it("Test upgradeability of original ibAlluo contract", async function() {
 
             let ibAlluoCurrentUsd = await ethers.getContractAt("IbAlluoOld", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
