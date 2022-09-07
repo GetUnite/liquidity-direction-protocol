@@ -103,9 +103,9 @@ contract LiquidityHandler is
         __UUPSUpgradeable_init();
 
         require(_multiSigWallet.isContract(), "Handler: Not contract");
+        require(_exchangeAddress.isContract(), "Handler: Not contract");
         exchangeAddress = _exchangeAddress;
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
     }
 

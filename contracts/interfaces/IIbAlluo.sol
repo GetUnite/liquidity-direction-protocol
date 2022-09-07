@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/access/IAccessControl.sol";
@@ -34,6 +34,9 @@ interface IIbAlluo is IERC20, IAccessControl{
   function upgradeStatus (  ) external view returns ( bool );
   function withdraw ( address _targetToken, uint256 _amount ) external; 
   function withdrawTo ( address _recipient, address _targetToken, uint256 _amount ) external;
+  function stopFlowWhenCritical(address sender, address receiver) external;
+  function forceWrap(address sender) external;
+  function superToken() external view returns (address);
   function symbol (  ) external view returns ( string memory symbol );
 
 }
