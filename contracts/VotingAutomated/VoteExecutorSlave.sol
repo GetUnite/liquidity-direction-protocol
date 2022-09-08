@@ -10,16 +10,12 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
 import "../interfaces/IGnosis.sol";
 import "../interfaces/ILiquidityHandler.sol";
 import "../interfaces/IIbAlluo.sol";
 import "../interfaces/IAlluoStrategy.sol";
-import "../interfaces/IMultichain.sol";
-import "../interfaces/IExchange.sol";
 
-import "hardhat/console.sol";
 
 interface IAnyCallExecutor {
     struct Context {
@@ -31,6 +27,7 @@ interface IAnyCallExecutor {
 }
 interface IAnyCall {
     function anyCall(address _to, bytes calldata _data, address _fallback, uint256 _toChainID, uint256 _flags) external;
+
 }
 
 contract VoteExecutorSlave is
@@ -42,7 +39,6 @@ contract VoteExecutorSlave is
     using ECDSA for bytes32;
     using Address for address;
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
-    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bool public upgradeStatus;
@@ -72,16 +68,6 @@ contract VoteExecutorSlave is
     mapping(bytes32 => uint256) public hashExecutionTime;
 
 
-
-    mapping(address => address) public tokenToAnyToken;
-    mapping(address => EnumerableSetUpgradeable.AddressSet) private strategyToEntryTokens;
-    mapping(address => address) public strategyToPrimaryToken;
-    mapping(address => DepositQueue) public tokenToDepositQueue;
-    address[] public primaryTokens;
-    address public multichainRouter;
-    mapping(string => LiquidityDirection) public liquidityDirection;
-    uint256 public slippage;
-
     struct Message {
         uint256 commandIndex;
         bytes commandData;
@@ -92,24 +78,7 @@ contract VoteExecutorSlave is
         uint256 newInterestPerSecond;
         string ibAlluo;
     }
-
-    struct Deposit {
-        address strategyAddress;
-        uint256 amount;
-        address entryToken;
-        bytes data;
-    }
-
-    struct DepositQueue {
-        Deposit[] depositList;
-        uint256 depositNumber;
-    }
-
-    struct LiquidityDirection {
-        address strategyAddress;
-        uint256 chainId;
-        bytes data;
-    }
+   
     event MessageReceived(bytes32 indexed messagesHash);
 
 
@@ -161,6 +130,7 @@ contract VoteExecutorSlave is
         emit MessageReceived(hashed);
     }
 
+
     /// @notice Executes all messages received after authentication
     /// @dev Loops through each command in the array and executes it.
     /// @param _messages Array of messages
@@ -171,111 +141,11 @@ contract VoteExecutorSlave is
                 (string memory ibAlluoSymbol, uint256 newAnnualInterest, uint256 newInterestPerSecond) = abi.decode(currentMessage.commandData, (string, uint256, uint256));
                 _changeAPY(newAnnualInterest, newInterestPerSecond, ibAlluoSymbol);
             }
-
-            if(currentMessage.commandIndex == 2) {
-                // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
-                (address strategyAddress, uint256 delta, uint256 chainId, address exitToken, bytes memory data) = abi.decode(currentMessage.commandData, (address, uint256, uint256, address, bytes));
-                if (chainId == currentChain) {
-                    console.log("Withdraw strategy", strategyAddress, delta);
-                    IAlluoStrategy(strategyAddress).exitAll(data, delta, strategyToPrimaryToken[strategyAddress], address(this), true);
-
-                }
-            }
-            if(currentMessage.commandIndex == 3) {
-                // Add all deposits to the queue.
-                (address strategyAddress, uint256 delta, uint256 chainId, address entryToken, bytes memory data) = abi.decode(currentMessage.commandData, (address, uint256, uint256, address, bytes));
-                if (chainId == currentChain) {
-                    address token = strategyToPrimaryToken[strategyAddress];
-                    console.log("Deposit added", strategyAddress, delta);
-                    tokenToDepositQueue[token].depositList.push(Deposit(strategyAddress, delta, entryToken, data));
-                }
-            }
-        }
-        // _executeDeposits(true);
-
-    }
-    function _executeDeposits(bool forward) internal {
-        for (uint256 i; i < primaryTokens.length; i++) {
-            DepositQueue memory depositQueue = tokenToDepositQueue[primaryTokens[i]];
-            Deposit[] memory depositList = depositQueue.depositList;
-            uint256 depositNumber = depositQueue.depositNumber;    
-            uint256 iters = depositList.length - depositNumber;
-            for (uint256 j; j < iters; j++) {
-                Deposit memory depositInfo = depositList[depositNumber + j];
-                address strategyPrimaryToken = strategyToPrimaryToken[depositInfo.strategyAddress];
-                uint256 tokenAmount = depositInfo.amount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
-                if (depositInfo.entryToken != strategyPrimaryToken) {
-                    tokenAmount = IExchange(address(this)).exchange(strategyPrimaryToken, depositInfo.entryToken, tokenAmount, tokenAmount * slippage/100000);
-                }
-                IERC20MetadataUpgradeable(strategyPrimaryToken).transfer(depositInfo.strategyAddress, tokenAmount);
-                IAlluoStrategy(depositInfo.strategyAddress).invest(depositInfo.data, tokenAmount * slippage/100000);
-                tokenToDepositQueue[strategyPrimaryToken].depositNumber++;
-            }
         }
     }
-    function incrementDepositNumber(address primaryToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        tokenToDepositQueue[primaryToken].depositNumber++;
-    }
-    
-    // Public can only executeDeposits by bridging funds backwards.
-    function executeDeposits() public {
-        _executeDeposits(false);
-    }
-
-    // This function checks if executeDeposits() can be called without being reverted.
-    // We can put a flag to set as true for gelato to start listening , such as when we receive 
-    function checkExecuteDeposits() public view returns (bool) {
-        for (uint256 i; i < primaryTokens.length; i++) {
-            DepositQueue memory depositQueue = tokenToDepositQueue[primaryTokens[i]];
-            Deposit[] memory depositList = depositQueue.depositList;
-            uint256 depositNumber = depositQueue.depositNumber;
-            uint256 iters = depositList.length - depositNumber;
-            for (uint256 j; j < iters; j++) {
-                Deposit memory depositInfo = depositList[depositNumber + i];
-                if (IERC20MetadataUpgradeable(strategyToEntryTokens[depositInfo.strategyAddress].at(0)).balanceOf(address(this)) < depositInfo.amount) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
+  
     function _changeAPY(uint256 _newAnnualInterest, uint256 _newInterestPerSecond, string memory _ibAlluoSymbol) internal {
         ibAlluoSymbolToAddress[_ibAlluoSymbol].setInterest(_newAnnualInterest, _newInterestPerSecond);
-    }
-
-// Amount is in USDC
-// Change the usdc into whatever entry token, and then 
-    function _depositStrategy(address _strategy, uint256 _amount, address _entryToken, bytes memory _data) internal {
-        // Below, try deposit into strategy, otherwise add to deposit queue
-        // No partial deposits for a single strategy to optimise gas. Do deposits in bulk.
-        // Amount in 10**18 in primary tokens
-        // Amount in the entry token.
-        address strategyPrimaryToken = strategyToPrimaryToken[_strategy];
-        uint256 tokenAmount = _amount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
-        if (_entryToken != strategyPrimaryToken) {
-            tokenAmount = IExchange(address(this)).exchange(strategyPrimaryToken, _entryToken, tokenAmount, tokenAmount * slippage/100000);
-        }
-        IERC20MetadataUpgradeable(strategyPrimaryToken).transfer(_strategy, tokenAmount);
-        IAlluoStrategy(_strategy).invest(_data, tokenAmount * slippage/100000);
-        tokenToDepositQueue[strategyPrimaryToken].depositNumber++;
-    }
-
-    function setStrategyPrimarytoken(address _strategy, address _primaryToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        strategyToPrimaryToken[_strategy] = _primaryToken;
-    }
-
-    function _bridgeFunds(bool forward) internal {
-        // primaryTokens = eth, usd, eur
-        for (uint256 i; i < primaryTokens.length; i++) {
-            uint256 tokenBalance = IERC20MetadataUpgradeable(primaryTokens[i]).balanceOf(address(this));
-            if ( tokenToDepositQueue[primaryTokens[i]].depositList.length ==  tokenToDepositQueue[primaryTokens[i]].depositNumber && tokenBalance >= 1000 && forward) {
-                IMultichain(multichainRouter).anySwapOutUnderlying(tokenToAnyToken[primaryTokens[i]], nextChainExecutor, tokenBalance, nextChain);
-            }
-            if ( tokenToDepositQueue[primaryTokens[i]].depositList.length ==  tokenToDepositQueue[primaryTokens[i]].depositNumber && tokenBalance >= 1000 && !forward) {
-                IMultichain(multichainRouter).anySwapOutUnderlying(tokenToAnyToken[primaryTokens[i]], previousChainExecutor, tokenBalance, previousChain);
-            }
-        }
     }
 
     /// @notice Checks the array of signatures from L1 for authentication

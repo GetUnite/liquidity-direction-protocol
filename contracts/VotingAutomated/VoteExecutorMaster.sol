@@ -48,14 +48,6 @@ contract VoteExecutorMaster is
         uint256 depositNumber;
     }
 
-    struct LiquidityDirection {
-        address strategyAddress;
-        address primaryToken;
-        uint256 chainId;
-        bytes data;
-    }
-    mapping(string => LiquidityDirection) public liquidityDirection;
-
     SubmittedData[] public submittedData;
 
     uint256 public minSigns;
