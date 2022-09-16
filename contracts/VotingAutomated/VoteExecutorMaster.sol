@@ -238,8 +238,10 @@ contract VoteExecutorMaster is
                 address strategyPrimaryToken = depositInfo.strategyPrimaryToken;
                 uint256 tokenAmount = depositInfo.amount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
                 if (depositInfo.entryToken != strategyPrimaryToken) {
+                    // 3CRV vs USDC
                     IERC20MetadataUpgradeable(strategyPrimaryToken).approve(exchange, tokenAmount);
                     tokenAmount = IExchange(exchange).exchange(strategyPrimaryToken, depositInfo.entryToken, tokenAmount, 0);
+                    strategyPrimaryToken = depositInfo.entryToken;
                 }
                 IERC20MetadataUpgradeable(strategyPrimaryToken).safeTransfer(depositInfo.strategyAddress, tokenAmount);
                 IAlluoStrategy(depositInfo.strategyAddress).invest(depositInfo.data, tokenAmount);
@@ -265,6 +267,12 @@ contract VoteExecutorMaster is
             uint256 tokenBalance = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
             TokenBridging memory currentBridgingInfo = tokenToBridgingInfo[primaryToken];
             if (tokenToDepositQueue[primaryToken].depositList.length == tokenToDepositQueue[primaryToken].depositNumber && currentBridgingInfo.minimumAmount <= tokenBalance) {
+                // WETH --> WETH
+                // WETH --> ETH --> Send it to multichain's router 
+
+                // Polygon:
+                // WETH --> WETH
+                // WETH --> Router --> ETH --> WETH
                 IERC20MetadataUpgradeable(primaryToken).approve(currentBridgingInfo.multichainRouter, tokenBalance);
                 bytes memory data = abi.encodeWithSelector(
                     currentBridgingInfo.functionSignature, 
