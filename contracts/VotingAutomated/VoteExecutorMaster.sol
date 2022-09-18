@@ -11,6 +11,7 @@ import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeab
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import "hardhat/console.sol";
 
 import "../interfaces/IAlluoToken.sol";
 import "../interfaces/ILocker.sol";
@@ -19,6 +20,7 @@ import "../interfaces/IAlluoStrategyNew.sol";
 import "../interfaces/IMultichain.sol";
 import "../interfaces/IAlluoStrategy.sol";
 import "../interfaces/IExchange.sol";                                                                 
+import "../interfaces/IWrappedEther.sol";
 
 contract VoteExecutorMaster is
     Initializable,
@@ -55,6 +57,7 @@ contract VoteExecutorMaster is
     GeneralBridging public generalBridgingInfo;
     mapping(address => TokenBridging) public tokenToBridgingInfo;
     CrossChainMessaging public messagingInfo;
+    IWrappedEther public constant wETH = IWrappedEther(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     struct Deposit{
         address strategyAddress;
@@ -142,6 +145,13 @@ contract VoteExecutorMaster is
         _grantRole(UPGRADER_ROLE, _secondAdmin);
     }
 
+    receive() external payable {
+        if(msg.sender != address(wETH)){
+            wETH.deposit{value : msg.value}();
+            console.log("eth wrapped");
+        }
+        console.log("receive worked");
+    }
 
     /// @notice Allows anyone to submit data for execution of votes
     /// @dev Attempts to parse at high level and then confirm hash before submitting to queue
@@ -273,15 +283,39 @@ contract VoteExecutorMaster is
                 // Polygon:
                 // WETH --> WETH
                 // WETH --> Router --> ETH --> WETH
-                IERC20MetadataUpgradeable(primaryToken).approve(currentBridgingInfo.multichainRouter, tokenBalance);
-                bytes memory data = abi.encodeWithSelector(
-                    currentBridgingInfo.functionSignature, 
-                    tokenToAnyToken[primaryToken], 
-                    bridgingInfoMemory.nextChainExecutor, 
-                    tokenBalance, 
-                    bridgingInfoMemory.nextChain
-                );
-                currentBridgingInfo.multichainRouter.functionCall(data);
+
+                if(primaryToken == address(wETH)){
+                    console.log(wETH.balanceOf(address(this)));
+                    console.log(address(this).balance);
+                    wETH.withdraw(tokenBalance);
+                    console.log(wETH.balanceOf(address(this)));
+                    console.log(address(this).balance);
+                    console.log(primaryToken);
+                    console.log(bridgingInfoMemory.nextChainExecutor);
+                    console.log(bridgingInfoMemory.nextChain);
+                    console.log(currentBridgingInfo.multichainRouter);
+                    bytes memory data = abi.encodeWithSelector(
+                        currentBridgingInfo.functionSignature, 
+                        0x0615Dbba33Fe61a31c7eD131BDA6655Ed76748B1, // anyWETH
+                        bridgingInfoMemory.nextChainExecutor, 
+                        bridgingInfoMemory.nextChain
+                    );
+                    // (bool test, ) = currentBridgingInfo.multichainRouter.call{value: tokenBalance}(data);
+                    // console.log(test);
+                    currentBridgingInfo.multichainRouter.functionCallWithValue(data, tokenBalance);
+                    console.log(address(this).balance);
+                }
+                else{
+                    IERC20MetadataUpgradeable(primaryToken).approve(currentBridgingInfo.multichainRouter, tokenBalance);
+                    bytes memory data = abi.encodeWithSelector(
+                        currentBridgingInfo.functionSignature, 
+                        tokenToAnyToken[primaryToken], 
+                        bridgingInfoMemory.nextChainExecutor, 
+                        tokenBalance, 
+                        bridgingInfoMemory.nextChain
+                    );
+                    currentBridgingInfo.multichainRouter.functionCall(data);
+                }
             }
         }
     }
