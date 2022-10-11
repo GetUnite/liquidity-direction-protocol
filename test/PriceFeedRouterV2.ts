@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { BigNumberish, constants } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
-import { ChainlinkFeedStrategy, ChainlinkFeedStrategyV2, CurvePoolReferenceFeedStrategy, CurvePoolReferenceFeedStrategyV2, IERC20Metadata, IFeedStrategy, PriceFeedRouter, PriceFeedRouterV2, PriceFeedRouterV2__factory } from "../typechain";
+import { ChainlinkFeedStrategy, ChainlinkFeedStrategyV2, CurveLpReferenceFeedStrategyV2, CurvePoolReferenceFeedStrategy, CurvePoolReferenceFeedStrategyV2, IERC20Metadata, IFeedStrategy, PriceFeedRouter, PriceFeedRouterV2, PriceFeedRouterV2__factory } from "../typechain";
 
 describe("Price Feed Router", function () {
     type FiatRoute = {
@@ -18,10 +18,18 @@ describe("Price Feed Router", function () {
         strategy?: ChainlinkFeedStrategyV2,
     }
     type CurveRoute = {
-        outIndex: number,
+        desiredIndex: number,
         oneTokenAmount: BigNumberish,
         coin: string,
         strategy?: CurvePoolReferenceFeedStrategyV2
+    }
+    type CurveLpRoute = {
+        coin: string,
+        poolAddress: string,
+        referenceCoinIndex: number,
+        referenceCoinDecimals: number,
+        oneTokenAmount: BigNumberish,
+        strategy?: CurveLpReferenceFeedStrategyV2
     }
 
     let signers: SignerWithAddress[];
@@ -29,15 +37,17 @@ describe("Price Feed Router", function () {
 
     let usdc: IERC20Metadata, usdt: IERC20Metadata, dai: IERC20Metadata, weth: IERC20Metadata,
         wbtc: IERC20Metadata, eurt: IERC20Metadata, jeur: IERC20Metadata, par: IERC20Metadata,
-        eurs: IERC20Metadata;
+        eurs: IERC20Metadata, frax: IERC20Metadata, susd: IERC20Metadata, crv3: IERC20Metadata,
+        mimLp: IERC20Metadata; 
 
     let fiatRoutes: FiatRoute[];
     let cryptoRoutes: CryptoRoute[];
     let curveRoutes: CurveRoute[];
+    let curveLpRoutes: CurveLpRoute[];
 
-    const curvePoolAddress = "0xAd326c253A84e9805559b73A08724e11E49ca651";
-    const curveReferenceCoinIndex = 3; // EURT index in pool ^
-    const curveReferenceCoinDecimals = 6; // 1.0 EURT with decimals
+    const curvePoolAddress = "0xA5407eAE9Ba41422680e2e00537571bcC53efBfD";
+    const curveReferenceCoinIndex = 1; // USDC index in pool ^
+    const curveReferenceCoinDecimals = 6; // 1.0 USDC with decimals
 
     before(async function () {
         await network.provider.request({
@@ -45,92 +55,105 @@ describe("Price Feed Router", function () {
             params: [{
                 forking: {
                     enabled: true,
-                    jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
+                    jsonRpcUrl: process.env.MAINNET_FORKING_URL as string,
+                    blockNumber: 15713655, 
                 },
             },],
         });
 
-        usdc = await ethers.getContractAt("IERC20Metadata", "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
-        usdt = await ethers.getContractAt("IERC20Metadata", "0xc2132D05D31c914a87C6611C10748AEb04B58e8F");
-        dai = await ethers.getContractAt("IERC20Metadata", "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063");
-        weth = await ethers.getContractAt("IERC20Metadata", "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619");
-        wbtc = await ethers.getContractAt("IERC20Metadata", "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6");
-        eurt = await ethers.getContractAt("IERC20Metadata", "0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f");
-        jeur = await ethers.getContractAt("IERC20Metadata", "0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c");
-        par = await ethers.getContractAt("IERC20Metadata", "0xE2Aa7db6dA1dAE97C5f5C6914d285fBfCC32A128");
-        eurs = await ethers.getContractAt("IERC20Metadata", "0xE111178A87A3BFf0c8d18DECBa5798827539Ae99");
+        dai = await ethers.getContractAt("IERC20Metadata", "0x6b175474e89094c44da98b954eedeac495271d0f");
+        frax = await ethers.getContractAt('IERC20Metadata', '0x853d955acef822db058eb8505911ed77f175b99e');
+        usdc = await ethers.getContractAt("IERC20Metadata", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+        usdt = await ethers.getContractAt("IERC20Metadata", "0xdAC17F958D2ee523a2206206994597C13D831ec7");
+        weth = await ethers.getContractAt("IERC20Metadata", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+        wbtc = await ethers.getContractAt("IERC20Metadata", "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599");
+        susd = await ethers.getContractAt("IERC20Metadata", "0x57Ab1ec28D129707052df4dF418D58a2D46d5f51");
+        crv3 = await ethers.getContractAt("IERC20Metadata", "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490");
+        mimLp = await ethers.getContractAt("IERC20Metadata", "0x5a6A4D54456819380173272A5E8E9B9904BdF41B");
+      
+        // eurt = await ethers.getContractAt("IERC20Metadata", "0xC581b735A1688071A1746c968e0798D642EDE491");
 
         cryptoRoutes = [
             {
                 // USDC
-                // https://data.chain.link/polygon/mainnet/stablecoins/usdc-usd
                 coin: usdc.address,
-                oracle: "0xfe4a8cc5b5b2366c1b58bea3858e81843581b2f7"
+                oracle: "0x8fffffd4afb6115b954bd326cbe7b4ba576818f6"
             },
             {
                 // USDT
-                // https://data.chain.link/polygon/mainnet/stablecoins/usdt-usd
                 coin: usdt.address,
-                oracle: "0x0a6513e40db6eb1b165753ad52e80663aea50545"
+                oracle: "0x3e7d1eab13ad0104d2750b8863b489d65364e32d"
             },
             {
                 // DAI
-                // https://data.chain.link/polygon/mainnet/stablecoins/dai-usd
                 coin: dai.address,
-                oracle: "0x4746dec9e833a82ec7c2c1356372ccf2cfcd2f3d"
+                oracle: "0xaed0c38402a5d19df6e4c03f4e2dced6e29c1ee9"
             },
-            {
-                // (W)ETH
-                // https://data.chain.link/polygon/mainnet/crypto-usd/eth-usd
-                coin: weth.address,
-                oracle: "0xf9680d99d6c9589e2a93a78a04a279e509205945"
-            },
-            {
-                // (W)BTC
-                // https://data.chain.link/polygon/mainnet/crypto-usd/btc-usd
-                coin: wbtc.address,
-                oracle: "0xc907e116054ad103354f2d350fd2514433d57f6f"
-            },
-            {
-                // EURT
-                // https://data.chain.link/polygon/mainnet/stablecoins/eurt-usd
-                coin: eurt.address,
-                oracle: "0xe7ef3246654ac0fd0e22fc30dce40466cfdf597c"
-            },
+            // {
+            //     // (W)ETH
+            //     coin: weth.address,
+            //     oracle: "0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419"
+            // },
+            // {
+            //     // (W)BTC
+            //     coin: wbtc.address,
+            //     oracle: "0xf4030086522a5beea4988f8ca5b36dbc97bee88c"
+            // },
+            // {
+            //     // EURT
+            //     coin: eurt.address,
+            //     oracle: "0x01d391a48f4f7339ac64ca2c83a07c22f95f587a"
+            // },
         ];
 
         fiatRoutes = [
             {
-                // https://data.chain.link/polygon/mainnet/fiat/eur-usd
                 name: "EUR",
                 id: 1,
-                oracle: "0x73366fe0aa0ded304479862808e02506fe556a98"
+                oracle: "0xb49f677943bc038e9857d61e7d053caa2c1734c1"
             },
             {
-                // https://data.chain.link/polygon/mainnet/fiat/gbp-usd
-                name: "GBP",
+                name: "ETH",
                 id: 2,
-                oracle: "0x099a2540848573e94fb1ca0fa420b00acbbc845a"
+                oracle: "0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419"
+            },
+            {
+                name: "BTC",
+                id: 3,
+                oracle: "0xf4030086522a5beea4988f8ca5b36dbc97bee88c"
+            },
+            {
+                name: "GBP",
+                id: 4,
+                oracle: "0x5c0ab2d9b5a7ed9f470386e82bb36a3613cdd4b5"
             }
         ];
 
         curveRoutes = [
             {
-                // jEUR
-                coin: jeur.address,
-                oneTokenAmount: parseUnits("1.0", await jeur.decimals()),
-                outIndex: 0
+                // sUSD
+                coin: susd.address,
+                oneTokenAmount: parseUnits("1.0", await susd.decimals()),
+                desiredIndex: 3
+            },
+        ]
+
+        curveLpRoutes = [
+            {
+                // 3CRV
+                coin: crv3.address,
+                oneTokenAmount: parseUnits("1.0", await crv3.decimals()),
+                poolAddress: "0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7",
+                referenceCoinIndex: 1,
+                referenceCoinDecimals: 6,
             },
             {
-                // PAR
-                coin: par.address,
-                oneTokenAmount: parseUnits("1.0", await par.decimals()),
-                outIndex: 1
-            }, {
-                // EURS
-                coin: eurs.address,
-                oneTokenAmount: parseUnits("1.0", await eurs.decimals()),
-                outIndex: 2
+                // 3CRV
+                coin: mimLp.address,
+                oneTokenAmount: parseUnits("1.0", await mimLp.decimals()),
+                poolAddress: "0x5a6A4D54456819380173272A5E8E9B9904BdF41B",
+                referenceCoinIndex: 1,
+                referenceCoinDecimals: 18,
             },
         ]
 
@@ -180,48 +203,50 @@ describe("Price Feed Router", function () {
             await expect(router.setFiatStrategy(fiatSymbol, fiatId, fiatFeed)).to.be.revertedWith("PriceFeed: id 0 reserved for USD");
         })
 
-        it("Should revert Curve strategy (reference strategy returned zero or less)", async function () {
-            const curveRoute = curveRoutes[0];
-            const BadStrategy = await ethers.getContractFactory("BadPriceStrategy");
-            const badReferenceStragegy = await BadStrategy.deploy(0, 8);
+        // it("Should revert Curve strategy (reference strategy returned zero or less)", async function () {
+        //     const curveRoute = curveRoutes[0];
+        //     const BadStrategy = await ethers.getContractFactory("BadPriceStrategy");
+        //     const badReferenceStragegy = await BadStrategy.deploy(0, 8);
 
-            const CurveStrategy = await ethers.getContractFactory("CurvePoolReferenceFeedStrategy");
-            const curveStrategy = await CurveStrategy.deploy(
-                badReferenceStragegy.address,
-                curvePoolAddress,
-                curveReferenceCoinIndex,
-                curveRoute.outIndex,
-                curveReferenceCoinDecimals,
-                curveRoute.oneTokenAmount
-            );
+        //     const CurveStrategy = await ethers.getContractFactory("CurvePoolReferenceFeedStrategy");
+        //     const curveStrategy = await CurveStrategy.deploy(
+        //         badReferenceStragegy.address,
+        //         curvePoolAddress,
+        //         curveReferenceCoinIndex,
+        //         curveRoute.desiredIndex,
+        //         curveReferenceCoinDecimals,
+        //         curveRoute.oneTokenAmount
+        //     );
 
-            await router.setCryptoStrategy(curveStrategy.address, curveRoute.coin);
-            await expect(router["getPrice(address,uint256)"](curveRoute.coin, 0)).to.be.revertedWith("CurvePRFS: feed lte 0");
+        //     await router.setCryptoStrategy(curveStrategy.address, curveRoute.coin);
+        //     await expect(router["getPrice(address,uint256)"](curveRoute.coin, 0)).to.be.revertedWith("CurvePRFS: feed lte 0");
 
-            await badReferenceStragegy.changeParams(-5, 8);
-            await expect(router["getPrice(address,uint256)"](curveRoute.coin, 0)).to.be.revertedWith("CurvePRFS: feed lte 0");
-        })
+        //     await badReferenceStragegy.changeParams(-5, 8);
+        //     await expect(router["getPrice(address,uint256)"](curveRoute.coin, 0)).to.be.revertedWith("CurvePRFS: feed lte 0");
+        // })
     })
 
     describe("Filled router", async function () {
         beforeEach(async function () {
             const ChainlinkStrategy = await ethers.getContractFactory("ChainlinkFeedStrategyV2");
             const CurveStrategy = await ethers.getContractFactory("CurvePoolReferenceFeedStrategyV2");
+            const CurveLpStrategy = await ethers.getContractFactory("CurveLpReferenceFeedStrategyV2");
 
             for (let i = 0; i < fiatRoutes.length; i++) {
                 const element = fiatRoutes[i];
                 const strategy = await upgrades.deployProxy(ChainlinkStrategy,
-                    [constants.AddressZero, element.oracle],
+                    [constants.AddressZero, element.oracle, constants.AddressZero],
                     { initializer: 'initialize', kind: 'uups' }
                 ) as ChainlinkFeedStrategyV2;
                 element.strategy = strategy
+                
                 await router.setFiatStrategy(element.name, element.id, strategy.address);
             }
 
             for (let i = 0; i < cryptoRoutes.length; i++) {
                 const element = cryptoRoutes[i];
                 const strategy = await upgrades.deployProxy(ChainlinkStrategy,
-                    [constants.AddressZero, element.oracle],
+                    [constants.AddressZero, element.oracle, element.coin],
                     { initializer: 'initialize', kind: 'uups' }
                 ) as ChainlinkFeedStrategyV2;
                 element.strategy = strategy
@@ -233,14 +258,38 @@ describe("Price Feed Router", function () {
 
                 const strategy = await upgrades.deployProxy(CurveStrategy,
                     [   constants.AddressZero,
-                        await router.cryptoToUsdStrategies(eurt.address),
+                        await router.cryptoToUsdStrategies(usdc.address),
                         curvePoolAddress,
                         curveReferenceCoinIndex,
-                        element.outIndex,
+                        element.desiredIndex,
                         curveReferenceCoinDecimals,
                         element.oneTokenAmount],
                     { initializer: 'initialize', kind: 'uups' }
                 ) as CurvePoolReferenceFeedStrategyV2;
+
+                element.strategy = strategy;
+                await router.setCryptoStrategy(strategy.address, element.coin);
+            }
+
+            for (let i = 0; i < curveLpRoutes.length; i++) {
+                const element = curveLpRoutes[i];
+                let feed
+                if(i == 0){
+                    feed = await router.cryptoToUsdStrategies(usdc.address);
+                }
+                else{
+                    feed = await router.cryptoToUsdStrategies(crv3.address);
+                }
+
+                const strategy = await upgrades.deployProxy(CurveLpStrategy,
+                    [   constants.AddressZero,
+                        feed,
+                        element.poolAddress,
+                        element.referenceCoinIndex,
+                        element.referenceCoinDecimals,
+                        element.oneTokenAmount],
+                    { initializer: 'initialize', kind: 'uups' }
+                ) as CurveLpReferenceFeedStrategyV2;
 
                 element.strategy = strategy;
                 await router.setCryptoStrategy(strategy.address, element.coin);
@@ -270,12 +319,13 @@ describe("Price Feed Router", function () {
             for (let i = 0; i < curveRoutes.length; i++) {
                 const element = curveRoutes[i];
                 const strategy = element!.strategy;
+                
                 expect(await router.cryptoToUsdStrategies(element.coin)).to.be.equal(element.strategy?.address);
 
-                expect(await strategy?.referenceFeed()).to.be.equal(await router.cryptoToUsdStrategies(eurt.address));
+                expect(await strategy?.referenceFeed()).to.be.equal(await router.cryptoToUsdStrategies(usdc.address));
                 expect(await strategy?.curvePool()).to.be.equal(curvePoolAddress);
                 expect(await strategy?.referenceCoinIndex()).to.be.equal(curveReferenceCoinIndex);
-                expect(await strategy?.desiredCoinIndex()).to.be.equal(element.outIndex);
+                expect(await strategy?.desiredCoinIndex()).to.be.equal(element.desiredIndex);
                 expect(await strategy?.referenceCoinDecimals()).to.be.equal(curveReferenceCoinDecimals);
                 expect(await strategy?.desiredOneTokenAmount()).to.be.equal(element.oneTokenAmount);
             }
@@ -317,7 +367,7 @@ describe("Price Feed Router", function () {
         it("Should show same price when calling with fiatId and fiatName (USD)", async function () {
             const fiatName = "USD";
             const fiatId = await router.fiatNameToFiatId(fiatName);
-            const cryptoAddress = weth.address;
+            const cryptoAddress = usdc.address;
 
             const priceWithName = await router["getPrice(address,string)"](cryptoAddress, fiatName);
             const priceWithId = await router["getPrice(address,uint256)"](cryptoAddress, fiatId);
@@ -329,7 +379,7 @@ describe("Price Feed Router", function () {
         it("Should show same price when calling with fiatId and fiatName (non USD)", async function () {
             const fiatName = "GBP";
             const fiatId = await router.fiatNameToFiatId(fiatName);
-            const cryptoAddress = weth.address;
+            const cryptoAddress = usdc.address;
 
             const priceWithName = await router["getPrice(address,string)"](cryptoAddress, fiatName);
             const priceWithId = await router["getPrice(address,uint256)"](cryptoAddress, fiatId);
@@ -339,8 +389,8 @@ describe("Price Feed Router", function () {
         })
 
         it("Should show current prices", async function () {
-            const fiats = ["USD", "GBP", "EUR"];
-            const cryptos = [usdc, usdt, dai, weth, wbtc, eurt, eurs, jeur, par];
+            const fiats = ["USD", "GBP", "EUR", "ETH", "BTC"];
+            const cryptos = [usdc, usdt, dai, susd, crv3, mimLp];
 
             for (let i = 0; i < fiats.length; i++) {
                 const fiat = fiats[i];
@@ -348,6 +398,23 @@ describe("Price Feed Router", function () {
                     const crypto = cryptos[j];
                     const price = await router["getPrice(address,string)"](crypto.address, fiat);
                     console.log(`1 ${await crypto.symbol()} costs ${formatUnits(price.value, price.decimals)} ${fiat}`);
+                }
+                console.log();
+            }
+        })
+
+        it("Should show current prices of amounts", async function () {
+            const fiats = ["USD", "GBP", "EUR", "ETH", "BTC"];
+            const cryptos = [usdc, usdt, dai, susd, crv3, mimLp];
+
+            for (let i = 0; i < fiats.length; i++) {
+                const fiat = fiats[i];
+                for (let j = 0; j < cryptos.length; j++) {
+                    const crypto = cryptos[j];
+                    let amount = parseUnits("3000", await crypto.decimals())
+                    const price = await router["getPriceOfAmount(address,uint256,string)"](crypto.address, amount, fiat);
+                    
+                    console.log(`3000 ${await crypto.symbol()} costs ${formatUnits(price.value, price.decimals)} ${fiat}`);
                 }
                 console.log();
             }
