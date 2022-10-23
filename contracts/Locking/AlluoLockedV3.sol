@@ -1,5 +1,5 @@
 // // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -11,6 +11,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import "./../interfaces/IExchange.sol";
 import "./../interfaces/IBalancer.sol";
+import "./CvxDistributor.sol";
+import "./../interfaces/IAlluoLockedV3.sol";
 
 contract AlluoLockedV3 is
     Initializable,
@@ -75,6 +77,13 @@ contract AlluoLockedV3 is
     // Lockers info by token holders.
     mapping(address => Locker) public _lockers;
 
+    // Contract that manages extra rewards in CVX tokens
+    CvxDistributor public cvxDistributor;
+
+    // old values available for claim from old vlAlluo contract
+    mapping(address => uint256) public oldClaim;
+    mapping(address => uint256) public oldWithdraw;
+
     // ERC20 token locked on the contract and earned by locker as reward.
     IERC20Upgradeable public constant alluoToken =
         IERC20Upgradeable(0x1E5193ccC53f25638Aa22a940af899B692e10B09);
@@ -112,7 +121,6 @@ contract AlluoLockedV3 is
         address indexed sender,
         address tokenAddress, 
         uint256 tokenAmount, 
-        uint256 lpAmount, 
         uint256 time
     );
 
@@ -122,7 +130,6 @@ contract AlluoLockedV3 is
     event TokensUnlocked(
         address indexed sender,
         uint256 alluoAmount,
-        uint256 lpAmount,
         uint256 time
     );
     
@@ -181,10 +188,6 @@ contract AlluoLockedV3 is
 
         depositLockDuration = 86400 * 7; 
         withdrawLockDuration = 86400 * 5;
-
-        alluoToken.approve(address(exchange), type(uint256).max);
-        alluoBalancerLp.approve(address(balancer), type(uint256).max);
-        weth.approve(address(exchange), type(uint256).max);
     }
 
     function decimals() public view returns (uint8) {
@@ -241,72 +244,29 @@ contract AlluoLockedV3 is
             _amount
         );
 
-        uint256 lpAmount = exchange.exchange(
-            address(alluoToken),
-            address(alluoBalancerLp),
-            _amount,
-            0
-        );
-
         if (totalLocked > 0) {
             update();
         }
 
         locker.rewardDebt =
             locker.rewardDebt +
-            ((lpAmount * tokensPerLock) / 1e20);
-        totalLocked = totalLocked + lpAmount;
-        locker.amount = locker.amount + lpAmount;
+            ((_amount * tokensPerLock) / 1e20);
+        totalLocked = totalLocked + _amount;
+        locker.amount = locker.amount + _amount;
         locker.depositUnlockTime = block.timestamp + depositLockDuration;
 
-        emit TokensLocked(msg.sender, address(alluoToken), _amount, lpAmount, block.timestamp );
-        emit Transfer(address(0), msg.sender, lpAmount);
-    }
+        emit TokensLocked(msg.sender, address(alluoToken), _amount, block.timestamp);
+        emit Transfer(address(0), msg.sender, _amount);
 
-    /**
-     * @dev Locks specified amount WETH in the contract
-     * @param _amount An amount of WETH tokens to lock
-     */
-    function lockWETH(uint256 _amount) public {
-
-        Locker storage locker = _lockers[msg.sender];
-
-        weth.safeTransferFrom(
-            msg.sender,
-            address(this),
-            _amount
-        );
-
-        uint256 lpAmount = exchange.exchange(
-            address(weth),
-            address(alluoBalancerLp),
-            _amount,
-            0
-        );
-
-        if (totalLocked > 0) {
-            update();
-        }
-
-        locker.rewardDebt =
-            locker.rewardDebt +
-            ((lpAmount * tokensPerLock) / 1e20);
-        totalLocked = totalLocked + lpAmount;
-        locker.amount = locker.amount + lpAmount;
-        locker.depositUnlockTime = block.timestamp + depositLockDuration;
-
-        emit TokensLocked(msg.sender, address(weth), _amount, lpAmount, block.timestamp);
-        emit Transfer(address(0), msg.sender, lpAmount);
+        cvxDistributor.receiveStakeInfo(msg.sender, _amount);
     }
 
     /**
      * @dev Migrates all balances from old contract
      * @param _users list of lockers from old contract
      * @param _amounts list of amounts each equal to the share of locker on old contract
-     *          (locked amount + unlocked + claim)
      */
     function migrationLock(address[] memory _users, uint256[] memory _amounts) external onlyRole(DEFAULT_ADMIN_ROLE){
-
         for(uint i = 0; i < _users.length; i++){
             Locker storage locker = _lockers[_users[i]];
 
@@ -321,8 +281,37 @@ contract AlluoLockedV3 is
             locker.amount = _amounts[i];
             locker.depositUnlockTime = block.timestamp + depositLockDuration;
 
-            emit TokensLocked(_users[i], address(0), 0, _amounts[i], block.timestamp);
+            cvxDistributor.receiveStakeInfo(_users[i], _amounts[i]);
+
+            emit TokensLocked(_users[i], address(0), _amounts[i], block.timestamp);
             emit Transfer(address(0), _users[i], _amounts[i]);
+        }
+    }
+
+    /// @notice Migrate withdraw or claim debt for users who did not have vlAlluo from previous version
+    /// @param _users user addresses to migrate
+    /// @param _withdraw true if migrating withdrawals, false for claim
+    function migrateWithdrawOrClaimValues(address[] memory _users, bool _withdraw) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IAlluoLockedV3 oldLocker = IAlluoLockedV3(0xF295EE9F1FA3Df84493Ae21e08eC2e1Ca9DebbAf);
+
+        for (uint256 i = 0; i < _users.length; i++) {
+            address user = _users[i];
+
+            (
+                uint256 locked_,
+                uint256 unlockAmount_,
+                uint256 claim_,
+                ,
+                uint256 withdrawUnlockTime_
+            ) = oldLocker.getInfoByAddress(user);
+
+            if (_withdraw && withdrawUnlockTime_ < block.timestamp) {
+                oldWithdraw[user] = unlockAmount_;
+            } 
+            else if (!_withdraw) {
+                require(locked_ == 0, "AlluoLockedV4: use migrationLock");
+                oldClaim[user] = claim_;
+            } 
         }
     }
 
@@ -345,22 +334,21 @@ contract AlluoLockedV3 is
 
         update();
 
-
-        uint256 alluoAmount = _exitAlluoPoolExactLp(_amount);
-
         locker.rewardAllowed =
             locker.rewardAllowed +
             ((_amount * tokensPerLock) / 1e20);
         locker.amount -= _amount;
         totalLocked -= _amount;
 
-        waitingForWithdrawal += alluoAmount;
+        waitingForWithdrawal += _amount;
 
-        locker.unlockAmount += alluoAmount;
+        locker.unlockAmount += _amount;
         locker.withdrawUnlockTime = block.timestamp + withdrawLockDuration;
 
-        emit TokensUnlocked(msg.sender, alluoAmount, _amount, block.timestamp);
+        emit TokensUnlocked(msg.sender, _amount, block.timestamp);
         emit Transfer(msg.sender, address(0), _amount);
+
+        cvxDistributor.receiveUnstakeInfo(msg.sender, _amount);
     }
 
     /**
@@ -380,21 +368,21 @@ contract AlluoLockedV3 is
 
         update();
 
-        uint256 alluoAmount = _exitAlluoPoolExactLp(amount);
-
         locker.rewardAllowed =
             locker.rewardAllowed +
             ((amount * tokensPerLock) / 1e20);
         locker.amount = 0;
         totalLocked -= amount;
 
-        waitingForWithdrawal += alluoAmount;
+        waitingForWithdrawal += amount;
 
-        locker.unlockAmount += alluoAmount;
+        locker.unlockAmount += amount;
         locker.withdrawUnlockTime = block.timestamp + withdrawLockDuration;
 
-        emit TokensUnlocked(msg.sender, alluoAmount, amount, block.timestamp);
+        emit TokensUnlocked(msg.sender, amount, block.timestamp);
         emit Transfer(msg.sender, address(0), amount);
+
+        cvxDistributor.receiveUnstakeInfo(msg.sender, amount);
     }
 
     /**
@@ -402,6 +390,18 @@ contract AlluoLockedV3 is
      */
     function withdraw() public whenNotPaused {
         Locker storage locker = _lockers[msg.sender];
+        uint256 _oldWithdraw = oldWithdraw[msg.sender];
+
+        if(_oldWithdraw != 0) {
+            alluoToken.safeTransfer(msg.sender, _oldWithdraw);
+            emit TokensWithdrawed(msg.sender, _oldWithdraw, block.timestamp);
+            oldWithdraw[msg.sender] = 0;
+
+            // to avoid tx revert, if there is no current unlocked amount
+            if (locker.unlockAmount == 0 || block.timestamp >= locker.withdrawUnlockTime) {
+                return;
+            }
+        }
 
         require(
             locker.unlockAmount > 0,
@@ -430,6 +430,19 @@ contract AlluoLockedV3 is
         }
 
         uint256 reward = calcReward(msg.sender, tokensPerLock);
+        uint256 oldReward = oldClaim[msg.sender];
+
+        if (oldReward > 0) {
+            alluoToken.safeTransfer(msg.sender, oldReward);
+            emit TokensClaimed(msg.sender, oldReward, block.timestamp);
+            oldClaim[msg.sender] = 0;
+
+            // to avoid tx revert, if there is no current claim amount
+            if (reward == 0) {
+                return;
+            }
+        }
+
         require(reward > 0, "Locking: Nothing to claim");
 
         Locker storage locker = _lockers[msg.sender];
@@ -439,6 +452,8 @@ contract AlluoLockedV3 is
 
         alluoToken.safeTransfer(msg.sender, reward);
         emit TokensClaimed(msg.sender, reward, block.timestamp);
+
+        cvxDistributor.claim(msg.sender);
     }
 
     /**
@@ -482,6 +497,15 @@ contract AlluoLockedV3 is
     }
 
     /**
+     * @dev Returns locker's available CVX rewards
+     * @param locker Address of the locker
+     * @return reward Available CVX reward to claim
+     */
+    function getClaimCvx(address locker) public view returns (uint256 reward) {
+        return cvxDistributor.getClaim(locker);
+    }
+
+    /**
      * @dev Returns balance of the specified locker
      * @param _address Locker's address
      * @return amount of vote/locked tokens
@@ -508,40 +532,6 @@ contract AlluoLockedV3 is
     }
 
     /**
-     * @dev converts amount of Alluo to Lp based on current ratio
-     * @param _amount amount of Alluo tokens
-     * @return amount amount of Lp tokens
-     */
-    function convertAlluoToLp(uint256 _amount)
-        external
-        view
-        returns (uint256)
-    {
-        uint256 alluoOnBalancer = alluoToken.balanceOf(address(balancer));
-        uint256 totalBalancerAlluoLp = ERC20Upgradeable(address(alluoBalancerLp)).totalSupply();
-        uint256 alluoPerLp = alluoOnBalancer * 100 * 100000000 / totalBalancerAlluoLp / 80;
-        return 
-        _amount * 100000000 / alluoPerLp;
-    }
-
-    /**
-     * @dev converts amount of Lp to Alluo tokens based on current ratio
-     * @param _amount amount of Lp tokens
-     * @return amount amount of Alluo tokens
-     */
-    function convertLpToAlluo(uint256 _amount)
-        external
-        view
-        returns (uint256)
-    {
-        uint256 alluoOnBalancer = alluoToken.balanceOf(address(balancer));
-        uint256 totalBalancerAlluoLp = ERC20Upgradeable(address(alluoBalancerLp)).totalSupply();
-        uint256 alluoPerLp = alluoOnBalancer * 100 * 100000000 / totalBalancerAlluoLp / 80;
-        return 
-        _amount * alluoPerLp / 100000000;
-    }
-
-    /**
      * @dev Returns total amount of locked tokens (in lp)
      * @return amount of locked 
      */
@@ -555,6 +545,7 @@ contract AlluoLockedV3 is
      * @return locked_ Locked amount of tokens (in lp)
      * @return unlockAmount_ Unlocked amount of tokens (in Alluo)
      * @return claim_  Reward amount available to be claimed
+     * @return claimCvx_  Reward amount of CVX LP available to be claimed
      * @return depositUnlockTime_ Timestamp when tokens will be available to unlock
      * @return withdrawUnlockTime_ Timestamp when tokens will be available to withdraw
      */
@@ -565,6 +556,7 @@ contract AlluoLockedV3 is
             uint256 locked_,
             uint256 unlockAmount_,
             uint256 claim_,
+            uint256 claimCvx_,
             uint256 depositUnlockTime_,
             uint256 withdrawUnlockTime_
         )
@@ -575,11 +567,13 @@ contract AlluoLockedV3 is
         depositUnlockTime_ = locker.depositUnlockTime;
         withdrawUnlockTime_ = locker.withdrawUnlockTime;
         claim_ = getClaim(_address);
+        claimCvx_ = cvxDistributor.getClaim(_address);
 
         return (
             locked_,
             unlockAmount_,
             claim_,
+            claimCvx_,
             depositUnlockTime_,
             withdrawUnlockTime_
         );
@@ -656,36 +650,6 @@ contract AlluoLockedV3 is
         IERC20Upgradeable(withdrawToken).safeTransfer(to, amount);
     }
 
-    function _exitAlluoPoolExactLp(uint256 lpAmount) private returns (uint256) {
-        address[] memory assets = new address[](2);
-        assets[0] = 0x1E5193ccC53f25638Aa22a940af899B692e10B09;
-        assets[1] = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-
-        uint256[] memory amounts = new uint256[](2);
-
-        bytes memory data = abi.encode(
-            uint256(ExitKind.EXACT_BPT_IN_FOR_ONE_TOKEN_OUT),
-            lpAmount,
-            0
-        );
-
-        ExitPoolRequest memory request = ExitPoolRequest(
-            assets,
-            amounts,
-            data,
-            false
-        );
-        uint256 alluoBalanceBefore = alluoToken.balanceOf(address(this));
-        balancer.exitPool(
-            poolId,
-            address(this),
-            payable(address(this)),
-            request
-        );
-
-        return alluoToken.balanceOf(address(this)) - alluoBalanceBefore;
-    }
-
     /**
      * @dev allows and prohibits to upgrade contract
      * @param _status flag for allowing upgrade from gnosis
@@ -695,6 +659,17 @@ contract AlluoLockedV3 is
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         upgradeStatus = _status;
+    }
+
+    /**
+     * @dev Set CVX rewards manager contract address
+     * @param cvxDistributorAddress contract address
+     */
+    function setCvxDistributor(address cvxDistributorAddress)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        cvxDistributor = CvxDistributor(cvxDistributorAddress);
     }
 
     function _authorizeUpgrade(address newImplementation)
