@@ -286,9 +286,13 @@ contract CvxDistributor is
      * @return Totally produced rewards
      */
     function produced() private view returns (uint256) {
+        uint256 timePassed = (block.timestamp - producedTime);
+        if (timePassed > distributionTime) {
+            timePassed = distributionTime;
+        }
         return
             allProduced +
-            (rewardTotal * (block.timestamp - producedTime)) /
+            (rewardTotal * timePassed) /
             distributionTime;
     }
 

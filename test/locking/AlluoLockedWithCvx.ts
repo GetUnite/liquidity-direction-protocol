@@ -130,25 +130,6 @@ describe("Locking contract with CVX", async () => {
         await alluoToken.connect(admin).burn(accounts[4].address, await alluoToken.balanceOf(accounts[4].address))
     })
 
-    it("Should upgrade contract", async () => {
-        if ((await ethers.provider.getNetwork()).chainId == 1) {
-            const oldContract = await ethers.getContractAt("AlluoLockedV3", "0xF295EE9F1FA3Df84493Ae21e08eC2e1Ca9DebbAf");
-            const oldContractVE = await ethers.getContractAt("VoteExecutorV2", "0xF5FF6A941516AF0D8311b98B77D011910f2559C4");
-            const vlAlluoNew = await ethers.getContractFactory("AlluoLockedV3");
-            const veNew = await ethers.getContractFactory("VoteExecutorV2");
-
-            await oldContract.connect(admin).grantRole(await oldContract.UPGRADER_ROLE(), accounts[0].address);
-            await oldContract.connect(admin).changeUpgradeStatus(true);
-
-            await oldContractVE.connect(admin).grantRole(await oldContractVE.UPGRADER_ROLE(), accounts[0].address)
-            await oldContractVE.connect(admin).Up(true);
-
-            await upgrades.upgradeProxy(oldContract.address, vlAlluoNew);
-        } else {
-            console.warn("WARN: Couldn't check upgradeability, please set chainId: 1 in hardat network config.")
-        }
-    });
-
     it("Should allow lock/unlock + withdraw", async () => {
         await locker.connect(accounts[1]).lock(parseEther("1000"));
         await skipDays(7);
