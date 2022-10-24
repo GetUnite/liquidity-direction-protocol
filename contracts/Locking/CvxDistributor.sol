@@ -48,6 +48,11 @@ contract CvxDistributor is
         uint256 distributed; // amount of distributed tokens
     }
 
+    struct RewardData {
+        address token;
+        uint256 amount;
+    }
+    
     ///@dev ERC20 token earned by stakers as reward.
     IERC20MetadataUpgradeable public rewardToken;
 
@@ -385,6 +390,35 @@ contract CvxDistributor is
         } else {
             return 0;
         }
+    }
+
+    function accruedRewards() public view returns (RewardData[] memory) {
+        (, , , address pool, , ) = cvxBooster.poolInfo(crvCVXETHPoolId);
+        ICvxBaseRewardPool mainCvxPool = ICvxBaseRewardPool(pool);
+        uint256 extraRewardsLength = mainCvxPool.extraRewardsLength();
+        RewardData[] memory rewardArray = new RewardData[](extraRewardsLength + 1);
+        rewardArray[0] = RewardData(mainCvxPool.rewardToken(),mainCvxPool.earned(address(this)));
+        for (uint256 i; i < extraRewardsLength; i++) {
+            ICvxBaseRewardPool extraReward = ICvxBaseRewardPool(mainCvxPool.extraRewards(i));
+
+            rewardArray[i+1] = (RewardData(extraReward.rewardToken(), extraReward.earned(address(this))));
+        }
+        return rewardArray;
+    }
+
+    function stakerAccruedRewards(address _staker) public view returns (RewardData[] memory) {
+        RewardData[] memory accruals = accruedRewards();
+        Staker memory staker = _stakers[_staker];
+
+        uint256 stakerAmount = staker.amount;
+        uint256 totalStakedAmount = totalStaked;
+
+        for (uint256 i; i < accruals.length; i++) {
+            uint256 stakerShareOfaccruals = accruals[i].amount * stakerAmount / totalStakedAmount;
+            accruals[i].amount = stakerShareOfaccruals;
+        }
+
+        return (accruals);
     }
 
     function getCvxRewardPool(uint256 poolId)
