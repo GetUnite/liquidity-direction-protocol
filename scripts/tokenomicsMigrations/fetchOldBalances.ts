@@ -1,7 +1,7 @@
 import { BigNumber, BigNumberish, constants } from "ethers";
 import { defaultAbiCoder, formatUnits, parseUnits } from "ethers/lib/utils";
-import { writeFileSync } from "fs";
 import { ethers, network } from "hardhat";
+import { AlluoLockedV3Interface } from "../../typechain/AlluoLockedV3";
 
 type Locker = {
     address: string,
@@ -20,10 +20,10 @@ async function main() {
             forking: {
                 enabled: true,
                 jsonRpcUrl: process.env.MAINNET_FORKING_URL as string,
+                blockNumber: 15817704
             },
         },],
     });
-
 
     const oldVlAlluo = await ethers.getContractAt("AlluoLockedV3", "0xF295EE9F1FA3Df84493Ae21e08eC2e1Ca9DebbAf");
     const lp = await ethers.getContractAt("IERC20Metadata", "0x85Be1e46283f5f438D1f864c2d925506571d544f");
@@ -35,13 +35,13 @@ async function main() {
     const filterIn = oldVlAlluo.filters.Transfer(constants.AddressZero, null, null);
 
     const queryIn = await oldVlAlluo.queryFilter(
-        filterIn, 
-        deployBlockNumber, 
+        filterIn,
+        deployBlockNumber,
         currentBlock
     );
 
     const result: Locker[] = [];
-    
+
     for (let i = 0; i < queryIn.length; i++) {
         const locker = queryIn[i];
         const to = locker.args.to;
@@ -87,37 +87,21 @@ async function main() {
     console.log("Current total Alluo tokens is", formatUnits(totalAlluoTokensCurrent, 18));
     console.log("Current amount of ALLUO per LP:", formatUnits(alluoPerLpCurrent, 18));
 
-    const queryBlock = 15645828;
-    console.log("Switching to block", queryBlock);
-    await network.provider.request({
-        method: "hardhat_reset",
-        params: [{
-            forking: {
-                enabled: true,
-                jsonRpcUrl: process.env.MAINNET_FORKING_URL as string,
-                blockNumber: queryBlock,
-            },
-        },],
-    });
-
-    const lpTotalSupplyPast = await lp.totalSupply();
-    const balancerInfoPast = await balancer.getPoolTokens(poolId);
-    const alluoPoolBalancePast = balancerInfoPast.balances[0];
-    const totalAlluoTokensPast = alluoPoolBalancePast.mul(10).div(8);
-    const alluoPerLpPast = totalAlluoTokensPast.mul(oneToken).div(lpTotalSupplyPast)
-
-    console.log("Past LP Total Supply is:", formatUnits(lpTotalSupplyPast, 18));
-    console.log("Past Alluo amount in pool is:", formatUnits(alluoPoolBalancePast, 18));
-    console.log("Past total Alluo tokens is", formatUnits(totalAlluoTokensPast, 18));
-    console.log("Past amount of ALLUO per LP:", formatUnits(alluoPerLpPast, 18));
-
-
     const totalAmounts: any = [];
+    const usersToMigrateLock: any[] = [];
     for (let i = 0; i < result.length; i++) {
         const locker = result[i];
 
         const lpToAlluoAmountCurrent = (locker.lpAmount as BigNumber).mul(alluoPerLpCurrent).div(oneToken);
-        const lpToAlluoAmountPast = (locker.lpAmount as BigNumber).mul(alluoPerLpPast).div(oneToken);
+
+        let isUserMigrateLocking = false;
+        if (locker.lpAmount > 0 && locker.address != "0x1F020A4943EB57cd3b2213A66b355CB662Ea43C3") {
+            isUserMigrateLocking = true;
+            usersToMigrateLock.push({
+                address: locker.address,
+                newStakeTotalAmountCurrentBlock: lpToAlluoAmountCurrent.add(locker.alluoRewards),
+            });
+        }
 
         totalAmounts.push({
             address: locker.address,
@@ -125,21 +109,32 @@ async function main() {
             alluoRewardsAvailable: formatUnits(locker.alluoRewards, 18),
             lpToTokenAmountCurrentBlock: formatUnits(lpToAlluoAmountCurrent, 18),
             newStakeTotalAmountCurrentBlock: formatUnits(lpToAlluoAmountCurrent.add(locker.alluoRewards), 18),
-            lpToTokenAmountPastBlock: formatUnits(lpToAlluoAmountPast, 18),
-            newStakeTotalAmountPastBlock: formatUnits(lpToAlluoAmountPast.add(locker.alluoRewards), 18),
             unlockPendingAmount: formatUnits(locker.unlocked, 18),
             unlockRequestAfterLockingAvailableAt: (locker.depositUnlockTime as BigNumber).toNumber(),
             unlockedWithdrawAvailableAt: (locker.withdrawUnlockTime as BigNumber).toNumber(),
             dataDumpedAtBlockTimestamp: locker.dumpTimestamp,
+            isUserMigrateLocking: isUserMigrateLocking
         })
     }
 
-    console.log(JSON.stringify(totalAmounts));
+
+
+    const vlAlluo = (await ethers.getContractFactory("AlluoLockedV3")).interface as AlluoLockedV3Interface;
+
+    console.log(
+        vlAlluo.encodeFunctionData(
+            "migrationLock",
+            [
+                usersToMigrateLock.map((x) => x.address),
+                usersToMigrateLock.map((x) => x.newStakeTotalAmountCurrentBlock),
+            ]
+        )
+    )
 }
 
 main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+    .then(() => process.exit(0))
+    .catch((error) => {
+        console.error(error);
+        process.exit(1);
+    });
