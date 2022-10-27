@@ -2,7 +2,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { formatEther, parseEther } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
-import { AlluoLockedV3, CvxDistributor, IAlluoToken, ICurveCVXETH, IERC20Metadata, TestERC20, VoteExecutor, VoteExecutorV2 } from "../../typechain";
+import { AlluoLockedV4, CvxDistributor, IAlluoToken, ICurveCVXETH, IERC20Metadata, TestERC20, VoteExecutor, VoteExecutorV2 } from "../../typechain";
 
 async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
     await ethers.provider.send(
@@ -24,7 +24,7 @@ describe("Locking contract with CVX", async () => {
 
     let alluoToken: IAlluoToken, cvx: IERC20Metadata, cvxEthPool: ICurveCVXETH, cvxEthToken: IERC20Metadata;
 
-    let locker: AlluoLockedV3, cvxDistributor: CvxDistributor, voteExecutor: VoteExecutorV2;
+    let locker: AlluoLockedV4, cvxDistributor: CvxDistributor, voteExecutor: VoteExecutorV2;
 
     before(async function () {
         //We are forking Ethereum mainnet, please set Alchemy key in .env
@@ -49,7 +49,7 @@ describe("Locking contract with CVX", async () => {
     });
 
     beforeEach(async () => {
-        const Locker = await ethers.getContractFactory("AlluoLockedV3");
+        const Locker = await ethers.getContractFactory("AlluoLockedV4");
 
         locker = await upgrades.deployProxy(Locker,
             [
@@ -57,7 +57,7 @@ describe("Locking contract with CVX", async () => {
                 0,
             ],
             { initializer: 'initialize', kind: 'uups' }
-        ) as AlluoLockedV3;
+        ) as AlluoLockedV4;
 
         const exchangeAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec";
         const VoteExecutorV2 = await ethers.getContractFactory("VoteExecutorV2");
@@ -76,7 +76,7 @@ describe("Locking contract with CVX", async () => {
                 0,
             ],
             { initializer: 'initialize', kind: 'uups' }
-        ) as AlluoLockedV3;
+        ) as AlluoLockedV4;
 
         cvx = await ethers.getContractAt("IERC20Metadata", "0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B");
 

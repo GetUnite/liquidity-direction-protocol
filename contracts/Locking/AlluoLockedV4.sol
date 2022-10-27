@@ -14,7 +14,7 @@ import "./../interfaces/IBalancer.sol";
 import "./CvxDistributor.sol";
 import "./../interfaces/IAlluoLockedV3.sol";
 
-contract AlluoLockedV3 is
+contract AlluoLockedV4 is
     Initializable,
     UUPSUpgradeable,
     AccessControlUpgradeable,

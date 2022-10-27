@@ -5,7 +5,7 @@ import { Contract, ContractFactory } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { parseEther } from "@ethersproject/units";
 import { keccak256 } from "ethers/lib/utils";
-import { AlluoLockedV3, IAlluoToken, PseudoMultisigWallet, TestERC20, AlluoLockedV2Final, CvxDistributor } from '../../typechain';
+import { AlluoLockedV4, IAlluoToken, PseudoMultisigWallet, TestERC20, AlluoLockedV2Final, CvxDistributor } from '../../typechain';
 import { getLockers } from "../../scripts/dev/getLockers";
 import { writeFileSync } from 'fs';
 import { join } from "path";
@@ -18,7 +18,7 @@ let Multisig: ContractFactory;
 let multisig: PseudoMultisigWallet;
 
 let Locker: ContractFactory;
-let locker: AlluoLockedV3;
+let locker: AlluoLockedV4;
 let cvxDistributor: CvxDistributor;
 let cvx: TestERC20;
 let oldLockerFinal: AlluoLockedV2Final;
@@ -144,7 +144,7 @@ describe("Locking contract", function () {
         Multisig = await ethers.getContractFactory("PseudoMultisigWallet");
         multisig = await Multisig.deploy(true) as PseudoMultisigWallet;
 
-        Locker = await ethers.getContractFactory("AlluoLockedV3");
+        Locker = await ethers.getContractFactory("AlluoLockedV4");
 
         locker = await upgrades.deployProxy(Locker,
             [
@@ -152,7 +152,7 @@ describe("Locking contract", function () {
                 0,
             ],
             { initializer: 'initialize', kind: 'uups' }
-        ) as AlluoLockedV3;
+        ) as AlluoLockedV4;
 
         const CvxToken = await ethers.getContractFactory("TestERC20");
         cvx = await CvxToken.deploy("CvxToken", "CVX", 18, false, admin.address);
