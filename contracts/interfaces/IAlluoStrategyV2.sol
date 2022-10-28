@@ -38,7 +38,7 @@ interface IAlluoStrategyV2 {
         bool swapRewards
     ) external;
 
-    function getDeployedAmount(
+    function getDeployedAmountAndRewards(
         bytes calldata data
     ) external returns(uint256);
 

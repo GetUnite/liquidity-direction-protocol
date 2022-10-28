@@ -20,7 +20,7 @@ import "../interfaces/IAlluoStrategyNew.sol";
 import "../interfaces/IMultichain.sol";
 import "../interfaces/IAlluoStrategyV2.sol";
 import "../interfaces/IExchange.sol";                                                                 
-import "../interfaces/IWrappedEther.sol";
+import "../interfaces/IWrappedEther.sol";                               
 import "../interfaces/IIbAlluo.sol";
 import "../Farming/priceFeedsV2/PriceFeedRouterV2.sol";
 import "./strategies/StrategyHandler.sol";
@@ -47,55 +47,36 @@ contract VoteExecutorMaster is
     address public exchangeAddress;
     address public priceFeed;
     address public strategyHandler;
+    IWrappedEther public constant wETH = IWrappedEther(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     bool public upgradeStatus;
 
     SubmittedData[] public submittedData;
-    // we dont use it 
-    Bridging public bridgingInfo;
-    EnumerableSetUpgradeable.AddressSet private primaryTokens;
-
-    mapping(address => address) public tokenToAnyToken;
-    mapping(address => DepositQueue) public tokenToDepositQueue;
     mapping(bytes32 => uint256) public hashExecutionTime;
 
-    GeneralBridging public generalBridgingInfo;
-    mapping(address => TokenBridging) public tokenToBridgingInfo;
-    CrossChainMessaging public messagingInfo;
-    IWrappedEther public constant wETH = IWrappedEther(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    CrossChainInfo public crossChainInfo;
+    mapping(uint => AssetBridging) public assetIdToAssetBridging;
 
-    // can we add here direction id?
+    mapping(uint256 => Deposit[]) public assetIdToDepositList;
+
     struct Deposit{
-        address strategyAddress;
+        uint256 directionId;
         uint256 amount;
-        address strategyPrimaryToken;
-        address entryToken;
-        bytes data;
     }
     
-    struct GeneralBridging{
-        address nextChainExecutor;
-        uint256 currentChain;
-        uint256 nextChain;
-    }
-    
-    struct CrossChainMessaging {
+    struct CrossChainInfo{
         address anyCallAddress;
         address anyCallExecutor;
         address nextChainExecutor;
-        uint256 nextChain;
         address previousChainExecutor;
-    }
-
-    struct Bridging{
-        address anyCallAddress;
-        address multichainRouter;
-        address nextChainExecutor;
         uint256 currentChain;
         uint256 nextChain;
+        uint256 previousChain;
     }
 
-    struct TokenBridging{
+    struct AssetBridging{
+        address token;
+        address anyToken;
         bytes4 functionSignature;
         address multichainRouter;
         uint256 minimumAmount;
@@ -112,17 +93,11 @@ contract VoteExecutorMaster is
         bytes[] signs;
     }
 
-    struct DepositQueue {
-        Deposit[] depositList;
-        uint256 depositNumber;
-    }
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
     function initialize(
-        address _multiSigWallet, 
-        address _secondAdmin
+        address _multiSigWallet
     ) public initializer {
         __Pausable_init();
         __AccessControl_init();
@@ -140,9 +115,6 @@ contract VoteExecutorMaster is
         // For tests only
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
-
-        _grantRole(DEFAULT_ADMIN_ROLE, _secondAdmin);
-        _grantRole(UPGRADER_ROLE, _secondAdmin);
     }
 
     receive() external payable {
@@ -205,67 +177,86 @@ contract VoteExecutorMaster is
             require(hashExecutionTime[hashed] == 0, "Duplicate Hash");
 
             if(exactData.signs.length >= minSigns){
-                uint256 currentChain = generalBridgingInfo.currentChain;
+                uint256 currentChain = crossChainInfo.currentChain;
+                Message memory lastMessage = messages[messages.length-1];
+                StrategyHandler(strategyHandler).calculateRewards();
+                if(lastMessage.commandIndex == 3){
+                    (int256 treasuryDelta) = abi.decode(lastMessage.commandData, (int256));
+                    StrategyHandler(strategyHandler).adjustTreasury(treasuryDelta);
+                }
+                uint[1] memory amountsDeployed = StrategyHandler(strategyHandler).getAllDeployedAmounts();
+                
                 for (uint256 j; j < messages.length; j++) {
-                    // if(messages[j].commandIndex == 1){
+                    uint256 commandIndex = messages[j].commandIndex;
+                    // if(commandIndex == 1){
                     //     (uint256 mintAmount, uint256 period) = abi.decode(messages[j].commandData, (uint256, uint256));
                     //     IAlluoToken(ALLUO).mint(locker, mintAmount);
                     //     ILocker(locker).setReward(mintAmount / (period));
                     // }
-                    if(messages[j].commandIndex == 2) {
+                    if(commandIndex == 2) {
                         // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
-                        (uint256 directionId, address strategyAddress, uint256 delta, uint256 chainId, address strategyPrimaryToken,, bytes memory data) = abi.decode(messages[j].commandData, (uint256, address, uint256, uint256, address,address, bytes));
-                        if (chainId == currentChain) {
-                            IAlluoStrategyV2(strategyAddress).exitAll(data, delta, strategyPrimaryToken, address(this), false);
-                            if(delta == 10000){
+                        (uint256 directionId, uint256 percent) = abi.decode(messages[j].commandData, (uint256, uint256));
+                        (address strategyPrimaryToken, StrategyHandler.LiquidityDirection memory direction) = StrategyHandler(strategyHandler).getLiquidityDirectionById(directionId);
+                        if (direction.chainId == currentChain) {
+
+                            if(percent == 0){
+                                IAlluoStrategyV2(direction.strategyAddress).exitAll(direction.exitData, 10000, strategyPrimaryToken, address(this), false);
                                 StrategyHandler(strategyHandler).removeFromActiveDirections(directionId);
+                            }
+                            else{
+                                uint newAmount = percent * amountsDeployed[direction.assetId] / 10000;
+                                console.log("Dealing with direction:", directionId);
+                                console.log("New amount should be:",newAmount/10**18);
+                                console.log("old amount is",direction.latestAmount/10**18);
+                                if(newAmount < direction.latestAmount){
+                                    uint exitPercent = 10000 - newAmount * 10000 / direction.latestAmount;
+                                    // we already get rewards can not call it again
+                                    console.log("need to withdraw percent",exitPercent);
+
+                                    IAlluoStrategyV2(direction.strategyAddress).exitAll(direction.exitData, exitPercent, strategyPrimaryToken, address(this), false);
+                                }
+                                else{
+                                    uint depositAmount = newAmount - direction.latestAmount;
+                                    console.log("need to deposit amount",depositAmount/10**18);
+                                    assetIdToDepositList[direction.assetId].push(Deposit(directionId, depositAmount));
+                                }
                             }
                         }
                     }
-                    else if(messages[j].commandIndex == 3) {
-                        // Add all deposits to the queue.
-                        (uint256 directionId, address strategyAddress, uint256 delta, uint256 chainId, address strategyPrimaryToken, address entryToken, bytes memory data) = abi.decode(messages[j].commandData, (uint256, address, uint256, uint256, address,address, bytes));
-                        if (chainId == currentChain) {
-                            tokenToDepositQueue[strategyPrimaryToken].depositList.push(Deposit(strategyAddress, delta, strategyPrimaryToken, entryToken, data));
-                            //should move it to _executeDeposits()
-                            StrategyHandler(strategyHandler).addToActiveDirections(directionId);
-                        }
-                    }
                 }
-                // Execute deposits. Only executes if we have sufficient balances.
                 hashExecutionTime[hashed] = block.timestamp;
                 bytes memory finalData = abi.encode(exactData.data, exactData.signs);
-                IAnyCall(messagingInfo.anyCallAddress).anyCall(messagingInfo.nextChainExecutor, finalData, address(0), messagingInfo.nextChain, 0);
+                IAnyCall(crossChainInfo.anyCallAddress).anyCall(crossChainInfo.nextChainExecutor, finalData, address(0), crossChainInfo.nextChain, 0);
             }     
     }
 
+    // Execute deposits. Only executes if we have sufficient balances.
     function _executeDeposits() internal {
-        for (uint256 i; i < primaryTokens.length(); i++) {
-            DepositQueue memory depositQueue = tokenToDepositQueue[primaryTokens.at(i)];
-            Deposit[] memory depositList = depositQueue.depositList;
-            uint256 depositNumber = depositQueue.depositNumber;    
-            uint256 iters = depositList.length - depositNumber;
+        for (uint256 i; i < 1; i++) {
+            Deposit[] storage depositList = assetIdToDepositList[i];
             address exchange = exchangeAddress;
-            for (uint256 j; j < iters; j++) {
-                Deposit memory depositInfo = depositList[depositNumber + j];
-                address strategyPrimaryToken = depositInfo.strategyPrimaryToken;
-                uint256 tokenAmount = depositInfo.amount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
-                if (depositInfo.entryToken != strategyPrimaryToken) {
+            while(depositList.length > 0){
+                Deposit memory depositInfo = depositList[depositList.length - 1];
+                (address strategyPrimaryToken, StrategyHandler.LiquidityDirection memory direction) = StrategyHandler(strategyHandler).getLiquidityDirectionById(depositInfo.directionId);
+                (uint256 fiatPrice, uint8 fiatDecimals) = PriceFeedRouterV2(priceFeed).getPrice(strategyPrimaryToken, i);
+                uint exactAmount = (depositInfo.amount * 10**fiatDecimals) / fiatPrice;
+                console.log("exact amount to deposit with token price",exactAmount/10**18);
+                uint256 tokenAmount = exactAmount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
+                if (direction.entryToken != strategyPrimaryToken) {
                     // 3CRV vs USDC
                     IERC20MetadataUpgradeable(strategyPrimaryToken).approve(exchange, tokenAmount);
-                    tokenAmount = IExchange(exchange).exchange(strategyPrimaryToken, depositInfo.entryToken, tokenAmount, 0);
-                    strategyPrimaryToken = depositInfo.entryToken;
+                    tokenAmount = IExchange(exchange).exchange(strategyPrimaryToken, direction.entryToken, tokenAmount, 0);
+                    strategyPrimaryToken = direction.entryToken;
                 }
-                IERC20MetadataUpgradeable(strategyPrimaryToken).safeTransfer(depositInfo.strategyAddress, tokenAmount);
-                IAlluoStrategyV2(depositInfo.strategyAddress).invest(depositInfo.data, tokenAmount);
-                tokenToDepositQueue[depositInfo.strategyPrimaryToken].depositNumber++;
+                //for future we can optimise it and transfer once and then entry all strtegy
+                IERC20MetadataUpgradeable(strategyPrimaryToken).safeTransfer(direction.strategyAddress, tokenAmount);
+                IAlluoStrategyV2(direction.strategyAddress).invest(direction.entryData, tokenAmount);
+                StrategyHandler(strategyHandler).addToActiveDirections(depositInfo.directionId);
+                depositList.pop();
             }
         }
     }
 
-    function incrementDepositNumber(address primaryToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        tokenToDepositQueue[primaryToken].depositNumber++;
-    }
     
     // Public can only executeDeposits by bridging funds backwards.
     function executeDeposits() public {
@@ -273,22 +264,20 @@ contract VoteExecutorMaster is
     }
 
    function _bridgeFunds() internal {
-        // primaryTokens = eth, usd, eur
-        GeneralBridging memory bridgingInfoMemory = generalBridgingInfo;
-        for (uint256 i; i < primaryTokens.length(); i++) {
-            address primaryToken = primaryTokens.at(i);
+        CrossChainInfo memory crossChainInfoMemory = crossChainInfo;
+        for (uint256 i; i < 1; i++) {
+            AssetBridging memory currentBridgingInfo = assetIdToAssetBridging[i];
+            address primaryToken = currentBridgingInfo.token;
             uint256 tokenBalance = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
-            TokenBridging memory currentBridgingInfo = tokenToBridgingInfo[primaryToken];
-            if (tokenToDepositQueue[primaryToken].depositList.length == tokenToDepositQueue[primaryToken].depositNumber && currentBridgingInfo.minimumAmount <= tokenBalance) {
+            if (assetIdToDepositList[i].length == 0 && currentBridgingInfo.minimumAmount <= tokenBalance) {
 
                 if(primaryToken == address(wETH)){
                     wETH.withdraw(tokenBalance);
                     bytes memory data = abi.encodeWithSelector(
                         currentBridgingInfo.functionSignature, 
-                        //can change to tokenToAnyToken
-                        0x0615Dbba33Fe61a31c7eD131BDA6655Ed76748B1, // anyWETH
-                        bridgingInfoMemory.nextChainExecutor, 
-                        bridgingInfoMemory.nextChain
+                        currentBridgingInfo.anyToken, // anyWETH
+                        crossChainInfoMemory.previousChainExecutor, 
+                        crossChainInfoMemory.previousChain
                     );
                     currentBridgingInfo.multichainRouter.functionCallWithValue(data, tokenBalance);
                 }
@@ -296,10 +285,10 @@ contract VoteExecutorMaster is
                     IERC20MetadataUpgradeable(primaryToken).approve(currentBridgingInfo.multichainRouter, tokenBalance);
                     bytes memory data = abi.encodeWithSelector(
                         currentBridgingInfo.functionSignature, 
-                        tokenToAnyToken[primaryToken], 
-                        bridgingInfoMemory.nextChainExecutor, 
+                        currentBridgingInfo.anyToken, 
+                        crossChainInfoMemory.previousChainExecutor, 
                         tokenBalance, 
-                        bridgingInfoMemory.nextChain
+                        crossChainInfoMemory.previousChain
                     );
                     currentBridgingInfo.multichainRouter.functionCall(data);
                 }
@@ -333,26 +322,47 @@ contract VoteExecutorMaster is
     //     return (1, encodedCommand);
     // }
 
+    function removeTokenByAddress(address _address, uint256 _amount)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(_address != address(0), "Wrong address");
+        IERC20MetadataUpgradeable(_address).safeTransfer(msg.sender, _amount);
+    }
+
    function encodeLiquidityCommand(
         string memory _codeName,
-        address _entryToken,
-        uint256 _delta,
-        bool _isDeposit
+        uint256 _percent
     ) public view  returns (uint256, bytes memory) {
-        (uint256 directionId, address strategyPrimaryToken, StrategyHandler.LiquidityDirection memory direction) = StrategyHandler(strategyHandler).getLiquidityDirectionByName(_codeName);
-        if(!_isDeposit){
-            return (2, abi.encode(directionId, direction.strategyAddress, _delta, direction.chainId, strategyPrimaryToken, _entryToken, direction.exitData));
-        }
-        else{
-            return (3, abi.encode(directionId, direction.strategyAddress, _delta, direction.chainId, strategyPrimaryToken, _entryToken, direction.entryData));
-        }
+        uint256 directionId = StrategyHandler(strategyHandler).getDirectionIdByName(_codeName);
+        return (2, abi.encode(directionId, _percent));
+    }
+
+    function encodeTreasuryAllocationChangeCommand(
+        int256 _delta
+    ) public pure  returns (uint256, bytes memory) {
+        bytes memory encodedCommand = abi.encode(_delta);
+        return (3, encodedCommand);
     }
     
     function encodeAllMessages(uint256[] memory _commandIndexes, bytes[] memory _messages) public view  returns (bytes32 messagesHash, Message[] memory messages, bytes memory inputData) {
         uint256 timestamp = block.timestamp;
-        require(_commandIndexes.length == _messages.length, "Array length mismatch");
-        messages = new Message[](_commandIndexes.length);
-        for (uint256 i; i < _commandIndexes.length; i++) {
+        uint length = _commandIndexes.length;
+        require(length == _messages.length, "Array length mismatch");
+
+        for (uint256 i; i < length; i++) {
+            if(_commandIndexes[i] == 3){
+                uint temporaryIndex = _commandIndexes[length-1];
+                bytes memory temporaryMessage = _messages[length-1];
+                _commandIndexes[length-1] = _commandIndexes[i];
+                _messages[length-1] = _messages[i];
+                _commandIndexes[i] = temporaryIndex;
+                _messages[i] = temporaryMessage;
+            }
+        }
+
+        messages = new Message[](length);
+        for (uint256 i; i < length; i++) {
             messages[i] = Message(_commandIndexes[i], _messages[i]);
         }
         messagesHash = keccak256(abi.encode(messages, timestamp));
@@ -360,7 +370,7 @@ contract VoteExecutorMaster is
                 messagesHash,
                 messages,
                 timestamp
-            );
+        );
     }
 
     function _verify(bytes32 data, bytes memory signature, address account) internal pure returns (bool) {
@@ -383,27 +393,35 @@ contract VoteExecutorMaster is
         return true;
     }
 
-    function currentDepositsInQueue(address _primaryToken) public view returns (Deposit[] memory) {
-        Deposit[] memory list = tokenToDepositQueue[_primaryToken].depositList;
-        uint256 currentIndex = tokenToDepositQueue[_primaryToken].depositNumber;
-        Deposit[] memory depositsInQueue = new Deposit[](list.length - currentIndex);
-        for (uint256 i; i < list.length - currentIndex; i++) {
-            depositsInQueue[i] = list[currentIndex + i];
-        }
-        return depositsInQueue;
-    }
+    // function currentDepositsInQueue(address _primaryToken) public view returns (Deposit[] memory) {
+    //     Deposit[] memory list = tokenToDepositQueue[_primaryToken].depositList;
+    //     uint256 currentIndex = tokenToDepositQueue[_primaryToken].depositNumber;
+    //     Deposit[] memory depositsInQueue = new Deposit[](list.length - currentIndex);
+    //     for (uint256 i; i < list.length - currentIndex; i++) {
+    //         depositsInQueue[i] = list[currentIndex + i];
+    //     }
+    //     return depositsInQueue;
+    // }
 
 
     /// Admin functions 
 
-     function setTokenBridgingInfo(address _tokenAddress, bytes4 _selector, address _router, uint256 _minimumAmount) external onlyRole(DEFAULT_ADMIN_ROLE){
-        tokenToBridgingInfo[_tokenAddress].functionSignature = _selector;
-        tokenToBridgingInfo[_tokenAddress].multichainRouter = _router;
-        tokenToBridgingInfo[_tokenAddress].minimumAmount = _minimumAmount;
-    }
+    //  function setTokenBridgingInfo(address _tokenAddress, bytes4 _selector, address _router, uint256 _minimumAmount) external onlyRole(DEFAULT_ADMIN_ROLE){
+    //     tokenToBridgingInfo[_tokenAddress].functionSignature = _selector;
+    //     tokenToBridgingInfo[_tokenAddress].multichainRouter = _router;
+    //     tokenToBridgingInfo[_tokenAddress].minimumAmount = _minimumAmount;
+    // }
 
-    function setMessagingInfo(address _anyCallAddress, address _anyCallExecutor, address _nextChainExecutor, uint256 _nextChain,address _previousChainExecutor) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        messagingInfo = CrossChainMessaging(_anyCallAddress, _anyCallExecutor, _nextChainExecutor, _nextChain, _previousChainExecutor);
+    function setCrossChainInfo(
+        address _anyCallAddress,
+        address _anyCallExecutor,
+        address _nextChainExecutor,
+        address _previousChainExecutor,
+        uint256 _currentChain,
+        uint256 _nextChain,
+        uint256 _previousChain
+        ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        crossChainInfo = CrossChainInfo(_anyCallAddress, _anyCallExecutor, _nextChainExecutor, _previousChainExecutor, _currentChain, _nextChain, _previousChain);
     }
 
     /**
@@ -424,27 +442,35 @@ contract VoteExecutorMaster is
         minSigns = _minSigns;
     }
 
-    function setBridgingInfo(address _nextChainExecutor,uint256 _currentChain, uint256 _nextChain) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        generalBridgingInfo = GeneralBridging(_nextChainExecutor, _currentChain, _nextChain);
-    }
+    // function setBridgingInfo(address _nextChainExecutor,uint256 _currentChain, uint256 _nextChain) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    //     generalBridgingInfo = GeneralBridging(_nextChainExecutor, _currentChain, _nextChain);
+    // }
 
-    function setTokenToAnyToken(address _token, address _anyToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        tokenToAnyToken[_token] = _anyToken;
-    }
+    // function setTokenToAnyToken(address _token, address _anyToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    //     tokenToAnyToken[_token] = _anyToken;
+    // }
 
     function setExchangeAddress(address _newExchange) public onlyRole(DEFAULT_ADMIN_ROLE) {
         exchangeAddress = _newExchange;
     }
 
-    function addPrimaryToken(address _token) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        primaryTokens.add(_token);
+    function setStrategyHandler(address _newHandler) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        strategyHandler = _newHandler;
     }
-    function removePrimaryToken(address _token) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        primaryTokens.remove(_token);
+
+    function setPriceFeed(address _newFeed) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        priceFeed = _newFeed;
     }
-    function getPrimaryToken() external view returns(address[] memory) {
-        return primaryTokens.values();
-    }
+
+    // function addPrimaryToken(address _token) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    //     primaryTokens.add(_token);
+    // }
+    // function removePrimaryToken(address _token) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    //     primaryTokens.remove(_token);
+    // }
+    // function getPrimaryToken() external view returns(address[] memory) {
+    //     return primaryTokens.values();
+    // }
 
 
     function grantRole(bytes32 role, address account)

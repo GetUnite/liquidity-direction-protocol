@@ -3,6 +3,7 @@ pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
+import "hardhat/console.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -45,15 +46,19 @@ contract CurveConvexStrategyV2 is
 
     function initialize(
         address _multiSigWallet, 
-        address voteExecutor
+        address _voteExecutor,
+        address _strategyHandler,
+        address _priceFeed
     ) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
         require(_multiSigWallet.isContract(), "Executor: Not contract");
-
+        priceFeed = _priceFeed;
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
-        _grantRole(DEFAULT_ADMIN_ROLE, voteExecutor);
+        _grantRole(DEFAULT_ADMIN_ROLE, _voteExecutor);
+        _grantRole(DEFAULT_ADMIN_ROLE, _strategyHandler);
+        
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
 
         // For tests only
@@ -68,8 +73,8 @@ contract CurveConvexStrategyV2 is
     {
         (
             address curvePool,
-            IERC20 lpToken,
             IERC20 poolToken,
+            IERC20 lpToken,
             uint8 poolSize,
             uint8 tokenIndexInCurve,
             uint256 poolId
@@ -176,7 +181,7 @@ contract CurveConvexStrategyV2 is
         manageRewardsAndWithdraw(swapRewards, IERC20(outputCoin), receiver);
     }
 
-     function getDeployedAmount(
+    function getDeployedAmountAndRewards(
         bytes calldata data
     ) external onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256){
         (
@@ -198,6 +203,29 @@ contract CurveConvexStrategyV2 is
 
         return PriceFeedRouterV2(priceFeed).decimalsConverter(fiatPrice, fiatDecimals, 18);
     }
+
+     function getDeployedAmount(
+        bytes calldata data
+    ) external view returns(uint256){
+        (
+            IERC20 lpToken,
+            uint256 convexPoolId,
+            uint256 assetId
+        ) = decodeRewardsParams(data);
+
+        uint256 lpAmount;
+        if (convexPoolId != type(uint256).max) {
+            ICvxBaseRewardPool rewards = getCvxRewardPool(convexPoolId);
+            lpAmount = rewards.balanceOf(address(this));
+        } else {
+            lpAmount = lpToken.balanceOf(address(this));
+        }
+
+        (uint256 fiatPrice, uint8 fiatDecimals) = PriceFeedRouterV2(priceFeed).getPriceOfAmount(address(lpToken), lpAmount, assetId);
+
+        return PriceFeedRouterV2(priceFeed).decimalsConverter(fiatPrice, fiatDecimals, 18);
+    }
+    
 
     function getRewards(address _token) public onlyRole(DEFAULT_ADMIN_ROLE){
         manageRewardsAndWithdraw(true, IERC20(_token), msg.sender);
@@ -230,8 +258,8 @@ contract CurveConvexStrategyV2 is
 
     function encodeEntryParams(
         address curvePool,
-        address lpToken,
         address poolToken,
+        address lpToken,
         uint8 poolSize,
         uint8 tokenIndexInCurve,
         uint256 convexPoolId
@@ -239,8 +267,8 @@ contract CurveConvexStrategyV2 is
         return
             abi.encode(
                 curvePool,
-                lpToken,
                 poolToken,
+                lpToken,
                 poolSize,
                 tokenIndexInCurve,
                 convexPoolId

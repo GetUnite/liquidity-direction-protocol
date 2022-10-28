@@ -41,6 +41,8 @@ contract StrategyHandler is
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     address public gnosis;
+    address public booster;
+    address public executor;
     address public exchangeAddress;
     address public priceFeed;
 
@@ -54,15 +56,17 @@ contract StrategyHandler is
     //can be changed to array
     mapping(uint256 => AssetInfo) private assetIdToAssetInfo;
 
-    uint8 public numberOfAssets = 4;
+    uint8 public numberOfAssets;
 
     struct LiquidityDirection {
-        address strategyAddress; //frax convex , mim
+        address strategyAddress; 
+        address entryToken; 
         uint256 assetId;
         uint256 chainId;
         bytes entryData;
         bytes exitData;
         bytes rewardsData;
+        uint256 latestAmount;
     }
 
     struct AssetInfo {
@@ -77,8 +81,8 @@ contract StrategyHandler is
     constructor() initializer {}
 
     function initialize(
-        address _multiSigWallet, 
-        address _secondAdmin
+        address _multiSigWallet,
+        address _priceFeed
     ) public initializer {
         __Pausable_init();
         __AccessControl_init();
@@ -94,9 +98,8 @@ contract StrategyHandler is
         // For tests only
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
-
-        _grantRole(DEFAULT_ADMIN_ROLE, _secondAdmin);
-        _grantRole(UPGRADER_ROLE, _secondAdmin);
+        numberOfAssets = 1;
+        priceFeed = _priceFeed;
     }
 
     // receive() external payable {
@@ -105,7 +108,8 @@ contract StrategyHandler is
     //     }
     // }returns()
 
-    function calculateRewards() external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function calculateRewards() external onlyRole(DEFAULT_ADMIN_ROLE){
+        console.log("------------------------");
 
         uint256 timePass = block.timestamp - lastTimeCalculated;
         for (uint256 i; i < numberOfAssets; i++) {
@@ -113,7 +117,9 @@ contract StrategyHandler is
             AssetInfo storage info = assetIdToAssetInfo[i];
             for (uint256 j; j < info.activeDirections.length(); j++) {
                 LiquidityDirection memory direction = liquidityDirection[info.activeDirections.at(j)];
-                newAmountDeployed += IAlluoStrategyV2(direction.strategyAddress).getDeployedAmount(direction.rewardsData);
+                uint latestAmount = IAlluoStrategyV2(direction.strategyAddress).getDeployedAmountAndRewards(direction.rewardsData);
+                liquidityDirection[info.activeDirections.at(j)].latestAmount = latestAmount;
+                newAmountDeployed += latestAmount;
                 if(!info.needToTransferFrom.contains(direction.strategyAddress)){
                     info.needToTransferFrom.add(direction.strategyAddress);
                 }
@@ -134,35 +140,87 @@ contract StrategyHandler is
             );
             
             uint256 interest = IIbAlluo(info.ibAlluo).annualInterest();
-            uint256 expectedAmount = info.amountDeployed + (info.amountDeployed * interest * timePass / 31536000  / 10000);
+            // uint256 interest = 50;
+            uint256 expectedAddition = info.amountDeployed * interest * timePass / 31536000  / 10000;
+            uint256 expectedFullAmount = info.amountDeployed + expectedAddition;
             uint256 actualAmount = newAmountDeployed + totalRewards;
 
-            if(actualAmount > expectedAmount){
+            console.log("actualAmount is:",actualAmount / 10**18);
+            console.log("expectedFullAmount is:",expectedFullAmount / 10**18);
 
-                uint256 surplus = actualAmount - expectedAmount;
-                surplus = PriceFeedRouterV2(priceFeed).decimalsConverter(
-                    surplus, 
-                    18, 
-                    primaryDecimals
-                );
-                if(surplus < totalRewardsBalance){
-                    //transfer surplus to booster
-                    // all what left to executor
+            console.log("totalRewards is:",totalRewards / 10**18);
+
+            if(actualAmount > expectedFullAmount){
+            uint256 surplus = actualAmount - expectedFullAmount;
+            console.log("surplus is:",surplus / 10**18);
+            console.log("expectedAddition is:",expectedAddition / 10**18);
+
+                if(surplus < totalRewards){
+                    uint rewardsLeft = totalRewards-surplus;
+
+                    info.amountDeployed = actualAmount - surplus + rewardsLeft;
+                    console.log("surplus sent to booster, all rewards that left sent to executor:", rewardsLeft/10**18);
+                    surplus = PriceFeedRouterV2(priceFeed).decimalsConverter(
+                        surplus, 
+                        18, 
+                        primaryDecimals
+                    );  
+                    IERC20Upgradeable(primaryToken).transfer(booster, surplus);
+                    rewardsLeft = PriceFeedRouterV2(priceFeed).decimalsConverter(
+                        rewardsLeft, 
+                        18, 
+                        primaryDecimals
+                    );  
+                    IERC20Upgradeable(primaryToken).transfer(executor, rewardsLeft);
+
+                    console.log("new total amount:", info.amountDeployed/10**18);
                 }
                 else{
-                    // ???
+
+                    info.amountDeployed = actualAmount - totalRewards;
+                    IERC20Upgradeable(primaryToken).transfer(booster, totalRewardsBalance);
+
+                    console.log("all rewards sent to booster");
+                    console.log("new total amount:", info.amountDeployed/10**18);
+
+                    //in the future here we will also exit some existing strategy to send to booster
                 }
+
             }
             else{
-                //transfer all rewards to executor
-                // ???
+                console.log("expectedAddition is:",(expectedFullAmount-actualAmount) / 10**18);
+                IERC20Upgradeable(primaryToken).transfer(executor, totalRewardsBalance);
+                info.amountDeployed = actualAmount;
+
+                console.log("all rewards sent to executor");
+                console.log("new total amount:", info.amountDeployed/10**18);
             }
-            // record last total amount
-            // what if tvl changes
-            // 1m
-            // 500k
         }
         lastTimeCalculated = block.timestamp;
+        console.log("------------------------");
+    }
+
+    function adjustTreasury(int256 _delta) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        if(_delta > 0){
+            assetIdToAssetInfo[0].amountDeployed += uint(_delta);
+            console.log("total amount changed to:", assetIdToAssetInfo[0].amountDeployed/10**18);
+        }
+        else if(_delta < 0){
+            assetIdToAssetInfo[0].amountDeployed = uint(int(assetIdToAssetInfo[0].amountDeployed) + _delta);
+            console.log("total amount changed to:", assetIdToAssetInfo[0].amountDeployed/10**18);
+        }
+    }
+
+    function getDirectionIdByName(string memory _codeName) external view returns(uint256){
+        return directionNameToId[_codeName];
+    }
+
+    function getDirectionLatestAmount(uint256 _id) external view returns(uint){
+        return liquidityDirection[_id].latestAmount;
+    }
+
+    function getAllDeployedAmounts()external view returns(uint[1] memory){
+        return [assetIdToAssetInfo[0].amountDeployed];
     }
 
     function getLiquidityDirectionByName(string memory _codeName) external view returns(uint256, address, LiquidityDirection memory){
@@ -173,6 +231,25 @@ contract StrategyHandler is
         return (directionId, primaryToken, direction);
     }
 
+    function getAssetIdByDirectionId(uint256 _id)external view returns(uint){
+        return liquidityDirection[_id].assetId;
+    }
+
+    function getLiquidityDirectionById(uint256 _id) external view returns(address, LiquidityDirection memory){
+        LiquidityDirection memory direction = liquidityDirection[_id];
+        address primaryToken = assetIdToAssetInfo[direction.assetId].primaryTokens[direction.chainId];
+        //change primT to full asset info
+        return (primaryToken, direction);
+    }
+
+    function setAssetAmount(uint _id,uint amount) public onlyRole(DEFAULT_ADMIN_ROLE){
+        assetIdToAssetInfo[_id].amountDeployed = amount;
+    }
+
+    function getAssetAmount(uint _id) view public returns(uint){
+        return (assetIdToAssetInfo[_id].amountDeployed);
+    }
+
     function addToActiveDirections(uint256 _directionId) public onlyRole(DEFAULT_ADMIN_ROLE) {
         if(!assetIdToAssetInfo[liquidityDirection[_directionId].assetId].activeDirections.contains(_directionId)){
             assetIdToAssetInfo[liquidityDirection[_directionId].assetId].activeDirections.add(_directionId);
@@ -181,20 +258,35 @@ contract StrategyHandler is
 
     function removeFromActiveDirections(uint256 _directionId) public onlyRole(DEFAULT_ADMIN_ROLE) {
         assetIdToAssetInfo[liquidityDirection[_directionId].assetId].activeDirections.remove(_directionId);
+        liquidityDirection[_directionId].latestAmount = 0;
     }   
 
     function setGnosis(address _gnosisAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
         gnosis = _gnosisAddress;
     }
 
+    function setLastTime(uint256 _lastTime) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        lastTimeCalculated = block.timestamp;
+    }
+
     function setExchangeAddress(address _newExchange) public onlyRole(DEFAULT_ADMIN_ROLE) {
         exchangeAddress = _newExchange;
+    }
+
+    function setBoosterAddress(address _newBooster) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        booster = _newBooster;
+    }
+
+    function setExecutorAddress(address _newExecutor) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        executor = _newExecutor;
+        _grantRole(DEFAULT_ADMIN_ROLE, _newExecutor);
     }
 
     function setLiquidityDirection(
         string memory _codeName,
         uint256 _directionId,
         address _strategyAddress, 
+        address _entryToken, 
         uint256 _assetId, 
         uint256 _chainId, 
         bytes memory _entryData, 
@@ -204,11 +296,13 @@ contract StrategyHandler is
         directionNameToId[_codeName] = _directionId;
         liquidityDirection[_directionId] = LiquidityDirection(
             _strategyAddress, 
+            _entryToken, 
             _assetId, 
             _chainId, 
             _entryData, 
             _exitData, 
-            _rewardsData
+            _rewardsData,
+            0
         );
     }
 
@@ -224,7 +318,6 @@ contract StrategyHandler is
             assetIdToAssetInfo[_assetId].primaryTokens[_chainIds[i]] = _primaryTokens[i];
         }
     }
-
 
     function grantRole(bytes32 role, address account)
     public
