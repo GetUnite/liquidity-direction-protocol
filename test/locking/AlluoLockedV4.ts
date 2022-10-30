@@ -334,8 +334,14 @@ describe("Locking contract", function () {
         });
 
         it("Should not allow claim 0 amount", async function () {
-            await expect(locker.connect(addr[2]).claim()
-            ).to.be.revertedWith("Locking: Nothing to claim");
+            const balancAlluoBefore = await alluoToken.balanceOf(addr[2].address);
+            const balancCvxBefore = await cvx.balanceOf(addr[2].address);
+            await locker.connect(addr[2]).claim()
+            const balanceAlluoAfter = await alluoToken.balanceOf(addr[2].address);
+            const balancCvxAfter = await cvx.balanceOf(addr[2].address);
+
+            expect(balancAlluoBefore).to.be.equal(balanceAlluoAfter);
+            expect(balancCvxBefore).to.be.equal(balancCvxAfter);
         });
 
         it("Should return right total amount locked tokens after user lock/unlock", async function () {
