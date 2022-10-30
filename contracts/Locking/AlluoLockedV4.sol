@@ -443,15 +443,16 @@ contract AlluoLockedV4 is
             }
         }
 
-        require(reward > 0, "Locking: Nothing to claim");
+        // require(reward > 0, "Locking: Nothing to claim");
+        if (reward > 0) {
+            Locker storage locker = _lockers[msg.sender];
 
-        Locker storage locker = _lockers[msg.sender];
+            locker.distributed = locker.distributed + reward;
+            totalDistributed += reward;
 
-        locker.distributed = locker.distributed + reward;
-        totalDistributed += reward;
-
-        alluoToken.safeTransfer(msg.sender, reward);
-        emit TokensClaimed(msg.sender, reward, block.timestamp);
+            alluoToken.safeTransfer(msg.sender, reward);
+            emit TokensClaimed(msg.sender, reward, block.timestamp);
+        }
 
         cvxDistributor.claim(msg.sender);
     }
