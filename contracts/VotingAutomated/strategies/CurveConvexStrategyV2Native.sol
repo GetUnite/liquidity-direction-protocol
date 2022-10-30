@@ -9,20 +9,23 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
 import "./../../interfaces/IAlluoStrategy.sol";
 import "./interfaces/ICvxBooster.sol";
 import "./interfaces/ICvxBaseRewardPool.sol";
 import "../../interfaces/IExchange.sol";
+import "../../interfaces/IWrappedEther.sol";
 import "../../Farming/priceFeedsV2/PriceFeedRouterV2.sol";
 
-contract CurveConvexStrategyV2 is
+contract CurveConvexStrategyV2Native is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable {
 
     using AddressUpgradeable for address;
     using SafeERC20 for IERC20;
+    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
@@ -34,11 +37,18 @@ contract CurveConvexStrategyV2 is
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     IERC20 public constant crvRewards =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
+    IWrappedEther public constant wETH =
+        IWrappedEther(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     bool public upgradeStatus;
     address public priceFeed;
 
+    // address[] public additionalRewards;
+    EnumerableSetUpgradeable.AddressSet private additionalRewards;
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
+
+    receive() external payable {
+    }
 
     function initialize(
         address _multiSigWallet, 
@@ -75,12 +85,16 @@ contract CurveConvexStrategyV2 is
             uint256 poolId
         ) = decodeEntryParams(data);
 
+        uint256 valueETH;
+        if (address(poolToken) == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) {
+            wETH.withdraw(amount);
+            valueETH = amount;
+        } else {
+            poolToken.safeIncreaseAllowance(curvePool, amount);
+        }
         // prepare amounts array for curve
         uint256[4] memory fourPoolTokensAmount;
         fourPoolTokensAmount[tokenIndexInCurve] = amount;
-
-        // approve tokens to curve pool
-        poolToken.safeIncreaseAllowance(curvePool, amount);
 
         // encode call to curve - this ugly code handles different curve pool
         // sizes and function selectors
@@ -112,7 +126,7 @@ contract CurveConvexStrategyV2 is
         }
 
         // execute call
-        curvePool.functionCall(curveCall);
+        curvePool.functionCallWithValue(curveCall, valueETH);
 
         // skip investment in convex, if poolId is uint256 max value
         if (poolId != type(uint256).max) {
@@ -161,8 +175,15 @@ contract CurveConvexStrategyV2 is
             tokenIndexInCurve,
             0
         );
-
-        curvePool.functionCall(curveCall);
+        {
+            uint256  valueETH = address(this).balance;
+            curvePool.functionCall(curveCall);
+            valueETH = address(this).balance - valueETH;
+            if (valueETH > 0) {
+                wETH.deposit{value: valueETH}();
+                poolToken = IERC20(address(wETH));
+            } 
+        }
 
         // execute exchanges and transfer all tokens to receiver
         exchangeAll(poolToken, IERC20(outputCoin));
@@ -221,6 +242,18 @@ contract CurveConvexStrategyV2 is
         require(length == calldatas.length, "CurveConvexStrategyV2: lengths");
         for (uint256 i = 0; i < length; i++) {
             destinations[i].functionCall(calldatas[i]);
+        }
+    }
+
+    function changeAdditionalRewardTokenStatus(
+        address _newToken,
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if(_status){
+            additionalRewards.add(_newToken);
+        }
+        else{
+            additionalRewards.remove(_newToken);
         }
     }
 
@@ -360,6 +393,13 @@ contract CurveConvexStrategyV2 is
         if (swapRewards) {
             exchangeAll(cvxRewards, outputCoin);
             exchangeAll(crvRewards, outputCoin);
+
+            uint256 additionalRewardsLength = additionalRewards.length();
+            if(additionalRewardsLength != 0){
+                for (uint256 i; i < additionalRewardsLength; i++) {
+                    exchangeAll(IERC20(additionalRewards.at(i)), outputCoin);
+                }
+            }
         } else {
             cvxRewards.safeTransfer(
                 receiver,
@@ -369,6 +409,17 @@ contract CurveConvexStrategyV2 is
                 receiver,
                 crvRewards.balanceOf(address(this))
             );
+
+            uint256 additionalRewardsLength = additionalRewards.length();
+            if(additionalRewardsLength != 0){
+                for (uint256 i; i < additionalRewardsLength; i++) {
+                    address token = additionalRewards.at(i);
+                    IERC20(token).safeTransfer(
+                        receiver,
+                        IERC20(token).balanceOf(address(this))
+                    );
+                }
+            }
         }
 
         outputCoin.safeTransfer(receiver, outputCoin.balanceOf(address(this)));

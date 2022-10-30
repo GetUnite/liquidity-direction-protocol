@@ -7,10 +7,8 @@ interface IAlluoStrategyV2 {
     /// transferred to strategy by vote executor.
     /// @param data whatever data you want to pass to strategy from vote extry.
     /// @param amount amount of your tokens that will be invested.
-    /// @return data that MUST be passed in exiting functions
     function invest(bytes calldata data, uint256 amount)
-        external
-        returns (bytes memory);
+        external;
 
     /// @notice Uninvest value and tranfer exchanged value to receiver.
     /// @param data whatever data you want to pass to strategy from vote extry.
@@ -23,8 +21,13 @@ interface IAlluoStrategyV2 {
         uint256 unwindPercent,
         address outputCoin,
         address receiver,
+        bool _withdrawRewards,
         bool swapRewards
     ) external;
+
+    function getDeployedAmountAndRewards(
+        bytes calldata data
+    ) external returns(uint256);
 
     /// @notice Claim available rewards.
     /// @param data whatever data you want to pass to strategy from vote extry.
@@ -38,11 +41,11 @@ interface IAlluoStrategyV2 {
         bool swapRewards
     ) external;
 
-    function getDeployedAmountAndRewards(
+    function getDeployedAmount(
         bytes calldata data
-    ) external returns(uint256);
+    ) external view returns(uint256);
 
-    function getRewards(address _token) external;
+    function withdrawRewards(address _token) external;
 
 
     /// @notice Execute any action on behalf of strategy.

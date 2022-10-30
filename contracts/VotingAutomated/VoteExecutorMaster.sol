@@ -103,7 +103,7 @@ contract VoteExecutorMaster is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        require(_multiSigWallet.isContract(), "Executor: Not contract");
+        // require(_multiSigWallet.isContract(), "Executor: Not contract");
         gnosis = _multiSigWallet;
         minSigns = 1;
         exchangeAddress = 0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec;
@@ -179,15 +179,16 @@ contract VoteExecutorMaster is
             if(exactData.signs.length >= minSigns){
                 uint256 currentChain = crossChainInfo.currentChain;
                 Message memory lastMessage = messages[messages.length-1];
-                StrategyHandler(strategyHandler).calculateRewards();
+                StrategyHandler(strategyHandler).calculateAll();
                 if(lastMessage.commandIndex == 3){
                     (int256 treasuryDelta) = abi.decode(lastMessage.commandData, (int256));
                     StrategyHandler(strategyHandler).adjustTreasury(treasuryDelta);
                 }
-                uint[1] memory amountsDeployed = StrategyHandler(strategyHandler).getAllDeployedAmounts();
+                uint[] memory amountsDeployed = StrategyHandler(strategyHandler).getLatestDeployed();
                 
                 for (uint256 j; j < messages.length; j++) {
                     uint256 commandIndex = messages[j].commandIndex;
+                    console.log("********");
                     // if(commandIndex == 1){
                     //     (uint256 mintAmount, uint256 period) = abi.decode(messages[j].commandData, (uint256, uint256));
                     //     IAlluoToken(ALLUO).mint(locker, mintAmount);
@@ -199,25 +200,27 @@ contract VoteExecutorMaster is
                         (address strategyPrimaryToken, StrategyHandler.LiquidityDirection memory direction) = StrategyHandler(strategyHandler).getLiquidityDirectionById(directionId);
                         if (direction.chainId == currentChain) {
 
+                            console.log("dealing with direction:", directionId);
                             if(percent == 0){
-                                IAlluoStrategyV2(direction.strategyAddress).exitAll(direction.exitData, 10000, strategyPrimaryToken, address(this), false);
+                                console.log("full exit from strategy");
+                                IAlluoStrategyV2(direction.strategyAddress).exitAll(direction.exitData, 10000, strategyPrimaryToken, address(this), false, false);
                                 StrategyHandler(strategyHandler).removeFromActiveDirections(directionId);
                             }
                             else{
                                 uint newAmount = percent * amountsDeployed[direction.assetId] / 10000;
-                                console.log("Dealing with direction:", directionId);
-                                console.log("New amount should be:",newAmount/10**18);
-                                console.log("old amount is",direction.latestAmount/10**18);
+                                console.log("new amount should be:",newAmount/10**18);
+                                console.log("new amount should be:",newAmount);
+                                console.log("old amount:",direction.latestAmount/10**18);
+                                console.log("old amount:",direction.latestAmount);
                                 if(newAmount < direction.latestAmount){
                                     uint exitPercent = 10000 - newAmount * 10000 / direction.latestAmount;
-                                    // we already get rewards can not call it again
                                     console.log("need to withdraw percent",exitPercent);
-
-                                    IAlluoStrategyV2(direction.strategyAddress).exitAll(direction.exitData, exitPercent, strategyPrimaryToken, address(this), false);
+                                    IAlluoStrategyV2(direction.strategyAddress).exitAll(direction.exitData, exitPercent, strategyPrimaryToken, address(this), false, false);
                                 }
                                 else{
                                     uint depositAmount = newAmount - direction.latestAmount;
                                     console.log("need to deposit amount",depositAmount/10**18);
+                                    console.log("need to deposit amount",depositAmount);
                                     assetIdToDepositList[direction.assetId].push(Deposit(directionId, depositAmount));
                                 }
                             }
@@ -232,7 +235,8 @@ contract VoteExecutorMaster is
 
     // Execute deposits. Only executes if we have sufficient balances.
     function _executeDeposits() internal {
-        for (uint256 i; i < 1; i++) {
+        uint8 numberOfAssets = StrategyHandler(strategyHandler).numberOfAssets();
+        for (uint256 i; i < numberOfAssets; i++) {
             Deposit[] storage depositList = assetIdToDepositList[i];
             address exchange = exchangeAddress;
             while(depositList.length > 0){
@@ -240,8 +244,21 @@ contract VoteExecutorMaster is
                 (address strategyPrimaryToken, StrategyHandler.LiquidityDirection memory direction) = StrategyHandler(strategyHandler).getLiquidityDirectionById(depositInfo.directionId);
                 (uint256 fiatPrice, uint8 fiatDecimals) = PriceFeedRouterV2(priceFeed).getPrice(strategyPrimaryToken, i);
                 uint exactAmount = (depositInfo.amount * 10**fiatDecimals) / fiatPrice;
-                console.log("exact amount to deposit with token price",exactAmount/10**18);
+                console.log("exact amount of tokens to deposit:",exactAmount/10**18);
+                console.log("exact amount of tokens to deposit:",exactAmount);
                 uint256 tokenAmount = exactAmount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
+                uint256 actualBalance = IERC20MetadataUpgradeable(strategyPrimaryToken).balanceOf(address(this));
+                if(depositList.length == 1 && actualBalance < tokenAmount){
+                    if(tokenAmount * 9800 / 10000 < actualBalance){
+                        tokenAmount = actualBalance;
+                        console.log("there was not enough tokens to fully cover last asset deposit");
+                        console.log("tokenAmount changed because of exit slippage:",tokenAmount/10**IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
+                        console.log("tokenAmount changed because of exit slippage:",tokenAmount);
+                    }
+                    else{
+                        revert("slippage to big");
+                    }
+                }
                 if (direction.entryToken != strategyPrimaryToken) {
                     // 3CRV vs USDC
                     IERC20MetadataUpgradeable(strategyPrimaryToken).approve(exchange, tokenAmount);
@@ -255,8 +272,8 @@ contract VoteExecutorMaster is
                 depositList.pop();
             }
         }
+        StrategyHandler(strategyHandler).calculateOnlyLp();
     }
-
     
     // Public can only executeDeposits by bridging funds backwards.
     function executeDeposits() public {
@@ -265,7 +282,8 @@ contract VoteExecutorMaster is
 
    function _bridgeFunds() internal {
         CrossChainInfo memory crossChainInfoMemory = crossChainInfo;
-        for (uint256 i; i < 1; i++) {
+        uint8 numberOfAssets = StrategyHandler(strategyHandler).numberOfAssets();
+        for (uint256 i; i < numberOfAssets; i++) {
             AssetBridging memory currentBridgingInfo = assetIdToAssetBridging[i];
             address primaryToken = currentBridgingInfo.token;
             uint256 tokenBalance = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
