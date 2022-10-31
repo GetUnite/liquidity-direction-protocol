@@ -145,23 +145,21 @@ contract StrategyHandler is
             console.log("expectedAddition:",expectedAddition);
 
                 if(surplus < totalRewards){
-                    uint rewardsLeft = totalRewards-surplus;
+                    
+                    IERC20Upgradeable(primaryToken).transfer(booster, totalRewardsBalance * surplus  / totalRewards);
 
-                    info.amountDeployed = actualAmount - surplus + rewardsLeft;
-                    console.log("surplus sent to booster, all rewards that left sent to executor:", rewardsLeft/10**18);
-                    console.log("surplus sent to booster, all rewards that left sent to executor:", rewardsLeft);
-                    surplus = PriceFeedRouterV2(priceFeed).decimalsConverter(
-                        surplus, 
-                        18, 
-                        primaryDecimals
-                    );  
-                    IERC20Upgradeable(primaryToken).transfer(booster, surplus);
+                    uint rewardsLeft = IERC20Upgradeable(primaryToken).balanceOf(address(this)); 
+                    IERC20Upgradeable(primaryToken).transfer(executor, rewardsLeft);
+
                     rewardsLeft = PriceFeedRouterV2(priceFeed).decimalsConverter(
                         rewardsLeft, 
-                        18, 
-                        primaryDecimals
+                        primaryDecimals, 
+                        18
                     );  
-                    IERC20Upgradeable(primaryToken).transfer(executor, rewardsLeft);
+                    info.amountDeployed = newAmountDeployed + rewardsLeft;
+
+                    console.log("surplus sent to booster, all rewards that left sent to executor:", rewardsLeft/10**18);
+                    console.log("surplus sent to booster, all rewards that left sent to executor:", rewardsLeft);
 
                     console.log("new total amount:", info.amountDeployed/10**18);
                     console.log("new total amount:", info.amountDeployed);
