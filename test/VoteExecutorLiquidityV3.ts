@@ -21,7 +21,7 @@ async function skipDays(d: number) {
     ethers.provider.send('evm_mine', []);
 }
 
-describe("Test L2 Contracts", function() {
+describe("Test L1 Contract", function() {
     let voteExecutorMaster : VoteExecutorMaster;
     let router: PriceFeedRouterV2;
     let strategyHandler: StrategyHandler;
@@ -79,7 +79,7 @@ describe("Test L2 Contracts", function() {
     eurs: IERC20Metadata, frax: IERC20Metadata, susd: IERC20Metadata, crv3: IERC20Metadata,
     mimLp: IERC20Metadata, cvxLp: IERC20Metadata, stEthLp: IERC20Metadata, fraxUsdcLp: IERC20Metadata,
     musdLp: IERC20Metadata, agEur: IERC20Metadata, ceurLp: IERC20Metadata, eur3: IERC20Metadata,
-    alEthLp:IERC20Metadata; 
+    alEthLp:IERC20Metadata,lido:IERC20Metadata; 
 
     let whaleUsdc: SignerWithAddress;
     let whaleEurt: SignerWithAddress;
@@ -118,7 +118,8 @@ describe("Test L2 Contracts", function() {
         eur3 = await ethers.getContractAt("IERC20Metadata", "0xb9446c4Ef5EBE66268dA6700D26f96273DE3d571");
         stEthLp = await ethers.getContractAt("IERC20Metadata", "0x06325440D014e39736583c165C2963BA99fAf14E");
         alEthLp = await ethers.getContractAt("IERC20Metadata", "0xC4C319E2D4d66CcA4464C0c2B32c9Bd23ebe784e");
-
+        lido = await ethers.getContractAt("IERC20Metadata", "0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32");
+        
         exchange = await ethers.getContractAt("contracts/interfaces/IExchange.sol:IExchange", "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec") as IExchange;
         nativeETH = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
 
@@ -351,6 +352,8 @@ describe("Test L2 Contracts", function() {
                 kind: 'uups'
             }
         ) as CurveConvexStrategyV2Native
+
+        await strategyEth.changeAdditionalRewardTokenStatus(lido.address, true)
 
         strategyBtc = await upgrades.deployProxy(Strategy,
             [gnosis.address, strategyHandler.address, voteExecutorMaster.address, router.address], {
