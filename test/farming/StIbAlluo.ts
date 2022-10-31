@@ -215,8 +215,6 @@ describe("IbAlluoUSD and Handler", function () {
             let operation = {operationType: 201, target: cfaAddress, data: operationData}
             let operationArray = [operation];
             console.log(operationArray);
-
-            // https://dashboard.tenderly.co/pentatonictritones/project/simulator/fd708bad-b2d9-4e7b-8949-93a07834fdd7
         })
 
         it("Test upgradeability of original ibAlluo contract", async function() {

@@ -413,21 +413,6 @@ contract IbAlluo is
         emit UpdatedFlow(_msgSender(), receiver, flowRate);
     }
 
-    // /// @notice Wraps and creates flow with context
-    // /// @dev Forces transfer of ibAlluo to the StIbAlluo contract then mints StIbAlluos to circumvent having to sign multiple transactions to create streams
-    // /// @param receiver The recipient of the streamed flow
-    // /// @param flowRate The amount of ibAlluos per second to be streamed (decimals 10**18)
-    // /// @param toWrap The amount of ibAlluos to automatically wrap (recommend wrapping entire ibALluo balance initially)
-    // function createFlow(address receiver, int96 flowRate, uint256 toWrap, bytes memory ctx, bytes memory userData, uint256 timestamp) external {
-    //     _transfer(_msgSender(), address(this), toWrap);
-    //     _approve(address(this), superToken, toWrap);
-    //     IAlluoSuperToken(superToken).upgradeTo(_msgSender(), toWrap, "");
-    //     cfaV1Lib.createFlowByOperatorWithCtx( ctx, msg.sender, receiver, ISuperfluidToken(superToken), flowRate, userData);
-    //     ISuperfluidResolver(superfluidResolver).addToChecker(_msgSender(), receiver);
-    //     ISuperfluidEndResolver(superfluidEndResolver).addToChecker(_msgSender(), receiver, timestamp);
-    //     emit CreateFlow(_msgSender(), receiver, flowRate);
-    // }
-
     /// @notice Wraps and creates flow 
     /// @dev Forces transfer of ibAlluo to the StIbAlluo contract then mints StIbAlluos to circumvent having to sign multiple transactions to create streams
     /// @param receiver The recipient of the streamed flow

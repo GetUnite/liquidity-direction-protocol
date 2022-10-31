@@ -87,20 +87,7 @@ async function main() {
         },
     ];
 
-    fiatRoutes = [
-        // {
-        //     // https://data.chain.link/polygon/mainnet/fiat/eur-usd
-        //     name: "EUR",
-        //     id: 2,
-        //     oracle: "0x73366fe0aa0ded304479862808e02506fe556a98"
-        // },
-        // {
-        //     // https://data.chain.link/polygon/mainnet/fiat/gbp-usd
-        //     name: "GBP",
-        //     id: 3,
-        //     oracle: "0x099a2540848573e94fb1ca0fa420b00acbbc845a"
-        // }
-    ];
+    fiatRoutes = [];
 
     curveRoutes = [
         {
