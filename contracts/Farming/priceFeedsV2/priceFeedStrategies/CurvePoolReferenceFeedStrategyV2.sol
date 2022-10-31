@@ -21,9 +21,6 @@ contract CurvePoolReferenceFeedStrategyV2 is
     UUPSUpgradeable,
     IFeedStrategy {
 
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-    bool public upgradeStatus;
-
     IFeedStrategy public referenceFeed;
     ICurvePool public curvePool;
     int8 public referenceCoinIndex;
@@ -47,7 +44,6 @@ contract CurvePoolReferenceFeedStrategyV2 is
         __UUPSUpgradeable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
-        _grantRole(UPGRADER_ROLE, _multiSigWallet);
 
         curvePool = ICurvePool(_curvePoolAddress);
         referenceCoinIndex = _referenceCoinIndex;
@@ -82,19 +78,10 @@ contract CurvePoolReferenceFeedStrategyV2 is
         return (int256(tokenAmountPrice) * usdPrice, usdDecimals + referenceCoinDecimals);
     }
 
-    function changeUpgradeStatus(bool _status)
-    external
-    onlyRole(DEFAULT_ADMIN_ROLE) {
-        upgradeStatus = _status;
-    }
-
-
     function _authorizeUpgrade(address newImplementation)
     internal
-    onlyRole(UPGRADER_ROLE)
+    onlyRole(DEFAULT_ADMIN_ROLE)
     override {
-        require(upgradeStatus, "Executor: Upgrade not allowed");
-        upgradeStatus = false;
     }
 
 }

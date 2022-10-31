@@ -3,17 +3,6 @@ pragma solidity ^0.8.9;
 
 import "./../IFeedStrategy.sol";
 
-interface ICurvePool {
-    function calc_withdraw_one_coin(uint256 _token_amount, int128 i)
-        external
-        view
-        returns (uint256);
-    function calc_withdraw_one_coin(uint256 _token_amount, uint256 i)
-        external
-        view
-        returns (uint256);
-}
-
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -25,15 +14,14 @@ contract CurveLpReferenceFeedStrategyV2 is
     UUPSUpgradeable,
     IFeedStrategy {
 
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    using AddressUpgradeable for address;
 
     IFeedStrategy public referenceFeed;
-    ICurvePool public curvePool;
+    address public curvePool;
     uint256 public lpOneTokenAmount;
     uint128 public referenceCoinIndex;
-    uint16 public typeOfTokenIndex;
+    bytes public typeOfTokenIndex;
     uint8 public referenceCoinDecimals;
-    bool public upgradeStatus;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -45,15 +33,14 @@ contract CurveLpReferenceFeedStrategyV2 is
         uint8 _referenceCoinIndex, // token index which feed (_referenceFeedAddress) we already have
         uint8 _referenceCoinDecimals, // decimals of coin in pool we are referring to
         uint256 _lpOneTokenAmount, // 1.0 of desired lp coin token with decimals
-        uint16 _typeOfTokenIndex
+        bytes memory _typeOfTokenIndex
     ) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
-        _grantRole(UPGRADER_ROLE, _multiSigWallet);
 
-        curvePool = ICurvePool(_curvePoolAddress);
+        curvePool = _curvePoolAddress;
         referenceCoinIndex = _referenceCoinIndex;
         lpOneTokenAmount = _lpOneTokenAmount;
         referenceFeed = IFeedStrategy(_referenceFeedAddress);
@@ -64,18 +51,14 @@ contract CurveLpReferenceFeedStrategyV2 is
     function getPrice() external view returns (int256 value, uint8 decimals) {
         uint256 oneLpPrice;
         
-        if(typeOfTokenIndex == 128){
-            oneLpPrice = curvePool.calc_withdraw_one_coin(
-                lpOneTokenAmount,
-                int128(referenceCoinIndex)
-            );
-        }
-        else{
-            oneLpPrice = curvePool.calc_withdraw_one_coin(
-                lpOneTokenAmount,
-                uint256(referenceCoinIndex)
-            );
-        }
+        bytes memory curveCall = abi.encodeWithSignature(
+            string(bytes.concat("calc_withdraw_one_coin(uint256,", typeOfTokenIndex,")")),
+            lpOneTokenAmount,
+            referenceCoinIndex
+        );
+
+        bytes memory data = curvePool.functionStaticCall(curveCall);
+        oneLpPrice = abi.decode(data, (uint256));
         
         (int256 usdPrice, uint8 usdDecimals) = referenceFeed.getPrice();
         require(usdPrice > 0, "CurvePRFS: feed lte 0");
@@ -86,36 +69,26 @@ contract CurveLpReferenceFeedStrategyV2 is
     function getPriceOfAmount(uint256 amount) external view returns (int256 value, uint8 decimals){
         uint256 lpAmountPrice;
 
-        if(typeOfTokenIndex == 128){
-            lpAmountPrice = curvePool.calc_withdraw_one_coin(
-                amount,
-                int128(referenceCoinIndex)
-            );
-        }
-        else{
-            lpAmountPrice = curvePool.calc_withdraw_one_coin(
-                amount,
-                uint256(referenceCoinIndex)
-            );
-        }
+        bytes memory curveCall = abi.encodeWithSignature(
+            string(bytes.concat("calc_withdraw_one_coin(uint256,", typeOfTokenIndex,")")),
+            amount,
+            referenceCoinIndex
+        );
+
+        bytes memory data = curvePool.functionStaticCall(curveCall);
+        lpAmountPrice = abi.decode(data, (uint256));
+
         (int256 usdPrice, uint8 usdDecimals) = referenceFeed.getPrice();
         require(usdPrice > 0, "CurvePRFS: feed lte 0");
         return (int256(lpAmountPrice) * usdPrice, usdDecimals + referenceCoinDecimals);
     }
 
-    function changeUpgradeStatus(bool _status)
-    external
-    onlyRole(DEFAULT_ADMIN_ROLE) {
-        upgradeStatus = _status;
-    }
 
 
     function _authorizeUpgrade(address newImplementation)
     internal
-    onlyRole(UPGRADER_ROLE)
+    onlyRole(DEFAULT_ADMIN_ROLE)
     override {
-        require(upgradeStatus, "Executor: Upgrade not allowed");
-        upgradeStatus = false;
     }
 
 }

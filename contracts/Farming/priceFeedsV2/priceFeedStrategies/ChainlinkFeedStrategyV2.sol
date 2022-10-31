@@ -15,11 +15,8 @@ contract ChainlinkFeedStrategyV2 is
     UUPSUpgradeable,
     IFeedStrategy {
 
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-
     IChainlinkPriceFeed public chainlinkFeed;
     address public token;
-    bool public upgradeStatus;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -33,7 +30,6 @@ contract ChainlinkFeedStrategyV2 is
         __UUPSUpgradeable_init();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
-        _grantRole(UPGRADER_ROLE, _multiSigWallet);
 
         chainlinkFeed = IChainlinkPriceFeed(_chainlinkFeedAddress);
         token = _token;
@@ -51,18 +47,9 @@ contract ChainlinkFeedStrategyV2 is
         return (chainlinkFeed.latestAnswer() * int256(amount), totalDecimals);
     }
 
-    function changeUpgradeStatus(bool _status)
-    external
-    onlyRole(DEFAULT_ADMIN_ROLE) {
-        upgradeStatus = _status;
-    }
-
 
     function _authorizeUpgrade(address newImplementation)
     internal
-    onlyRole(UPGRADER_ROLE)
-    override {
-        require(upgradeStatus, "Executor: Upgrade not allowed");
-        upgradeStatus = false;
-    }
+    onlyRole(DEFAULT_ADMIN_ROLE)
+    override {}
 }

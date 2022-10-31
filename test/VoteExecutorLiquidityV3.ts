@@ -52,6 +52,7 @@ describe("Test L1 Contract", function() {
         desiredIndex: number,
         referenceCoinIndex: number,
         referenceCoinDecimals: number,
+        referenceFeed: string,
         oneTokenAmount: BigNumberish,
         strategy?: CurvePoolReferenceFeedStrategyV2
     }
@@ -62,7 +63,7 @@ describe("Test L1 Contract", function() {
         referenceCoinDecimals: number,
         oneTokenAmount: BigNumberish,
         referenceFeed: string,
-        typeOfTokenIndex: number,
+        typeOfTokenIndex: Uint8Array,
         strategy?: CurveLpReferenceFeedStrategyV2
     }
 
@@ -71,6 +72,8 @@ describe("Test L1 Contract", function() {
     let curveRoutes: CurveRoute[];
     let curveLpRoutes: CurveLpRoute[];
 
+    let uint256 = ethers.utils.toUtf8Bytes("uint256");
+    let int128 = ethers.utils.toUtf8Bytes("int128");
 
     let nativeETH: string;
 
@@ -95,7 +98,7 @@ describe("Test L1 Contract", function() {
                     enabled: true,
                     jsonRpcUrl: process.env.MAINNET_FORKING_URL as string,
                     //you can fork from last block by commenting next line
-                    blockNumber: 15862205
+                    blockNumber: 15868944
                 },
             },],
         });
@@ -166,12 +169,6 @@ describe("Test L1 Contract", function() {
                 oracle: "0xf4030086522a5beea4988f8ca5b36dbc97bee88c",
                 token: wbtc.address
             },
-            {
-                name: "GBP",
-                id: 4,
-                oracle: "0x5c0ab2d9b5a7ed9f470386e82bb36a3613cdd4b5",
-                token: constants.AddressZero
-            }
         ];
 
         curveRoutes = [
@@ -181,6 +178,7 @@ describe("Test L1 Contract", function() {
                 poolAddress: "0xA5407eAE9Ba41422680e2e00537571bcC53efBfD",
                 desiredIndex: 3,
                 referenceCoinIndex: 1,
+                referenceFeed: usdc.address,
                 referenceCoinDecimals: 6,
                 oneTokenAmount: parseUnits("1.0", await susd.decimals()),
             },
@@ -190,6 +188,7 @@ describe("Test L1 Contract", function() {
                 poolAddress: "0xb9446c4Ef5EBE66268dA6700D26f96273DE3d571",
                 desiredIndex: 0,
                 referenceCoinIndex: 1,
+                referenceFeed: eurt.address,
                 referenceCoinDecimals: 6,
                 oneTokenAmount: parseUnits("1.0", await agEur.decimals()),
             },
@@ -202,7 +201,7 @@ describe("Test L1 Contract", function() {
                 poolAddress: "0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7",
                 referenceCoinIndex: 1,
                 referenceCoinDecimals: 6,
-                typeOfTokenIndex: 128,
+                typeOfTokenIndex: int128,
                 referenceFeed: usdc.address,
                 oneTokenAmount: parseUnits("1.0", await crv3.decimals()),
             },
@@ -213,7 +212,7 @@ describe("Test L1 Contract", function() {
                 referenceCoinIndex: 1,
                 referenceCoinDecimals: 18,
                 referenceFeed: crv3.address,
-                typeOfTokenIndex: 128,
+                typeOfTokenIndex: int128,
                 oneTokenAmount: parseUnits("1.0", await mimLp.decimals()),
             },
             {
@@ -223,7 +222,7 @@ describe("Test L1 Contract", function() {
                 referenceCoinIndex: 1,
                 referenceCoinDecimals: 18,
                 referenceFeed: crv3.address,
-                typeOfTokenIndex: 128,
+                typeOfTokenIndex: int128,
                 oneTokenAmount: parseUnits("1.0", await musdLp.decimals()),
             },
 
@@ -233,8 +232,8 @@ describe("Test L1 Contract", function() {
                 poolAddress: "0xDcEF968d416a41Cdac0ED8702fAC8128A64241A2",
                 referenceCoinIndex: 1,
                 referenceCoinDecimals: 6,
+                typeOfTokenIndex: int128,
                 referenceFeed: usdc.address,
-                typeOfTokenIndex: 128,
                 oneTokenAmount: parseUnits("1.0", await weth.decimals()),
             },
 
@@ -244,8 +243,8 @@ describe("Test L1 Contract", function() {
                 poolAddress: "0xe7A3b38c39F97E977723bd1239C3470702568e7B",
                 referenceCoinIndex: 1,
                 referenceCoinDecimals: 18,
+                typeOfTokenIndex: int128,
                 referenceFeed: agEur.address,
-                typeOfTokenIndex: 128,
                 oneTokenAmount: parseUnits("1.0", await weth.decimals()),
             },
             {
@@ -254,8 +253,8 @@ describe("Test L1 Contract", function() {
                 poolAddress: "0xb9446c4Ef5EBE66268dA6700D26f96273DE3d571",
                 referenceCoinIndex: 1,
                 referenceCoinDecimals: 6,
+                typeOfTokenIndex: int128,
                 referenceFeed: eurt.address,
-                typeOfTokenIndex: 128,
                 oneTokenAmount: parseUnits("1.0", await eur3.decimals()),
             },
             {
@@ -264,8 +263,8 @@ describe("Test L1 Contract", function() {
                 poolAddress: "0xDC24316b9AE028F1497c275EB9192a3Ea0f67022",
                 referenceCoinIndex: 0,
                 referenceCoinDecimals: 18,
+                typeOfTokenIndex: int128,
                 referenceFeed: weth.address,
-                typeOfTokenIndex: 128,
                 oneTokenAmount: parseUnits("1.0", await weth.decimals()),
             },
             {
@@ -274,9 +273,19 @@ describe("Test L1 Contract", function() {
                 poolAddress: "0xC4C319E2D4d66CcA4464C0c2B32c9Bd23ebe784e",
                 referenceCoinIndex: 0,
                 referenceCoinDecimals: 18,
+                typeOfTokenIndex: int128,
                 referenceFeed: weth.address,
-                typeOfTokenIndex: 128,
                 oneTokenAmount: parseUnits("1.0", await weth.decimals()),
+            },
+            {
+                // cvxLp
+                coin: cvxLp.address,
+                poolAddress: "0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4",
+                referenceCoinIndex: 0,
+                referenceCoinDecimals: 18,
+                referenceFeed: weth.address,
+                typeOfTokenIndex: uint256,
+                oneTokenAmount: parseUnits("1.0", await cvxLp.decimals()),
             },
         ]
     })
@@ -375,8 +384,7 @@ describe("Test L1 Contract", function() {
         whaleWbtc = await getImpersonatedSigner("0x218b95be3ed99141b0144dba6ce88807c4ad7c09")
         // wbtc.connect(whale4).transfer(VoteExecutorSlave.address, parseUnits("10", "8"));
 
-        let uint256 = ethers.utils.toUtf8Bytes("uint256");
-        let int128 = ethers.utils.toUtf8Bytes("int128");
+
         // Add data for USD pools
 
         await strategyHandler.changeAssetInfo(0, [1], [usdc.address], "0xF555B595D04ee62f0EA9D0e72001D926a736A0f6")
@@ -502,7 +510,7 @@ describe("Test L1 Contract", function() {
 
             const strategy = await upgrades.deployProxy(CurveStrategy,
                 [   constants.AddressZero,
-                    await router.cryptoToUsdStrategies(usdc.address),
+                    await router.cryptoToUsdStrategies(element.referenceFeed),
                     element.poolAddress,
                     element.referenceCoinIndex,
                     element.desiredIndex,
@@ -536,8 +544,8 @@ describe("Test L1 Contract", function() {
    describe("Full workflow", function () {
 
     // it("Should show current prices", async function () {
-    //     const fiats = ["USD", "EUR"];
-    //     const cryptos = [eurt, agEur, ceurLp, eur3];
+    //     const fiats = ["USD", "EUR", "ETH", "BTC"];
+    //     const cryptos = [usdc, usdt, dai, eurt, weth, wbtc, susd, agEur, crv3, mimLp, musdLp, fraxUsdcLp, ceurLp, eur3, stEthLp, alEthLp, cvxLp];
 
     //     for (let i = 0; i < fiats.length; i++) {
     //         const fiat = fiats[i];
@@ -551,17 +559,17 @@ describe("Test L1 Contract", function() {
     // })
 
     // it("Should show current prices of amounts", async function () {
-    //     const fiats = ["USD", "EUR"];
-    //     const cryptos = [eurt, agEur, ceurLp, eur3];
+    //     const fiats = ["USD", "EUR", "ETH", "BTC"];
+    //     const cryptos = [usdc, usdt, dai, eurt, weth, wbtc, susd, agEur, crv3, mimLp, musdLp, fraxUsdcLp, ceurLp, eur3, stEthLp, alEthLp, cvxLp];
 
     //     for (let i = 0; i < fiats.length; i++) {
     //         const fiat = fiats[i];
     //         for (let j = 0; j < cryptos.length; j++) {
     //             const crypto = cryptos[j];
-    //             let amount = parseUnits("200000", await crypto.decimals())
+    //             let amount = parseUnits("20000", await crypto.decimals())
     //             const price = await router["getPriceOfAmount(address,uint256,string)"](crypto.address, amount, fiat);
                 
-    //             console.log(`200000 ${await crypto.symbol()} costs ${formatUnits(price.value, price.decimals)} ${fiat}`);
+    //             console.log(`20000 ${await crypto.symbol()} costs ${formatUnits(price.value, price.decimals)} ${fiat}`);
     //         }
     //         console.log();
     //     }

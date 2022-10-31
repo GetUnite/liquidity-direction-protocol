@@ -39,9 +39,7 @@ contract PriceFeedRouterV2 is
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
 
-        // For tests only
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(UPGRADER_ROLE, msg.sender);
     }
 
     function getPrice(address token, string calldata fiatName)
@@ -127,7 +125,6 @@ contract PriceFeedRouterV2 is
         }
     }
 
-    // 1.0 `token` costs `value` of [fiatId] (in decimals of `token`)
     function _getPriceOfAmount(address token, uint256 amount, uint256 fiatId)
         private
         view
@@ -177,9 +174,9 @@ contract PriceFeedRouterV2 is
     public
     override
     onlyRole(getRoleAdmin(role)) {
-        // if (role == DEFAULT_ADMIN_ROLE) {
-        //     require(account.isContract(), "Handler: Not contract");
-        // }
+        if (role == DEFAULT_ADMIN_ROLE) {
+            require(account.isContract(), "Handler: Not contract");
+        }
         _grantRole(role, account);
     }
 
