@@ -54,11 +54,11 @@ contract StrategyHandler is
     }
 
     struct AssetInfo {
-        mapping(uint256 => address) chainIdToPrimaryToken; // chainId --> primary
+        mapping(uint256 => address) chainIdToPrimaryToken; 
         address ibAlluo;
         EnumerableSetUpgradeable.UintSet activeDirections;
         EnumerableSetUpgradeable.AddressSet needToTransferFrom;
-        uint256 amountDeployed; // in 18d
+        uint256 amountDeployed; 
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -71,24 +71,18 @@ contract StrategyHandler is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        // require(_multiSigWallet.isContract(), "Executor: Not contract");
+        require(_multiSigWallet.isContract(), "Executor: Not contract");
         gnosis = _multiSigWallet;
         exchangeAddress = 0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec;
+        priceFeed = _priceFeed;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
 
         // For tests only
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(UPGRADER_ROLE, msg.sender);
-        priceFeed = _priceFeed;
     }
 
-    // receive() external payable {
-    //     if(msg.sender != address(wETH)){
-    //         wETH.deposit{value : msg.value}();
-    //     }
-    // }returns()
 
     function calculateAll() external onlyRole(DEFAULT_ADMIN_ROLE){
 
@@ -120,8 +114,7 @@ contract StrategyHandler is
                 18
             );
             
-            // uint256 interest = IIbAlluo(info.ibAlluo).annualInterest();
-            uint256 interest = 200;
+            uint256 interest = IIbAlluo(info.ibAlluo).annualInterest();
             uint256 expectedAddition = info.amountDeployed * interest * timePass / 31536000  / 10000;
             uint256 expectedFullAmount = info.amountDeployed + expectedAddition;
             uint256 actualAmount = newAmountDeployed + totalRewards;
