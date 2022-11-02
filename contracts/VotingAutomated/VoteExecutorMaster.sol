@@ -266,17 +266,20 @@ contract VoteExecutorMaster is
                     uint256 actualBalance = IERC20MetadataUpgradeable(strategyPrimaryToken).balanceOf(address(this));
                     if(depositList.length == 1 && actualBalance < tokenAmount){
                         uint assetAmount = StrategyHandler(strategyHandler).getAssetAmount(i);
-                        uint directionPercent = depositInfo.amount * 10000 / assetAmount;
-                        uint tvlWithSlippage = assetAmount * 9800 / 10000;
-                        uint amountWithSlippage = directionPercent * tvlWithSlippage / 10000;
-                        if(amountWithSlippage > actualBalance){
+                        uint assetMaxSlippageAmount = assetAmount - (assetAmount * 9800 / 10000);
+                        uint minAmount = (exactAmount - assetMaxSlippageAmount) / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
+                        if(minAmount < actualBalance){
 
                             tokenAmount = actualBalance;
                             console.log("there was not enough tokens to fully cover last asset deposit");
                             console.log("tokenAmount changed because of exit slippage:",tokenAmount/10**IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
                             console.log("tokenAmount changed because of exit slippage:",tokenAmount);
+                            console.log(assetAmount);
+                            console.log(assetMaxSlippageAmount);
+                            console.log(minAmount);
                         }
                         else{
+                            console.log(minAmount);
                             console.log(tokenAmount);
                             console.log(actualBalance);
                             revert("VEMaster: Slippage screwed you");
