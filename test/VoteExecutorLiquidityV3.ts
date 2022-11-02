@@ -29,6 +29,7 @@ describe("Test L1 Contract", function() {
     let strategyEur: CurveConvexStrategyV2;
     let strategyEth: CurveConvexStrategyV2Native;
     let strategyBtc: CurveConvexStrategyV2;
+    let gnosis: PseudoMultisigWallet;
 
     let exchange: IExchange;
 
@@ -295,7 +296,7 @@ describe("Test L1 Contract", function() {
 
         //  = "0x6b140e772aCC4D5E0d5Eac3813D586aa6DB8Fbf7"
 
-        const gnosis = await (await ethers.getContractFactory("PseudoMultisigWallet")).deploy(true)
+        gnosis = await (await ethers.getContractFactory("PseudoMultisigWallet")).deploy(true)
         await gnosis.addOwners(signers[0].address);
 
         const VoteExecutorMaster = await ethers.getContractFactory("VoteExecutorMaster");
@@ -576,6 +577,14 @@ describe("Test L1 Contract", function() {
     // })
        it("2 cycles with usd+eur+eth", async function () {
 
+        let ABI = ["function approve(address spender, uint256 amount)"];
+        let iface = new ethers.utils.Interface(ABI);
+        let calldata = iface.encodeFunctionData("approve", [strategyHandler.address, constants.MaxUint256]);
+
+        await gnosis.executeCall(usdc.address, calldata);
+
+        // console.log(await usdc.allowance(gnosis.address, strategyHandler.address));
+
         await strategyHandler.changeNumberOfAssets(3)
         let amountUsd = parseUnits("1200000", 6)
         let amountEur = parseUnits("200000", 6)
@@ -588,6 +597,7 @@ describe("Test L1 Contract", function() {
         await usdc.connect(whaleUsdc).transfer(strategyUsd.address, amountUsd)
         await agEur.connect(whaleEurt).transfer(strategyEur.address, finalAmountEur)
         await weth.connect(whaleWeth).transfer(strategyEth.address, amountEth)
+
         let dataUsd = await strategyUsd.encodeEntryParams("0xDcEF968d416a41Cdac0ED8702fAC8128A64241A2", usdc.address, "0x3175Df0976dFA876431C2E9eE6Bc45b65d3473CC",2,1,100)
         
         let dataEur = await strategyEur.encodeEntryParams("0xe7A3b38c39F97E977723bd1239C3470702568e7B", agEur.address, "0xe7A3b38c39F97E977723bd1239C3470702568e7B",3,1,112)
@@ -654,6 +664,7 @@ describe("Test L1 Contract", function() {
 
         console.log(Number((await strategyHandler.getCurrentDeployed())[0])/10**18);
         console.log(Number(await usdc.balanceOf(voteExecutorMaster.address))/10**6);
+        console.log(Number(await usdc.balanceOf(gnosis.address))/10**6);
 
         console.log(Number((await strategyHandler.getCurrentDeployed())[1])/10**18);
         console.log(Number(await eurt.balanceOf(voteExecutorMaster.address))/10**6);
@@ -701,6 +712,7 @@ describe("Test L1 Contract", function() {
         
         console.log(Number((await strategyHandler.getCurrentDeployed())[0])/10**18);
         console.log(Number(await usdc.balanceOf(voteExecutorMaster.address))/10**6);
+        console.log(Number(await usdc.balanceOf(gnosis.address))/10**6);
 
         console.log(Number((await strategyHandler.getCurrentDeployed())[1])/10**18);
         console.log(Number(await eurt.balanceOf(voteExecutorMaster.address))/10**6);

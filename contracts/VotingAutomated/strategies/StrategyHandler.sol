@@ -246,6 +246,15 @@ contract StrategyHandler is
 
     function adjustTreasury(int256 _delta) public onlyRole(DEFAULT_ADMIN_ROLE) {
         assetIdToAssetInfo[0].amountDeployed = uint(int(assetIdToAssetInfo[0].amountDeployed) + _delta);
+        if(_delta > 0){
+            address primaryToken = assetIdToAssetInfo[0].chainIdToPrimaryToken[1];
+            (uint256 fiatPrice, uint8 fiatDecimals) = PriceFeedRouterV2(priceFeed).getPrice(primaryToken, 0);
+            uint exactAmount = (uint(_delta) * 10**fiatDecimals) / fiatPrice;
+            uint256 tokenAmount = exactAmount / 10**(18 - IERC20MetadataUpgradeable(primaryToken).decimals());
+            console.log("exact amount of tokens to transfer from gnosis:",exactAmount/10**18);
+            console.log("tokenAmount of tokens to transfer from gnosis:",tokenAmount);
+            IERC20MetadataUpgradeable(primaryToken).safeTransferFrom(gnosis, executor, tokenAmount);
+        }
         console.log("total amount changed to:", assetIdToAssetInfo[0].amountDeployed/10**18);
         console.log("total amount changed to:", assetIdToAssetInfo[0].amountDeployed);
     }
@@ -270,12 +279,20 @@ contract StrategyHandler is
         return liquidityDirection[_id].assetId;
     }
 
-    function getLiquidityDirectionById(uint256 _id) external view returns(address, LiquidityDirection memory){
+    function getDirectionFullInfoById(uint256 _id) external view returns(address, LiquidityDirection memory){
         LiquidityDirection memory direction = liquidityDirection[_id];
         address primaryToken = assetIdToAssetInfo[direction.assetId].chainIdToPrimaryToken[direction.chainId];
-        //change primT to full asset info
         return (primaryToken, direction);
     }
+
+    function getLiquidityDirectionById(uint256 _id) external view returns(LiquidityDirection memory){
+        return (liquidityDirection[_id]);
+    }
+
+    function getPrimaryTokenByAssetId(uint256 _id, uint256 _chainId) external view returns(address){
+        return (assetIdToAssetInfo[_id].chainIdToPrimaryToken[_chainId]);
+    }
+
 
     function setAssetAmount(uint _id,uint amount) public onlyRole(DEFAULT_ADMIN_ROLE){
         assetIdToAssetInfo[_id].amountDeployed = amount;

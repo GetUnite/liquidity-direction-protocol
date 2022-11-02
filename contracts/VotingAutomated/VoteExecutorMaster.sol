@@ -178,12 +178,21 @@ contract VoteExecutorMaster is
 
             if(exactData.signs.length >= minSigns){
                 uint256 currentChain = crossChainInfo.currentChain;
-                Message memory lastMessage = messages[messages.length-1];
+
                 StrategyHandler(strategyHandler).calculateAll();
+
+                bool needToWithdrawTreasury;
+                uint amountToWithdrawTreasury;
+                Message memory lastMessage = messages[messages.length-1];
                 if(lastMessage.commandIndex == 3){
                     (int256 treasuryDelta) = abi.decode(lastMessage.commandData, (int256));
                     StrategyHandler(strategyHandler).adjustTreasury(treasuryDelta);
+                    if(treasuryDelta < 0){
+                        needToWithdrawTreasury = true;
+                        amountToWithdrawTreasury = uint(-treasuryDelta);
+                    }
                 }
+               
                 uint[] memory amountsDeployed = StrategyHandler(strategyHandler).getLatestDeployed();
                 
                 for (uint256 j; j < messages.length; j++) {
@@ -197,7 +206,7 @@ contract VoteExecutorMaster is
                     if(commandIndex == 2) {
                         // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
                         (uint256 directionId, uint256 percent) = abi.decode(messages[j].commandData, (uint256, uint256));
-                        (address strategyPrimaryToken, StrategyHandler.LiquidityDirection memory direction) = StrategyHandler(strategyHandler).getLiquidityDirectionById(directionId);
+                        (address strategyPrimaryToken, StrategyHandler.LiquidityDirection memory direction) = StrategyHandler(strategyHandler).getDirectionFullInfoById(directionId);
                         if (direction.chainId == currentChain) {
 
                             console.log("dealing with direction:", directionId);
@@ -227,6 +236,9 @@ contract VoteExecutorMaster is
                         }
                     }
                 }
+                if(needToWithdrawTreasury){
+                    assetIdToDepositList[0].push(Deposit(type(uint).max, amountToWithdrawTreasury));
+                }
                 hashExecutionTime[hashed] = block.timestamp;
                 bytes memory finalData = abi.encode(exactData.data, exactData.signs);
                 IAnyCall(crossChainInfo.anyCallAddress).anyCall(crossChainInfo.nextChainExecutor, finalData, address(0), crossChainInfo.nextChain, 0);
@@ -238,37 +250,57 @@ contract VoteExecutorMaster is
         uint8 numberOfAssets = StrategyHandler(strategyHandler).numberOfAssets();
         for (uint256 i; i < numberOfAssets; i++) {
             Deposit[] storage depositList = assetIdToDepositList[i];
+            address strategyPrimaryToken = StrategyHandler(strategyHandler).getPrimaryTokenByAssetId(i,1);
             address exchange = exchangeAddress;
             while(depositList.length > 0){
                 Deposit memory depositInfo = depositList[depositList.length - 1];
-                (address strategyPrimaryToken, StrategyHandler.LiquidityDirection memory direction) = StrategyHandler(strategyHandler).getLiquidityDirectionById(depositInfo.directionId);
-                (uint256 fiatPrice, uint8 fiatDecimals) = PriceFeedRouterV2(priceFeed).getPrice(strategyPrimaryToken, i);
-                uint exactAmount = (depositInfo.amount * 10**fiatDecimals) / fiatPrice;
-                console.log("exact amount of tokens to deposit:",exactAmount/10**18);
-                console.log("exact amount of tokens to deposit:",exactAmount);
-                uint256 tokenAmount = exactAmount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
-                uint256 actualBalance = IERC20MetadataUpgradeable(strategyPrimaryToken).balanceOf(address(this));
-                if(depositList.length == 1 && actualBalance < tokenAmount){
-                    if(tokenAmount * 9800 / 10000 < actualBalance){
-                        tokenAmount = actualBalance;
-                        console.log("there was not enough tokens to fully cover last asset deposit");
-                        console.log("tokenAmount changed because of exit slippage:",tokenAmount/10**IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
-                        console.log("tokenAmount changed because of exit slippage:",tokenAmount);
+                if(depositInfo.directionId != type(uint).max){
+
+                    console.log(depositInfo.directionId);
+                    StrategyHandler.LiquidityDirection memory direction = StrategyHandler(strategyHandler).getLiquidityDirectionById(depositInfo.directionId);
+                    (uint256 fiatPrice, uint8 fiatDecimals) = PriceFeedRouterV2(priceFeed).getPrice(strategyPrimaryToken, i);
+                    uint exactAmount = (depositInfo.amount * 10**fiatDecimals) / fiatPrice;
+                    console.log("exact amount of tokens to deposit:",exactAmount/10**18);
+                    console.log("exact amount of tokens to deposit:",exactAmount);
+                    uint256 tokenAmount = exactAmount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
+                    uint256 actualBalance = IERC20MetadataUpgradeable(strategyPrimaryToken).balanceOf(address(this));
+                    if(depositList.length == 1 && actualBalance < tokenAmount){
+                        if(tokenAmount * 9800 / 10000 < actualBalance){
+                            tokenAmount = actualBalance;
+                            console.log("there was not enough tokens to fully cover last asset deposit");
+                            console.log("tokenAmount changed because of exit slippage:",tokenAmount/10**IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
+                            console.log("tokenAmount changed because of exit slippage:",tokenAmount);
+                        }
+                        else{
+                            // uint assetAmount = StrategyHandler(strategyHandler).getAssetAmount(i);
+                            // uint directionPercent = depositInfo.amount * 10000 / assetAmount;
+                            // uint minAmoun = assetAmount * 9800 / 10000 * directionPercent / 10000 * 9800 / 10000;
+                            // if(minAmoun < actualBalance){
+
+                            // }
+                            // else{
+                                console.log(tokenAmount);
+                                console.log(actualBalance);
+                                revert("slippage to big");
+                            // }
+                        }
                     }
-                    else{
-                        revert("slippage to big");
+                    if (direction.entryToken != strategyPrimaryToken) {
+                        IERC20MetadataUpgradeable(strategyPrimaryToken).approve(exchange, tokenAmount);
+                        tokenAmount = IExchange(exchange).exchange(strategyPrimaryToken, direction.entryToken, tokenAmount, 0);
                     }
+                    //for future we can optimise it and transfer once and then entry all strtegy
+                    IERC20MetadataUpgradeable(direction.entryToken).safeTransfer(direction.strategyAddress, tokenAmount);
+                    IAlluoStrategyV2(direction.strategyAddress).invest(direction.entryData, tokenAmount);
+                    StrategyHandler(strategyHandler).addToActiveDirections(depositInfo.directionId);
                 }
-                if (direction.entryToken != strategyPrimaryToken) {
-                    // 3CRV vs USDC
-                    IERC20MetadataUpgradeable(strategyPrimaryToken).approve(exchange, tokenAmount);
-                    tokenAmount = IExchange(exchange).exchange(strategyPrimaryToken, direction.entryToken, tokenAmount, 0);
-                    strategyPrimaryToken = direction.entryToken;
+                else{
+                    (uint256 fiatPrice, uint8 fiatDecimals) = PriceFeedRouterV2(priceFeed).getPrice(strategyPrimaryToken, i);
+                    uint exactAmount = (depositInfo.amount * 10**fiatDecimals) / fiatPrice;
+                    uint256 tokenAmount = exactAmount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
+                    
+                    IERC20MetadataUpgradeable(strategyPrimaryToken).safeTransfer(gnosis, tokenAmount);
                 }
-                //for future we can optimise it and transfer once and then entry all strtegy
-                IERC20MetadataUpgradeable(strategyPrimaryToken).safeTransfer(direction.strategyAddress, tokenAmount);
-                IAlluoStrategyV2(direction.strategyAddress).invest(direction.entryData, tokenAmount);
-                StrategyHandler(strategyHandler).addToActiveDirections(depositInfo.directionId);
                 depositList.pop();
             }
         }
