@@ -385,16 +385,13 @@ describe("Test L1 Contract", function() {
         whaleWbtc = await getImpersonatedSigner("0x218b95be3ed99141b0144dba6ce88807c4ad7c09")
         // wbtc.connect(whale4).transfer(VoteExecutorSlave.address, parseUnits("10", "8"));
 
-
-        // Add data for USD pools
-
         await strategyHandler.changeAssetInfo(0, [1], [usdc.address], "0xF555B595D04ee62f0EA9D0e72001D926a736A0f6")
         await strategyHandler.changeAssetInfo(1, [1], [eurt.address], "0xeb38D2f6a745Bd3f466F3F20A617D2C615b316eE")
         await strategyHandler.changeAssetInfo(2, [1], [weth.address], "0x98f49aC358187116462BDEA748daD1Df480865d7")
         await strategyHandler.changeAssetInfo(3, [1], [wbtc.address], "0xb4FFDec68c297B278D757C49c5094dde53f2F878")
 
         await strategyHandler.setLiquidityDirection(
-            "FraxUsdc:Convex",
+            "Curve/Convex Frax+USDC",
             0,
             strategyUsd.address,
             usdc.address,
@@ -406,7 +403,7 @@ describe("Test L1 Contract", function() {
         )
 
         await strategyHandler.setLiquidityDirection(
-            "Mim:Convex",
+            "Curve/Convex Mim+3CRV",
             1,
             strategyUsd.address,
             crv3.address,
@@ -418,7 +415,7 @@ describe("Test L1 Contract", function() {
         )
 
         await strategyHandler.setLiquidityDirection(
-            "Musd:Convex",
+            "Curve/Convex Musd+3CRV",
             2,
             strategyUsd.address,
             crv3.address,
@@ -430,7 +427,7 @@ describe("Test L1 Contract", function() {
         )
 
         await strategyHandler.setLiquidityDirection(
-            "cEur:Convex",
+            "Curve/Convex cEUR+agEUR+EUROC",
             3,
             strategyEur.address,
             agEur.address,
@@ -454,7 +451,7 @@ describe("Test L1 Contract", function() {
         )
 
         await strategyHandler.setLiquidityDirection(
-            "stEth:Convex",
+            "Curve/Convex stETH+ETH",
             5,
             strategyEth.address,
             weth.address,
@@ -466,7 +463,7 @@ describe("Test L1 Contract", function() {
         )
 
         await strategyHandler.setLiquidityDirection(
-            "alEth:Convex",
+            "Curve/Convex alETH+ETH",
             6,
             strategyEth.address,
             weth.address,
@@ -625,15 +622,15 @@ describe("Test L1 Contract", function() {
         await strategyHandler.setAssetAmount(2, parseEther("30"));
         await skipDays(1)
         let treasuryChangeCommand = await voteExecutorMaster.encodeTreasuryAllocationChangeCommand(parseEther("-200000"))
-        let fraxCommand = await voteExecutorMaster.encodeLiquidityCommand("FraxUsdc:Convex", 3000)
-        let musdCommand = await voteExecutorMaster.encodeLiquidityCommand("Musd:Convex", 5000)
-        let mimCommand = await voteExecutorMaster.encodeLiquidityCommand("Mim:Convex", 2000)
+        let fraxCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex Frax+USDC", 3000)
+        let musdCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex Musd+3CRV", 5000)
+        let mimCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex Mim+3CRV", 2000)
 
         let eur3Command = await voteExecutorMaster.encodeLiquidityCommand("3eur:Convex", 6000)
-        let ceurCommand = await voteExecutorMaster.encodeLiquidityCommand("cEur:Convex", 4000)
+        let ceurCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex cEUR+agEUR+EUROC", 4000)
 
-        let stEthCommand = await voteExecutorMaster.encodeLiquidityCommand("stEth:Convex", 7000)
-        let alEthCommand = await voteExecutorMaster.encodeLiquidityCommand("alEth:Convex", 3000)
+        let stEthCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex stETH+ETH", 7000)
+        let alEthCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex alETH+ETH", 3000)
 
         let finalData = await voteExecutorMaster.encodeAllMessages(
             [3,2,2,2,2,2,2,2],
@@ -671,19 +668,20 @@ describe("Test L1 Contract", function() {
 
         console.log(Number((await strategyHandler.getCurrentDeployed())[2])/10**18);
         console.log(Number(await weth.balanceOf(voteExecutorMaster.address))/10**18);
+        console.log("---------");
 
         await skipDays(2)
 
         treasuryChangeCommand = await voteExecutorMaster.encodeTreasuryAllocationChangeCommand(parseEther("200000"))
-        fraxCommand = await voteExecutorMaster.encodeLiquidityCommand("FraxUsdc:Convex", 8000)
-        musdCommand = await voteExecutorMaster.encodeLiquidityCommand("Musd:Convex", 1000)
-        mimCommand = await voteExecutorMaster.encodeLiquidityCommand("Mim:Convex", 1000)
+        fraxCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex Frax+USDC", 8000)
+        musdCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex Musd+3CRV", 1000)
+        mimCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex Mim+3CRV", 1000)
 
         eur3Command = await voteExecutorMaster.encodeLiquidityCommand("3eur:Convex", 10000)
-        ceurCommand = await voteExecutorMaster.encodeLiquidityCommand("cEur:Convex", 0)
+        ceurCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex cEUR+agEUR+EUROC", 0)
 
-        stEthCommand = await voteExecutorMaster.encodeLiquidityCommand("stEth:Convex", 4000)
-        alEthCommand = await voteExecutorMaster.encodeLiquidityCommand("alEth:Convex", 6000)
+        stEthCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex stETH+ETH", 4000)
+        alEthCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex alETH+ETH", 6000)
 
         finalData = await voteExecutorMaster.encodeAllMessages(
             [3,2,2,2,2,2,2,2],

@@ -8,7 +8,6 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
-import "hardhat/console.sol";
 
 import "../../interfaces/IIbAlluo.sol";
 import "../../Farming/priceFeedsV2/PriceFeedRouterV2.sol";
@@ -92,11 +91,9 @@ contract StrategyHandler is
     // }returns()
 
     function calculateAll() external onlyRole(DEFAULT_ADMIN_ROLE){
-        console.log("------------------------");
 
         uint256 timePass = block.timestamp - lastTimeCalculated;
         for (uint256 i; i < numberOfAssets; i++) {
-            console.log("dealing with asset:", i);
             uint256 newAmountDeployed;
             AssetInfo storage info = assetIdToAssetInfo[i];
             for (uint256 j; j < info.activeDirections.length(); j++) {
@@ -129,20 +126,9 @@ contract StrategyHandler is
             uint256 expectedFullAmount = info.amountDeployed + expectedAddition;
             uint256 actualAmount = newAmountDeployed + totalRewards;
 
-            console.log("actualAmount:",actualAmount/10**18);
-            console.log("actualAmount:",actualAmount);
-            console.log("expectedFullAmount:",expectedFullAmount/10**18);
-            console.log("expectedFullAmount:",expectedFullAmount);
-
-            console.log("totalRewards:",totalRewards/10**18);
-            console.log("totalRewards:",totalRewards);
 
             if(actualAmount > expectedFullAmount){
             uint256 surplus = actualAmount - expectedFullAmount;
-            console.log("surplus:",surplus/10**18);
-            console.log("surplus:",surplus);
-            console.log("expectedAddition:",expectedAddition/10**18);
-            console.log("expectedAddition:",expectedAddition);
 
                 if(surplus < totalRewards){
                     
@@ -158,43 +144,26 @@ contract StrategyHandler is
                     );  
                     info.amountDeployed = newAmountDeployed + rewardsLeft;
 
-                    console.log("surplus sent to booster, all rewards that left sent to executor:", rewardsLeft/10**18);
-                    console.log("surplus sent to booster, all rewards that left sent to executor:", rewardsLeft);
-
-                    console.log("new total amount:", info.amountDeployed/10**18);
-                    console.log("new total amount:", info.amountDeployed);
                 }
                 else{
 
                     info.amountDeployed = actualAmount - totalRewards;
                     IERC20Upgradeable(primaryToken).transfer(booster, totalRewardsBalance);
 
-                    console.log("all rewards sent to booster");
-                    console.log("new total amount:", info.amountDeployed/10**18);
-                    console.log("new total amount:", info.amountDeployed);
-
                     //in the future here we will also exit some existing strategy to send to booster
                 }
 
             }
             else{
-                console.log("expectedFullAmount - actualAmount:",(expectedFullAmount-actualAmount)/ 10**18);
-                console.log("expectedFullAmount - actualAmount:",(expectedFullAmount-actualAmount));
                 IERC20Upgradeable(primaryToken).transfer(executor, totalRewardsBalance);
                 info.amountDeployed = actualAmount;
 
-                console.log("all rewards to executor");
-                console.log("new total amount:", info.amountDeployed/10**18);
-                console.log("new total amount:", info.amountDeployed);
             }
-            console.log("******************");
         }
         lastTimeCalculated = block.timestamp;
-        console.log("------------------------");
     }
 
     function calculateOnlyLp() external onlyRole(DEFAULT_ADMIN_ROLE){
-        console.log("------------------------");
 
         for (uint256 i; i < numberOfAssets; i++) {
             uint256 newAmountDeployed;
@@ -204,8 +173,6 @@ contract StrategyHandler is
                 newAmountDeployed += IAlluoStrategyV2(direction.strategyAddress).getDeployedAmount(direction.rewardsData);
             }
             info.amountDeployed = newAmountDeployed;
-            console.log("new total amount:", info.amountDeployed/10**18);
-            console.log("new total amount:", info.amountDeployed);
         }
         lastTimeCalculated = block.timestamp;
     }
@@ -251,12 +218,8 @@ contract StrategyHandler is
             (uint256 fiatPrice, uint8 fiatDecimals) = PriceFeedRouterV2(priceFeed).getPrice(primaryToken, 0);
             uint exactAmount = (uint(_delta) * 10**fiatDecimals) / fiatPrice;
             uint256 tokenAmount = exactAmount / 10**(18 - IERC20MetadataUpgradeable(primaryToken).decimals());
-            console.log("exact amount of tokens to transfer from gnosis:",exactAmount/10**18);
-            console.log("tokenAmount of tokens to transfer from gnosis:",tokenAmount);
             IERC20MetadataUpgradeable(primaryToken).safeTransferFrom(gnosis, executor, tokenAmount);
         }
-        console.log("total amount changed to:", assetIdToAssetInfo[0].amountDeployed/10**18);
-        console.log("total amount changed to:", assetIdToAssetInfo[0].amountDeployed);
     }
 
     function getDirectionIdByName(string memory _codeName) external view returns(uint256){
@@ -271,7 +234,6 @@ contract StrategyHandler is
         uint256 directionId = directionNameToId[_codeName];
         LiquidityDirection memory direction = liquidityDirection[directionId];
         address primaryToken = assetIdToAssetInfo[direction.assetId].chainIdToPrimaryToken[direction.chainId];
-        //change primT to full asset info
         return (directionId, primaryToken, direction);
     }
 

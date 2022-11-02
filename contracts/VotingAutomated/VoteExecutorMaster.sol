@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -10,14 +9,11 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
-import "hardhat/console.sol";
 
 import "../interfaces/ILiquidityHandler.sol";
 import "../interfaces/IAlluoToken.sol";
 import "../interfaces/ILocker.sol";
 import "../interfaces/IGnosis.sol";
-import "../interfaces/IAlluoStrategyNew.sol";
-import "../interfaces/IMultichain.sol";
 import "../interfaces/IAlluoStrategyV2.sol";
 import "../interfaces/IExchange.sol";                                                                 
 import "../interfaces/IWrappedEther.sol";                               
@@ -27,29 +23,28 @@ import "./strategies/StrategyHandler.sol";
 
 contract VoteExecutorMaster is
     Initializable,
-    PausableUpgradeable,
     AccessControlUpgradeable,
     UUPSUpgradeable {
 
     using ECDSAUpgradeable for bytes32;
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
-    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
-    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     address public constant ALLUO = 0x1E5193ccC53f25638Aa22a940af899B692e10B09;
-    uint256 public minSigns;
-    uint256 public timeLock;
-
     address public gnosis;
     address public locker;
     address public exchangeAddress;
     address public priceFeed;
+    address public liquidityHandler;
     address public strategyHandler;
     IWrappedEther public constant wETH = IWrappedEther(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
+    uint256 public timeLock;
+    uint256 public minSigns;
     bool public upgradeStatus;
+
+    mapping(string => address) public ibAlluoSymbolToAddress;
 
     SubmittedData[] public submittedData;
     mapping(bytes32 => uint256) public hashExecutionTime;
@@ -99,22 +94,18 @@ contract VoteExecutorMaster is
     function initialize(
         address _multiSigWallet
     ) public initializer {
-        __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        // require(_multiSigWallet.isContract(), "Executor: Not contract");
+        require(_multiSigWallet.isContract(), "Executor: Not contract");
         gnosis = _multiSigWallet;
         minSigns = 1;
         exchangeAddress = 0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec;
-        // timeLock = _timeLock;
-        // bridgingInfo.anyCallAddress = _anyCall;
+
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
 
-        // For tests only
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(UPGRADER_ROLE, msg.sender);
     }
 
     receive() external payable {
@@ -197,39 +188,37 @@ contract VoteExecutorMaster is
                 
                 for (uint256 j; j < messages.length; j++) {
                     uint256 commandIndex = messages[j].commandIndex;
-                    console.log("********");
-                    // if(commandIndex == 1){
-                    //     (uint256 mintAmount, uint256 period) = abi.decode(messages[j].commandData, (uint256, uint256));
-                    //     IAlluoToken(ALLUO).mint(locker, mintAmount);
-                    //     ILocker(locker).setReward(mintAmount / (period));
-                    // }
-                    if(commandIndex == 2) {
+                    if(messages[j].commandIndex == 0){
+                        (string memory ibAlluoSymbol, uint256 newAnnualInterest, uint256 newInterestPerSecond) = abi.decode(messages[j].commandData, (string, uint256, uint256));
+                        IIbAlluo ibAlluo = IIbAlluo(ibAlluoSymbolToAddress[ibAlluoSymbol]);
+                        if(ibAlluo.annualInterest() != newAnnualInterest){
+                           ibAlluo.setInterest(newAnnualInterest, newInterestPerSecond);
+                        }
+                    }
+                    else if(commandIndex == 1){
+                        (uint256 mintAmount, uint256 period) = abi.decode(messages[j].commandData, (uint256, uint256));
+                        IAlluoToken(ALLUO).mint(locker, mintAmount);
+                        ILocker(locker).setReward(mintAmount / (period));
+                    }
+
+                    else if(commandIndex == 2) {
                         // Handle all withdrawals first and then add all deposit actions to an array to be executed afterwards
                         (uint256 directionId, uint256 percent) = abi.decode(messages[j].commandData, (uint256, uint256));
                         (address strategyPrimaryToken, StrategyHandler.LiquidityDirection memory direction) = StrategyHandler(strategyHandler).getDirectionFullInfoById(directionId);
                         if (direction.chainId == currentChain) {
 
-                            console.log("dealing with direction:", directionId);
                             if(percent == 0){
-                                console.log("full exit from strategy");
                                 IAlluoStrategyV2(direction.strategyAddress).exitAll(direction.exitData, 10000, strategyPrimaryToken, address(this), false, false);
                                 StrategyHandler(strategyHandler).removeFromActiveDirections(directionId);
                             }
                             else{
                                 uint newAmount = percent * amountsDeployed[direction.assetId] / 10000;
-                                console.log("new amount should be:",newAmount/10**18);
-                                console.log("new amount should be:",newAmount);
-                                console.log("old amount:",direction.latestAmount/10**18);
-                                console.log("old amount:",direction.latestAmount);
                                 if(newAmount < direction.latestAmount){
                                     uint exitPercent = 10000 - newAmount * 10000 / direction.latestAmount;
-                                    console.log("need to withdraw percent",exitPercent);
                                     IAlluoStrategyV2(direction.strategyAddress).exitAll(direction.exitData, exitPercent, strategyPrimaryToken, address(this), false, false);
                                 }
                                 else{
                                     uint depositAmount = newAmount - direction.latestAmount;
-                                    console.log("need to deposit amount",depositAmount/10**18);
-                                    console.log("need to deposit amount",depositAmount);
                                     assetIdToDepositList[direction.assetId].push(Deposit(directionId, depositAmount));
                                 }
                             }
@@ -256,12 +245,9 @@ contract VoteExecutorMaster is
                 Deposit memory depositInfo = depositList[depositList.length - 1];
                 if(depositInfo.directionId != type(uint).max){
 
-                    console.log(depositInfo.directionId);
                     StrategyHandler.LiquidityDirection memory direction = StrategyHandler(strategyHandler).getLiquidityDirectionById(depositInfo.directionId);
                     (uint256 fiatPrice, uint8 fiatDecimals) = PriceFeedRouterV2(priceFeed).getPrice(strategyPrimaryToken, i);
                     uint exactAmount = (depositInfo.amount * 10**fiatDecimals) / fiatPrice;
-                    console.log("exact amount of tokens to deposit:",exactAmount/10**18);
-                    console.log("exact amount of tokens to deposit:",exactAmount);
                     uint256 tokenAmount = exactAmount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
                     uint256 actualBalance = IERC20MetadataUpgradeable(strategyPrimaryToken).balanceOf(address(this));
                     if(depositList.length == 1 && actualBalance < tokenAmount){
@@ -271,17 +257,8 @@ contract VoteExecutorMaster is
                         if(minAmount < actualBalance){
 
                             tokenAmount = actualBalance;
-                            console.log("there was not enough tokens to fully cover last asset deposit");
-                            console.log("tokenAmount changed because of exit slippage:",tokenAmount/10**IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
-                            console.log("tokenAmount changed because of exit slippage:",tokenAmount);
-                            console.log(assetAmount);
-                            console.log(assetMaxSlippageAmount);
-                            console.log(minAmount);
                         }
                         else{
-                            console.log(minAmount);
-                            console.log(tokenAmount);
-                            console.log(actualBalance);
                             revert("VEMaster: Slippage screwed you");
                         }
                     }
@@ -289,7 +266,6 @@ contract VoteExecutorMaster is
                         IERC20MetadataUpgradeable(strategyPrimaryToken).approve(exchange, tokenAmount);
                         tokenAmount = IExchange(exchange).exchange(strategyPrimaryToken, direction.entryToken, tokenAmount, 0);
                     }
-                    //for future we can optimise it and transfer once and then entry all strtegy
                     IERC20MetadataUpgradeable(direction.entryToken).safeTransfer(direction.strategyAddress, tokenAmount);
                     IAlluoStrategyV2(direction.strategyAddress).invest(direction.entryData, tokenAmount);
                     StrategyHandler(strategyHandler).addToActiveDirections(depositInfo.directionId);
@@ -307,8 +283,7 @@ contract VoteExecutorMaster is
         StrategyHandler(strategyHandler).calculateOnlyLp();
     }
     
-    // Public can only executeDeposits by bridging funds backwards.
-    function executeDeposits() public {
+    function executeDeposits() public onlyRole(DEFAULT_ADMIN_ROLE){
         _executeDeposits();
     }
 
@@ -364,20 +339,12 @@ contract VoteExecutorMaster is
         return (0, encodedCommand);
     }
 
-    // function encodeMintCommand(
-    //     uint256 _newMintAmount,
-    //     uint256 _period
-    // ) public pure  returns (uint256, bytes memory) {
-    //     bytes memory encodedCommand = abi.encode(_newMintAmount, _period);
-    //     return (1, encodedCommand);
-    // }
-
-    function removeTokenByAddress(address _address, uint256 _amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        require(_address != address(0), "Wrong address");
-        IERC20MetadataUpgradeable(_address).safeTransfer(msg.sender, _amount);
+    function encodeMintCommand(
+        uint256 _newMintAmount,
+        uint256 _period
+    ) public pure  returns (uint256, bytes memory) {
+        bytes memory encodedCommand = abi.encode(_newMintAmount, _period);
+        return (1, encodedCommand);
     }
 
    function encodeLiquidityCommand(
@@ -423,6 +390,22 @@ contract VoteExecutorMaster is
         );
     }
 
+    /// @notice Updates all the ibAlluo addresses used when setting APY
+    function updateAllIbAlluoAddresses() public {
+        address[] memory ibAlluoAddressList = ILiquidityHandler(liquidityHandler).getListOfIbAlluos();
+        for (uint256 i; i< ibAlluoAddressList.length; i++) {
+            ibAlluoSymbolToAddress[IIbAlluo(ibAlluoAddressList[i]).symbol()] = ibAlluoAddressList[i];
+        }
+    }
+
+    function removeTokenByAddress(address _address, uint256 _amount)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(_address != address(0), "Wrong address");
+        IERC20MetadataUpgradeable(_address).safeTransfer(msg.sender, _amount);
+    }
+
     function _verify(bytes32 data, bytes memory signature, address account) internal pure returns (bool) {
         return data
             .toEthSignedMessageHash()
@@ -443,25 +426,6 @@ contract VoteExecutorMaster is
         return true;
     }
 
-    // function currentDepositsInQueue(address _primaryToken) public view returns (Deposit[] memory) {
-    //     Deposit[] memory list = tokenToDepositQueue[_primaryToken].depositList;
-    //     uint256 currentIndex = tokenToDepositQueue[_primaryToken].depositNumber;
-    //     Deposit[] memory depositsInQueue = new Deposit[](list.length - currentIndex);
-    //     for (uint256 i; i < list.length - currentIndex; i++) {
-    //         depositsInQueue[i] = list[currentIndex + i];
-    //     }
-    //     return depositsInQueue;
-    // }
-
-
-    /// Admin functions 
-
-    //  function setTokenBridgingInfo(address _tokenAddress, bytes4 _selector, address _router, uint256 _minimumAmount) external onlyRole(DEFAULT_ADMIN_ROLE){
-    //     tokenToBridgingInfo[_tokenAddress].functionSignature = _selector;
-    //     tokenToBridgingInfo[_tokenAddress].multichainRouter = _router;
-    //     tokenToBridgingInfo[_tokenAddress].minimumAmount = _minimumAmount;
-    // }
-
     function setCrossChainInfo(
         address _anyCallAddress,
         address _anyCallExecutor,
@@ -472,6 +436,12 @@ contract VoteExecutorMaster is
         uint256 _previousChain
         ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         crossChainInfo = CrossChainInfo(_anyCallAddress, _anyCallExecutor, _nextChainExecutor, _previousChainExecutor, _currentChain, _nextChain, _previousChain);
+    }
+
+    /// @notice Sets the minimum required signatures before data is accepted on L2.
+    /// @param _minSigns New value
+    function setMinSigns(uint256 _minSigns) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        minSigns = _minSigns;
     }
 
     /**
@@ -486,19 +456,13 @@ contract VoteExecutorMaster is
         locker = _lockerAddress;
     }
 
-    /// @notice Sets the minimum required signatures before data is accepted on L2.
-    /// @param _minSigns New value
-    function setMinSigns(uint256 _minSigns) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        minSigns = _minSigns;
+    function setHandler(address _newHandler)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(_newHandler.isContract(), "Executor: Not contract");
+        liquidityHandler = _newHandler;
     }
-
-    // function setBridgingInfo(address _nextChainExecutor,uint256 _currentChain, uint256 _nextChain) public onlyRole(DEFAULT_ADMIN_ROLE) {
-    //     generalBridgingInfo = GeneralBridging(_nextChainExecutor, _currentChain, _nextChain);
-    // }
-
-    // function setTokenToAnyToken(address _token, address _anyToken) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    //     tokenToAnyToken[_token] = _anyToken;
-    // }
 
     function setExchangeAddress(address _newExchange) public onlyRole(DEFAULT_ADMIN_ROLE) {
         exchangeAddress = _newExchange;
@@ -512,24 +476,13 @@ contract VoteExecutorMaster is
         priceFeed = _newFeed;
     }
 
-    // function addPrimaryToken(address _token) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    //     primaryTokens.add(_token);
-    // }
-    // function removePrimaryToken(address _token) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    //     primaryTokens.remove(_token);
-    // }
-    // function getPrimaryToken() external view returns(address[] memory) {
-    //     return primaryTokens.values();
-    // }
-
-
     function grantRole(bytes32 role, address account)
     public
     override
     onlyRole(getRoleAdmin(role)) {
-        // if (role == DEFAULT_ADMIN_ROLE) {
-        //     require(account.isContract(), "Handler: Not contract");
-        // }
+        if (role == DEFAULT_ADMIN_ROLE) {
+            require(account.isContract(), "Handler: Not contract");
+        }
         _grantRole(role, account);
     }
 
@@ -544,6 +497,7 @@ contract VoteExecutorMaster is
     onlyRole(DEFAULT_ADMIN_ROLE) {
         timeLock = _newTimeLock;
     }
+
     function _authorizeUpgrade(address newImplementation)
     internal
     onlyRole(UPGRADER_ROLE)
@@ -566,5 +520,4 @@ contract VoteExecutorMaster is
 
 interface IAnyCall {
     function anyCall(address _to, bytes calldata _data, address _fallback, uint256 _toChainID, uint256 _flags) external;
-
 }
