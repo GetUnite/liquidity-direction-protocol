@@ -265,24 +265,21 @@ contract VoteExecutorMaster is
                     uint256 tokenAmount = exactAmount / 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
                     uint256 actualBalance = IERC20MetadataUpgradeable(strategyPrimaryToken).balanceOf(address(this));
                     if(depositList.length == 1 && actualBalance < tokenAmount){
-                        if(tokenAmount * 9800 / 10000 < actualBalance){
+                        uint assetAmount = StrategyHandler(strategyHandler).getAssetAmount(i);
+                        uint directionPercent = depositInfo.amount * 10000 / assetAmount;
+                        uint tvlWithSlippage = assetAmount * 9800 / 10000;
+                        uint amountWithSlippage = directionPercent * tvlWithSlippage / 10000;
+                        if(amountWithSlippage > actualBalance){
+
                             tokenAmount = actualBalance;
                             console.log("there was not enough tokens to fully cover last asset deposit");
                             console.log("tokenAmount changed because of exit slippage:",tokenAmount/10**IERC20MetadataUpgradeable(strategyPrimaryToken).decimals());
                             console.log("tokenAmount changed because of exit slippage:",tokenAmount);
                         }
                         else{
-                            // uint assetAmount = StrategyHandler(strategyHandler).getAssetAmount(i);
-                            // uint directionPercent = depositInfo.amount * 10000 / assetAmount;
-                            // uint minAmoun = assetAmount * 9800 / 10000 * directionPercent / 10000 * 9800 / 10000;
-                            // if(minAmoun < actualBalance){
-
-                            // }
-                            // else{
-                                console.log(tokenAmount);
-                                console.log(actualBalance);
-                                revert("slippage to big");
-                            // }
+                            console.log(tokenAmount);
+                            console.log(actualBalance);
+                            revert("VEMaster: Slippage screwed you");
                         }
                     }
                     if (direction.entryToken != strategyPrimaryToken) {
