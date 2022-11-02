@@ -66,7 +66,8 @@ contract StrategyHandler is
 
     function initialize(
         address _multiSigWallet,
-        address _priceFeed
+        address _priceFeed,
+        address _executor
     ) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -75,6 +76,7 @@ contract StrategyHandler is
         gnosis = _multiSigWallet;
         exchangeAddress = 0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec;
         priceFeed = _priceFeed;
+        executor = _executor;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
