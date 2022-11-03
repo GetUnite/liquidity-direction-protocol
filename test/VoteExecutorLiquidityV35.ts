@@ -65,7 +65,7 @@ describe("Test L1 Contract", function() {
                     enabled: true,
                     jsonRpcUrl: process.env.MAINNET_FORKING_URL as string,
                     //you can fork from last block by commenting next line
-                    blockNumber: 15883862
+                    blockNumber: 15888609
                 },
             },],
         });
@@ -109,6 +109,7 @@ describe("Test L1 Contract", function() {
         router = await ethers.getContractAt("PriceFeedRouterV2","0x24733D6EBdF1DA157d2A491149e316830443FC00")
 
         strategyHandler = await ethers.getContractAt("StrategyHandler", "0x385AB598E7DBF09951ba097741d2Fa573bDe94A5");
+        await strategyHandler.connect(artem).setGnosis(gnosis.address)
 
         await strategyHandler.connect(artem).setBoosterAddress("0x470e486acA0e215C925ddcc3A9D446735AabB714")
         await strategyHandler.connect(artem).setExecutorAddress(voteExecutorMaster.address)
@@ -133,7 +134,7 @@ describe("Test L1 Contract", function() {
     });
    describe("Full workflow", function () {
     it("2 cycles with usd+eur+eth", async function () {
-
+        
         let ABI = ["function approve(address spender, uint256 amount)"];
         let iface = new ethers.utils.Interface(ABI);
         let calldata = iface.encodeFunctionData("approve", [strategyHandler.address, constants.MaxUint256]);
@@ -176,7 +177,7 @@ describe("Test L1 Contract", function() {
 
         await strategyHandler.connect(artem).addToActiveDirections(0);
         await strategyHandler.connect(artem).addToActiveDirections(3);
-        await strategyHandler.connect(artem).addToActiveDirections(5);
+        await strategyHandler.connect(artem).addToActiveDirections(4);
         await strategyHandler.connect(artem).updateLastTime();
         await strategyHandler.connect(artem).setAssetAmount(0, parseEther("1200000"));
         await strategyHandler.connect(artem).setAssetAmount(1, parseEther("200000"));
@@ -187,7 +188,7 @@ describe("Test L1 Contract", function() {
         let musdCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex Musd+3CRV", 5000)
         let mimCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex Mim+3CRV", 2000)
 
-        let ceurCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex cEUR+agEUR+EUROC", 10000)
+        let ceurCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex cEUR+agEUR+EUROC", 9000)
 
         let stEthCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex stETH+ETH", 7000)
         let alEthCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex alETH+ETH", 3000)
@@ -216,9 +217,7 @@ describe("Test L1 Contract", function() {
         // console.log(await voteExecutorMaster.getSubmittedData(0));
         
         await voteExecutorMaster.connect(artem).executeSpecificData(0)
-        console.log("SDF");
         await voteExecutorMaster.connect(artem).executeDeposits()
-        console.log("SDF");
 
         console.log(Number((await strategyHandler.getCurrentDeployed())[0])/10**18);
         console.log(Number(await usdc.balanceOf(voteExecutorMaster.address))/10**6);
@@ -238,7 +237,7 @@ describe("Test L1 Contract", function() {
         musdCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex Musd+3CRV", 1000)
         mimCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex Mim+3CRV", 1000)
 
-        ceurCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex cEUR+agEUR+EUROC", 10000)
+        ceurCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex cEUR+agEUR+EUROC", 9000)
 
         stEthCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex stETH+ETH", 4000)
         alEthCommand = await voteExecutorMaster.encodeLiquidityCommand("Curve/Convex alETH+ETH", 6000)
