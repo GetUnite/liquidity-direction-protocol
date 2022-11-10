@@ -327,7 +327,7 @@ describe("Test L1 Contract", function() {
         const StrategyHandler = await ethers.getContractFactory("StrategyHandler");
 
         strategyHandler = await upgrades.deployProxy(StrategyHandler,
-            [gnosis.address, router.address], {
+            [gnosis.address, router.address, voteExecutorMaster], {
                 initializer: 'initialize',
                 kind: 'uups'
             }
@@ -542,18 +542,7 @@ describe("Test L1 Contract", function() {
    describe("Full workflow", function () {
 
     // it("Should show current prices", async function () {
-    //     const fiats = ["USD", "EUR", "ETH", "BTC"];
-    //     const cryptos = [usdc, usdt, dai, eurt, weth, wbtc, susd, agEur, crv3, mimLp, musdLp, fraxUsdcLp, ceurLp, eur3, stEthLp, alEthLp, cvxLp];
-
-    //     for (let i = 0; i < fiats.length; i++) {
-    //         const fiat = fiats[i];
-    //         for (let j = 0; j < cryptos.length; j++) {
-    //             const crypto = cryptos[j];
-    //             const price = await router["getPrice(address,string)"](crypto.address, fiat);
-    //             console.log(`1 ${await crypto.symbol()} costs ${formatUnits(price.value, price.decimals)} ${fiat}`);
-    //         }
-    //         console.log();
-    //     }
+ 
     // })
 
     // it("Should show current prices of amounts", async function () {
