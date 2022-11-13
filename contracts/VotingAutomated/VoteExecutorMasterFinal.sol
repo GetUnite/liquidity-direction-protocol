@@ -9,6 +9,7 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import "hardhat/console.sol";
 
 import "../interfaces/ILiquidityHandler.sol";
 import "../interfaces/IAlluoToken.sol";
@@ -259,10 +260,9 @@ contract VoteExecutorMasterFinal is
                     uint256 tokenAmount = exactAmount / primaryDecimalsMultiplier;
                     uint256 actualBalance = IERC20MetadataUpgradeable(strategyPrimaryToken).balanceOf(address(this));
                     if(depositListLength == 1 && actualBalance < tokenAmount){
-                        uint assetAmount = StrategyHandler(strategyHandler).getAssetAmount(i);
+                        uint assetAmount = handler.getAssetAmount(i);
                         uint assetMaxSlippageAmount = assetAmount - (assetAmount * (10000 - slippage) / 10000);
-                        uint minAmount = (exactAmount - assetMaxSlippageAmount) / primaryDecimalsMultiplier;
-                        if(minAmount < actualBalance){
+                        if(tokenAmount - actualBalance < assetMaxSlippageAmount/ primaryDecimalsMultiplier){
                             tokenAmount = actualBalance;
                         }
                         else{
