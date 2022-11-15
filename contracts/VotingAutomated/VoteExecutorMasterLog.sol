@@ -9,6 +9,7 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import "hardhat/console.sol";
 
 import "../interfaces/ILiquidityHandler.sol";
 import "../interfaces/IAlluoToken.sol";
@@ -21,7 +22,7 @@ import "../interfaces/IIbAlluo.sol";
 import "../Farming/priceFeedsV2/PriceFeedRouterV2.sol";
 import "./strategies/StrategyHandler.sol";
 
-contract VoteExecutorMasterFinal is
+contract VoteExecutorMasterLog is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable {
@@ -192,6 +193,7 @@ contract VoteExecutorMasterFinal is
                 
                 for (uint256 j; j < messages.length; j++) {
                     uint256 commandIndex = messages[j].commandIndex;
+                    console.log("********");
                     if(commandIndex == 0){
                         (string memory ibAlluoSymbol, uint256 newAnnualInterest, uint256 newInterestPerSecond) = abi.decode(messages[j].commandData, (string, uint256, uint256));
                         IIbAlluo ibAlluo = IIbAlluo(ibAlluoSymbolToAddress[ibAlluoSymbol]);
@@ -211,18 +213,24 @@ contract VoteExecutorMasterFinal is
                         (address strategyPrimaryToken, StrategyHandler.LiquidityDirection memory direction) = handler.getDirectionFullInfoById(directionId);
                         if (direction.chainId == currentChain) {
 
+                            console.log("dealing with direction:", directionId);
                             if(percent == 0){
+                                console.log("full exit from strategy");
                                 IAlluoStrategyV2(direction.strategyAddress).exitAll(direction.exitData, 10000, strategyPrimaryToken, address(this), false, false);
                                 handler.removeFromActiveDirections(directionId);
                             }
                             else{
                                 uint newAmount = percent * amountsDeployed[direction.assetId] / 10000;
+                                console.log("new amount should be:",newAmount);
+                                console.log("old amount:",direction.latestAmount);
                                 if(newAmount < direction.latestAmount){
                                     uint exitPercent = 10000 - newAmount * 10000 / direction.latestAmount;
+                                    console.log("need to withdraw percent",exitPercent);
                                     IAlluoStrategyV2(direction.strategyAddress).exitAll(direction.exitData, exitPercent, strategyPrimaryToken, address(this), false, false);
                                 }
                                 else if(newAmount != direction.latestAmount){
                                     uint depositAmount = newAmount - direction.latestAmount;
+                                    console.log("need to deposit amount",depositAmount);
                                     assetIdToDepositList[direction.assetId].push(Deposit(directionId, depositAmount));
                                 }
                             }
@@ -260,6 +268,7 @@ contract VoteExecutorMasterFinal is
                     StrategyHandler.LiquidityDirection memory direction = handler.getLiquidityDirectionById(depositInfo.directionId);
                     (uint256 fiatPrice, uint8 fiatDecimals) = feed.getPrice(strategyPrimaryToken, i);
                     uint exactAmount = (depositInfo.amount * 10**fiatDecimals) / fiatPrice;
+                    console.log("exact amount of tokens to deposit:",exactAmount);
                     uint256 tokenAmount = exactAmount / primaryDecimalsMultiplier;
                     uint256 actualBalance = IERC20MetadataUpgradeable(strategyPrimaryToken).balanceOf(address(this));
                     if(depositListLength == 1 && actualBalance < tokenAmount){
@@ -267,6 +276,7 @@ contract VoteExecutorMasterFinal is
                         uint assetMaxSlippageAmount = assetAmount - (assetAmount * (10000 - slippage) / 10000);
                         if(tokenAmount - actualBalance < assetMaxSlippageAmount/ primaryDecimalsMultiplier){
                             tokenAmount = actualBalance;
+                            console.log("tokenAmount changed because of exit slippage:",tokenAmount);
                         }
                         else{
                             revert("VEMaster: Slippage screwed you");
