@@ -132,7 +132,7 @@ contract StIbAlluo is
 
 
     function proxiableUUID() public pure override returns (bytes32) {
-        return keccak256("org.superfluid-finance.contracts.SuperToken.implementation");
+        return 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
     }
 
 
@@ -147,6 +147,10 @@ contract StIbAlluo is
     /// @param amount Amount of StIbAlluos to unwrap.
     function alluoWithdraw(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _downgrade(account, account, amount, "","");
+    }
+
+    function emitTransfer(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        emit Transfer(address(0), account, 0);
     }
 
     /**************************************************************************

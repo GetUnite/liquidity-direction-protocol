@@ -267,7 +267,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
             console.log(await (await StIbAlluo.realtimeBalanceOfNow(signers[1].address)).availableBalance)
             console.log(await ibAlluoCurrent.balanceOf(signers[1].address))
 
-            await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, parseEther("0.1"), parseEther("2000"))
+            await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256)"](signers[2].address, parseEther("0.1"), parseEther("2000"))
             // await skipDays(0.0625)
             console.log(await (await StIbAlluo.realtimeBalanceOfNow(signers[1].address)).availableBalance)
             console.log(await ibAlluoCurrent.balanceOf(signers[1].address))
@@ -286,7 +286,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
             console.log(await (await StIbAlluo.realtimeBalanceOfNow(signers[1].address)).availableBalance)
             console.log(await ibAlluoCurrent.balanceOf(signers[1].address))
 
-            await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, parseEther("0.1"), parseEther("2000"))
+            await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256)"](signers[2].address, parseEther("0.1"), parseEther("2000"))
             // await skipDays(0.0625)
             console.log(await (await StIbAlluo.realtimeBalanceOfNow(signers[1].address)).availableBalance)
             console.log(await ibAlluoCurrent.balanceOf(signers[1].address))
@@ -303,7 +303,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("10000", 18));
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent);
-                await ibAlluoCurrent.connect(signers[i]).createFlow(signers[2].address, parseEther("0.1"), parseEther("2000"))
+                await ibAlluoCurrent.connect(signers[i])["createFlow(address,int96,uint256)"](signers[2].address, parseEther("0.1"), parseEther("2000"))
 
             }
             
@@ -317,7 +317,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("5000", 18));
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent);
-                await ibAlluoCurrent.connect(signers[i]).createFlow(signers[2].address, parseEther("0.1"), parseEther("2000"))
+                await ibAlluoCurrent.connect(signers[i])["createFlow(address,int96,uint256)"](signers[2].address, parseEther("0.1"), parseEther("2000"))
             }
             await skipDays(2)
             expect((await resolver.checker()).canExec).equal(true);
@@ -330,13 +330,13 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("10000", 18));
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent);
-                await ibAlluoCurrent.connect(signers[i]).createFlow(signers[2].address, parseEther("0.1"), parseEther("2000"))
+                await ibAlluoCurrent.connect(signers[i])["createFlow(address,int96,uint256)"](signers[2].address, parseEther("0.1"), parseEther("2000"))
             }
 
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("10000", 18), ibAlluoCurrent2);
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent2);
-                await ibAlluoCurrent2.connect(signers[i]).createFlow(signers[2].address, parseEther("0.1"), parseEther("2000"))
+                await ibAlluoCurrent2.connect(signers[i])["createFlow(address,int96,uint256)"](signers[2].address, parseEther("0.1"), parseEther("2000"))
             }
             expect((await resolver.checker()).canExec).equal(true);
             for (let i = 3; i < 10; i++) {
@@ -349,12 +349,12 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("5000", 18));
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent);
-                await ibAlluoCurrent.connect(signers[i]).createFlow(signers[2].address, parseEther("0.1"), parseEther("2000"))
+                await ibAlluoCurrent.connect(signers[i])["createFlow(address,int96,uint256)"](signers[2].address, parseEther("0.1"), parseEther("2000"))
             }
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("10000", 18), ibAlluoCurrent2);
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent2);
-                await ibAlluoCurrent2.connect(signers[i]).createFlow(signers[2].address, parseEther("0.1"), parseEther("2000"))
+                await ibAlluoCurrent2.connect(signers[i])["createFlow(address,int96,uint256)"](signers[2].address, parseEther("0.1"), parseEther("2000"))
             }
 
             await skipDays(2)
@@ -369,12 +369,12 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("2000", 18));
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent);
-                await ibAlluoCurrent.connect(signers[i]).createFlow(signers[2].address, parseEther("0.1"), parseEther("2000"))
+                await ibAlluoCurrent.connect(signers[i])["createFlow(address,int96,uint256)"](signers[2].address, parseEther("0.1"), parseEther("2000"))
             }
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("10000", 18), ibAlluoCurrent2);
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent2);
-                await ibAlluoCurrent2.connect(signers[i]).createFlow(signers[2].address, parseEther("0.1"), parseEther("2000"))
+                await ibAlluoCurrent2.connect(signers[i])["createFlow(address,int96,uint256)"](signers[2].address, parseEther("0.1"), parseEther("2000"))
             }
             for (let i = 3; i < 10; i++) {
                 await expect(resolver.connect(signers[0]).liquidateSender(signers[i].address, [signers[2].address], ibAlluoCurrent2.address)).to.emit(resolver, "WrappedTokenToPreventLiquidation").withArgs(signers[i].address, signers[2].address)
