@@ -83,6 +83,8 @@ contract IbAlluo is
     address public superfluidEndResolver;
     bytes32 public constant GELATO = keccak256("GELATO");
 
+    mapping(address => address) public autoInvestMarketToSuperToken;
+
     struct Context {
         uint8 appLevel;
         uint8 callType;
@@ -161,8 +163,8 @@ contract IbAlluo is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        require(_multiSigWallet.isContract(), "IbAlluo: Not contract");
-        require(_handler.isContract(), "IbAlluo: Not contract");
+        require(_multiSigWallet.isContract());
+        require(_handler.isContract());
 
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
@@ -310,7 +312,7 @@ contract IbAlluo is
         if (supportedTokens.contains(_targetToken) == false) {
             (address liquidToken,) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
             // This just is used to revert if there is no active route.
-            require(IExchange(exchangeAddress).buildRoute(liquidToken, _targetToken).length > 0, "!Supported");
+            require(IExchange(exchangeAddress).buildRoute(liquidToken, _targetToken).length > 0);
             handler.withdraw(
             _recipient,
             liquidToken,
@@ -357,7 +359,7 @@ contract IbAlluo is
         if (supportedTokens.contains(_targetToken) == false) {
             (address liquidToken,) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
             // This just is used to revert if there is no active route.
-            require(IExchange(exchangeAddress).buildRoute(liquidToken, _targetToken).length > 0, "!Supported");
+            require(IExchange(exchangeAddress).buildRoute(liquidToken, _targetToken).length > 0);
             handler.withdraw(
             _recipient,
             liquidToken,
@@ -394,9 +396,39 @@ contract IbAlluo is
             _approve(address(this), superToken, toWrap);
             IAlluoSuperToken(superToken).upgradeTo(_msgSender(), toWrap, "");
         }
+
+        address dcaToken = autoInvestMarketToSuperToken[receiver];
+        if (dcaToken != address(0) && IAlluoSuperToken(dcaToken).balanceOf(_msgSender()) == 0 ) {
+            IAlluoSuperToken(dcaToken).emitTransfer(_msgSender());
+        }
+
         cfaV1Lib.createFlowByOperator( _msgSender(), receiver, ISuperfluidToken(superToken), flowRate);
         ISuperfluidResolver(superfluidResolver).addToChecker(_msgSender(), receiver);
         emit CreateFlow(_msgSender(), receiver, flowRate);
+    }
+
+    /// @notice Wraps and creates flow 
+    /// @dev Forces transfer of ibAlluo to the StIbAlluo contract then mints StIbAlluos to circumvent having to sign multiple transactions to create streams
+    /// @param receiver The recipient of the streamed flow
+    /// @param flowRate The amount of ibAlluos per second to be streamed (decimals 10**18)
+    /// @param toWrap The amount of ibAlluos to automatically wrap (recommend wrapping entire ibALluo balance initially)
+    /// @param timestamp Unix timestamp of when to end the stream by.
+
+    function createFlow(address receiver, int96 flowRate, uint256 toWrap, uint256 timestamp) external {
+        if (toWrap > 0) {
+            _transfer(_msgSender(), address(this), toWrap);
+            _approve(address(this), superToken, toWrap);
+            IAlluoSuperToken(superToken).upgradeTo(_msgSender(), toWrap, "");
+        }
+        address dcaToken = autoInvestMarketToSuperToken[receiver];
+        if (dcaToken != address(0) && IAlluoSuperToken(dcaToken).balanceOf(_msgSender()) == 0 ) {
+            IAlluoSuperToken(dcaToken).emitTransfer(_msgSender());
+        }
+
+        cfaV1Lib.createFlowByOperator( _msgSender(), receiver, ISuperfluidToken(superToken), flowRate);
+        ISuperfluidResolver(superfluidResolver).addToChecker(_msgSender(), receiver);
+        ISuperfluidEndResolver(superfluidEndResolver).addToChecker(_msgSender(), receiver, timestamp);
+        emit CreateFlowWithTimestamp(_msgSender(), receiver, flowRate, block.timestamp+timestamp);
     }
 
     /// @notice Deletes the flow
@@ -422,26 +454,6 @@ contract IbAlluo is
         }
         cfaV1Lib.updateFlowByOperator(_msgSender(), receiver,  ISuperfluidToken(superToken),flowRate);
         emit UpdatedFlow(_msgSender(), receiver, flowRate);
-    }
-
-
-    /// @notice Wraps and creates flow 
-    /// @dev Forces transfer of ibAlluo to the StIbAlluo contract then mints StIbAlluos to circumvent having to sign multiple transactions to create streams
-    /// @param receiver The recipient of the streamed flow
-    /// @param flowRate The amount of ibAlluos per second to be streamed (decimals 10**18)
-    /// @param toWrap The amount of ibAlluos to automatically wrap (recommend wrapping entire ibALluo balance initially)
-    /// @param timestamp Unix timestamp of when to end the stream by.
-
-    function createFlow(address receiver, int96 flowRate, uint256 toWrap, uint256 timestamp) external {
-        if (toWrap > 0) {
-            _transfer(_msgSender(), address(this), toWrap);
-            _approve(address(this), superToken, toWrap);
-            IAlluoSuperToken(superToken).upgradeTo(_msgSender(), toWrap, "");
-        }
-        cfaV1Lib.createFlowByOperator( _msgSender(), receiver, ISuperfluidToken(superToken), flowRate);
-        ISuperfluidResolver(superfluidResolver).addToChecker(_msgSender(), receiver);
-        ISuperfluidEndResolver(superfluidEndResolver).addToChecker(_msgSender(), receiver, timestamp);
-        emit CreateFlowWithTimestamp(_msgSender(), receiver, flowRate, block.timestamp+timestamp);
     }
 
     function stopFlowWhenCritical(address sender, address receiver) external onlyRole(GELATO) {
@@ -658,7 +670,11 @@ contract IbAlluo is
         superfluidEndResolver = _superfluidEndResolver;
     }
 
-
+    function setAutoInvestMarketToSuperToken(address[] memory markets, address[] memory superTokens) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint256 i; i < markets.length; i++) {
+            autoInvestMarketToSuperToken[markets[i]] = superTokens[i];
+        }
+    }
 
     /// @notice  Sets the new interest rate
     /// @dev When called, it sets the new interest rate after updating the index.
@@ -693,22 +709,22 @@ contract IbAlluo is
         emit DepositTokenStatusChanged(_token, _status);
     }
 
-    function setUpdateTimeLimit(uint256 _newLimit)
-        public
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        uint256 oldValue = updateTimeLimit;
-        updateTimeLimit = _newLimit;
+//    function setUpdateTimeLimit(uint256 _newLimit)
+//         public
+//         onlyRole(DEFAULT_ADMIN_ROLE)
+//     {
+//         uint256 oldValue = updateTimeLimit;
+//         updateTimeLimit = _newLimit;
 
-        emit UpdateTimeLimitSet(oldValue, _newLimit);
-    }
+//         emit UpdateTimeLimitSet(oldValue, _newLimit);
+//     }
 
 
     function setLiquidityHandler(address newHandler)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        require(newHandler.isContract(), "IbAlluo: Not contract");
+        require(newHandler.isContract());
 
         address oldValue = liquidityHandler;
         liquidityHandler = newHandler;
@@ -759,7 +775,7 @@ contract IbAlluo is
         onlyRole(getRoleAdmin(role))
     {
         if (role == DEFAULT_ADMIN_ROLE) {
-            require(account.isContract(), "IbAlluo: Not contract");
+            require(account.isContract());
         }
         _grantRole(role, account);
     }
@@ -827,7 +843,7 @@ contract IbAlluo is
         override
         onlyRole(UPGRADER_ROLE)
     {
-        require(upgradeStatus, "IbAlluo: Upgrade not allowed");
+        require(upgradeStatus);
         upgradeStatus = false;
     }
 }
