@@ -60,26 +60,57 @@ async function prepareCallData(type: string, parameters: any[]): Promise<BytesLi
 async function binarySearchForBlock(startTimestamp: number) : Promise<number> {
     let highestEstimatedBlockNumber = await ethers.provider.getBlockNumber();
     let highestEstimatedBlock = await ethers.provider.getBlock(highestEstimatedBlockNumber)
-    let lowestEstimatedBlock = await ethers.provider.getBlock(highestEstimatedBlock.number - Math.floor((highestEstimatedBlock.timestamp - startTimestamp)/9))
+    let lowestEstimatedBlock = await ethers.provider.getBlock(highestEstimatedBlock.number - Math.floor((highestEstimatedBlock.timestamp - startTimestamp)))
     let closestBlock;
+    let iterations = 0;
 
     while (lowestEstimatedBlock.number <= highestEstimatedBlock.number) {
+        if (iterations > 50) {
+            break
+        }
         closestBlock = await ethers.provider.getBlock(Math.floor((highestEstimatedBlock.number + lowestEstimatedBlock.number)/2))
-        console.log("Checking block number:", closestBlock.number, closestBlock.timestamp)
-
+        console.log("Checking block:", closestBlock.number, closestBlock.timestamp)
         if (closestBlock.timestamp == startTimestamp) {
+            console.log("Found block", closestBlock.number)
             return closestBlock.number
         } 
-        else if (closestBlock.timestamp > lowestEstimatedBlock.timestamp) {
-            lowestEstimatedBlock = closestBlock
+        else if (closestBlock.timestamp > startTimestamp) {
+            highestEstimatedBlock = closestBlock
         }
         else {
-            highestEstimatedBlock = closestBlock;
+            lowestEstimatedBlock = closestBlock;
         }
+        iterations++
     }
-    return 0;
+    return -1;
 }
-
+async function getClosestBlock(
+    timestamp: number,
+  ) : Promise<number> {
+    let minBlockNumber = 0
+    let maxBlockNumber = await ethers.provider.getBlockNumber();
+    let closestBlockNumber = Math.floor((maxBlockNumber + minBlockNumber) / 2)
+    let closestBlock = await ethers.provider.getBlock(closestBlockNumber);
+    let iterations = 0;
+    while (minBlockNumber <= maxBlockNumber) {
+        if (iterations > 50) {
+            break
+        }
+      console.log(`checking blockNumber=${closestBlockNumber}...`)
+      if (closestBlock.timestamp === timestamp) {
+        return closestBlock.number
+      } else if (closestBlock.timestamp > timestamp) {
+        maxBlockNumber = closestBlockNumber - 1
+      } else {
+        minBlockNumber = closestBlockNumber + 1
+      }
+  
+      closestBlockNumber = Math.floor((maxBlockNumber + minBlockNumber) / 2)
+      closestBlock = await ethers.provider.getBlock(closestBlockNumber);
+      iterations++
+    }
+    return -1;
+  }
 
 describe("IbAlluoUSD and Handler", function () {
     let signers: SignerWithAddress[];
@@ -104,6 +135,20 @@ describe("IbAlluoUSD and Handler", function () {
     let superFactory: ISuperTokenFactory;
     let resolver: SuperfluidResolver;
     before(async function () {
+        await network.provider.request({
+            method: "hardhat_reset",
+            params: [{
+                forking: {
+                    enabled: true,
+                    jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
+                    //you can fork from last block by commenting next line
+                    // blockNumber: 29518660,
+                },
+            }, ],
+        });
+        await getClosestBlock(1667502621)
+        await binarySearchForBlock(1667502621);
+
 
         //We are forking Polygon mainnet, please set Alchemy key in .env
         await network.provider.request({
@@ -885,27 +930,27 @@ describe("IbAlluoUSD and Handler", function () {
             expect(await ibAlluoCurrent.paused()).to.be.false;
         });
 
-        it("Should set new updateRatio time limit", async () => {
-            const newLimit = 120;
-            const oldLimit = await ibAlluoCurrent.updateTimeLimit();
+        // it("Should set new updateRatio time limit", async () => {
+        //     const newLimit = 120;
+        //     const oldLimit = await ibAlluoCurrent.updateTimeLimit();
 
-            expect(newLimit).to.not.be.equal(oldLimit);
+        //     expect(newLimit).to.not.be.equal(oldLimit);
 
-            let ABI = ["function setUpdateTimeLimit(uint256 _newLimit)"];
-            let iface = new ethers.utils.Interface(ABI);
-            const calldata = iface.encodeFunctionData("setUpdateTimeLimit", [newLimit]);
+        //     let ABI = ["function setUpdateTimeLimit(uint256 _newLimit)"];
+        //     let iface = new ethers.utils.Interface(ABI);
+        //     const calldata = iface.encodeFunctionData("setUpdateTimeLimit", [newLimit]);
 
-            await expect(multisig.executeCall(ibAlluoCurrent.address, calldata)).to.emit(ibAlluoCurrent, "UpdateTimeLimitSet").withArgs(oldLimit, newLimit);
-        });
+        //     await expect(multisig.executeCall(ibAlluoCurrent.address, calldata)).to.emit(ibAlluoCurrent, "UpdateTimeLimitSet").withArgs(oldLimit, newLimit);
+        // });
 
-        it("Should not set new updateRatio time limit (caller without DEFAULT_ADMIN_ROLE)", async () => {
-            const newLimit = 7200;
-            const notAdmin = signers[1];
-            const role = await ibAlluoCurrent.DEFAULT_ADMIN_ROLE();
+        // it("Should not set new updateRatio time limit (caller without DEFAULT_ADMIN_ROLE)", async () => {
+        //     const newLimit = 7200;
+        //     const notAdmin = signers[1];
+        //     const role = await ibAlluoCurrent.DEFAULT_ADMIN_ROLE();
 
-            await expect(ibAlluoCurrent.connect(notAdmin).setUpdateTimeLimit(newLimit)).to.be
-                .revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
-        });
+        //     await expect(ibAlluoCurrent.connect(notAdmin).setUpdateTimeLimit(newLimit)).to.be
+        //         .revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
+        // });
 
         it("Should add new deposit token and allow to deposit with it", async () => {
 
