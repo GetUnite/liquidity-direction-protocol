@@ -54,6 +54,33 @@ async function prepareCallData(type: string, parameters: any[]): Promise<BytesLi
         return ethers.utils.randomBytes(0);
     }
 }
+
+
+
+async function binarySearchForBlock(startTimestamp: number) : Promise<number> {
+    let highestEstimatedBlockNumber = await ethers.provider.getBlockNumber();
+    let highestEstimatedBlock = await ethers.provider.getBlock(highestEstimatedBlockNumber)
+    let lowestEstimatedBlock = await ethers.provider.getBlock(highestEstimatedBlock.number - Math.floor((highestEstimatedBlock.timestamp - startTimestamp)/9))
+    let closestBlock;
+
+    while (lowestEstimatedBlock.number <= highestEstimatedBlock.number) {
+        closestBlock = await ethers.provider.getBlock(Math.floor((highestEstimatedBlock.number + lowestEstimatedBlock.number)/2))
+        console.log("Checking block number:", closestBlock.number, closestBlock.timestamp)
+
+        if (closestBlock.timestamp == startTimestamp) {
+            return closestBlock.number
+        } 
+        else if (closestBlock.timestamp > lowestEstimatedBlock.timestamp) {
+            lowestEstimatedBlock = closestBlock
+        }
+        else {
+            highestEstimatedBlock = closestBlock;
+        }
+    }
+    return 0;
+}
+
+
 describe("IbAlluoUSD and Handler", function () {
     let signers: SignerWithAddress[];
     let admin: SignerWithAddress;
@@ -204,19 +231,26 @@ describe("IbAlluoUSD and Handler", function () {
     });
 
     describe('All IbAlluo tests with StIbAlluo integration', function () {
-        it("Format call for frontend", async function() {
-            let cfaAddress = "0x6EeE6060f715257b970700bc2656De21dEdF074C"
-            let realIbAlluo = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6" )
-            let permissions = await realIbAlluo.connect(signers[1]).formatPermissions();
-            let userData = "0x"
-
-            let operationData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"],[permissions,userData])
-
-            let operation = {operationType: 201, target: cfaAddress, data: operationData}
-            let operationArray = [operation];
-            console.log(operationArray);
-
-            // https://dashboard.tenderly.co/pentatonictritones/project/simulator/fd708bad-b2d9-4e7b-8949-93a07834fdd7
+        it("Test grabbing block number through timestamp using binary search", async function() {
+            await deposit(signers[1], dai, parseUnits("10000", 18));
+            let encodeData = await ibAlluoCurrent.connect(signers[1]).formatPermissions();
+            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
+            await superhost.connect(signers[1]).callAgreement(
+                "0x6EeE6060f715257b970700bc2656De21dEdF074C",
+                encodeData,
+                "0x"
+            )
+            let tx = await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256,uint256)"](signers[2].address, "1", parseEther("10000"), 1000)
+            let conf = await tx.wait();
+            console.log("Correct BlockNumber", conf.blockNumber)
+            await skipDays(20)
+            let superfluidFlow = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
+            let flowData = await superfluidFlow.getFlow(StIbAlluo.address, signers[1].address, signers[2].address);
+            let correctBlock =await binarySearchForBlock(Number(flowData.timestamp))
+            let logs = await ibAlluoCurrent.queryFilter(ibAlluoCurrent.filters.CreateFlowWithTimestamp(signers[1].address,signers[2].address), correctBlock, correctBlock)
+            logs.forEach(function(item,) {
+                console.log("End timestamp was:", item.args.endTimestamp)
+            })
         })
 
         it("Test upgradeability of original ibAlluo contract", async function() {
@@ -318,80 +352,7 @@ describe("IbAlluoUSD and Handler", function () {
 
 
 
-        it("Call agreement CFA directly to host", async function() {
-            await deposit(signers[1], dai, parseUnits("10000", 18));
-            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
-
-            await ibAlluoCurrent.connect(signers[1]).approve(StIbAlluo.address, parseEther("10000"));
-            await StIbAlluo.connect(signers[1]).upgrade(parseEther("10000"))
-
-
-            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
-            let CFA = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C");
-
-            let encodeData = await ibAlluoCurrent.callStatic.formatFlow(signers[2].address, "1", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
-
-
-            await superhost.connect(signers[1]).callAgreement(
-                "0x6EeE6060f715257b970700bc2656De21dEdF074C",
-                encodeData,
-                "0x"
-            )
-
-
-            await skipDays(1)
-            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
-            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
-        })
-
-        
-
-        it("Call agreement CFA directly to host using forwardBatchCall", async function() {
-            await deposit(signers[1], dai, parseUnits("10000", 18));
-            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
-
-            await ibAlluoCurrent.connect(signers[1]).approve(StIbAlluo.address, parseEther("10000"));
-            await StIbAlluo.connect(signers[1]).upgrade(parseEther("10000"))
-
-
-            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
-            let CFA = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C");
-            let encodeData = await ibAlluoCurrent.callStatic.formatFlow(signers[2].address, "1", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
-            await superhost.connect(signers[1]).forwardBatchCall([{
-                operationType: 201, target:"0x6EeE6060f715257b970700bc2656De21dEdF074C", data: ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"], [encodeData, "0x"])
-            }])
-
-
-            await skipDays(1)
-            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
-            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
-        })
-        it("Call agreement directly with CFA, and then withdraws from ibAlluo should pull StIbAlluo", async function() {
-            await deposit(signers[1], dai, parseUnits("10000", 18));
-            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
-
-            await ibAlluoCurrent.connect(signers[1]).approve(StIbAlluo.address, parseEther("10000"));
-            await StIbAlluo.connect(signers[1]).upgrade(parseEther("10000"))
-
-            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
-            let CFA = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C");
-
-            let encodeData = await ibAlluoCurrent.callStatic.formatFlow(signers[2].address, "10000000000000", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
-            await superhost.connect(signers[1]).callAgreement(
-                "0x6EeE6060f715257b970700bc2656De21dEdF074C",
-                encodeData,
-                "0x"
-            )
-
-
-            await skipDays(100)
-            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
-
-            await ibAlluoCurrent.connect(signers[2]).withdraw(dai.address, parseEther("10"));
-            expect(Number(await dai.connect(signers[2]).balanceOf(signers[2].address))).greaterThanOrEqual(0);
-            console.log(await dai.connect(signers[2]).balanceOf(signers[2].address));
-        })
-        it("Should convert StIbAlluo to IbAlluo when needed automatically", async function() {
+              it("Should convert StIbAlluo to IbAlluo when needed automatically", async function() {
             await deposit(signers[1], dai, parseUnits("10000", 18));
 
             await ibAlluoCurrent.connect(signers[1]).approve(StIbAlluo.address, parseEther("5000"));
