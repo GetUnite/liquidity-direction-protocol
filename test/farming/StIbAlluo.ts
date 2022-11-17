@@ -328,23 +328,6 @@ describe("IbAlluoUSD and Handler", function () {
             console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
         })
 
-        
-        it("Give permission using metatX then Create flow through contract ", async function() {
-            await deposit(signers[1], dai, parseUnits("10000", 18));
-            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
-            let encodeData = await ibAlluoCurrent.connect(signers[1]).formatPermissions();
-            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
-            await superhost.connect(signers[1]).forwardBatchCall([{
-                operationType: 201, target:"0x6EeE6060f715257b970700bc2656De21dEdF074C", data: ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"], [encodeData, "0x"])
-            }])
-            console.log("encoded data", encodeData);
-
-            await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256)"](signers[2].address, "1", parseEther("10000"))
-            await skipDays(1)
-            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
-            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
-        })
-
         it("Create flow through contract then delete flow", async function() {
             await deposit(signers[1], dai, parseUnits("10000", 18));
             let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);

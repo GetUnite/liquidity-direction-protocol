@@ -233,7 +233,6 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
         ABI = ["function setSuperToken(address _superToken)"];
         iface = new ethers.utils.Interface(ABI);
         calldata = iface.encodeFunctionData("setSuperToken", [StIbAlluo2.address]);
-
         await multisig.executeCall(ibAlluoCurrent2.address, calldata);
 
 
