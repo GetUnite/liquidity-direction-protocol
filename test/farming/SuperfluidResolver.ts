@@ -243,7 +243,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
 
         ABI = ["function grantRole(bytes32 role, address account)"];
         iface = new ethers.utils.Interface(ABI);
-        calldata = iface.encodeFunctionData("grantRole", ["0x0000000000000000000000000000000000000000000000000000000000000000", resolver.address]);
+        calldata = iface.encodeFunctionData("grantRole", ["0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30", resolver.address]);
         await multisig.executeCall(ibAlluoCurrent.address, calldata);
 
         ABI = ["function setSuperfluidResolver(address _superfluidResolver)"];
@@ -253,7 +253,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
 
         ABI = ["function grantRole(bytes32 role, address account)"];
         iface = new ethers.utils.Interface(ABI);
-        calldata = iface.encodeFunctionData("grantRole", ["0x0000000000000000000000000000000000000000000000000000000000000000", resolver.address]);
+        calldata = iface.encodeFunctionData("grantRole", ["0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30", resolver.address]);
         await multisig.executeCall(ibAlluoCurrent2.address, calldata);
     });
 
