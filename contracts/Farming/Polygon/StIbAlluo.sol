@@ -52,7 +52,6 @@ contract StIbAlluo is
     using SafeERC20 for IERC20;
 
     uint8 constant private _STANDARD_DECIMALS = 18;
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     /* WARNING: NEVER RE-ORDER VARIABLES! Including the base contracts.
        Always double-check that new
@@ -92,6 +91,7 @@ contract StIbAlluo is
 
     address public ibAlluo;
     bool public upgradeStatus;
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     function initialize(
         IERC20 underlyingToken,

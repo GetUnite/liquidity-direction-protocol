@@ -27,6 +27,7 @@ contract SuperfluidEndResolver is AccessControl {
         }
         ibAlluoAddresses = _ibAlluoAddresses;
         _grantRole(GELATO, _gelato);
+        _grantRole(GELATO, msg.sender);
     }
 
 
