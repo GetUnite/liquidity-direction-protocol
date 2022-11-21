@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import "hardhat/console.sol";
 
 import "../../interfaces/IIbAlluo.sol";
 import "../../Farming/priceFeedsV2/PriceFeedRouterV2.sol";
@@ -41,6 +42,7 @@ contract StrategyHandler is
     mapping(uint256 => AssetInfo) private assetIdToAssetInfo;
 
     uint8 public numberOfAssets;
+    uint256 public lastDirectionId;
 
     struct LiquidityDirection {
         address strategyAddress; 
@@ -87,75 +89,95 @@ contract StrategyHandler is
 
 
     function calculateAll() external onlyRole(DEFAULT_ADMIN_ROLE){
+        console.log("------------------------");
 
         uint256 timePass = block.timestamp - lastTimeCalculated;
+        PriceFeedRouterV2 feed = PriceFeedRouterV2(priceFeed);
         for (uint256 i; i < numberOfAssets; i++) {
+            console.log("dealing with asset:", i);
             uint256 newAmountDeployed;
             AssetInfo storage info = assetIdToAssetInfo[i];
+            address primaryToken = info.chainIdToPrimaryToken[1];
+            uint8 primaryDecimals = IERC20MetadataUpgradeable(primaryToken).decimals();
+
             for (uint256 j; j < info.activeDirections.length(); j++) {
-                LiquidityDirection memory direction = liquidityDirection[info.activeDirections.at(j)];
-                uint latestAmount = IAlluoStrategyV2(direction.strategyAddress).getDeployedAmountAndRewards(direction.rewardsData);
-                liquidityDirection[info.activeDirections.at(j)].latestAmount = latestAmount;
+                uint directionId = info.activeDirections.at(j);
+                address directionStrategy = liquidityDirection[directionId].strategyAddress;
+                uint latestAmount = IAlluoStrategyV2(directionStrategy).getDeployedAmountAndRewards(liquidityDirection[directionId].rewardsData);
+                liquidityDirection[directionId].latestAmount = latestAmount;
                 newAmountDeployed += latestAmount;
-                if(!info.needToTransferFrom.contains(direction.strategyAddress)){
-                    info.needToTransferFrom.add(direction.strategyAddress);
+                if(!info.needToTransferFrom.contains(directionStrategy)){
+                    info.needToTransferFrom.add(directionStrategy);
                 }
             }
-            address primaryToken = info.chainIdToPrimaryToken[1];
             for (uint256 j = info.needToTransferFrom.length(); j > 0 ; j--) {
                 address strategyAddress = info.needToTransferFrom.at(j-1);
                 IAlluoStrategyV2(strategyAddress).withdrawRewards(primaryToken);
                 info.needToTransferFrom.remove(strategyAddress);
             }
-            (uint256 fiatPrice, uint8 fiatDecimals) = PriceFeedRouterV2(priceFeed).getPrice(primaryToken, i);
+            (uint256 fiatPrice, uint8 fiatDecimals) = feed.getPrice(primaryToken, i);
             uint256 totalRewardsBalance = IERC20Upgradeable(primaryToken).balanceOf(address(this));
-            uint8 primaryDecimals = IERC20MetadataUpgradeable(primaryToken).decimals();
-            uint256 totalRewards = PriceFeedRouterV2(priceFeed).decimalsConverter(
+            uint256 totalRewards = feed.decimalsConverter(
                 fiatPrice * totalRewardsBalance, 
                 fiatDecimals + primaryDecimals, 
                 18
             );
+
+            
             
             uint256 interest = IIbAlluo(info.ibAlluo).annualInterest();
             uint256 expectedAddition = info.amountDeployed * interest * timePass / 31536000  / 10000;
             uint256 expectedFullAmount = info.amountDeployed + expectedAddition;
             uint256 actualAmount = newAmountDeployed + totalRewards;
 
-
+            console.log("expectedFullAmount:",expectedFullAmount);
+            console.log("actualAmount:",actualAmount);
+            console.log("totalRewards:",totalRewards);
             if(actualAmount > expectedFullAmount){
             uint256 surplus = actualAmount - expectedFullAmount;
+            console.log("expectedAddition:",expectedAddition);
+            console.log("surplus:",surplus);
 
                 if(surplus < totalRewards){
+
                     
                     IERC20Upgradeable(primaryToken).transfer(booster, totalRewardsBalance * surplus  / totalRewards);
 
                     uint rewardsLeft = IERC20Upgradeable(primaryToken).balanceOf(address(this)); 
                     IERC20Upgradeable(primaryToken).transfer(executor, rewardsLeft);
 
-                    rewardsLeft = PriceFeedRouterV2(priceFeed).decimalsConverter(
+                    rewardsLeft = feed.decimalsConverter(
                         rewardsLeft, 
                         primaryDecimals, 
                         18
                     );  
                     info.amountDeployed = newAmountDeployed + rewardsLeft;
+                    console.log("surplus sent to booster, all rewards that left sent to executor:", rewardsLeft);
+                    console.log("new total amount:", info.amountDeployed);
 
                 }
                 else{
-
                     info.amountDeployed = actualAmount - totalRewards;
                     IERC20Upgradeable(primaryToken).transfer(booster, totalRewardsBalance);
 
+                    console.log("new total amount:", info.amountDeployed);
+                    console.log("all rewards sent to booster");
                     //in the future here we will also exit some existing strategy to send to booster
                 }
 
             }
             else{
+                console.log("expectedFullAmount - actualAmount:",(expectedFullAmount-actualAmount));
                 IERC20Upgradeable(primaryToken).transfer(executor, totalRewardsBalance);
                 info.amountDeployed = actualAmount;
 
+                console.log("new total amount:", info.amountDeployed);
+                console.log("all rewards to executor");
             }
+            console.log("******************");
         }
         lastTimeCalculated = block.timestamp;
+        console.log("------------------------");
     }
 
     function calculateOnlyLp() external onlyRole(DEFAULT_ADMIN_ROLE){
@@ -163,9 +185,13 @@ contract StrategyHandler is
         for (uint256 i; i < numberOfAssets; i++) {
             uint256 newAmountDeployed;
             AssetInfo storage info = assetIdToAssetInfo[i];
-            for (uint256 j; j < info.activeDirections.length(); j++) {
-                LiquidityDirection memory direction = liquidityDirection[info.activeDirections.at(j)];
-                newAmountDeployed += IAlluoStrategyV2(direction.strategyAddress).getDeployedAmount(direction.rewardsData);
+            uint activeDirectionsLength = info.activeDirections.length();
+            for (uint256 j; j < activeDirectionsLength; j++) {
+                uint directionId = info.activeDirections.at(j);
+                address directionStrategy = liquidityDirection[directionId].strategyAddress;
+                uint latestAmount = IAlluoStrategyV2(directionStrategy).getDeployedAmount(liquidityDirection[directionId].rewardsData);
+                liquidityDirection[directionId].latestAmount = latestAmount;
+                newAmountDeployed += latestAmount;
             }
             info.amountDeployed = newAmountDeployed;
         }
@@ -215,6 +241,7 @@ contract StrategyHandler is
             uint256 tokenAmount = exactAmount / 10**(18 - IERC20MetadataUpgradeable(primaryToken).decimals());
             IERC20MetadataUpgradeable(primaryToken).safeTransferFrom(gnosis, executor, tokenAmount);
         }
+        console.log("total amount changed to:", assetIdToAssetInfo[0].amountDeployed);
     }
 
     function getDirectionIdByName(string memory _codeName) external view returns(uint256){
@@ -227,16 +254,19 @@ contract StrategyHandler is
 
     function getLiquidityDirectionByName(string memory _codeName) external view returns(uint256, address, LiquidityDirection memory){
         uint256 directionId = directionNameToId[_codeName];
+        require(directionId != 0);
         LiquidityDirection memory direction = liquidityDirection[directionId];
         address primaryToken = assetIdToAssetInfo[direction.assetId].chainIdToPrimaryToken[direction.chainId];
         return (directionId, primaryToken, direction);
     }
 
     function getAssetIdByDirectionId(uint256 _id)external view returns(uint){
+        require(_id != 0);
         return liquidityDirection[_id].assetId;
     }
 
     function getDirectionFullInfoById(uint256 _id) external view returns(address, LiquidityDirection memory){
+        require(_id != 0);
         LiquidityDirection memory direction = liquidityDirection[_id];
         address primaryToken = assetIdToAssetInfo[direction.assetId].chainIdToPrimaryToken[direction.chainId];
         return (primaryToken, direction);
@@ -259,10 +289,12 @@ contract StrategyHandler is
         return (assetIdToAssetInfo[_id].amountDeployed);
     }
 
+    function getAssetActiveIds(uint256 _assetId) view external returns (uint256[] memory) {
+        return assetIdToAssetInfo[_assetId].activeDirections.values();
+    }
+
     function addToActiveDirections(uint256 _directionId) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        if(!assetIdToAssetInfo[liquidityDirection[_directionId].assetId].activeDirections.contains(_directionId)){
-            assetIdToAssetInfo[liquidityDirection[_directionId].assetId].activeDirections.add(_directionId);
-        }
+        assetIdToAssetInfo[liquidityDirection[_directionId].assetId].activeDirections.add(_directionId);
     }
 
     function removeFromActiveDirections(uint256 _directionId) public onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -288,7 +320,6 @@ contract StrategyHandler is
 
     function setExecutorAddress(address _newExecutor) public onlyRole(DEFAULT_ADMIN_ROLE) {
         executor = _newExecutor;
-        _grantRole(DEFAULT_ADMIN_ROLE, _newExecutor);
     }
 
     function setLiquidityDirection(
@@ -315,6 +346,36 @@ contract StrategyHandler is
         );
     }
 
+    function addLiquidityDirection(
+        string memory _codeName,
+        address _strategyAddress, 
+        address _entryToken, 
+        uint256 _assetId, 
+        uint256 _chainId, 
+        bytes memory _entryData, 
+        bytes memory _exitData,
+        bytes memory _rewardsData
+    ) external {
+        require(directionNameToId[_codeName] == 0);
+
+        directionNameToId[_codeName] = lastDirectionId;
+        liquidityDirection[lastDirectionId] = LiquidityDirection(
+            _strategyAddress, 
+            _entryToken, 
+            _assetId, 
+            _chainId, 
+            _entryData, 
+            _exitData, 
+            _rewardsData,
+            0
+        );
+        lastDirectionId++;
+    }
+
+    function setLastDirectionId(uint256 _newNumber) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        lastDirectionId = _newNumber;
+    }
+
     function changeNumberOfAssets(uint8 _newNumber) public onlyRole(DEFAULT_ADMIN_ROLE) {
         numberOfAssets = _newNumber;
     }
@@ -336,9 +397,9 @@ contract StrategyHandler is
     public
     override
     onlyRole(getRoleAdmin(role)) {
-        // if (role == DEFAULT_ADMIN_ROLE) {
-        //     require(account.isContract(), "Handler: Not contract");
-        // }
+        if (role == DEFAULT_ADMIN_ROLE) {
+            require(account.isContract(), "Handler: Not contract");
+        }
         _grantRole(role, account);
     }
 

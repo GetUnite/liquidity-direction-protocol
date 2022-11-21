@@ -14,7 +14,7 @@ import "../../interfaces/IIbAlluo.sol";
 import "../../Farming/priceFeedsV2/PriceFeedRouterV2.sol";
 import "../../interfaces/IAlluoStrategyV2.sol";
 
-contract StrategyHandlerLog is
+contract StrategyHandlerOld is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable {

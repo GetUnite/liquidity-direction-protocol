@@ -100,7 +100,7 @@ contract VoteExecutorMasterLog is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        require(_multiSigWallet.isContract(), "Executor: Not contract");
+        require(_multiSigWallet.isContract());
         gnosis = _multiSigWallet;
         minSigns = 1;
         exchangeAddress = 0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec;
@@ -125,7 +125,7 @@ contract VoteExecutorMasterLog is
 
         (bytes32 hashed, Message[] memory _messages, uint256 timestamp) = abi.decode(data, (bytes32, Message[], uint256));
 
-        require(hashed == keccak256(abi.encode(_messages, timestamp)), "Hash doesn't match");
+        require(hashed == keccak256(abi.encode(_messages, timestamp)));
 
         SubmittedData memory newSubmittedData;
         newSubmittedData.data = data;
@@ -167,8 +167,8 @@ contract VoteExecutorMasterLog is
     function executeSpecificData(uint256 index) external {
             SubmittedData memory exactData = submittedData[index];
             (bytes32 hashed, Message[] memory messages,) = abi.decode(exactData.data, (bytes32, Message[], uint256));
-            require(exactData.time + timeLock < block.timestamp, "Under timelock");
-            require(hashExecutionTime[hashed] == 0, "Duplicate Hash");
+            require(exactData.time + timeLock < block.timestamp);
+            require(hashExecutionTime[hashed] == 0);
 
             StrategyHandler handler = StrategyHandler(strategyHandler);
 
@@ -193,7 +193,6 @@ contract VoteExecutorMasterLog is
                 
                 for (uint256 j; j < messages.length; j++) {
                     uint256 commandIndex = messages[j].commandIndex;
-                    console.log("********");
                     if(commandIndex == 0){
                         (string memory ibAlluoSymbol, uint256 newAnnualInterest, uint256 newInterestPerSecond) = abi.decode(messages[j].commandData, (string, uint256, uint256));
                         IIbAlluo ibAlluo = IIbAlluo(ibAlluoSymbolToAddress[ibAlluoSymbol]);
@@ -213,31 +212,31 @@ contract VoteExecutorMasterLog is
                         (address strategyPrimaryToken, StrategyHandler.LiquidityDirection memory direction) = handler.getDirectionFullInfoById(directionId);
                         if (direction.chainId == currentChain) {
 
-                            console.log("dealing with direction:", directionId);
+                            console.log("directionId", directionId);
                             if(percent == 0){
-                                console.log("full exit from strategy");
+                                console.log("full exit");
                                 IAlluoStrategyV2(direction.strategyAddress).exitAll(direction.exitData, 10000, strategyPrimaryToken, address(this), false, false);
                                 handler.removeFromActiveDirections(directionId);
                             }
                             else{
                                 uint newAmount = percent * amountsDeployed[direction.assetId] / 10000;
-                                console.log("new amount should be:",newAmount);
-                                console.log("old amount:",direction.latestAmount);
+                                console.log("new",newAmount);
+                                console.log("old",direction.latestAmount);
                                 if(newAmount < direction.latestAmount){
                                     uint exitPercent = 10000 - newAmount * 10000 / direction.latestAmount;
-                                    console.log("need to withdraw percent",exitPercent);
+                                    console.log("w percent",exitPercent);
                                     IAlluoStrategyV2(direction.strategyAddress).exitAll(direction.exitData, exitPercent, strategyPrimaryToken, address(this), false, false);
                                 }
                                 else if(newAmount != direction.latestAmount){
                                     uint depositAmount = newAmount - direction.latestAmount;
-                                    console.log("need to deposit amount",depositAmount);
+                                    console.log("deposit",depositAmount);
                                     assetIdToDepositList[direction.assetId].push(Deposit(directionId, depositAmount));
                                 }
                             }
                         }
                     }
                     else if(commandIndex == 3 && j != messages.length - 1) {
-                        revert("3 command !last");
+                        revert("3 !last");
                     }
 
                 }
@@ -263,12 +262,13 @@ contract VoteExecutorMasterLog is
             uint primaryDecimalsMultiplier = 10**(18 - IERC20MetadataUpgradeable(strategyPrimaryToken).decimals()) ;
             while(depositListLength > 0){
                 Deposit memory depositInfo = depositList[depositListLength - 1];
+                console.log("dep to directionId",depositInfo.directionId);
                 if(depositInfo.directionId != type(uint).max){
 
                     StrategyHandler.LiquidityDirection memory direction = handler.getLiquidityDirectionById(depositInfo.directionId);
                     (uint256 fiatPrice, uint8 fiatDecimals) = feed.getPrice(strategyPrimaryToken, i);
                     uint exactAmount = (depositInfo.amount * 10**fiatDecimals) / fiatPrice;
-                    console.log("exact amount of tokens to deposit:",exactAmount);
+                    console.log("exact",exactAmount);
                     uint256 tokenAmount = exactAmount / primaryDecimalsMultiplier;
                     uint256 actualBalance = IERC20MetadataUpgradeable(strategyPrimaryToken).balanceOf(address(this));
                     if(depositListLength == 1 && actualBalance < tokenAmount){
@@ -276,10 +276,10 @@ contract VoteExecutorMasterLog is
                         uint assetMaxSlippageAmount = assetAmount - (assetAmount * (10000 - slippage) / 10000);
                         if(tokenAmount - actualBalance < assetMaxSlippageAmount/ primaryDecimalsMultiplier){
                             tokenAmount = actualBalance;
-                            console.log("tokenAmount changed because of exit slippage:",tokenAmount);
+                            console.log("changed",tokenAmount);
                         }
                         else{
-                            revert("VEMaster: Slippage screwed you");
+                            revert("slippage");
                         }
                     }
                     if (direction.entryToken != strategyPrimaryToken) {
@@ -308,43 +308,6 @@ contract VoteExecutorMasterLog is
         _executeDeposits();
     }
 
-   function _bridgeFunds() internal {
-        CrossChainInfo memory crossChainInfoMemory = crossChainInfo;
-        uint8 numberOfAssets = StrategyHandler(strategyHandler).numberOfAssets();
-        for (uint256 i; i < numberOfAssets; i++) {
-            AssetBridging memory currentBridgingInfo = assetIdToAssetBridging[i];
-            address primaryToken = currentBridgingInfo.token;
-            uint256 tokenBalance = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
-            if (assetIdToDepositList[i].length == 0 && currentBridgingInfo.minimumAmount <= tokenBalance) {
-
-                if(primaryToken == address(wETH)){
-                    wETH.withdraw(tokenBalance);
-                    bytes memory data = abi.encodeWithSelector(
-                        currentBridgingInfo.functionSignature, 
-                        currentBridgingInfo.anyToken, // anyWETH
-                        crossChainInfoMemory.previousChainExecutor, 
-                        crossChainInfoMemory.previousChain
-                    );
-                    currentBridgingInfo.multichainRouter.functionCallWithValue(data, tokenBalance);
-                }
-                else{
-                    IERC20MetadataUpgradeable(primaryToken).approve(currentBridgingInfo.multichainRouter, tokenBalance);
-                    bytes memory data = abi.encodeWithSelector(
-                        currentBridgingInfo.functionSignature, 
-                        currentBridgingInfo.anyToken, 
-                        crossChainInfoMemory.previousChainExecutor, 
-                        tokenBalance, 
-                        crossChainInfoMemory.previousChain
-                    );
-                    currentBridgingInfo.multichainRouter.functionCall(data);
-                }
-            }
-        }
-    }
-
-    function bridgeFunds() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _bridgeFunds();
-    }
 
     function getSubmittedData(uint256 _dataId) external view returns(bytes memory, uint256, bytes[] memory){
         SubmittedData memory submittedDataExact = submittedData[_dataId];
@@ -386,7 +349,7 @@ contract VoteExecutorMasterLog is
     function encodeAllMessages(uint256[] memory _commandIndexes, bytes[] memory _messages) public view  returns (bytes32 messagesHash, Message[] memory messages, bytes memory inputData) {
         uint256 timestamp = block.timestamp;
         uint length = _commandIndexes.length;
-        require(length == _messages.length, "Array length mismatch");
+        require(length == _messages.length);
 
         for (uint256 i; i < length; i++) {
             if(_commandIndexes[i] == 3){

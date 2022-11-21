@@ -298,43 +298,6 @@ contract VoteExecutorMasterFinal is
         _executeDeposits();
     }
 
-   function _bridgeFunds() internal {
-        CrossChainInfo memory crossChainInfoMemory = crossChainInfo;
-        uint8 numberOfAssets = StrategyHandler(strategyHandler).numberOfAssets();
-        for (uint256 i; i < numberOfAssets; i++) {
-            AssetBridging memory currentBridgingInfo = assetIdToAssetBridging[i];
-            address primaryToken = currentBridgingInfo.token;
-            uint256 tokenBalance = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
-            if (assetIdToDepositList[i].length == 0 && currentBridgingInfo.minimumAmount <= tokenBalance) {
-
-                if(primaryToken == address(wETH)){
-                    wETH.withdraw(tokenBalance);
-                    bytes memory data = abi.encodeWithSelector(
-                        currentBridgingInfo.functionSignature, 
-                        currentBridgingInfo.anyToken, // anyWETH
-                        crossChainInfoMemory.previousChainExecutor, 
-                        crossChainInfoMemory.previousChain
-                    );
-                    currentBridgingInfo.multichainRouter.functionCallWithValue(data, tokenBalance);
-                }
-                else{
-                    IERC20MetadataUpgradeable(primaryToken).approve(currentBridgingInfo.multichainRouter, tokenBalance);
-                    bytes memory data = abi.encodeWithSelector(
-                        currentBridgingInfo.functionSignature, 
-                        currentBridgingInfo.anyToken, 
-                        crossChainInfoMemory.previousChainExecutor, 
-                        tokenBalance, 
-                        crossChainInfoMemory.previousChain
-                    );
-                    currentBridgingInfo.multichainRouter.functionCall(data);
-                }
-            }
-        }
-    }
-
-    function bridgeFunds() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _bridgeFunds();
-    }
 
     function getSubmittedData(uint256 _dataId) external view returns(bytes memory, uint256, bytes[] memory){
         SubmittedData memory submittedDataExact = submittedData[_dataId];
