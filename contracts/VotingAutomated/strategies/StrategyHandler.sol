@@ -232,7 +232,7 @@ contract StrategyHandler is
         }
     }
 
-    function adjustTreasury(int256 _delta) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function adjustTreasury(int256 _delta) external onlyRole(DEFAULT_ADMIN_ROLE) {
         assetIdToAssetInfo[0].amountDeployed = uint(int(assetIdToAssetInfo[0].amountDeployed) + _delta);
         if(_delta > 0){
             address primaryToken = assetIdToAssetInfo[0].chainIdToPrimaryToken[1];
@@ -245,7 +245,9 @@ contract StrategyHandler is
     }
 
     function getDirectionIdByName(string memory _codeName) external view returns(uint256){
-        return directionNameToId[_codeName];
+        uint256 directionId = directionNameToId[_codeName];
+        require(directionId != 0);
+        return directionId;
     }
 
     function getDirectionLatestAmount(uint256 _id) external view returns(uint){
@@ -273,6 +275,7 @@ contract StrategyHandler is
     }
 
     function getLiquidityDirectionById(uint256 _id) external view returns(LiquidityDirection memory){
+        require(_id != 0);
         return (liquidityDirection[_id]);
     }
 
@@ -281,11 +284,11 @@ contract StrategyHandler is
     }
 
 
-    function setAssetAmount(uint _id,uint amount) public onlyRole(DEFAULT_ADMIN_ROLE){
+    function setAssetAmount(uint _id,uint amount) external onlyRole(DEFAULT_ADMIN_ROLE){
         assetIdToAssetInfo[_id].amountDeployed = amount;
     }
 
-    function getAssetAmount(uint _id) view public returns(uint){
+    function getAssetAmount(uint _id) view external returns(uint){
         return (assetIdToAssetInfo[_id].amountDeployed);
     }
 
@@ -293,32 +296,49 @@ contract StrategyHandler is
         return assetIdToAssetInfo[_assetId].activeDirections.values();
     }
 
-    function addToActiveDirections(uint256 _directionId) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function getAllAssetActiveIds() view external returns (uint256[] memory) {
+        uint totalNumber;
+        for (uint256 i; i < numberOfAssets; i++) {
+            totalNumber += assetIdToAssetInfo[i].activeDirections.length();
+        }
+        uint256[] memory ids = new uint256[](totalNumber);
+        uint counter;
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            uint length = assetIdToAssetInfo[i].activeDirections.length();
+            for (uint256 j = 0; j < length; j++) {
+                ids[counter] = assetIdToAssetInfo[i].activeDirections.at(j);
+                counter++;
+            }
+        }
+        return ids;
+    }
+
+    function addToActiveDirections(uint256 _directionId) external onlyRole(DEFAULT_ADMIN_ROLE) {
         assetIdToAssetInfo[liquidityDirection[_directionId].assetId].activeDirections.add(_directionId);
     }
 
-    function removeFromActiveDirections(uint256 _directionId) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function removeFromActiveDirections(uint256 _directionId) external onlyRole(DEFAULT_ADMIN_ROLE) {
         assetIdToAssetInfo[liquidityDirection[_directionId].assetId].activeDirections.remove(_directionId);
         liquidityDirection[_directionId].latestAmount = 0;
     }   
 
-    function setGnosis(address _gnosisAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setGnosis(address _gnosisAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
         gnosis = _gnosisAddress;
     }
 
-    function updateLastTime() public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updateLastTime() external onlyRole(DEFAULT_ADMIN_ROLE) {
         lastTimeCalculated = block.timestamp;
     }
 
-    function setExchangeAddress(address _newExchange) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setExchangeAddress(address _newExchange) external onlyRole(DEFAULT_ADMIN_ROLE) {
         exchangeAddress = _newExchange;
     }
 
-    function setBoosterAddress(address _newBooster) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setBoosterAddress(address _newBooster) external onlyRole(DEFAULT_ADMIN_ROLE) {
         booster = _newBooster;
     }
 
-    function setExecutorAddress(address _newExecutor) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setExecutorAddress(address _newExecutor) external onlyRole(DEFAULT_ADMIN_ROLE) {
         executor = _newExecutor;
     }
 
@@ -376,7 +396,7 @@ contract StrategyHandler is
         lastDirectionId = _newNumber;
     }
 
-    function changeNumberOfAssets(uint8 _newNumber) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function changeNumberOfAssets(uint8 _newNumber) external onlyRole(DEFAULT_ADMIN_ROLE) {
         numberOfAssets = _newNumber;
     }
 
