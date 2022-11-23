@@ -5,6 +5,8 @@ import "./AlluoERC20Upgradable.sol";
 import "../../interfaces/ILiquidityHandler.sol";
 import "../../mock/interestHelper/Interest.sol";
 import "../../interfaces/IExchange.sol";
+import "../../interfaces/IChainlinkPriceFeed.sol";
+
 import "../../interfaces/superfluid/ISuperfluidToken.sol";
 import "../../interfaces/superfluid/ISuperfluid.sol";
 import "../../interfaces/superfluid/IConstantFlowAgreementV1.sol";
@@ -21,6 +23,7 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 
 
 import {CFAv1Library} from "./superfluid/libs/CFAv1Library.sol";
@@ -84,6 +87,9 @@ contract IbAlluo is
     bytes32 public constant GELATO = keccak256("GELATO");
 
     mapping(address => address) public autoInvestMarketToSuperToken;
+    
+    // Map of chainlinks price feeds organized by description (e.g. USDC / USD)
+    mapping(string => IChainlinkPriceFeed) public priceFeedMap;
 
     struct Context {
         uint8 appLevel;
@@ -104,6 +110,13 @@ contract IbAlluo is
     event NewHandlerSet(address oldHandler, address newHandler);
     event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
     event DepositTokenStatusChanged(address token, bool status);
+
+    event PriceFeedStatusChanged(string discription, bool status);
+    event Withdraw(
+        address indexed recipient,
+        address token,
+        uint256 withdrawAmount
+    );
     
     event InterestChanged(
         uint256 oldYearInterest,
@@ -156,7 +169,8 @@ contract IbAlluo is
         uint256 _interestPerSecond,
         uint256 _annualInterest,
         address _trustedForwarder,
-        address _exchangeAddress
+        address _exchangeAddress,
+        address[] memory _supportedPriceFeedAddresses
     ) public initializer {
         __ERC20_init(_name, _symbol);
         __Pausable_init();
@@ -172,6 +186,13 @@ contract IbAlluo is
         for (uint256 i = 0; i < _supportedTokens.length; i++) {
             supportedTokens.add(_supportedTokens[i]);
             emit DepositTokenStatusChanged(_supportedTokens[i], true);
+        }
+
+        for (uint256 i = 0; i < _supportedPriceFeedAddresses.length; i++) {
+            IChainlinkPriceFeed priceFeed = IChainlinkPriceFeed(_supportedPriceFeedAddresses[i]);
+            string memory discription = priceFeed.description();
+
+            priceFeedMap[discription] = priceFeed;
         }
 
         interestPerSecond = _interestPerSecond * 10**10;
@@ -628,6 +649,10 @@ contract IbAlluo is
         return supportedTokens.values();
     }
 
+    function getPriceFeed(string memory _discription) public view returns ( IChainlinkPriceFeed) {
+        return priceFeedMap[_discription];
+    }
+
     function isTrustedForwarder(address forwarder)
         public
         view
@@ -707,6 +732,20 @@ contract IbAlluo is
             supportedTokens.remove(_token);
         }
         emit DepositTokenStatusChanged(_token, _status);
+    }
+
+    function changePriceFeedStatus(address _priceFeedAddress, bool _status) external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        IChainlinkPriceFeed priceFeed = IChainlinkPriceFeed(_priceFeedAddress);
+        string memory discription = priceFeed.description();
+        
+        if (_status) {
+            priceFeedMap[discription] = priceFeed;
+        } else {
+            priceFeedMap[discription] = IChainlinkPriceFeed(address(0));
+        }
+        emit PriceFeedStatusChanged(discription, _status);
     }
 
 //    function setUpdateTimeLimit(uint256 _newLimit)
@@ -805,6 +844,21 @@ contract IbAlluo is
         uint256 amount
     ) internal override {
         super._beforeTokenTransfer(from, to, amount);
+    }
+
+    function _getPriceOfAmount(address _token, uint256 amount) internal view returns (uint256 value, uint8 decimals){
+        string memory tokenSymbol = IERC20Metadata(_token).symbol();
+        string memory fiatSymbol = " / USD";
+
+       //Improvement: update to string.concat();
+        string memory description = string(abi.encodePacked(tokenSymbol, fiatSymbol));
+
+        IChainlinkPriceFeed priceFeed = priceFeedMap[description];
+        require(priceFeed.decimals() != 0, "Price feed not found for the token provided");
+
+        // adjust value to have equal number of decimals as the token
+        uint256 value = (uint256(priceFeed.latestAnswer()) * amount) / (10 ** uint256(priceFeed.decimals()));
+        return (value, IERC20Metadata(_token).decimals());
     }
 
     function _msgSender()
