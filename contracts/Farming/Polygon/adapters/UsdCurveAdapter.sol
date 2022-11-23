@@ -85,40 +85,22 @@ contract UsdCurveAdapter is AccessControl {
         }
     } 
 
-    /// @notice When called by liquidity handler, withdraws funds from liquidity pool
-    /// @dev It checks against arbitragers attempting to exploit spreads in stablecoins. 
+    /// @notice When called by liquidity handler, withdraws funds from liquidity pool 
     /// @param _user Recipient address
     /// @param _token Deposit token address (eg. USDC)
     /// @param _amount  Amount to be withdrawn in 10*18
     function withdraw (address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         
         uint256[3] memory amounts;
-        address liquidToken = ICurvePoolUSD(curvePool).underlying_coins(liquidTokenIndex);
-        uint256 amount = _amount / 10**(18 - IERC20Metadata(liquidToken).decimals());
-        amounts[liquidTokenIndex] = amount;
+        uint256 amount = _amount / 10**(18 - IERC20Metadata(_token).decimals());
+        amounts[indexes[_token]] = amount;
         
-        if(_token == liquidToken){
-            ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
-                amounts, 
-                _amount * (10000 + slippage) / 10000,
-                true
-            );
-            IERC20(_token).safeTransfer(_user, amount);
-        }
-        else{
-            // We want to be save agains arbitragers so at any withraw contract checks 
-            // how much will be burned curveLp by withrawing this amount in token with most liquidity
-            // and passes this burned amount to get tokens
-            uint256 toBurn = ICurvePoolUSD(curvePool).calc_token_amount(amounts, false);
-            uint256 minAmountOut = _amount / 10**(18 - IERC20Metadata(_token).decimals());
-            uint256 toUser = ICurvePoolUSD(curvePool).remove_liquidity_one_coin(
-                    toBurn, 
-                    int128(indexes[_token]), 
-                    minAmountOut * (10000 - slippage) / 10000,
-                    true
-                );
-            IERC20(_token).safeTransfer(_user, toUser);
-        }
+        ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
+            amounts, 
+            _amount * (10000 + slippage) / 10000,
+            true
+        );
+        IERC20(_token).safeTransfer(_user, amount);
     }
     
     function getAdapterAmount() external view returns ( uint256 ) {
