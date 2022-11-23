@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
 import "./../interfaces/curve/mainnet/ICvxBooster.sol";
 import "./../interfaces/curve/mainnet/ICvxBaseRewardPool.sol";
@@ -20,6 +21,7 @@ contract CvxDistributor is
     AccessControlUpgradeable
 {
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
+    using AddressUpgradeable for address;
 
     bytes32 public constant PROTOCOL_ROLE = keccak256("PROTOCOL_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -48,11 +50,6 @@ contract CvxDistributor is
         uint256 rewardAllowed; // rewards allowed to be paid out
         uint256 rewardDebt; // param is needed for correct calculation staker's share
         uint256 distributed; // amount of distributed tokens
-    }
-
-    struct RewardData {
-        address token;
-        uint256 amount;
     }
     
     ///@dev ERC20 token earned by stakers as reward.
@@ -377,34 +374,32 @@ contract CvxDistributor is
         }
     }
 
-    // function accruedRewards() public view returns (RewardData[] memory) {
-    //     (, , , address pool, , ) = cvxBooster.poolInfo(crvCVXETHPoolId);
-    //     ICvxBaseRewardPool mainCvxPool = ICvxBaseRewardPool(pool);
-    //     uint256 extraRewardsLength = mainCvxPool.extraRewardsLength();
-    //     RewardData[] memory rewardArray = new RewardData[](extraRewardsLength + 1);
-    //     rewardArray[0] = RewardData(mainCvxPool.rewardToken(),mainCvxPool.earned(address(this)));
-    //     for (uint256 i; i < extraRewardsLength; i++) {
-    //         ICvxBaseRewardPool extraReward = ICvxBaseRewardPool(mainCvxPool.extraRewards(i));
+    function accruedRewards() public view returns (IAlluoVault.RewardData[] memory, IAlluoVault.RewardData[] memory) {
+        return IAlluoVault(alluoCvxVault).shareholderAccruedRewards(address(this));
+    }
 
-    //         rewardArray[i+1] = (RewardData(extraReward.rewardToken(), extraReward.earned(address(this))));
-    //     }
-    //     return rewardArray;
-    // }
+    function stakerAccruedRewards(address _staker) public view returns (IAlluoVault.RewardData[] memory, IAlluoVault.RewardData[] memory) {
+        (
+            IAlluoVault.RewardData[] memory vaultAccruals,
+            IAlluoVault.RewardData[] memory poolAccruals
+        ) = IAlluoVault(alluoCvxVault).shareholderAccruedRewards(address(this));
 
-    // function stakerAccruedRewards(address _staker) public view returns (RewardData[] memory) {
-    //     RewardData[] memory accruals = accruedRewards();
-    //     Staker memory staker = _stakers[_staker];
+        Staker memory staker = _stakers[_staker];
 
-    //     uint256 stakerAmount = staker.amount;
-    //     uint256 totalStakedAmount = totalStaked;
+        uint256 stakerAmount = staker.amount;
+        uint256 totalStakedAmount = totalStaked;
 
-    //     for (uint256 i; i < accruals.length; i++) {
-    //         uint256 stakerShareOfaccruals = accruals[i].amount * stakerAmount / totalStakedAmount;
-    //         accruals[i].amount = stakerShareOfaccruals;
-    //     }
+        for (uint256 i; i < vaultAccruals.length; i++) {
+            uint256 stakerShareOfVaulAccruals = vaultAccruals[i].amount * stakerAmount / totalStakedAmount;
+            vaultAccruals[i].amount = stakerShareOfVaulAccruals;
+        }
 
-    //     return (accruals);
-    // }
+        for (uint256 i; i < poolAccruals.length; i++) {
+            uint256 stakerShareOfPoolAccruals = poolAccruals[i].amount * stakerAmount / totalStakedAmount;
+            poolAccruals[i].amount = stakerShareOfPoolAccruals;
+        }
+        return (vaultAccruals, poolAccruals);
+    }
 
     function getCvxRewardPool(uint256 poolId)
         private

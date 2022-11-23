@@ -16,7 +16,7 @@ interface IStrategyHandler {
 
   function DEFAULT_ADMIN_ROLE (  ) external view returns ( bytes32 );
   function UPGRADER_ROLE (  ) external view returns ( bytes32 );
-  function addLiquidityDirection ( string memory _codeName, address _strategyAddress, address _entryToken, uint256 _assetId, uint256 _chainId, bytes _entryData, bytes _exitData, bytes _rewardsData ) external;
+  function addLiquidityDirection ( string memory _codeName, address _strategyAddress, address _entryToken, uint256 _assetId, uint256 _chainId, bytes memory _entryData, bytes memory _exitData, bytes memory _rewardsData ) external;
   function addToActiveDirections ( uint256 _directionId ) external;
   function adjustTreasury ( int256 _delta ) external;
   function booster (  ) external view returns ( address );

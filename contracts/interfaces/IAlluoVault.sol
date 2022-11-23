@@ -43,6 +43,11 @@ interface IAlluoVault {
         uint256 shares
     );
 
+    struct RewardData {
+        address token;
+        uint256 amount;
+    }
+
     function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
 
     function UPGRADER_ROLE() external view returns (bytes32);
@@ -57,6 +62,8 @@ interface IAlluoVault {
     function approve(address spender, uint256 amount) external returns (bool);
 
     function asset() external view returns (address);
+    function accruedRewards (  ) external view returns ( RewardData[] memory);
+    function shareholderAccruedRewards ( address shareholder ) external view returns ( RewardData[] memory, RewardData[] memory);
 
     function balanceOf(address account) external view returns (uint256);
 
