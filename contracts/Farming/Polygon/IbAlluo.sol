@@ -329,6 +329,8 @@ contract IbAlluo is
         updateRatio();
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(_msgSender(), adjustedAmount);
+        (uint256 withdrawAmount, ) = _getPriceOfAmount(_targetToken, adjustedAmount);
+
         ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
         if (supportedTokens.contains(_targetToken) == false) {
             (address liquidToken,) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
@@ -337,19 +339,20 @@ contract IbAlluo is
             handler.withdraw(
             _recipient,
             liquidToken,
-            _amount,
+            withdrawAmount,
             _targetToken
             );
         } else {
             handler.withdraw(
             _recipient,
             _targetToken,
-            _amount
+            withdrawAmount
             );
         }
 
         emit TransferAssetValue(_msgSender(), address(0), adjustedAmount, _amount, growingRatio);
         emit BurnedForWithdraw(_msgSender(), adjustedAmount);
+        emit Withdraw(_recipient, _targetToken, withdrawAmount);
     }
 
     /// @notice  Withdraws accuratel
