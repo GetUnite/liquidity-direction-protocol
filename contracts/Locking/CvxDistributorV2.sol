@@ -231,7 +231,7 @@ contract CvxDistributorV2 is
             uint256 tokenAmount = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
 
             if (tokenAmount > 0 && primaryToken != address(WETH)) {
-                IERC20MetadataUpgradeable(primaryToken).approve(
+                IERC20MetadataUpgradeable(primaryToken).safeApprove(
                     exchangeAddress,
                     tokenAmount
                 );
@@ -364,7 +364,7 @@ contract CvxDistributorV2 is
     }
 
     function migrate() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        crvCVXETH.approve(alluoCvxVault, type(uint256).max);
+        crvCVXETH.safeApprove(alluoCvxVault, type(uint256).max);
 
         ICvxBaseRewardPool(0xb1Fb0BA0676A1fFA83882c7F4805408bA232C1fA).withdrawAllAndUnwrap(true);
 
