@@ -15,7 +15,7 @@ import "../interfaces/IStrategyHandler.sol";
 import "../interfaces/IAlluoVault.sol";
 import "./../interfaces/curve/mainnet/ICurveCVXETH.sol";
 
-contract CvxDistributor is
+contract CvxDistributorV2 is
     Initializable,
     UUPSUpgradeable,
     AccessControlUpgradeable
@@ -35,11 +35,8 @@ contract CvxDistributor is
         IERC20MetadataUpgradeable(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20MetadataUpgradeable public constant WETH =
         IERC20MetadataUpgradeable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    ICvxBooster public constant cvxBooster =
-        ICvxBooster(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
     ICurveCVXETH public constant CurveCVXETH =
         ICurveCVXETH(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4);
-    uint256 public constant crvCVXETHPoolId = 64;
 
     ///@dev Stakers info by token holders.
     mapping(address => Staker) public _stakers;
@@ -136,14 +133,8 @@ contract CvxDistributor is
         _setupRole(PROTOCOL_ROLE, vlAlluo);
         _setupRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
 
-        rewards = getCvxRewardPool(crvCVXETHPoolId);
         exchangeAddress = _exchangeAddress;
 
-        crvRewards.safeApprove(exchangeAddress, type(uint256).max);
-
-        crvCVXETH.approve(address(cvxBooster), type(uint256).max);
-
-        cvxRewards.safeApprove(address(CurveCVXETH), type(uint256).max);
         WETH.safeApprove(address(CurveCVXETH), type(uint256).max);
     }
 
@@ -240,6 +231,10 @@ contract CvxDistributor is
             uint256 tokenAmount = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
 
             if (tokenAmount > 0 && primaryToken != address(WETH)) {
+                IERC20MetadataUpgradeable(primaryToken).approve(
+                    exchangeAddress,
+                    tokenAmount
+                );
                 IExchange(exchangeAddress).exchange(
                     address(primaryToken),
                     address(WETH),
@@ -346,6 +341,57 @@ contract CvxDistributor is
         exchangeAddress = _exchangeAddress;
     }
 
+    /**
+     * @dev admin function for adding/changing Alluo CVX booster vault
+     * @param _alluoCvxVault new Alluo CVX booster vault address
+     */
+    function addCvxVault(address _alluoCvxVault)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        alluoCvxVault = _alluoCvxVault;
+    }
+
+    /**
+     * @dev admin function for adding/changing Alluo Strategy handler
+     * @param _strategyHandler new Alluo Strategy handler address
+     */
+    function addStrategyHandler(address _strategyHandler)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        strategyHandler = _strategyHandler;
+    }
+
+    function migrate() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        crvCVXETH.approve(alluoCvxVault, type(uint256).max);
+
+        ICvxBaseRewardPool(0xb1Fb0BA0676A1fFA83882c7F4805408bA232C1fA).withdrawAllAndUnwrap(true);
+
+        uint256 crvAmount = crvRewards.balanceOf(address(this));
+        uint256 cvxAmount = cvxRewards.balanceOf(address(this));
+
+        uint256 wethReceived;
+
+        if (crvAmount > 0) {
+            wethReceived = IExchange(exchangeAddress).exchange(
+                address(crvRewards),
+                address(WETH),
+                crvAmount,
+                0
+            );
+        }
+
+        if (crvAmount > 0 || cvxAmount > 0) {
+            CurveCVXETH.add_liquidity([wethReceived, cvxAmount], 0);
+        }
+
+        uint lpBalance = crvCVXETH.balanceOf(address(this));
+        if(lpBalance > 0){
+            IAlluoVault(alluoCvxVault).deposit(lpBalance, address(this));
+        }
+    }
+
     function withdrawTokens(
         address withdrawToken,
         address to,
@@ -399,14 +445,5 @@ contract CvxDistributor is
             poolAccruals[i].amount = stakerShareOfPoolAccruals;
         }
         return (vaultAccruals, poolAccruals);
-    }
-
-    function getCvxRewardPool(uint256 poolId)
-        private
-        view
-        returns (ICvxBaseRewardPool)
-    {
-        (, , , address pool, , ) = cvxBooster.poolInfo(poolId);
-        return ICvxBaseRewardPool(pool);
     }
 }
