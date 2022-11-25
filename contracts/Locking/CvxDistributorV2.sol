@@ -14,6 +14,7 @@ import "../interfaces/IExchange.sol";
 import "../interfaces/IStrategyHandler.sol";
 import "../interfaces/IAlluoVault.sol";
 import "./../interfaces/curve/mainnet/ICurveCVXETH.sol";
+import "hardhat/console.sol";
 
 contract CvxDistributorV2 is
     Initializable,
@@ -432,8 +433,8 @@ contract CvxDistributorV2 is
 
         Staker memory staker = _stakers[_staker];
 
-        uint256 stakerAmount = staker.amount;
-        uint256 totalStakedAmount = totalStaked;
+        uint256 stakerAmount = getClaim(_staker);
+        uint256 totalStakedAmount = IAlluoVault(alluoCvxVault).balanceOf(address(this));
 
         for (uint256 i; i < vaultAccruals.length; i++) {
             uint256 stakerShareOfVaulAccruals = vaultAccruals[i].amount * stakerAmount / totalStakedAmount;
