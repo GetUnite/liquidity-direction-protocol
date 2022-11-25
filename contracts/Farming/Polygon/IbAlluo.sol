@@ -309,10 +309,11 @@ contract IbAlluo is
         ILiquidityHandler(liquidityHandler).deposit(_token, _amount);
         uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = (amountIn18 * multiplier) / growingRatio;
-        _mint(_msgSender(), adjustedAmount);
-        emit TransferAssetValue(address(0), _msgSender(), adjustedAmount, amountIn18, growingRatio);
+        (uint256 depositAmount, ) = _getAmountInIbAlluo(_token, adjustedAmount);
+        _mint(_msgSender(), depositAmount);
+        emit TransferAssetValue(address(0), _msgSender(), depositAmount, amountIn18, growingRatio);
         emit Deposited(_msgSender(), _token, _amount);
-        return adjustedAmount;
+        return depositAmount;
     }
 
     /// @notice  Withdraws accuratel
@@ -329,7 +330,7 @@ contract IbAlluo is
         updateRatio();
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(_msgSender(), adjustedAmount);
-        (uint256 withdrawAmount, ) = _getPriceOfAmount(_targetToken, adjustedAmount);
+        (uint256 withdrawAmount, ) = _getAmountInToken(_targetToken, adjustedAmount);
 
         ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
         if (supportedTokens.contains(_targetToken) == false) {
@@ -751,15 +752,15 @@ contract IbAlluo is
         emit PriceFeedStatusChanged(discription, _status);
     }
 
-//    function setUpdateTimeLimit(uint256 _newLimit)
-//         public
-//         onlyRole(DEFAULT_ADMIN_ROLE)
-//     {
-//         uint256 oldValue = updateTimeLimit;
-//         updateTimeLimit = _newLimit;
+   function setUpdateTimeLimit(uint256 _newLimit)
+        public
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        uint256 oldValue = updateTimeLimit;
+        updateTimeLimit = _newLimit;
 
-//         emit UpdateTimeLimitSet(oldValue, _newLimit);
-//     }
+        emit UpdateTimeLimitSet(oldValue, _newLimit);
+    }
 
 
     function setLiquidityHandler(address newHandler)
@@ -849,7 +850,7 @@ contract IbAlluo is
         super._beforeTokenTransfer(from, to, amount);
     }
 
-    function _getPriceOfAmount(address _token, uint256 amount) internal view returns (uint256 value, uint8 decimals){
+    function _getAmountInToken(address _token, uint256 amount) internal view returns (uint256 value, uint8 decimals){
         string memory tokenSymbol = IERC20Metadata(_token).symbol();
         string memory fiatSymbol = " / USD";
 
@@ -857,10 +858,26 @@ contract IbAlluo is
         string memory description = string(abi.encodePacked(tokenSymbol, fiatSymbol));
 
         IChainlinkPriceFeed priceFeed = priceFeedMap[description];
-        require(priceFeed.decimals() != 0, "Price feed not found for the token provided");
+        require(priceFeed.decimals() != 0, "PriceFeed not found");
 
         // adjust value to have equal number of decimals as the token
         uint256 value = (uint256(priceFeed.latestAnswer()) * amount) / (10 ** uint256(priceFeed.decimals()));
+        return (value, IERC20Metadata(_token).decimals());
+    }
+
+    function _getAmountInIbAlluo(address _token, uint256 amount) internal view returns (uint256 value, uint8 decimals){
+        string memory tokenSymbol = IERC20Metadata(_token).symbol();
+        string memory fiatSymbol = " / USD";
+
+       //Improvement: update to string.concat();
+        string memory description = string(abi.encodePacked(tokenSymbol, fiatSymbol));
+
+        IChainlinkPriceFeed priceFeed = priceFeedMap[description];
+        require(priceFeed.decimals() != 0, "PriceFeed not found");
+
+        // adjust value to have equal number of decimals as the amount
+        uint256 value = amount / uint256(priceFeed.latestAnswer());
+        value = value * 10**(priceFeed.decimals());
         return (value, IERC20Metadata(_token).decimals());
     }
 
