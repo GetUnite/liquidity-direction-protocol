@@ -169,8 +169,7 @@ contract IbAlluo is
         uint256 _interestPerSecond,
         uint256 _annualInterest,
         address _trustedForwarder,
-        address _exchangeAddress,
-        address[] memory _supportedPriceFeedAddresses
+        address _exchangeAddress
     ) public initializer {
         __ERC20_init(_name, _symbol);
         __Pausable_init();
@@ -186,13 +185,6 @@ contract IbAlluo is
         for (uint256 i = 0; i < _supportedTokens.length; i++) {
             supportedTokens.add(_supportedTokens[i]);
             emit DepositTokenStatusChanged(_supportedTokens[i], true);
-        }
-
-        for (uint256 i = 0; i < _supportedPriceFeedAddresses.length; i++) {
-            IChainlinkPriceFeed priceFeed = IChainlinkPriceFeed(_supportedPriceFeedAddresses[i]);
-            string memory discription = priceFeed.description();
-
-            priceFeedMap[discription] = priceFeed;
         }
 
         interestPerSecond = _interestPerSecond * 10**10;
@@ -309,7 +301,7 @@ contract IbAlluo is
         ILiquidityHandler(liquidityHandler).deposit(_token, _amount);
         uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = (amountIn18 * multiplier) / growingRatio;
-        (uint256 depositAmount, ) = _getAmountInIbAlluo(_token, adjustedAmount);
+        (uint256 depositAmount, ) = _getAmountInIbAlluo(_token, adjustedAmount); 
         _mint(_msgSender(), depositAmount);
         emit TransferAssetValue(address(0), _msgSender(), depositAmount, amountIn18, growingRatio);
         emit Deposited(_msgSender(), _token, _amount);
@@ -738,20 +730,6 @@ contract IbAlluo is
         emit DepositTokenStatusChanged(_token, _status);
     }
 
-    function changePriceFeedStatus(address _priceFeedAddress, bool _status) external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        IChainlinkPriceFeed priceFeed = IChainlinkPriceFeed(_priceFeedAddress);
-        string memory discription = priceFeed.description();
-        
-        if (_status) {
-            priceFeedMap[discription] = priceFeed;
-        } else {
-            priceFeedMap[discription] = IChainlinkPriceFeed(address(0));
-        }
-        emit PriceFeedStatusChanged(discription, _status);
-    }
-
    function setUpdateTimeLimit(uint256 _newLimit)
         public
         onlyRole(DEFAULT_ADMIN_ROLE)
@@ -821,6 +799,28 @@ contract IbAlluo is
             require(account.isContract());
         }
         _grantRole(role, account);
+    }
+
+    function addPriceFeed(address[] _priceFeedAddresses) external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        for (uint256 i = 0; i < _priceFeedAddresses.length; i++) {
+            IChainlinkPriceFeed priceFeed = IChainlinkPriceFeed(_priceFeedAddresses[i]);
+            string memory discription = priceFeed.description();
+
+            priceFeedMap[discription] = priceFeed;
+        }
+        emit PriceFeedStatusChanged(discription, _status);
+    }
+
+    function removePriceFeed(address _priceFeedAddress) external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        IChainlinkPriceFeed priceFeed = IChainlinkPriceFeed(_priceFeedAddress);
+        string memory discription = priceFeed.description();
+        
+        priceFeedMap[discription] = IChainlinkPriceFeed(address(0));
+        emit PriceFeedStatusChanged(discription, _status);
     }
 
     function _transfer(
