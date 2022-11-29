@@ -18,7 +18,7 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 50,
       },
     },
   },
@@ -44,13 +44,13 @@ const config: HardhatUserConfig = {
         mnemonic: process.env.MNEMONIC,
       },
     },
-    fantom: {
-      url: process.env.FANTOM_URL,
-      gasPrice: "auto",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-    },
+    // fantom: {
+    //   url: process.env.FANTOM_URL,
+    //   gasPrice: "auto",
+    //   accounts: {
+    //     mnemonic: process.env.MNEMONIC,
+    //   },
+    // },
     // TESTNETS
     mumbai: {
       url: process.env.MUMBAI_URL,
@@ -59,13 +59,13 @@ const config: HardhatUserConfig = {
         mnemonic: process.env.MNEMONIC,
       },
     },
-    kovan: {
-      url: process.env.KOVAN_URL,
-      gasPrice: "auto",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-    },
+    // kovan: {
+    //   url: process.env.KOVAN_URL,
+    //   gasPrice: "auto",
+    //   accounts: {
+    //     mnemonic: process.env.MNEMONIC,
+    //   },
+    // },
     rinkeby: {
       url: process.env.RINKEBY_URL,
       gasPrice: 25000000000,
@@ -87,12 +87,10 @@ const config: HardhatUserConfig = {
     currency: "USD",
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
-  },
-  // etherscan: {
-  //   apiKey: process.env.POLYGONSCAN_API_KEY,
-  // },
+    // apiKey: process.env.ETHERSCAN_API_KEY,
+        apiKey: process.env.POLYGONSCAN_API_KEY,
 
+  },
   mocha: {
     timeout: 3600000,
   },

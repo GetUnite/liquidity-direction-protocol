@@ -166,7 +166,6 @@ describe("IbAlluoUSD and Handler", function () {
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoCurrent.address, lastAdapterId)
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoCurrent.address)
 
-
         const StIbAlluoFactory = await ethers.getContractFactory("StIbAlluo") as StIbAlluo__factory;
 
         StIbAlluo = await upgrades.deployProxy(StIbAlluoFactory,
@@ -191,17 +190,43 @@ describe("IbAlluoUSD and Handler", function () {
         calldata = iface.encodeFunctionData("setSuperfluidResolver", [resolver.address]);
         await multisig.executeCall(ibAlluoCurrent.address, calldata);
 
+        
+        const SuperfluidEndResolver = await ethers.getContractFactory("SuperfluidEndResolver");
+        let ndresolver = await SuperfluidEndResolver.deploy([ibAlluoCurrent.address], signers[0].address);
+
+        ABI = ["function setSuperfluidEndResolver(address _superfluidEndResolver)"];
+        iface = new ethers.utils.Interface(ABI);
+        calldata = iface.encodeFunctionData("setSuperfluidEndResolver", [ndresolver.address]);
+        await multisig.executeCall(ibAlluoCurrent.address, calldata);
+
+
+
     });
 
     describe('All IbAlluo tests with StIbAlluo integration', function () {
+        it("Format call for frontend", async function() {
+            let cfaAddress = "0x6EeE6060f715257b970700bc2656De21dEdF074C"
+            let realIbAlluo = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6" )
+            let permissions = await realIbAlluo.connect(signers[1]).formatPermissions();
+            let userData = "0x"
+
+            let operationData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"],[permissions,userData])
+
+            let operation = {operationType: 201, target: cfaAddress, data: operationData}
+            let operationArray = [operation];
+            console.log(operationArray);
+
+            // https://dashboard.tenderly.co/pentatonictritones/project/simulator/fd708bad-b2d9-4e7b-8949-93a07834fdd7
+        })
+
         it("Test upgradeability of original ibAlluo contract", async function() {
 
-            let ibAlluoCurrentUsd = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
+            let ibAlluoCurrentUsd = await ethers.getContractAt("IbAlluoOld", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
             await ibAlluoCurrentUsd.connect(admin).grantRole("0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3", "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266")
             await ibAlluoCurrentUsd.connect(admin).changeUpgradeStatus(true);
-
+            const IbAlluoOld = await ethers.getContractFactory("IbAlluoOld")
             const IbAlluoNew = await ethers.getContractFactory("IbAlluo");
-            let IbAlluoUsd = await upgrades.forceImport("0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6", IbAlluoNew);
+            let IbAlluoUsd = await upgrades.forceImport("0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6", IbAlluoOld);
             await upgrades.upgradeProxy(IbAlluoUsd.address, IbAlluoNew);
             console.log("Upgrade complete")
         })
@@ -218,8 +243,24 @@ describe("IbAlluoUSD and Handler", function () {
 
             console.log("encoded data", encodeData);
 
-            await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
+            await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256)"](signers[2].address, "1", parseEther("10000"))
+            await skipDays(1)
+            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
+            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
+        })
 
+        
+        it("Give permission using metatX then Create flow through contract ", async function() {
+            await deposit(signers[1], dai, parseUnits("10000", 18));
+            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
+            let encodeData = await ibAlluoCurrent.connect(signers[1]).formatPermissions();
+            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
+            await superhost.connect(signers[1]).forwardBatchCall([{
+                operationType: 201, target:"0x6EeE6060f715257b970700bc2656De21dEdF074C", data: ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"], [encodeData, "0x"])
+            }])
+            console.log("encoded data", encodeData);
+
+            await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256)"](signers[2].address, "1", parseEther("10000"))
             await skipDays(1)
             expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
             console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
@@ -235,7 +276,7 @@ describe("IbAlluoUSD and Handler", function () {
                 encodeData,
                 "0x"
             )
-            await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
+            await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256)"](signers[2].address, "1", parseEther("10000"))
 
             await skipDays(1)
             expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
@@ -258,7 +299,7 @@ describe("IbAlluoUSD and Handler", function () {
                 encodeData,
                 "0x"
             )
-            await ibAlluoCurrent.connect(signers[1]).createFlow(signers[2].address, "1", parseEther("10000"))
+            await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256)"](signers[2].address, "1", parseEther("10000"))
 
             await skipDays(1)
             expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
@@ -296,6 +337,29 @@ describe("IbAlluoUSD and Handler", function () {
                 encodeData,
                 "0x"
             )
+
+
+            await skipDays(1)
+            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
+            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
+        })
+
+        
+
+        it("Call agreement CFA directly to host using forwardBatchCall", async function() {
+            await deposit(signers[1], dai, parseUnits("10000", 18));
+            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
+
+            await ibAlluoCurrent.connect(signers[1]).approve(StIbAlluo.address, parseEther("10000"));
+            await StIbAlluo.connect(signers[1]).upgrade(parseEther("10000"))
+
+
+            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
+            let CFA = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C");
+            let encodeData = await ibAlluoCurrent.callStatic.formatFlow(signers[2].address, "1", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
+            await superhost.connect(signers[1]).forwardBatchCall([{
+                operationType: 201, target:"0x6EeE6060f715257b970700bc2656De21dEdF074C", data: ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"], [encodeData, "0x"])
+            }])
 
 
             await skipDays(1)
