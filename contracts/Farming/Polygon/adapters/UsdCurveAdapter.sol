@@ -8,6 +8,9 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "../../../interfaces/curve/ICurvePoolUSD.sol";
+import "../../../interfaces/IPriceFeedRouter.sol";
+
+import "hardhat/console.sol";
 
 contract UsdCurveAdapter is AccessControl {
     using Address for address;
@@ -23,7 +26,6 @@ contract UsdCurveAdapter is AccessControl {
     uint64 public slippage;
 
     uint64 public primaryTokenIndex;
-    uint128 public liquidTokenIndex;
     
     mapping(address => uint128) public indexes;
 
@@ -39,7 +41,6 @@ contract UsdCurveAdapter is AccessControl {
         indexes[USDC] = 1;
         indexes[USDT] = 2;
 
-        liquidTokenIndex = 2;
         primaryTokenIndex = 1;
     }
 
@@ -94,7 +95,6 @@ contract UsdCurveAdapter is AccessControl {
         uint256[3] memory amounts;
         uint256 amount = _amount / 10**(18 - IERC20Metadata(_token).decimals());
         amounts[indexes[_token]] = amount;
-        
         ICurvePoolUSD(curvePool).remove_liquidity_imbalance(
             amounts, 
             _amount * (10000 + slippage) / 10000,
@@ -103,26 +103,29 @@ contract UsdCurveAdapter is AccessControl {
         IERC20(_token).safeTransfer(_user, amount);
     }
     
-    function getAdapterAmount() external view returns ( uint256 ) {
+    function getAdapterAmount() external returns ( uint256 ) {
+        // get price feed for primary token in usd
+        // return the usd value to amount 
+        // return in 10**18
+
+        address priceFeedRouter = 0x54a6c19C7a7304A99489D547ce71DC990BF141a9;
+        uint256 fiatIndex = 1;
+
         uint256 curveLpAmount = IERC20(curveLp).balanceOf((address(this)));
         if(curveLpAmount != 0){
-            address liquidToken = ICurvePoolUSD(curvePool).underlying_coins(liquidTokenIndex);
-            uint256 amount = ICurvePoolUSD(curvePool).calc_withdraw_one_coin(curveLpAmount, int128(liquidTokenIndex));
-            return amount  * 10 **(18 - ERC20(liquidToken).decimals());
+            address primaryToken = ICurvePoolUSD(curvePool).underlying_coins(primaryTokenIndex);
+            (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(priceFeedRouter).getPrice(primaryToken, fiatIndex);
+            uint256 amount = (curveLpAmount * price) / 10**(uint256(priceDecimals));
+            return amount  * 10 **(18 - ERC20(primaryToken).decimals());
         } else {
             return 0;
         }
     }
 
-    function getCoreTokens() external view returns (address liquidToken, address primaryToken){
+    function getCoreTokens() external view returns (address primaryToken){
         return (
-            ICurvePoolUSD(curvePool).underlying_coins(liquidTokenIndex), 
             ICurvePoolUSD(curvePool).underlying_coins(primaryTokenIndex)
         );
-    }
-
-    function changeLiquidTokenIndex(uint128 _newLiquidTokenIndex) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        liquidTokenIndex = _newLiquidTokenIndex;
     }
 
     function changePrimaryTokenIndex(uint64 _newPrimaryTokenIndex) external onlyRole(DEFAULT_ADMIN_ROLE) {
