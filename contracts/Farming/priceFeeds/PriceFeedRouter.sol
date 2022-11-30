@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./IFeedStrategy.sol";
 import "./../../interfaces/IChainlinkPriceFeed.sol";
+import "./../../interfaces/IPriceFeedRouter.sol";
 
 contract PriceFeedRouter is Ownable {
     using Address for address;
