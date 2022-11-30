@@ -5,8 +5,6 @@ import "./AlluoERC20Upgradable.sol";
 import "../../interfaces/ILiquidityHandler.sol";
 import "../../mock/interestHelper/Interest.sol";
 import "../../interfaces/IExchange.sol";
-import "../../interfaces/IChainlinkPriceFeed.sol";
-
 import "../../interfaces/superfluid/ISuperfluidToken.sol";
 import "../../interfaces/superfluid/ISuperfluid.sol";
 import "../../interfaces/superfluid/IConstantFlowAgreementV1.sol";
@@ -16,6 +14,8 @@ import "../../interfaces/superfluid/IAlluoSuperToken.sol";
 import "../../interfaces/ISuperfluidResolver.sol";
 import "../../interfaces/ISuperfluidEndResolver.sol";
 
+import "../../interfaces/IPriceFeedRouter.sol";
+
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
@@ -23,8 +23,8 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
-import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 
+import "hardhat/console.sol";
 
 import {CFAv1Library} from "./superfluid/libs/CFAv1Library.sol";
 
@@ -87,9 +87,6 @@ contract IbAlluo is
     bytes32 public constant GELATO = keccak256("GELATO");
 
     mapping(address => address) public autoInvestMarketToSuperToken;
-    
-    // Map of chainlinks price feeds organized by description (e.g. USDC / USD)
-    mapping(string => IChainlinkPriceFeed) public priceFeedMap;
 
     struct Context {
         uint8 appLevel;
@@ -110,13 +107,6 @@ contract IbAlluo is
     event NewHandlerSet(address oldHandler, address newHandler);
     event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
     event DepositTokenStatusChanged(address token, bool status);
-
-    event PriceFeedStatusChanged(string discription, bool status);
-    event Withdraw(
-        address indexed recipient,
-        address token,
-        uint256 withdrawAmount
-    );
     
     event InterestChanged(
         uint256 oldYearInterest,
@@ -287,6 +277,11 @@ contract IbAlluo is
     function deposit(address _token, uint256 _amount) external returns (uint256) {
         // The main token is the one which isn't converted to primary tokens.
         // Small issue with deposits and withdrawals though. Need to approve.
+
+        address priceFeedRouter = 0x54a6c19C7a7304A99489D547ce71DC990BF141a9;
+        uint256 fiatIndex = 1;
+        (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(priceFeedRouter).getPrice(_token, fiatIndex);
+
         if (supportedTokens.contains(_token) == false) {
             IERC20Upgradeable(_token).safeTransferFrom(_msgSender(), address(this), _amount);
             (, address primaryToken) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
@@ -301,11 +296,14 @@ contract IbAlluo is
         ILiquidityHandler(liquidityHandler).deposit(_token, _amount);
         uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = (amountIn18 * multiplier) / growingRatio;
-        (uint256 depositAmount, ) = _getAmountInIbAlluo(_token, adjustedAmount); 
-        _mint(_msgSender(), depositAmount);
-        emit TransferAssetValue(address(0), _msgSender(), depositAmount, amountIn18, growingRatio);
+
+        // adjust value to have equal number of decimals as the amount
+        uint256 mintAmount = (adjustedAmount * 10**(uint256(priceDecimals))) / price;
+        _mint(_msgSender(), mintAmount);
+
+        emit TransferAssetValue(address(0), _msgSender(), mintAmount, amountIn18, growingRatio);
         emit Deposited(_msgSender(), _token, _amount);
-        return depositAmount;
+        return mintAmount;
     }
 
     /// @notice  Withdraws accuratel
@@ -319,10 +317,17 @@ contract IbAlluo is
         address _targetToken,
         uint256 _amount
     ) public {
+
+        address priceFeedRouter = 0x54a6c19C7a7304A99489D547ce71DC990BF141a9;
+        uint256 fiatIndex = 1;
+        (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(priceFeedRouter).getPrice(_targetToken, fiatIndex);
+
         updateRatio();
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(_msgSender(), adjustedAmount);
-        (uint256 withdrawAmount, ) = _getAmountInToken(_targetToken, adjustedAmount);
+
+        //adjust value to have equal number of decimals as the token
+        uint256 withdrawAmount = (adjustedAmount * price) / 10**(uint256(priceDecimals));
 
         ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
         if (supportedTokens.contains(_targetToken) == false) {
@@ -343,9 +348,8 @@ contract IbAlluo is
             );
         }
 
-        emit TransferAssetValue(_msgSender(), address(0), adjustedAmount, _amount, growingRatio);
+        emit TransferAssetValue(_msgSender(), address(0), withdrawAmount, _amount, growingRatio);
         emit BurnedForWithdraw(_msgSender(), adjustedAmount);
-        emit Withdraw(_recipient, _targetToken, withdrawAmount);
     }
 
     /// @notice  Withdraws accuratel
@@ -363,44 +367,44 @@ contract IbAlluo is
     /// @param _targetToken Asset token
     /// @param _amount Amount (parsed 10**18) in ibAlluo**** value
 
-    function withdrawTokenValueTo(
-        address _recipient,
-        address _targetToken,
-        uint256 _amount
-    ) public {
-        _burn(_msgSender(), _amount);
-        updateRatio();
-        uint256 assetAmount = (_amount * growingRatio) / multiplier;
+    // function withdrawTokenValueTo(
+    //     address _recipient,
+    //     address _targetToken,
+    //     uint256 _amount
+    // ) public {
+    //     _burn(_msgSender(), _amount);
+    //     updateRatio();
+    //     uint256 assetAmount = (_amount * growingRatio) / multiplier;
 
-        ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
-        if (supportedTokens.contains(_targetToken) == false) {
-            (address liquidToken,) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
-            // This just is used to revert if there is no active route.
-            require(IExchange(exchangeAddress).buildRoute(liquidToken, _targetToken).length > 0);
-            handler.withdraw(
-            _recipient,
-            liquidToken,
-            assetAmount,
-            _targetToken
-            );
-        } else {
-            handler.withdraw(
-            _recipient,
-            _targetToken,
-            assetAmount
-            );
-        }
+    //     ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
+    //     if (supportedTokens.contains(_targetToken) == false) {
+    //         (address liquidToken,) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
+    //         // This just is used to revert if there is no active route.
+    //         require(IExchange(exchangeAddress).buildRoute(liquidToken, _targetToken).length > 0);
+    //         handler.withdraw(
+    //         _recipient,
+    //         liquidToken,
+    //         assetAmount,
+    //         _targetToken
+    //         );
+    //     } else {
+    //         handler.withdraw(
+    //         _recipient,
+    //         _targetToken,
+    //         assetAmount
+    //         );
+    //     }
 
-        emit TransferAssetValue(_msgSender(), address(0), _amount, assetAmount, growingRatio);
-        emit BurnedForWithdraw(_msgSender(), _amount);
-    }
+    //     emit TransferAssetValue(_msgSender(), address(0), _amount, assetAmount, growingRatio);
+    //     emit BurnedForWithdraw(_msgSender(), _amount);
+    // }
 
     /// @notice  Withdraws accuratel
     /// @param _targetToken Asset token
     /// @param _amount Amount of ibAlluos (10**18)
-    function withdrawTokenValue(address _targetToken, uint256 _amount) external {
-        withdrawTokenValueTo(_msgSender(), _targetToken, _amount);
-    }
+    // function withdrawTokenValue(address _targetToken, uint256 _amount) external {
+    //     withdrawTokenValueTo(_msgSender(), _targetToken, _amount);
+    // }
 
     /// @notice Wraps and creates flow 
     /// @dev Forces transfer of ibAlluo to the StIbAlluo contract then mints StIbAlluos to circumvent having to sign multiple transactions to create streams
@@ -645,10 +649,6 @@ contract IbAlluo is
         return supportedTokens.values();
     }
 
-    function getPriceFeed(string memory _discription) public view returns ( IChainlinkPriceFeed) {
-        return priceFeedMap[_discription];
-    }
-
     function isTrustedForwarder(address forwarder)
         public
         view
@@ -730,15 +730,15 @@ contract IbAlluo is
         emit DepositTokenStatusChanged(_token, _status);
     }
 
-   function setUpdateTimeLimit(uint256 _newLimit)
-        public
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        uint256 oldValue = updateTimeLimit;
-        updateTimeLimit = _newLimit;
+//    function setUpdateTimeLimit(uint256 _newLimit)
+//         public
+//         onlyRole(DEFAULT_ADMIN_ROLE)
+//     {
+//         uint256 oldValue = updateTimeLimit;
+//         updateTimeLimit = _newLimit;
 
-        emit UpdateTimeLimitSet(oldValue, _newLimit);
-    }
+//         emit UpdateTimeLimitSet(oldValue, _newLimit);
+//     }
 
 
     function setLiquidityHandler(address newHandler)
@@ -801,28 +801,6 @@ contract IbAlluo is
         _grantRole(role, account);
     }
 
-    function addPriceFeed(address[] _priceFeedAddresses) external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        for (uint256 i = 0; i < _priceFeedAddresses.length; i++) {
-            IChainlinkPriceFeed priceFeed = IChainlinkPriceFeed(_priceFeedAddresses[i]);
-            string memory discription = priceFeed.description();
-
-            priceFeedMap[discription] = priceFeed;
-        }
-        emit PriceFeedStatusChanged(discription, _status);
-    }
-
-    function removePriceFeed(address _priceFeedAddress) external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
-        IChainlinkPriceFeed priceFeed = IChainlinkPriceFeed(_priceFeedAddress);
-        string memory discription = priceFeed.description();
-        
-        priceFeedMap[discription] = IChainlinkPriceFeed(address(0));
-        emit PriceFeedStatusChanged(discription, _status);
-    }
-
     function _transfer(
         address from,
         address to,
@@ -848,37 +826,6 @@ contract IbAlluo is
         uint256 amount
     ) internal override {
         super._beforeTokenTransfer(from, to, amount);
-    }
-
-    function _getAmountInToken(address _token, uint256 amount) internal view returns (uint256 value, uint8 decimals){
-        string memory tokenSymbol = IERC20Metadata(_token).symbol();
-        string memory fiatSymbol = " / USD";
-
-       //Improvement: update to string.concat();
-        string memory description = string(abi.encodePacked(tokenSymbol, fiatSymbol));
-
-        IChainlinkPriceFeed priceFeed = priceFeedMap[description];
-        require(priceFeed.decimals() != 0, "PriceFeed not found");
-
-        // adjust value to have equal number of decimals as the token
-        uint256 value = (uint256(priceFeed.latestAnswer()) * amount) / (10 ** uint256(priceFeed.decimals()));
-        return (value, IERC20Metadata(_token).decimals());
-    }
-
-    function _getAmountInIbAlluo(address _token, uint256 amount) internal view returns (uint256 value, uint8 decimals){
-        string memory tokenSymbol = IERC20Metadata(_token).symbol();
-        string memory fiatSymbol = " / USD";
-
-       //Improvement: update to string.concat();
-        string memory description = string(abi.encodePacked(tokenSymbol, fiatSymbol));
-
-        IChainlinkPriceFeed priceFeed = priceFeedMap[description];
-        require(priceFeed.decimals() != 0, "PriceFeed not found");
-
-        // adjust value to have equal number of decimals as the amount
-        uint256 value = amount / uint256(priceFeed.latestAnswer());
-        value = value * 10**(priceFeed.decimals());
-        return (value, IERC20Metadata(_token).decimals());
     }
 
     function _msgSender()
