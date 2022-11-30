@@ -54,6 +54,64 @@ async function prepareCallData(type: string, parameters: any[]): Promise<BytesLi
         return ethers.utils.randomBytes(0);
     }
 }
+
+
+
+async function binarySearchForBlock(startTimestamp: number) : Promise<number> {
+    let highestEstimatedBlockNumber = await ethers.provider.getBlockNumber();
+    let highestEstimatedBlock = await ethers.provider.getBlock(highestEstimatedBlockNumber)
+    let lowestEstimatedBlock = await ethers.provider.getBlock(highestEstimatedBlock.number - Math.floor((highestEstimatedBlock.timestamp - startTimestamp)))
+    let closestBlock;
+    let iterations = 0;
+
+    while (lowestEstimatedBlock.number <= highestEstimatedBlock.number) {
+        if (iterations > 50) {
+            break
+        }
+        closestBlock = await ethers.provider.getBlock(Math.floor((highestEstimatedBlock.number + lowestEstimatedBlock.number)/2))
+        console.log("Checking block:", closestBlock.number, closestBlock.timestamp)
+        if (closestBlock.timestamp == startTimestamp) {
+            console.log("Found block", closestBlock.number)
+            return closestBlock.number
+        } 
+        else if (closestBlock.timestamp > startTimestamp) {
+            highestEstimatedBlock = closestBlock
+        }
+        else {
+            lowestEstimatedBlock = closestBlock;
+        }
+        iterations++
+    }
+    return -1;
+}
+async function getClosestBlock(
+    timestamp: number,
+  ) : Promise<number> {
+    let minBlockNumber = 0
+    let maxBlockNumber = await ethers.provider.getBlockNumber();
+    let closestBlockNumber = Math.floor((maxBlockNumber + minBlockNumber) / 2)
+    let closestBlock = await ethers.provider.getBlock(closestBlockNumber);
+    let iterations = 0;
+    while (minBlockNumber <= maxBlockNumber) {
+        if (iterations > 50) {
+            break
+        }
+      console.log(`checking blockNumber=${closestBlockNumber}...`)
+      if (closestBlock.timestamp === timestamp) {
+        return closestBlock.number
+      } else if (closestBlock.timestamp > timestamp) {
+        maxBlockNumber = closestBlockNumber - 1
+      } else {
+        minBlockNumber = closestBlockNumber + 1
+      }
+  
+      closestBlockNumber = Math.floor((maxBlockNumber + minBlockNumber) / 2)
+      closestBlock = await ethers.provider.getBlock(closestBlockNumber);
+      iterations++
+    }
+    return -1;
+  }
+
 describe("IbAlluoUSD and Handler", function () {
     let signers: SignerWithAddress[];
     let admin: SignerWithAddress;
@@ -77,6 +135,20 @@ describe("IbAlluoUSD and Handler", function () {
     let superFactory: ISuperTokenFactory;
     let resolver: SuperfluidResolver;
     before(async function () {
+        await network.provider.request({
+            method: "hardhat_reset",
+            params: [{
+                forking: {
+                    enabled: true,
+                    jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
+                    //you can fork from last block by commenting next line
+                    // blockNumber: 29518660,
+                },
+            }, ],
+        });
+        await getClosestBlock(1667502621)
+        await binarySearchForBlock(1667502621);
+
 
         //We are forking Polygon mainnet, please set Alchemy key in .env
         await network.provider.request({
@@ -204,19 +276,26 @@ describe("IbAlluoUSD and Handler", function () {
     });
 
     describe('All IbAlluo tests with StIbAlluo integration', function () {
-        it("Format call for frontend", async function() {
-            let cfaAddress = "0x6EeE6060f715257b970700bc2656De21dEdF074C"
-            let realIbAlluo = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6" )
-            let permissions = await realIbAlluo.connect(signers[1]).formatPermissions();
-            let userData = "0x"
-
-            let operationData = ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"],[permissions,userData])
-
-            let operation = {operationType: 201, target: cfaAddress, data: operationData}
-            let operationArray = [operation];
-            console.log(operationArray);
-
-            // https://dashboard.tenderly.co/pentatonictritones/project/simulator/fd708bad-b2d9-4e7b-8949-93a07834fdd7
+        it("Test grabbing block number through timestamp using binary search", async function() {
+            await deposit(signers[1], dai, parseUnits("10000", 18));
+            let encodeData = await ibAlluoCurrent.connect(signers[1]).formatPermissions();
+            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
+            await superhost.connect(signers[1]).callAgreement(
+                "0x6EeE6060f715257b970700bc2656De21dEdF074C",
+                encodeData,
+                "0x"
+            )
+            let tx = await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256,uint256)"](signers[2].address, "1", parseEther("10000"), 1000)
+            let conf = await tx.wait();
+            console.log("Correct BlockNumber", conf.blockNumber)
+            await skipDays(20)
+            let superfluidFlow = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
+            let flowData = await superfluidFlow.getFlow(StIbAlluo.address, signers[1].address, signers[2].address);
+            let correctBlock =await binarySearchForBlock(Number(flowData.timestamp))
+            let logs = await ibAlluoCurrent.queryFilter(ibAlluoCurrent.filters.CreateFlowWithTimestamp(signers[1].address,signers[2].address), correctBlock, correctBlock)
+            logs.forEach(function(item,) {
+                console.log("End timestamp was:", item.args.endTimestamp)
+            })
         })
 
         it("Test upgradeability of original ibAlluo contract", async function() {
@@ -241,23 +320,6 @@ describe("IbAlluoUSD and Handler", function () {
                 "0x"
             )
 
-            console.log("encoded data", encodeData);
-
-            await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256)"](signers[2].address, "1", parseEther("10000"))
-            await skipDays(1)
-            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
-            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
-        })
-
-        
-        it("Give permission using metatX then Create flow through contract ", async function() {
-            await deposit(signers[1], dai, parseUnits("10000", 18));
-            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
-            let encodeData = await ibAlluoCurrent.connect(signers[1]).formatPermissions();
-            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
-            await superhost.connect(signers[1]).forwardBatchCall([{
-                operationType: 201, target:"0x6EeE6060f715257b970700bc2656De21dEdF074C", data: ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"], [encodeData, "0x"])
-            }])
             console.log("encoded data", encodeData);
 
             await ibAlluoCurrent.connect(signers[1])["createFlow(address,int96,uint256)"](signers[2].address, "1", parseEther("10000"))
@@ -318,80 +380,7 @@ describe("IbAlluoUSD and Handler", function () {
 
 
 
-        it("Call agreement CFA directly to host", async function() {
-            await deposit(signers[1], dai, parseUnits("10000", 18));
-            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
-
-            await ibAlluoCurrent.connect(signers[1]).approve(StIbAlluo.address, parseEther("10000"));
-            await StIbAlluo.connect(signers[1]).upgrade(parseEther("10000"))
-
-
-            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
-            let CFA = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C");
-
-            let encodeData = await ibAlluoCurrent.callStatic.formatFlow(signers[2].address, "1", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
-
-
-            await superhost.connect(signers[1]).callAgreement(
-                "0x6EeE6060f715257b970700bc2656De21dEdF074C",
-                encodeData,
-                "0x"
-            )
-
-
-            await skipDays(1)
-            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
-            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
-        })
-
-        
-
-        it("Call agreement CFA directly to host using forwardBatchCall", async function() {
-            await deposit(signers[1], dai, parseUnits("10000", 18));
-            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
-
-            await ibAlluoCurrent.connect(signers[1]).approve(StIbAlluo.address, parseEther("10000"));
-            await StIbAlluo.connect(signers[1]).upgrade(parseEther("10000"))
-
-
-            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
-            let CFA = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C");
-            let encodeData = await ibAlluoCurrent.callStatic.formatFlow(signers[2].address, "1", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
-            await superhost.connect(signers[1]).forwardBatchCall([{
-                operationType: 201, target:"0x6EeE6060f715257b970700bc2656De21dEdF074C", data: ethers.utils.defaultAbiCoder.encode(["bytes", "bytes"], [encodeData, "0x"])
-            }])
-
-
-            await skipDays(1)
-            expect(Number(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address))).greaterThanOrEqual(Number(balanceBefore));
-            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
-        })
-        it("Call agreement directly with CFA, and then withdraws from ibAlluo should pull StIbAlluo", async function() {
-            await deposit(signers[1], dai, parseUnits("10000", 18));
-            let balanceBefore = await ibAlluoCurrent.getBalance(signers[2].address);
-
-            await ibAlluoCurrent.connect(signers[1]).approve(StIbAlluo.address, parseEther("10000"));
-            await StIbAlluo.connect(signers[1]).upgrade(parseEther("10000"))
-
-            let superhost = await ethers.getContractAt("Superfluid", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7");
-            let CFA = await ethers.getContractAt("IConstantFlowAgreementV1", "0x6EeE6060f715257b970700bc2656De21dEdF074C");
-
-            let encodeData = await ibAlluoCurrent.callStatic.formatFlow(signers[2].address, "10000000000000", "0x6EeE6060f715257b970700bc2656De21dEdF074C")
-            await superhost.connect(signers[1]).callAgreement(
-                "0x6EeE6060f715257b970700bc2656De21dEdF074C",
-                encodeData,
-                "0x"
-            )
-
-
-            await skipDays(100)
-            console.log(await ibAlluoCurrent.connect(signers[2]).getBalance(signers[2].address));
-
-            await ibAlluoCurrent.connect(signers[2]).withdraw(dai.address, parseEther("10"));
-            expect(Number(await dai.connect(signers[2]).balanceOf(signers[2].address))).greaterThanOrEqual(0);
-            console.log(await dai.connect(signers[2]).balanceOf(signers[2].address));
-        })
-        it("Should convert StIbAlluo to IbAlluo when needed automatically", async function() {
+              it("Should convert StIbAlluo to IbAlluo when needed automatically", async function() {
             await deposit(signers[1], dai, parseUnits("10000", 18));
 
             await ibAlluoCurrent.connect(signers[1]).approve(StIbAlluo.address, parseEther("5000"));
@@ -924,27 +913,27 @@ describe("IbAlluoUSD and Handler", function () {
             expect(await ibAlluoCurrent.paused()).to.be.false;
         });
 
-        it("Should set new updateRatio time limit", async () => {
-            const newLimit = 120;
-            const oldLimit = await ibAlluoCurrent.updateTimeLimit();
+        // it("Should set new updateRatio time limit", async () => {
+        //     const newLimit = 120;
+        //     const oldLimit = await ibAlluoCurrent.updateTimeLimit();
 
-            expect(newLimit).to.not.be.equal(oldLimit);
+        //     expect(newLimit).to.not.be.equal(oldLimit);
 
-            let ABI = ["function setUpdateTimeLimit(uint256 _newLimit)"];
-            let iface = new ethers.utils.Interface(ABI);
-            const calldata = iface.encodeFunctionData("setUpdateTimeLimit", [newLimit]);
+        //     let ABI = ["function setUpdateTimeLimit(uint256 _newLimit)"];
+        //     let iface = new ethers.utils.Interface(ABI);
+        //     const calldata = iface.encodeFunctionData("setUpdateTimeLimit", [newLimit]);
 
-            await expect(multisig.executeCall(ibAlluoCurrent.address, calldata)).to.emit(ibAlluoCurrent, "UpdateTimeLimitSet").withArgs(oldLimit, newLimit);
-        });
+        //     await expect(multisig.executeCall(ibAlluoCurrent.address, calldata)).to.emit(ibAlluoCurrent, "UpdateTimeLimitSet").withArgs(oldLimit, newLimit);
+        // });
 
-        it("Should not set new updateRatio time limit (caller without DEFAULT_ADMIN_ROLE)", async () => {
-            const newLimit = 7200;
-            const notAdmin = signers[1];
-            const role = await ibAlluoCurrent.DEFAULT_ADMIN_ROLE();
+        // it("Should not set new updateRatio time limit (caller without DEFAULT_ADMIN_ROLE)", async () => {
+        //     const newLimit = 7200;
+        //     const notAdmin = signers[1];
+        //     const role = await ibAlluoCurrent.DEFAULT_ADMIN_ROLE();
 
-            await expect(ibAlluoCurrent.connect(notAdmin).setUpdateTimeLimit(newLimit)).to.be
-                .revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
-        });
+        //     await expect(ibAlluoCurrent.connect(notAdmin).setUpdateTimeLimit(newLimit)).to.be
+        //         .revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
+        // });
 
         it("Should add new deposit token and allow to deposit with it", async () => {
 

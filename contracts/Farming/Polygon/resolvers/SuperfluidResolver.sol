@@ -27,6 +27,7 @@ contract SuperfluidResolver is AccessControl {
         ibAlluoAddresses = _ibAlluoAddresses;
         CFAContract = _CFAContract;
         _grantRole(GELATO, _gelato);
+        _grantRole(GELATO,msg.sender);
     }
 
 
