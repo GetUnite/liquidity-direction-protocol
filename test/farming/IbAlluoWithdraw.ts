@@ -2,6 +2,7 @@ import { parseEther, parseUnits } from "@ethersproject/units";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
+import { hexValue } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import {
   IERC20,
@@ -12,6 +13,7 @@ import {
   LiquidityHandler,
   UsdCurveAdapter,
   UsdCurveAdapter__factory,
+  PriceFeedRouter,
 } from "./../../typechain";
 
 async function getImpersonatedSigner(
@@ -56,6 +58,7 @@ describe("ibAlluoCurrent and Handler", function () {
   let dai: IERC20, usdc: IERC20, usdt: IERC20;
   let usdWhale: SignerWithAddress;
   let exchangeAddress: string;
+  let priceFeedRouter: PriceFeedRouter;
 
   before(async function () {
     //We are forking Polygon mainnet, please set Alchemy key in .env
@@ -67,7 +70,7 @@ describe("ibAlluoCurrent and Handler", function () {
             enabled: true,
             jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
             //you can fork from last block by commenting next line
-            blockNumber: 29518660,
+            blockNumber: 36251556,
           },
         },
       ],
@@ -174,11 +177,6 @@ describe("ibAlluoCurrent and Handler", function () {
         1600,
         "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
         exchangeAddress,
-        [
-          "0x0A6513e40db6EB1b165753AD52E80663aeA50545", // USDT / USD price feed
-          "0xfe4a8cc5b5b2366c1b58bea3858e81843581b2f7", // USDC / USD price feed
-          "0x4746dec9e833a82ec7c2c1356372ccf2cfcd2f3d", // DAI / USD price feed
-        ],
       ],
       {
         initializer: "initialize",
@@ -192,6 +190,11 @@ describe("ibAlluoCurrent and Handler", function () {
     await handler
       .connect(admin)
       .grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoCurrent.address);
+
+    priceFeedRouter = (await ethers.getContractAt(
+      "PriceFeedRouter",
+      "0x54a6c19C7a7304A99489D547ce71DC990BF141a9"
+    )) as PriceFeedRouter;
   });
 
   describe("IbAlluo tests", function () {
@@ -207,115 +210,176 @@ describe("ibAlluoCurrent and Handler", function () {
       await ibAlluoCurrent.connect(recipient).deposit(token.address, amount);
     }
 
-    describe("Chainlink price feeds tests", function () {
-      it("Should return price feeds", async function () {
-        const usdtPriceFeed = "0x0A6513e40db6EB1b165753AD52E80663aeA50545";
-        const usdcPriceFeed = "0xfE4A8cc5b5B2366C1B58Bea3858e81843581b2F7";
-        const daiPriceFeed = "0x4746DeC9e833A82EC7C2C1356372CcF2cfcD2F3D";
+    describe("Test Deposit event", function () {
+      it("Should mint the correct amount of USDC", async function () {
+        const recipient = signers[0];
+        const token = usdc;
+        const amount = parseUnits("100", 6);
+        await token.connect(usdWhale).transfer(recipient.address, amount);
+        await token.connect(recipient).approve(ibAlluoCurrent.address, amount);
 
-        expect(await ibAlluoCurrent.getPriceFeed("USDT / USD")).equals(
-          usdtPriceFeed
-        );
-        expect(await ibAlluoCurrent.getPriceFeed("USDC / USD")).equals(
-          usdcPriceFeed
-        );
-        expect(await ibAlluoCurrent.getPriceFeed("DAI / USD")).equals(
-          daiPriceFeed
-        );
+        const tx = ibAlluoCurrent
+          .connect(recipient)
+          .deposit(token.address, amount);
+
+        let { value, decimals } = await priceFeedRouter[
+          "getPrice(address,uint256)"
+        ](token.address, 1);
+
+        let price = Number(value);
+
+        const amountIn18 = Number(amount) * 10 ** (18 - 6);
+        const mintAmount = (amountIn18 * 10 ** decimals) / price;
+        const growingRatio = 10 ** 18;
+
+        await expect(tx)
+          .to.emit(ibAlluoCurrent, "TransferAssetValue")
+          .withArgs(
+            ethers.constants.AddressZero,
+            recipient.address,
+            String(mintAmount),
+            String(amountIn18),
+            String(growingRatio)
+          );
       });
 
-      it("Should add price feed", async function () {
-        const ethPriceFeed = "0xF9680D99D6C9589e2a93a78A04A279e509205945";
+      it("Should mint the correct amount of USDT", async function () {
+        const recipient = signers[0];
+        const token = usdt;
+        const amount = parseUnits("100", 6);
+        await token.connect(usdWhale).transfer(recipient.address, amount);
+        await token.connect(recipient).approve(ibAlluoCurrent.address, amount);
 
-        expect(await ibAlluoCurrent.getPriceFeed("ETH / USD")).equals(
-          ethers.constants.AddressZero
-        );
+        const tx = ibAlluoCurrent
+          .connect(recipient)
+          .deposit(token.address, amount);
 
-        let ABI = [
-          "function changePriceFeedStatus(address _priceFeedAddress, bool _status)",
-        ];
-        let iface = new ethers.utils.Interface(ABI);
-        const calldata = iface.encodeFunctionData("changePriceFeedStatus", [
-          ethPriceFeed,
-          true,
-        ]);
+        let { value, decimals } = await priceFeedRouter[
+          "getPrice(address,uint256)"
+        ](token.address, 1);
 
-        await multisig.executeCall(ibAlluoCurrent.address, calldata);
+        let price = Number(value);
 
-        expect(await ibAlluoCurrent.getPriceFeed("ETH / USD")).equals(
-          ethPriceFeed
-        );
+        const amountIn18 = Number(amount) * 10 ** (18 - 6);
+        const mintAmount = (amountIn18 * 10 ** decimals) / price;
+        const growingRatio = 10 ** 18;
+
+        await expect(tx)
+          .to.emit(ibAlluoCurrent, "TransferAssetValue")
+          .withArgs(
+            ethers.constants.AddressZero,
+            recipient.address,
+            String(mintAmount),
+            String(amountIn18),
+            String(growingRatio)
+          );
       });
 
-      it("Should remove price feed", async function () {
-        const usdtPriceFeed = "0x0A6513e40db6EB1b165753AD52E80663aeA50545";
+      it("Should mint the correct amount of DAI", async function () {
+        const recipient = signers[0];
+        const token = dai;
+        const amount = parseUnits("100", 18);
+        await token
+          .connect(usdWhale)
+          .transfer(recipient.address, parseUnits("100", 18));
+        await token
+          .connect(recipient)
+          .approve(ibAlluoCurrent.address, parseUnits("100", 18));
 
-        expect(await ibAlluoCurrent.getPriceFeed("USDT / USD")).equals(
-          usdtPriceFeed
-        );
+        const tx = ibAlluoCurrent
+          .connect(recipient)
+          .deposit(token.address, amount);
 
-        let ABI = [
-          "function changePriceFeedStatus(address _priceFeedAddress, bool _status)",
-        ];
-        let iface = new ethers.utils.Interface(ABI);
-        const calldata = iface.encodeFunctionData("changePriceFeedStatus", [
-          usdtPriceFeed,
-          false,
-        ]);
+        let { value, decimals } = await priceFeedRouter[
+          "getPrice(address,uint256)"
+        ](token.address, 1);
 
-        await multisig.executeCall(ibAlluoCurrent.address, calldata);
+        let price = Number(value);
 
-        expect(await ibAlluoCurrent.getPriceFeed("USDT / USD")).equals(
-          ethers.constants.AddressZero
-        );
-      });
+        const amountIn18 = Number(amount) * 10 ** (18 - 18);
+        const mintAmount = (amountIn18 * 10 ** decimals) / price;
+        const growingRatio = 10 ** 18;
 
-      it("Should add and emit PriceFeedStatusChanged", async function () {
-        const ethPriceFeed = "0xF9680D99D6C9589e2a93a78A04A279e509205945";
-
-        let ABI = [
-          "function changePriceFeedStatus(address _priceFeedAddress, bool _status)",
-        ];
-        let iface = new ethers.utils.Interface(ABI);
-        const calldata = iface.encodeFunctionData("changePriceFeedStatus", [
-          ethPriceFeed,
-          true,
-        ]);
-
-        const tx = await multisig.executeCall(ibAlluoCurrent.address, calldata);
-
-        expect(tx)
-          .to.emit("IbAlluo", "PriceFeedStatusChanged")
-          .withArgs("ETH / USD", true);
-      });
-
-      it("Should remove and emit PriceFeedStatusChanged", async function () {
-        const usdtPriceFeed = "0x0A6513e40db6EB1b165753AD52E80663aeA50545";
-
-        let ABI = [
-          "function changePriceFeedStatus(address _priceFeedAddress, bool _status)",
-        ];
-        let iface = new ethers.utils.Interface(ABI);
-        const calldata = iface.encodeFunctionData("changePriceFeedStatus", [
-          usdtPriceFeed,
-          false,
-        ]);
-
-        const tx = await multisig.executeCall(ibAlluoCurrent.address, calldata);
-
-        expect(tx)
-          .to.emit("IbAlluo", "PriceFeedStatusChanged")
-          .withArgs("USDT / USD", false);
+        await expect(tx)
+          .to.emit(ibAlluoCurrent, "TransferAssetValue")
+          .withArgs(
+            ethers.constants.AddressZero,
+            recipient.address,
+            String(mintAmount),
+            String(amountIn18),
+            String(growingRatio)
+          );
       });
     });
 
-    describe("Withdraw tests", function () {
-      it("Should withdraw 50 USD in DAI", async function () {
-        await deposit(signers[0], dai, parseEther("100"));
+    describe("Test Withdraw event", function () {
+      it("Should withdraw the correct amount of USDC", async function () {
+        const recipient = signers[0];
+        const token = usdc;
+        const amount = parseUnits("100", 6);
 
-        await ibAlluoCurrent
+        await deposit(recipient, token, amount);
+        const tx = ibAlluoCurrent
           .connect(signers[0])
-          .withdraw(dai.address, parseEther("50"));
+          .withdraw(token.address, amount);
+
+        let { value, decimals } = await priceFeedRouter[
+          "getPrice(address,uint256)"
+        ](token.address, 1);
+
+        const growingRatio = 10 ** 18;
+        let price = Number(value);
+        const adjustedAmount = Number(amount);
+        const withdrawAmount = (adjustedAmount * price) / 10 ** decimals;
+
+        await expect(tx)
+          .to.emit(ibAlluoCurrent, "TransferAssetValue")
+          .withArgs(
+            signers[0].address,
+            ethers.constants.AddressZero,
+            String(withdrawAmount),
+            String(amount),
+            String(growingRatio)
+          );
+      });
+
+      it("Should withdraw the correct amount of USDT", async function () {
+        const recipient = signers[0];
+        const token = usdt;
+        const amount = parseUnits("100", 6);
+
+        await deposit(recipient, token, amount);
+        const tx = ibAlluoCurrent
+          .connect(signers[0])
+          .withdraw(token.address, amount);
+
+        let { value, decimals } = await priceFeedRouter[
+          "getPrice(address,uint256)"
+        ](token.address, 1);
+
+        const growingRatio = 10 ** 18;
+        let price = Number(value);
+        const adjustedAmount = Number(amount);
+        const withdrawAmount = (adjustedAmount * price) / 10 ** decimals;
+
+        await expect(tx)
+          .to.emit(ibAlluoCurrent, "TransferAssetValue")
+          .withArgs(
+            signers[0].address,
+            ethers.constants.AddressZero,
+            String(withdrawAmount),
+            String(amount),
+            String(growingRatio)
+          );
+      });
+
+      it("Should withdraw the correct amount of DAI", async function () {
+        const recipient = signers[0];
+        const token = usdc;
+        const amount = parseUnits("100", 6);
+
+        await deposit(recipient, token, amount);
+        await ibAlluoCurrent.connect(recipient).withdraw(token.address, amount);
 
         let withdrawalArray = await getLastWithdrawalInfo(
           ibAlluoCurrent,
@@ -323,86 +387,113 @@ describe("ibAlluoCurrent and Handler", function () {
         );
         expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
 
-        await deposit(signers[1], dai, parseEther("100"));
+        await deposit(signers[1], token, amount);
         await handler.satisfyAdapterWithdrawals(ibAlluoCurrent.address);
 
-        console.log("Balance DAI = ", await dai.balanceOf(signers[0].address));
+        let { value, decimals } = await priceFeedRouter[
+          "getPrice(address,uint256)"
+        ](token.address, 1);
+        const growingRatio = 10 ** 18;
+        let price = Number(value);
+        const adjustedAmount = Number(amount);
+        const withdrawAmount = (adjustedAmount * price) / 10 ** decimals;
 
-        expect(Number(await dai.balanceOf(signers[0].address))).lessThan(
-          Number(parseUnits("51", 18))
-        );
-        expect(Number(await dai.balanceOf(signers[0].address))).greaterThan(
-          Number(parseUnits("50", 18))
+        expect(Number(await token.balanceOf(recipient.address))).equal(
+          withdrawAmount
         );
       });
+    });
 
-      it("Should withdraw 50 USD in USDC", async function () {
-        await deposit(signers[0], usdc, parseUnits("100", 6));
-        await ibAlluoCurrent
-          .connect(signers[0])
-          .withdraw(usdc.address, parseUnits("50", 18));
+    describe("Test Withdraw balance", function () {
+      it("Should get the expected balance of USDC", async function () {
+        const recipient = signers[0];
+        const token = usdc;
+        const amount = parseUnits("100", 6);
+
+        await deposit(recipient, token, amount);
+        await ibAlluoCurrent.connect(recipient).withdraw(token.address, amount);
+
         let withdrawalArray = await getLastWithdrawalInfo(
           ibAlluoCurrent,
           handler
         );
         expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
 
-        await deposit(signers[1], usdc, parseUnits("100", 6));
+        await deposit(signers[1], token, amount);
         await handler.satisfyAdapterWithdrawals(ibAlluoCurrent.address);
 
-        console.log(
-          "Balance USDC = ",
-          await usdc.balanceOf(signers[0].address)
-        );
+        let { value, decimals } = await priceFeedRouter[
+          "getPrice(address,uint256)"
+        ](token.address, 1);
+        const growingRatio = 10 ** 18;
+        let price = Number(value);
+        const adjustedAmount = Number(amount);
+        const withdrawAmount = (adjustedAmount * price) / 10 ** decimals;
 
-        expect(Number(await usdc.balanceOf(signers[0].address))).lessThan(
-          Number(parseUnits("51", 6))
+        expect(Number(await token.balanceOf(recipient.address))).equal(
+          withdrawAmount
         );
-        expect(
-          Number(await usdc.balanceOf(signers[0].address))
-        ).greaterThanOrEqual(Number(parseUnits("50", 6)));
       });
 
-      it("Should withdraw 50 USD in USDT", async function () {
-        await deposit(signers[0], usdt, parseUnits("100", 6));
-        await ibAlluoCurrent
-          .connect(signers[0])
-          .withdraw(usdt.address, parseUnits("50", 18));
+      it("Should get the expected balance of USDT", async function () {
+        const recipient = signers[0];
+        const token = usdt;
+        const amount = parseUnits("100", 6);
+
+        await deposit(recipient, token, amount);
+        await ibAlluoCurrent.connect(recipient).withdraw(token.address, amount);
+
         let withdrawalArray = await getLastWithdrawalInfo(
           ibAlluoCurrent,
           handler
         );
         expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
 
-        await deposit(signers[1], usdt, parseUnits("100", 6));
+        await deposit(signers[1], token, amount);
         await handler.satisfyAdapterWithdrawals(ibAlluoCurrent.address);
 
-        console.log(
-          "Balance USDT = ",
-          await usdt.balanceOf(signers[0].address)
-        );
+        let { value, decimals } = await priceFeedRouter[
+          "getPrice(address,uint256)"
+        ](token.address, 1);
+        const growingRatio = 10 ** 18;
+        let price = Number(value);
+        const adjustedAmount = Number(amount);
+        const withdrawAmount = (adjustedAmount * price) / 10 ** decimals;
 
-        expect(Number(await usdt.balanceOf(signers[0].address))).lessThan(
-          Number(parseUnits("50", 6))
+        expect(Number(await token.balanceOf(recipient.address))).equal(
+          withdrawAmount
         );
-        expect(
-          Number(await usdt.balanceOf(signers[0].address))
-        ).greaterThanOrEqual(Number(parseUnits("49", 6)));
       });
 
-      it("Should withdraw and emit Withdraw", async function () {
-        await deposit(signers[0], dai, parseEther("100"));
+      it("Should get the expected balance of DAI", async function () {
+        const recipient = signers[0];
+        const token = dai;
+        const amount = parseUnits("100", 6);
 
-        const tx = await ibAlluoCurrent
-          .connect(signers[0])
-          .withdraw(dai.address, parseEther("50"));
+        await deposit(recipient, token, amount);
+        await ibAlluoCurrent.connect(recipient).withdraw(token.address, amount);
 
-        expect(tx).to.emit("IbAlluo", "Withdraw");
+        let withdrawalArray = await getLastWithdrawalInfo(
+          ibAlluoCurrent,
+          handler
+        );
+        expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+
+        await deposit(signers[1], token, amount);
+        await handler.satisfyAdapterWithdrawals(ibAlluoCurrent.address);
+
+        let { value, decimals } = await priceFeedRouter[
+          "getPrice(address,uint256)"
+        ](token.address, 1);
+        const growingRatio = 10 ** 18;
+        let price = Number(value);
+        const adjustedAmount = Number(amount);
+        const withdrawAmount = (adjustedAmount * price) / 10 ** decimals;
+
+        expect(Number(await token.balanceOf(recipient.address))).equal(
+          withdrawAmount
+        );
       });
     });
   });
 });
-
-// USDT / USD Plygon : 0x0A6513e40db6EB1b165753AD52E80663aeA50545
-// USDC / USD Plygon : 0xfe4a8cc5b5b2366c1b58bea3858e81843581b2f7
-// DAI / USD Plygon : 0x4746dec9e833a82ec7c2c1356372ccf2cfcd2f3d
