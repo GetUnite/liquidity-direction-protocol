@@ -5,7 +5,7 @@ import { Contract, ContractFactory } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { parseEther } from "@ethersproject/units";
 import { keccak256 } from "ethers/lib/utils";
-import { AlluoLockedV3, IAlluoToken, PseudoMultisigWallet, TestERC20, AlluoLockedV2Final } from '../../typechain';
+import { AlluoLockedV4, IAlluoToken, PseudoMultisigWallet, TestERC20, AlluoLockedV2Final, CvxDistributor } from '../../typechain';
 import { getLockers } from "../../scripts/dev/getLockers";
 import { writeFileSync } from 'fs';
 import { join } from "path";
@@ -18,7 +18,9 @@ let Multisig: ContractFactory;
 let multisig: PseudoMultisigWallet;
 
 let Locker: ContractFactory;
-let locker: AlluoLockedV3;
+let locker: AlluoLockedV4;
+let cvxDistributor: CvxDistributor;
+let cvx: TestERC20;
 let oldLockerFinal: AlluoLockedV2Final;
 
 let addr: Array<SignerWithAddress>;
@@ -142,7 +144,7 @@ describe("Locking contract", function () {
         Multisig = await ethers.getContractFactory("PseudoMultisigWallet");
         multisig = await Multisig.deploy(true) as PseudoMultisigWallet;
 
-        Locker = await ethers.getContractFactory("AlluoLockedV3");
+        Locker = await ethers.getContractFactory("AlluoLockedV4");
 
         locker = await upgrades.deployProxy(Locker,
             [
@@ -150,7 +152,25 @@ describe("Locking contract", function () {
                 0,
             ],
             { initializer: 'initialize', kind: 'uups' }
-        ) as AlluoLockedV3;
+        ) as AlluoLockedV4;
+
+        const CvxToken = await ethers.getContractFactory("TestERC20");
+        cvx = await CvxToken.deploy("CvxToken", "CVX", 18, false, admin.address);
+
+        const CvxDistributor = await ethers.getContractFactory("CvxDistributor");
+        const exchangeAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec";
+
+        cvxDistributor = await upgrades.deployProxy(CvxDistributor,
+            [
+                admin.address,
+                locker.address,
+                cvx.address,
+                exchangeAddress
+            ],
+            { initializer: 'initialize', kind: 'uups' }
+        ) as CvxDistributor;
+
+        await locker.setCvxDistributor(cvxDistributor.address);
 
         await alluoToken.connect(admin).mint(addr[0].address, parseEther("2000000"))
 
@@ -251,21 +271,6 @@ describe("Locking contract", function () {
 
             await locker.connect(addr[1]).withdraw();
         });
-        it("Should allow lock weth + unlock", async function () {
-
-            await weth.connect(wethHolder).transfer(addr[1].address, parseEther("5"))
-            await weth.connect(addr[1]).approve(locker.address, parseEther("5"))
-
-            await locker.connect(addr[2]).lock(parseEther("1000"));
-            await locker.connect(addr[1]).lockWETH(parseEther("5"));
-
-            await skipDays(7);
-
-            await locker.connect(addr[1]).unlockAll();
-            await skipDays(5);
-
-            await locker.connect(addr[1]).withdraw();
-        });
         it("Should not allow unlock and withdraw before the lock time expires", async function () {
 
             await locker.connect(addr[1]).lock(parseEther("1000"));
@@ -303,14 +308,14 @@ describe("Locking contract", function () {
             await locker.connect(addr[1]).lock(parseEther("1000"));
             await skipDays(7);
 
-            let lp = await locker.convertAlluoToLp(parseEther("500"))
+            let lp = parseEther("500")
             await locker.connect(addr[1]).unlock(lp);
 
             await skipDays(6);
             await locker.connect(addr[1]).withdraw();
 
             let balance = await alluoToken.balanceOf(addr[1].address);
-            expect(balance).to.be.lt(parseEther("2000"));
+            expect(balance).to.be.lte(parseEther("2000"));
             expect(balance).to.be.gt(parseEther("1999"));
         });
 
@@ -329,8 +334,14 @@ describe("Locking contract", function () {
         });
 
         it("Should not allow claim 0 amount", async function () {
-            await expect(locker.connect(addr[2]).claim()
-            ).to.be.revertedWith("Locking: Nothing to claim");
+            const balancAlluoBefore = await alluoToken.balanceOf(addr[2].address);
+            const balancCvxBefore = await cvx.balanceOf(addr[2].address);
+            await locker.connect(addr[2]).claim()
+            const balanceAlluoAfter = await alluoToken.balanceOf(addr[2].address);
+            const balancCvxAfter = await cvx.balanceOf(addr[2].address);
+
+            expect(balancAlluoBefore).to.be.equal(balanceAlluoAfter);
+            expect(balancCvxBefore).to.be.equal(balancCvxAfter);
         });
 
         it("Should return right total amount locked tokens after user lock/unlock", async function () {
@@ -338,19 +349,19 @@ describe("Locking contract", function () {
 
             let txn = await locker.connect(addr[1]).lock(amount);
 
-            let [lpAmountReturned] = await getEvents(txn, "TokensLocked", [3])
+            let [lpAmountReturned] = await getEvents(txn, "TokensLocked", [2])
 
             await skipDays(7);
             expect(await locker.balanceOf(addr[1].address)).to.equal(lpAmountReturned);
 
             expect(await locker.totalSupply()).to.equal(lpAmountReturned);
 
-            let lp = await locker.convertAlluoToLp(parseEther("500"))
+            let lp = parseEther("500")
             await locker.connect(addr[1]).unlock(lp);
 
             let unlockedBalance = await locker.unlockedBalanceOf(addr[1].address);
 
-            expect(unlockedBalance).to.be.lt(parseEther("500"));
+            expect(unlockedBalance).to.be.lte(parseEther("500"));
             expect(unlockedBalance).to.be.gt(parseEther("499"));
 
         });
@@ -359,17 +370,17 @@ describe("Locking contract", function () {
             let amount = parseEther("1000");
 
             let txn = await locker.connect(addr[1]).lock(amount);
-            let [lpAmountReturned] = await getEvents(txn, "TokensLocked", [3])
+            let [lpAmountReturned] = await getEvents(txn, "TokensLocked", [2])
 
             await locker.connect(admin).setReward(rewardPerDistribution)
             await skipDays(7);
 
-            let lp = await locker.convertAlluoToLp(parseEther("400"))
+            let lp = parseEther("400")
             await locker.connect(addr[1]).unlock(lp);
 
             let [locked, unlocked, forClaim, depositUnlockTime, withdrawUnlockTime] = await locker.getInfoByAddress(addr[1].address)
             expect(locked).to.equal(lpAmountReturned.sub(lp));
-            expect(unlocked).to.be.lt(parseEther("400"));
+            expect(unlocked).to.be.lte(parseEther("400"));
             expect(unlocked).to.be.gt(parseEther("399"));
             expect(forClaim).to.be.gt(parseEther("604800"));
             expect(forClaim).to.be.lt(parseEther("604803"));
@@ -540,7 +551,7 @@ describe("Locking contract", function () {
 
             await locker.connect(addr[1]).lock(parseEther("1000"));
             await skipDays(7);
-            let lp = await locker.convertAlluoToLp(parseEther("500"))
+            let lp = parseEther("500")
 
             await locker.connect(addr[1]).unlock(lp);
 
@@ -558,7 +569,7 @@ describe("Locking contract", function () {
 
             await locker.connect(admin).unpause()
 
-            lp = await locker.convertAlluoToLp(parseEther("400"))
+            lp = parseEther("400")
 
             await locker.connect(addr[1]).unlock(lp);
         });
