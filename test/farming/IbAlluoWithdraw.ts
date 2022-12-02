@@ -226,10 +226,9 @@ describe("ibAlluoCurrent and Handler", function () {
           "getPrice(address,uint256)"
         ](token.address, 1);
 
-        let price = Number(value);
-
-        const amountIn18 = Number(amount) * 10 ** (18 - 6);
-        const mintAmount = (amountIn18 * 10 ** decimals) / price;
+        const amountIn18 = amount.mul(10 ** (18 - 6));
+        let mintAmount = amountIn18.mul(10 ** decimals);
+        mintAmount = mintAmount.div(value);
         const growingRatio = 10 ** 18;
 
         await expect(tx)
@@ -258,10 +257,9 @@ describe("ibAlluoCurrent and Handler", function () {
           "getPrice(address,uint256)"
         ](token.address, 1);
 
-        let price = Number(value);
-
-        const amountIn18 = Number(amount) * 10 ** (18 - 6);
-        const mintAmount = (amountIn18 * 10 ** decimals) / price;
+        const amountIn18 = amount.mul(10 ** (18 - 6));
+        let mintAmount = amountIn18.mul(10 ** decimals);
+        mintAmount = mintAmount.div(value);
         const growingRatio = 10 ** 18;
 
         await expect(tx)
@@ -294,10 +292,9 @@ describe("ibAlluoCurrent and Handler", function () {
           "getPrice(address,uint256)"
         ](token.address, 1);
 
-        let price = Number(value);
-
-        const amountIn18 = Number(amount) * 10 ** (18 - 18);
-        const mintAmount = (amountIn18 * 10 ** decimals) / price;
+        const amountIn18 = amount.mul(10 ** (18 - 18));
+        let mintAmount = amountIn18.mul(10 ** decimals);
+        mintAmount = mintAmount.div(value);
         const growingRatio = 10 ** 18;
 
         await expect(tx)
@@ -312,13 +309,102 @@ describe("ibAlluoCurrent and Handler", function () {
       });
     });
 
+    describe("Test Withdraw balance", function () {
+      it("Should get the expected balance of USDC", async function () {
+        const recipient = signers[0];
+        const token = usdc;
+        const amount = parseUnits("50", 18);
+
+        await deposit(recipient, token, parseUnits("10000", 6));
+        await ibAlluoCurrent.connect(recipient).withdraw(token.address, amount);
+
+        let withdrawalArray = await getLastWithdrawalInfo(
+          ibAlluoCurrent,
+          handler
+        );
+        // expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+
+        await deposit(signers[1], token, parseUnits("10000", 6));
+        await handler.satisfyAdapterWithdrawals(ibAlluoCurrent.address);
+
+        let { value, decimals } = await priceFeedRouter[
+          "getPrice(address,uint256)"
+        ](token.address, 1);
+
+        const denominator = parseUnits("100", 18);
+        const withdrawAmount = amount.mul(value).div(denominator);
+
+        expect(Number(await token.balanceOf(recipient.address))).equal(
+          Number(withdrawAmount)
+        );
+      });
+
+      it("Should get the expected balance of USDT", async function () {
+        const recipient = signers[0];
+        const token = usdt;
+        const amount = parseUnits("50", 18);
+
+        await deposit(recipient, token, parseUnits("10000", 6));
+        await ibAlluoCurrent.connect(recipient).withdraw(token.address, amount);
+
+        let withdrawalArray = await getLastWithdrawalInfo(
+          ibAlluoCurrent,
+          handler
+        );
+        // expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+
+        await deposit(signers[1], token, parseUnits("10000", 6));
+        await handler.satisfyAdapterWithdrawals(ibAlluoCurrent.address);
+
+        let { value, decimals } = await priceFeedRouter[
+          "getPrice(address,uint256)"
+        ](token.address, 1);
+
+        const denominator = parseUnits("100", 18);
+        const withdrawAmount = amount.mul(value).div(denominator);
+
+        expect(Number(await token.balanceOf(recipient.address))).equal(
+          Number(withdrawAmount)
+        );
+      });
+
+      it("Should get the expected balance of DAI", async function () {
+        const recipient = signers[0];
+        const token = dai;
+        const amount = parseUnits("50", 18);
+
+        await deposit(recipient, token, parseUnits("10000", 18));
+        await ibAlluoCurrent.connect(recipient).withdraw(token.address, amount);
+
+        let withdrawalArray = await getLastWithdrawalInfo(
+          ibAlluoCurrent,
+          handler
+        );
+        // expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+
+        await deposit(signers[1], token, parseUnits("10000", 18));
+        await handler.satisfyAdapterWithdrawals(ibAlluoCurrent.address);
+
+        let { value, decimals } = await priceFeedRouter[
+          "getPrice(address,uint256)"
+        ](token.address, 1);
+
+        const denominator = parseUnits("100", 6);
+        const withdrawAmount = amount.mul(value).div(denominator);
+
+        expect(Number(await token.balanceOf(recipient.address))).equal(
+          Number(withdrawAmount)
+        );
+      });
+    });
+
     describe("Test Withdraw event", function () {
       it("Should withdraw the correct amount of USDC", async function () {
         const recipient = signers[0];
         const token = usdc;
-        const amount = parseUnits("100", 6);
+        const amount = parseUnits("100", 18);
 
-        await deposit(recipient, token, amount);
+        await deposit(recipient, token, parseUnits("10000", 6));
         const tx = ibAlluoCurrent
           .connect(signers[0])
           .withdraw(token.address, amount);
@@ -328,9 +414,7 @@ describe("ibAlluoCurrent and Handler", function () {
         ](token.address, 1);
 
         const growingRatio = 10 ** 18;
-        let price = Number(value);
-        const adjustedAmount = Number(amount);
-        const withdrawAmount = (adjustedAmount * price) / 10 ** decimals;
+        const withdrawAmount = amount.mul(value).div(10 ** decimals);
 
         await expect(tx)
           .to.emit(ibAlluoCurrent, "TransferAssetValue")
@@ -346,9 +430,9 @@ describe("ibAlluoCurrent and Handler", function () {
       it("Should withdraw the correct amount of USDT", async function () {
         const recipient = signers[0];
         const token = usdt;
-        const amount = parseUnits("100", 6);
+        const amount = parseUnits("100", 18);
 
-        await deposit(recipient, token, amount);
+        await deposit(recipient, token, parseUnits("10000", 6));
         const tx = ibAlluoCurrent
           .connect(signers[0])
           .withdraw(token.address, amount);
@@ -358,9 +442,7 @@ describe("ibAlluoCurrent and Handler", function () {
         ](token.address, 1);
 
         const growingRatio = 10 ** 18;
-        let price = Number(value);
-        const adjustedAmount = Number(amount);
-        const withdrawAmount = (adjustedAmount * price) / 10 ** decimals;
+        const withdrawAmount = amount.mul(value).div(10 ** decimals);
 
         await expect(tx)
           .to.emit(ibAlluoCurrent, "TransferAssetValue")
@@ -375,124 +457,30 @@ describe("ibAlluoCurrent and Handler", function () {
 
       it("Should withdraw the correct amount of DAI", async function () {
         const recipient = signers[0];
-        const token = usdc;
-        const amount = parseUnits("100", 6);
-
-        await deposit(recipient, token, amount);
-        await ibAlluoCurrent.connect(recipient).withdraw(token.address, amount);
-
-        let withdrawalArray = await getLastWithdrawalInfo(
-          ibAlluoCurrent,
-          handler
-        );
-        expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
-
-        await deposit(signers[1], token, amount);
-        await handler.satisfyAdapterWithdrawals(ibAlluoCurrent.address);
-
-        let { value, decimals } = await priceFeedRouter[
-          "getPrice(address,uint256)"
-        ](token.address, 1);
-        const growingRatio = 10 ** 18;
-        let price = Number(value);
-        const adjustedAmount = Number(amount);
-        const withdrawAmount = (adjustedAmount * price) / 10 ** decimals;
-
-        expect(Number(await token.balanceOf(recipient.address))).equal(
-          withdrawAmount
-        );
-      });
-    });
-
-    describe("Test Withdraw balance", function () {
-      it("Should get the expected balance of USDC", async function () {
-        const recipient = signers[0];
-        const token = usdc;
-        const amount = parseUnits("100", 6);
-
-        await deposit(recipient, token, amount);
-        await ibAlluoCurrent.connect(recipient).withdraw(token.address, amount);
-
-        let withdrawalArray = await getLastWithdrawalInfo(
-          ibAlluoCurrent,
-          handler
-        );
-        expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
-
-        await deposit(signers[1], token, amount);
-        await handler.satisfyAdapterWithdrawals(ibAlluoCurrent.address);
-
-        let { value, decimals } = await priceFeedRouter[
-          "getPrice(address,uint256)"
-        ](token.address, 1);
-        const growingRatio = 10 ** 18;
-        let price = Number(value);
-        const adjustedAmount = Number(amount);
-        const withdrawAmount = (adjustedAmount * price) / 10 ** decimals;
-
-        expect(Number(await token.balanceOf(recipient.address))).equal(
-          withdrawAmount
-        );
-      });
-
-      it("Should get the expected balance of USDT", async function () {
-        const recipient = signers[0];
-        const token = usdt;
-        const amount = parseUnits("100", 6);
-
-        await deposit(recipient, token, amount);
-        await ibAlluoCurrent.connect(recipient).withdraw(token.address, amount);
-
-        let withdrawalArray = await getLastWithdrawalInfo(
-          ibAlluoCurrent,
-          handler
-        );
-        expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
-
-        await deposit(signers[1], token, amount);
-        await handler.satisfyAdapterWithdrawals(ibAlluoCurrent.address);
-
-        let { value, decimals } = await priceFeedRouter[
-          "getPrice(address,uint256)"
-        ](token.address, 1);
-        const growingRatio = 10 ** 18;
-        let price = Number(value);
-        const adjustedAmount = Number(amount);
-        const withdrawAmount = (adjustedAmount * price) / 10 ** decimals;
-
-        expect(Number(await token.balanceOf(recipient.address))).equal(
-          withdrawAmount
-        );
-      });
-
-      it("Should get the expected balance of DAI", async function () {
-        const recipient = signers[0];
         const token = dai;
-        const amount = parseUnits("100", 6);
+        const amount = parseUnits("100", 18);
 
-        await deposit(recipient, token, amount);
-        await ibAlluoCurrent.connect(recipient).withdraw(token.address, amount);
-
-        let withdrawalArray = await getLastWithdrawalInfo(
-          ibAlluoCurrent,
-          handler
-        );
-        expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
-
-        await deposit(signers[1], token, amount);
-        await handler.satisfyAdapterWithdrawals(ibAlluoCurrent.address);
+        await deposit(recipient, token, parseUnits("10000", 18));
+        const tx = ibAlluoCurrent
+          .connect(signers[0])
+          .withdraw(token.address, amount);
 
         let { value, decimals } = await priceFeedRouter[
           "getPrice(address,uint256)"
         ](token.address, 1);
-        const growingRatio = 10 ** 18;
-        let price = Number(value);
-        const adjustedAmount = Number(amount);
-        const withdrawAmount = (adjustedAmount * price) / 10 ** decimals;
 
-        expect(Number(await token.balanceOf(recipient.address))).equal(
-          withdrawAmount
-        );
+        const growingRatio = 10 ** 18;
+        const withdrawAmount = amount.mul(value).div(10 ** decimals);
+
+        await expect(tx)
+          .to.emit(ibAlluoCurrent, "TransferAssetValue")
+          .withArgs(
+            signers[0].address,
+            ethers.constants.AddressZero,
+            String(withdrawAmount),
+            String(amount),
+            String(growingRatio)
+          );
       });
     });
   });
