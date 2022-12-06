@@ -18,7 +18,7 @@ const config: HardhatUserConfig = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 50,
       },
     },
   },
@@ -88,9 +88,7 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     // apiKey: process.env.ETHERSCAN_API_KEY,
-    // apiKey: process.env.FTMSCAN_API_KEY,
-        apiKey: process.env.POLYGONSCAN_API_KEY,
-
+    apiKey: process.env.POLYGONSCAN_API_KEY,
 
   },
 

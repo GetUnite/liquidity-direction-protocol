@@ -87,20 +87,7 @@ async function main() {
         },
     ];
 
-    fiatRoutes = [
-        {
-            // https://data.chain.link/polygon/mainnet/fiat/eur-usd
-            name: "EUR",
-            id: 2,
-            oracle: "0x73366fe0aa0ded304479862808e02506fe556a98"
-        },
-        {
-            // https://data.chain.link/polygon/mainnet/fiat/gbp-usd
-            name: "GBP",
-            id: 3,
-            oracle: "0x099a2540848573e94fb1ca0fa420b00acbbc845a"
-        }
-    ];
+    fiatRoutes = [];
 
     curveRoutes = [
         {
@@ -122,8 +109,8 @@ async function main() {
         },
     ]
 
-    const Router = await ethers.getContractFactory("PriceFeedRouter");
-    const router = await Router.deploy("0x2580f9954529853Ca5aC5543cE39E9B5B1145135", false);
+    // const Router = await ethers.getContractFactory("PriceFeedRouter");
+    const router = await ethers.getContractAt("PriceFeedRouter", "0x54a6c19C7a7304A99489D547ce71DC990BF141a9") //await Router.deploy("0x2580f9954529853Ca5aC5543cE39E9B5B1145135", false);
 
     console.log("Core router deployed at:", router.address);
     console.log();
@@ -131,6 +118,7 @@ async function main() {
     for (let i = 0; i < fiatRoutes.length; i++) {
         const element = fiatRoutes[i];
         const strategy = await ChainlinkStrategy.deploy(element.oracle);
+        await strategy.deployed()
         element.strategy = strategy
         console.log(`${element.name} route: ${strategy.address}. Call setFiatStrategy from Gnosis with args: [${element.name}, ${element.id}, ${strategy.address}]`);
     }
@@ -139,6 +127,7 @@ async function main() {
     for (let i = 0; i < cryptoRoutes.length; i++) {
         const element = cryptoRoutes[i];
         const strategy = await ChainlinkStrategy.deploy(element.oracle);
+        await strategy.deployed()
         element.strategy = strategy
         console.log(`${await element.coin.symbol()} route: ${strategy.address}. Call setCrytoStrategy from Gnosis with args: [${strategy.address}, ${element.coin.address}]`);
     }
@@ -154,6 +143,7 @@ async function main() {
             element.outDecimals,
             curveReferenceCoinOne
         )
+        await strategy.deployed()
         element.strategy = strategy;
         console.log(`${await element.coin.symbol()} route: ${strategy.address}. Call setCrytoStrategy from Gnosis with args: [${strategy.address}, ${element.coin.address}]`);
     }
