@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
@@ -10,6 +10,9 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import "../interfaces/IAlluoStrategy.sol";
 import "../interfaces/IExchange.sol";
+import "./../interfaces/curve/mainnet/ICurveCVXETH.sol";
+
+import "./../Locking/CvxDistributor.sol";
 
 contract VoteExecutorV2 is 
     Initializable,
@@ -20,6 +23,9 @@ contract VoteExecutorV2 is
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    ICurveCVXETH public constant CurveCVXETH = ICurveCVXETH(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4);
+    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address public constant crvCVXETH = 0x3A283D9c08E8b55966afb64C515f5143cf907611;
 
     struct Entry{
         // Percentage of the total contract balance
@@ -197,6 +203,32 @@ contract VoteExecutorV2 is
             receiver,
             swapRewards
         );
+    }
+
+    function initRewards() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        // required step to enable deliverRewards(): approving infinite WETH to CVX-ETH pool
+        IERC20MetadataUpgradeable(WETH).safeApprove(address(CurveCVXETH), type(uint256).max);
+    }
+
+    function deliverRewards(
+        address cvxDistributor,
+        address tokenFrom,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        // exchange `tokenFrom` to WETH, deposit WETH to CVX-ETH pool, send received tokens to 
+        // `cvxDistributor` and notify `cvxDistributor` to start distributing CVXs in LP value.
+        IERC20MetadataUpgradeable(tokenFrom).safeIncreaseAllowance(exchangeAddress, amount);
+        
+        uint256 amountOut = tokenFrom == WETH ? amount : IExchange(exchangeAddress).exchange(
+                tokenFrom, 
+                WETH,
+                amount,
+                0
+            );
+        uint256 lpAmount = CurveCVXETH.add_liquidity([amountOut, 0], 0);
+        IERC20MetadataUpgradeable(crvCVXETH).safeTransfer(cvxDistributor, lpAmount);
+
+        CvxDistributor(cvxDistributor).receiveReward(amount);
     }
 
     function exitStrategyRewards(
