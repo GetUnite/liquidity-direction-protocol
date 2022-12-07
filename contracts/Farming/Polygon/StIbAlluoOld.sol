@@ -13,7 +13,11 @@ import {
     TokenInfo
 } from "../../interfaces/superfluid/ISuperfluid.sol";
 
-import { IAlluoSuperToken } from "../../interfaces/superfluid/IAlluoSuperToken.sol";
+interface IAlluoSuperToken is ISuperToken {
+    function alluoWithdraw(address account, uint256 amount) external;
+    function upgradeTo(address to, uint256 amount, bytes calldata data) external;
+    function approve(address spender, uint256 amount) external returns (bool);
+}
 
 import { ISuperfluidToken, AlluoSuperfluidToken } from "./superfluid/AlluoSuperfluidToken.sol";
 
@@ -37,7 +41,7 @@ import "hardhat/console.sol";
  *
  * @author Superfluid
  */
-contract StIbAlluo is
+contract StIbAlluoOld is
     PausableUpgradeable,
     AccessControlUpgradeable,
     UUPSUpgradeable,
@@ -91,7 +95,6 @@ contract StIbAlluo is
 
     address public ibAlluo;
     bool public upgradeStatus;
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     function initialize(
         IERC20 underlyingToken,
@@ -133,7 +136,7 @@ contract StIbAlluo is
 
 
     function proxiableUUID() public pure override returns (bytes32) {
-        return 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+        return keccak256("org.superfluid-finance.contracts.SuperToken.implementation");
     }
 
 
@@ -142,16 +145,24 @@ contract StIbAlluo is
      *************************************************************************/
     // //@dev Alluo custom functions"
 
+    /// @notice Function that allows minting of StIbAlluos only by the underlying contract
+    /// @dev This is used when we want to force upgrade ibAlluos so that we can avoid the user needing to sign 3 transactions to create a flow.
+    /// @param account Address of account to mint to
+    /// @param amount Amount of StIbAlluos to mint
+    function alluoDeposit(address account, uint256 amount) external {
+        require(msg.sender ==  address(_underlyingToken));
+        (, uint256 adjustedAmount) = _toUnderlyingAmount(amount);
+        // Tokens are already received
+        _mint(account, account, adjustedAmount, account != account, "", "");
+        emit TokenUpgraded(account, adjustedAmount);
+    }
+
     /// @notice Force unwraps tokens to ibAlluos
     /// @dev Backdoor to unwrap user tokens. Unlikely to be ever used and no risk of losing user tokens.
     /// @param account Address of account to unwrap.
     /// @param amount Amount of StIbAlluos to unwrap.
     function alluoWithdraw(address account, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _downgrade(account, account, amount, "","");
-    }
-
-    function emitTransfer(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        emit Transfer(address(0), account, 0);
     }
 
     /**************************************************************************
@@ -722,7 +733,7 @@ contract StIbAlluo is
     function _authorizeUpgrade(address)
         internal
         override
-        onlyRole(UPGRADER_ROLE)
+        onlyRole(DEFAULT_ADMIN_ROLE)
     {
         require(upgradeStatus, "IbAlluo: Upgrade not allowed");
         upgradeStatus = false;
