@@ -9,80 +9,142 @@ import "hardhat/console.sol";
 
 contract SuperfluidResolver is AccessControl {
     using EnumerableSet for EnumerableSet.AddressSet;
-    mapping(address => mapping(address=>EnumerableSet.AddressSet)) private ibAlluoToStreamingData;
-    mapping(address => EnumerableSet.AddressSet) private ibAlluoToActiveStreamers;
+    mapping(address => mapping(address => EnumerableSet.AddressSet))
+        private ibAlluoToStreamingData;
+    mapping(address => EnumerableSet.AddressSet)
+        private ibAlluoToActiveStreamers;
     address[] public ibAlluoAddresses;
-    address public CFAContract;
+    address public cfaContract;
     bytes32 public constant GELATO = keccak256("GELATO");
 
-    event WrappedTokenToPreventLiquidation(address indexed sender, address indexed receiver);
-    event ClosedStreamToPreventLiquidation(address indexed sender, address indexed receiver);
+    event WrappedTokenToPreventLiquidation(
+        address indexed sender,
+        address indexed receiver
+    );
+    event ClosedStreamToPreventLiquidation(
+        address indexed sender,
+        address indexed receiver
+    );
 
     constructor(
-        address[] memory _ibAlluoAddresses, address _CFAContract, address _gelato
+        address[] memory _ibAlluoAddresses,
+        address _cfaContract,
+        address _gelato
     ) {
         for (uint i; i < _ibAlluoAddresses.length; i++) {
             _grantRole(DEFAULT_ADMIN_ROLE, _ibAlluoAddresses[i]);
         }
         ibAlluoAddresses = _ibAlluoAddresses;
-        CFAContract = _CFAContract;
+        cfaContract = _cfaContract;
         _grantRole(GELATO, _gelato);
-        _grantRole(GELATO,msg.sender);
+        _grantRole(GELATO, msg.sender);
     }
 
-
-    function addToChecker(address _sender, address _receiver) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function addToChecker(
+        address _sender,
+        address _receiver
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         ibAlluoToStreamingData[msg.sender][_sender].add(_receiver);
-        if (!ibAlluoToActiveStreamers[msg.sender].contains(_sender)) {  
+        if (!ibAlluoToActiveStreamers[msg.sender].contains(_sender)) {
             ibAlluoToActiveStreamers[msg.sender].add(_sender);
         }
     }
 
-    function removeFromChecker(address _sender, address _receiver) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function removeFromChecker(
+        address _sender,
+        address _receiver
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         ibAlluoToStreamingData[msg.sender][_sender].remove(_receiver);
         if (ibAlluoToStreamingData[msg.sender][_sender].length() == 0) {
             ibAlluoToActiveStreamers[msg.sender].remove(_sender);
-        } 
+        }
     }
 
-
-    function checker() external view returns (bool canExec, bytes memory execPayload) {
+    function checker()
+        external
+        view
+        returns (bool canExec, bytes memory execPayload)
+    {
         for (uint256 i; i < ibAlluoAddresses.length; i++) {
             address ibAlluo = ibAlluoAddresses[i];
-            for (uint256 j; j < ibAlluoToActiveStreamers[ibAlluo].length(); j++) {
+            for (
+                uint256 j;
+                j < ibAlluoToActiveStreamers[ibAlluo].length();
+                j++
+            ) {
                 address sender = ibAlluoToActiveStreamers[ibAlluo].at(j);
                 if (_isUserCloseToLiquidation(sender, ibAlluo)) {
-                    address[] memory receivers = ibAlluoToStreamingData[ibAlluo][sender].values();
+                    address[] memory receivers = ibAlluoToStreamingData[
+                        ibAlluo
+                    ][sender].values();
                     // Liquidate all streams that belong to the sender
-                    return(true, abi.encodeWithSelector(SuperfluidResolver.liquidateSender.selector, sender, receivers, ibAlluo));
+                    return (
+                        true,
+                        abi.encodeWithSelector(
+                            SuperfluidResolver.liquidateSender.selector,
+                            sender,
+                            receivers,
+                            ibAlluo
+                        )
+                    );
                 }
             }
         }
         return (canExec, execPayload);
     }
 
-
-    function _isUserCloseToLiquidation(address _sender, address _token) internal view returns (bool dangerZone) {
-        ISuperfluidToken superToken = ISuperfluidToken(IIbAlluo(_token).superToken());
-        (, int96 flowRate,,) = IConstantFlowAgreementV1(CFAContract).getAccountFlowInfo(superToken, _sender);
-        (int256 realTimeBalance,,,) = superToken.realtimeBalanceOfNow(_sender);
-        dangerZone= true ? realTimeBalance < -(int256(flowRate) * int256(16200)) : false;
+    function _isUserCloseToLiquidation(
+        address _sender,
+        address _token
+    ) internal view returns (bool dangerZone) {
+        ISuperfluidToken superToken = ISuperfluidToken(
+            IIbAlluo(_token).superToken()
+        );
+        (, int96 flowRate, , ) = IConstantFlowAgreementV1(cfaContract)
+            .getAccountFlowInfo(superToken, _sender);
+        (int256 realTimeBalance, , , ) = superToken.realtimeBalanceOfNow(
+            _sender
+        );
+        dangerZone = true
+            ? realTimeBalance < -(int256(flowRate) * int256(16200))
+            : false;
     }
 
-    function _isUserCloseToLiquidationAfterWrapping(address _sender, address _token) internal view returns (bool dangerZone) {
-        ISuperfluidToken superToken = ISuperfluidToken(IIbAlluo(_token).superToken());
-        (, int96 flowRate,,) = IConstantFlowAgreementV1(CFAContract).getAccountFlowInfo(superToken, _sender);
-        (int256 realTimeBalance,,,) = superToken.realtimeBalanceOfNow(_sender);
+    function _isUserCloseToLiquidationAfterWrapping(
+        address _sender,
+        address _token
+    ) internal view returns (bool dangerZone) {
+        ISuperfluidToken superToken = ISuperfluidToken(
+            IIbAlluo(_token).superToken()
+        );
+        (, int96 flowRate, , ) = IConstantFlowAgreementV1(cfaContract)
+            .getAccountFlowInfo(superToken, _sender);
+        (int256 realTimeBalance, , , ) = superToken.realtimeBalanceOfNow(
+            _sender
+        );
         uint256 ibAlluoBalance = IIbAlluo(_token).balanceOf(_sender);
-        dangerZone = true ? realTimeBalance + int256(ibAlluoBalance) < -(int256(flowRate) * int256(16200)) : false;
+        dangerZone = true
+            ? realTimeBalance + int256(ibAlluoBalance) <
+                -(int256(flowRate) * int256(16200))
+            : false;
     }
 
-    function liquidateSender(address _sender, address[] memory _receivers, address _token) external onlyRole(GELATO) {
+    function liquidateSender(
+        address _sender,
+        address[] memory _receivers,
+        address _token
+    ) external onlyRole(GELATO) {
         for (uint256 i; i < _receivers.length; i++) {
-            if(_isUserCloseToLiquidationAfterWrapping(_sender, _token)) {
-                try IIbAlluo(_token).stopFlowWhenCritical(_sender, _receivers[i]) {
-                } catch {
-                    ibAlluoToStreamingData[_token][_sender].remove(_receivers[i]);
+            if (_isUserCloseToLiquidationAfterWrapping(_sender, _token)) {
+                try
+                    IIbAlluo(_token).stopFlowWhenCritical(
+                        _sender,
+                        _receivers[i]
+                    )
+                {} catch {
+                    ibAlluoToStreamingData[_token][_sender].remove(
+                        _receivers[i]
+                    );
                     if (ibAlluoToStreamingData[_token][_sender].length() == 0) {
                         ibAlluoToActiveStreamers[_token].remove(_sender);
                     }
@@ -91,7 +153,6 @@ contract SuperfluidResolver is AccessControl {
             } else {
                 IIbAlluo(_token).forceWrap(_sender);
                 emit WrappedTokenToPreventLiquidation(_sender, _receivers[i]);
-
             }
         }
     }

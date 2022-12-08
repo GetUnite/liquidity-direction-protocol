@@ -10,7 +10,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract BtcNoPoolAdapterMainnet is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
+contract BtcNoPoolAdapterMainnet is
+    Initializable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable
+{
     using Address for address;
     using SafeERC20 for IERC20;
 
@@ -23,7 +27,10 @@ contract BtcNoPoolAdapterMainnet is Initializable, AccessControlUpgradeable, UUP
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-   function initialize(address _multiSigWallet, address _liquidityHandler) public initializer {
+    function initialize(
+        address _multiSigWallet,
+        address _liquidityHandler
+    ) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
@@ -36,26 +43,40 @@ contract BtcNoPoolAdapterMainnet is Initializable, AccessControlUpgradeable, UUP
         wallet = _multiSigWallet;
     }
 
-    function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function deposit(
+        address _token,
+        uint256 _fullAmount,
+        uint256 _leaveInPool
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
-        if(toSend != 0){
-            IERC20(WBTC).safeTransfer(wallet, toSend / 10**10);
+        if (toSend != 0) {
+            IERC20(WBTC).safeTransfer(wallet, toSend / 10 ** 10);
         }
-    } 
-
-    function withdraw(address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        IERC20(WBTC).safeTransfer(_user, _amount / 10**10);
     }
-    
+
+    function withdraw(
+        address _user,
+        address _token,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IERC20(WBTC).safeTransfer(_user, _amount / 10 ** 10);
+    }
+
     function getAdapterAmount() external view returns (uint256) {
-        return IERC20(WBTC).balanceOf(address(this)) * 10**10;
+        return IERC20(WBTC).balanceOf(address(this)) * 10 ** 10;
     }
 
-    function getCoreTokens() external pure returns ( address mathToken, address primaryToken ){
+    function getCoreTokens()
+        external
+        pure
+        returns (address mathToken, address primaryToken)
+    {
         return (WBTC, WBTC);
     }
 
-    function setWallet(address _newWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setWallet(
+        address _newWallet
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         wallet = _newWallet;
     }
 
@@ -64,25 +85,23 @@ contract BtcNoPoolAdapterMainnet is Initializable, AccessControlUpgradeable, UUP
      * @param _address address of the token being removed
      * @param _amount amount of the token being removed
      */
-    function removeTokenByAddress(address _address, address _to, uint256 _amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function removeTokenByAddress(
+        address _address,
+        address _to,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(_address).safeTransfer(_to, _amount);
     }
 
-    function changeUpgradeStatus(bool _status)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function changeUpgradeStatus(
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         upgradeStatus = _status;
     }
-    
-    function _authorizeUpgrade(address)
-        internal
-        override
-        onlyRole(UPGRADER_ROLE)
-    {
+
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(UPGRADER_ROLE) {
         require(upgradeStatus, "Adapter: Upgrade not allowed");
         upgradeStatus = false;
     }

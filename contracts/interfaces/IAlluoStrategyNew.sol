@@ -7,8 +7,7 @@ interface IAlluoStrategyNew {
     /// transferred to strategy by vote executor.
     /// @param data whatever data you want to pass to strategy from vote extry.
     /// @param amount amount of your tokens that will be invested.
-    function invest(bytes calldata data, uint256 amount)
-        external;
+    function invest(bytes calldata data, uint256 amount) external;
 
     /// @notice Uninvest value and tranfer exchanged value to receiver.
     /// @param data whatever data you want to pass to strategy from vote extry.

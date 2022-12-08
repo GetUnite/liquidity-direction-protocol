@@ -19,8 +19,8 @@ contract CurvePoolReferenceFeedStrategyV2 is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable,
-    IFeedStrategy {
-
+    IFeedStrategy
+{
     IFeedStrategy public referenceFeed;
     ICurvePool public curvePool;
     int8 public referenceCoinIndex;
@@ -51,7 +51,6 @@ contract CurvePoolReferenceFeedStrategyV2 is
         desiredOneTokenAmount = _desiredOneTokenAmount;
         referenceFeed = IFeedStrategy(_referenceFeedAddress);
         referenceCoinDecimals = _referenceCoinDecimals;
-
     }
 
     function getPrice() external view returns (int256 value, uint8 decimals) {
@@ -64,10 +63,15 @@ contract CurvePoolReferenceFeedStrategyV2 is
         (int256 usdPrice, uint8 usdDecimals) = referenceFeed.getPrice();
         require(usdPrice > 0, "CurvePRFS: feed lte 0");
 
-        return (int256(oneTokenPrice) * usdPrice, usdDecimals + referenceCoinDecimals);
+        return (
+            int256(oneTokenPrice) * usdPrice,
+            usdDecimals + referenceCoinDecimals
+        );
     }
 
-    function getPriceOfAmount(uint256 amount) external view returns (int256 value, uint8 decimals){
+    function getPriceOfAmount(
+        uint256 amount
+    ) external view returns (int256 value, uint8 decimals) {
         uint256 tokenAmountPrice = curvePool.get_dy(
             desiredCoinIndex,
             referenceCoinIndex,
@@ -75,13 +79,13 @@ contract CurvePoolReferenceFeedStrategyV2 is
         );
         (int256 usdPrice, uint8 usdDecimals) = referenceFeed.getPrice();
         require(usdPrice > 0, "CurvePRFS: feed lte 0");
-        return (int256(tokenAmountPrice) * usdPrice, usdDecimals + referenceCoinDecimals);
+        return (
+            int256(tokenAmountPrice) * usdPrice,
+            usdDecimals + referenceCoinDecimals
+        );
     }
 
-    function _authorizeUpgrade(address newImplementation)
-    internal
-    onlyRole(DEFAULT_ADMIN_ROLE)
-    override {
-    }
-
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

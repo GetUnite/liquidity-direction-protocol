@@ -42,9 +42,10 @@ interface ICurveCVXETH {
         uint256 dx
     ) external view returns (uint256);
 
-    function add_liquidity(uint256[2] memory amounts, uint256 min_mint_amount)
-        external
-        returns (uint256);
+    function add_liquidity(
+        uint256[2] memory amounts,
+        uint256 min_mint_amount
+    ) external returns (uint256);
 
     function add_liquidity(
         uint256[2] memory amounts,
@@ -52,8 +53,10 @@ interface ICurveCVXETH {
         bool use_eth
     ) external returns (uint256);
 
-    function remove_liquidity(uint256 _amount, uint256[2] memory min_amounts)
-        external;
+    function remove_liquidity(
+        uint256 _amount,
+        uint256[2] memory min_amounts
+    ) external;
 
     function remove_liquidity(
         uint256 _amount,
@@ -61,15 +64,14 @@ interface ICurveCVXETH {
         bool use_eth
     ) external;
 
-    function calc_token_amount(uint256[2] memory amounts)
-        external
-        view
-        returns (uint256);
+    function calc_token_amount(
+        uint256[2] memory amounts
+    ) external view returns (uint256);
 
-    function calc_withdraw_one_coin(uint256 token_amount, uint256 i)
-        external
-        view
-        returns (uint256);
+    function calc_withdraw_one_coin(
+        uint256 token_amount,
+        uint256 i
+    ) external view returns (uint256);
 
     function remove_liquidity_one_coin(
         uint256 token_amount,

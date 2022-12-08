@@ -13,8 +13,8 @@ contract ChainlinkFeedStrategyV2 is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable,
-    IFeedStrategy {
-
+    IFeedStrategy
+{
     IChainlinkPriceFeed public chainlinkFeed;
     address public token;
 
@@ -39,17 +39,17 @@ contract ChainlinkFeedStrategyV2 is
         return (chainlinkFeed.latestAnswer(), chainlinkFeed.decimals());
     }
 
-    function getPriceOfAmount(uint256 amount) external view returns (int256 value, uint8 decimals){
+    function getPriceOfAmount(
+        uint256 amount
+    ) external view returns (int256 value, uint8 decimals) {
         uint8 totalDecimals = chainlinkFeed.decimals();
-        if(token != address(0)){
+        if (token != address(0)) {
             totalDecimals += IERC20Metadata(token).decimals();
         }
         return (chainlinkFeed.latestAnswer() * int256(amount), totalDecimals);
     }
 
-
-    function _authorizeUpgrade(address newImplementation)
-    internal
-    onlyRole(DEFAULT_ADMIN_ROLE)
-    override {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

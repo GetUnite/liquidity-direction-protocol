@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: AGPLv3
-pragma solidity >= 0.8.0;
+pragma solidity >=0.8.0;
 
-import { ISuperAgreement } from "./ISuperAgreement.sol";
-
+import {ISuperAgreement} from "./ISuperAgreement.sol";
 
 /**
  * @title Superfluid token interface
  * @author Superfluid
  */
 interface ISuperfluidToken {
-
     /**************************************************************************
      * Basic information
      *************************************************************************/
@@ -17,12 +15,12 @@ interface ISuperfluidToken {
     /**
      * @dev Get superfluid host contract address
      */
-    function getHost() external view returns(address host);
+    function getHost() external view returns (address host);
 
     /**
      * @dev Encoded liquidation type data mainly used for handling stack to deep errors
      *
-     * @custom:note 
+     * @custom:note
      * - version: 1
      * - liquidationType key:
      *    - 0 = reward account receives reward (PIC period)
@@ -39,22 +37,20 @@ interface ISuperfluidToken {
      *************************************************************************/
 
     /**
-    * @dev Calculate the real balance of a user, taking in consideration all agreements of the account
-    * @param account for the query
-    * @param timestamp Time of balance
-    * @return availableBalance Real-time balance
-    * @return deposit Account deposit
-    * @return owedDeposit Account owed Deposit
-    */
+     * @dev Calculate the real balance of a user, taking in consideration all agreements of the account
+     * @param account for the query
+     * @param timestamp Time of balance
+     * @return availableBalance Real-time balance
+     * @return deposit Account deposit
+     * @return owedDeposit Account owed Deposit
+     */
     function realtimeBalanceOf(
-       address account,
-       uint256 timestamp
+        address account,
+        uint256 timestamp
     )
-        external view
-        returns (
-            int256 availableBalance,
-            uint256 deposit,
-            uint256 owedDeposit);
+        external
+        view
+        returns (int256 availableBalance, uint256 deposit, uint256 owedDeposit);
 
     /**
      * @notice Calculate the realtime balance given the current host.getNow() value
@@ -65,40 +61,38 @@ interface ISuperfluidToken {
      * @return owedDeposit Account owed Deposit
      */
     function realtimeBalanceOfNow(
-       address account
+        address account
     )
-        external view
+        external
+        view
         returns (
             int256 availableBalance,
             uint256 deposit,
             uint256 owedDeposit,
-            uint256 timestamp);
+            uint256 timestamp
+        );
 
     /**
-    * @notice Check if account is critical
-    * @dev A critical account is when availableBalance < 0
-    * @param account The account to check
-    * @param timestamp The time we'd like to check if the account is critical (should use future)
-    * @return isCritical Whether the account is critical
-    */
+     * @notice Check if account is critical
+     * @dev A critical account is when availableBalance < 0
+     * @param account The account to check
+     * @param timestamp The time we'd like to check if the account is critical (should use future)
+     * @return isCritical Whether the account is critical
+     */
     function isAccountCritical(
         address account,
         uint256 timestamp
-    )
-        external view
-        returns(bool isCritical);
+    ) external view returns (bool isCritical);
 
     /**
-    * @notice Check if account is critical now (current host.getNow())
-    * @dev A critical account is when availableBalance < 0
-    * @param account The account to check
-    * @return isCritical Whether the account is critical
-    */
+     * @notice Check if account is critical now (current host.getNow())
+     * @dev A critical account is when availableBalance < 0
+     * @param account The account to check
+     * @return isCritical Whether the account is critical
+     */
     function isAccountCriticalNow(
         address account
-    )
-        external view
-        returns(bool isCritical);
+    ) external view returns (bool isCritical);
 
     /**
      * @notice Check if account is solvent
@@ -110,9 +104,7 @@ interface ISuperfluidToken {
     function isAccountSolvent(
         address account,
         uint256 timestamp
-    )
-        external view
-        returns(bool isSolvent);
+    ) external view returns (bool isSolvent);
 
     /**
      * @notice Check if account is solvent now
@@ -122,35 +114,29 @@ interface ISuperfluidToken {
      */
     function isAccountSolventNow(
         address account
-    )
-        external view
-        returns(bool isSolvent);
+    ) external view returns (bool isSolvent);
 
     /**
-    * @notice Get a list of agreements that is active for the account
-    * @dev An active agreement is one that has state for the account
-    * @param account Account to query
-    * @return activeAgreements List of accounts that have non-zero states for the account
-    */
-    function getAccountActiveAgreements(address account)
-       external view
-       returns(ISuperAgreement[] memory activeAgreements);
+     * @notice Get a list of agreements that is active for the account
+     * @dev An active agreement is one that has state for the account
+     * @param account Account to query
+     * @return activeAgreements List of accounts that have non-zero states for the account
+     */
+    function getAccountActiveAgreements(
+        address account
+    ) external view returns (ISuperAgreement[] memory activeAgreements);
 
-
-   /**************************************************************************
-    * Super Agreement hosting functions
-    *************************************************************************/
+    /**************************************************************************
+     * Super Agreement hosting functions
+     *************************************************************************/
 
     /**
      * @dev Create a new agreement
      * @param id Agreement ID
      * @param data Agreement data
      */
-    function createAgreement(
-        bytes32 id,
-        bytes32[] calldata data
-    )
-        external;
+    function createAgreement(bytes32 id, bytes32[] calldata data) external;
+
     /**
      * @dev Agreement created event
      * @param agreementClass Contract address of the agreement
@@ -173,20 +159,15 @@ interface ISuperfluidToken {
         address agreementClass,
         bytes32 id,
         uint dataLength
-    )
-        external view
-        returns(bytes32[] memory data);
+    ) external view returns (bytes32[] memory data);
 
     /**
      * @dev Create a new agreement
      * @param id Agreement ID
      * @param data Agreement data
      */
-    function updateAgreementData(
-        bytes32 id,
-        bytes32[] calldata data
-    )
-        external;
+    function updateAgreementData(bytes32 id, bytes32[] calldata data) external;
+
     /**
      * @dev Agreement updated event
      * @param agreementClass Contract address of the agreement
@@ -203,34 +184,28 @@ interface ISuperfluidToken {
      * @dev Close the agreement
      * @param id Agreement ID
      */
-    function terminateAgreement(
-        bytes32 id,
-        uint dataLength
-    )
-        external;
+    function terminateAgreement(bytes32 id, uint dataLength) external;
+
     /**
      * @dev Agreement terminated event
      * @param agreementClass Contract address of the agreement
      * @param id Agreement ID
      */
-    event AgreementTerminated(
-        address indexed agreementClass,
-        bytes32 id
-    );
+    event AgreementTerminated(address indexed agreementClass, bytes32 id);
 
     /**
      * @dev Update agreement state slot
      * @param account Account to be updated
      *
-     * @custom:note 
+     * @custom:note
      * - To clear the storage out, provide zero-ed array of intended length
      */
     function updateAgreementStateSlot(
         address account,
         uint256 slotId,
         bytes32[] calldata slotData
-    )
-        external;
+    ) external;
+
     /**
      * @dev Agreement account state updated event
      * @param agreementClass Contract address of the agreement
@@ -255,9 +230,7 @@ interface ISuperfluidToken {
         address account,
         uint256 slotId,
         uint dataLength
-    )
-        external view
-        returns (bytes32[] memory slotData);
+    ) external view returns (bytes32[] memory slotData);
 
     /**
      * @notice Settle balance from an account by the agreement
@@ -265,14 +238,10 @@ interface ISuperfluidToken {
      * @param account Account to query.
      * @param delta Amount of balance delta to be settled
      *
-     * @custom:modifiers 
+     * @custom:modifiers
      *  - onlyAgreement
      */
-    function settleBalance(
-        address account,
-        int256 delta
-    )
-        external;
+    function settleBalance(address account, int256 delta) external;
 
     /**
      * @dev Make liquidation payouts (v2)
@@ -284,7 +253,7 @@ interface ISuperfluidToken {
      * @param rewardAmount The amount the rewarded account will receive
      * @param targetAccountBalanceDelta The delta amount the target account balance should change by
      *
-     * @custom:note 
+     * @custom:note
      * - If a bailout is required (bailoutAmount > 0)
      *   - the actual reward (single deposit) goes to the executor,
      *   - while the reward account becomes the bailout account
@@ -294,11 +263,10 @@ interface ISuperfluidToken {
      *   - the targetAccount will pay the rewardAmount
      *   - the liquidator (reward account in PIC period) will receive the rewardAmount
      *
-     * @custom:modifiers 
+     * @custom:modifiers
      *  - onlyAgreement
      */
-    function makeLiquidationPayoutsV2
-    (
+    function makeLiquidationPayoutsV2(
         bytes32 id,
         bytes memory liquidationTypeData,
         address liquidatorAccount,
@@ -307,6 +275,7 @@ interface ISuperfluidToken {
         uint256 rewardAmount,
         int256 targetAccountBalanceDelta
     ) external;
+
     /**
      * @dev Agreement liquidation event v2 (including agent account)
      * @param agreementClass Contract address of the agreement
@@ -318,7 +287,7 @@ interface ISuperfluidToken {
      * @param targetAccountBalanceDelta The amount the sender account balance should change by
      * @param liquidationTypeData The encoded liquidation type data including the version (how to decode)
      *
-     * @custom:note 
+     * @custom:note
      * Reward account rule:
      * - if the agreement is liquidated during the PIC period
      *   - the rewardAmountReceiver will get the rewardAmount (remaining deposit), regardless of the liquidatorAccount
@@ -351,8 +320,8 @@ interface ISuperfluidToken {
      * NOTE: solidity-coverage not supporting it
      *************************************************************************/
 
-     /// @dev The msg.sender must be host contract
-     //modifier onlyHost() virtual;
+    /// @dev The msg.sender must be host contract
+    //modifier onlyHost() virtual;
 
     /// @dev The msg.sender must be a listed agreement.
     //modifier onlyAgreement() virtual;
@@ -386,10 +355,7 @@ interface ISuperfluidToken {
      *
      * @custom:deprecated Use AgreementLiquidatedV2 instead
      */
-    event Bailout(
-        address indexed bailoutAccount,
-        uint256 bailoutAmount
-    );
+    event Bailout(address indexed bailoutAccount, uint256 bailoutAmount);
 
     /**
      * @dev Agreement liquidation event (DEPRECATED BY AgreementLiquidatedV2)
@@ -403,7 +369,7 @@ interface ISuperfluidToken {
      *
      * @custom:deprecated Use AgreementLiquidatedV2 instead
      *
-     * @custom:note 
+     * @custom:note
      * Reward account rule:
      * - if bailout is equal to 0, then
      *   - the bondAccount will get the rewardAmount,

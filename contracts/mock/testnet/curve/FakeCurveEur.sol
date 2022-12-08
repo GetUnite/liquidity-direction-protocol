@@ -31,9 +31,13 @@ contract FakeCurveEur is
     uint256 public jeurFee;
     uint256 public eurtFee;
 
-    IERC20Upgradeable public constant EURS = IERC20Upgradeable(0x3Aa4345De8B32e5c9c14FC7146597EAf262Fd70E);
-    IERC20Upgradeable public constant JEUR = IERC20Upgradeable(0x4bf7737515EE8862306Ddc221cE34cA9d5C91200);
-    IERC20Upgradeable public constant EURT = IERC20Upgradeable(0x34A13C2D581efe6239b92F9a65c8BAa65dfdeBE9);
+    IERC20Upgradeable public constant EURS =
+        IERC20Upgradeable(0x3Aa4345De8B32e5c9c14FC7146597EAf262Fd70E);
+    IERC20Upgradeable public constant JEUR =
+        IERC20Upgradeable(0x4bf7737515EE8862306Ddc221cE34cA9d5C91200);
+    IERC20Upgradeable public constant EURT =
+        IERC20Upgradeable(0x34A13C2D581efe6239b92F9a65c8BAa65dfdeBE9);
+
     //IERC20Upgradeable public constant  = ;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -62,21 +66,21 @@ contract FakeCurveEur is
             _mint(msg.sender, _amount);
         } else if (IERC20Upgradeable(_token) == EURT) {
             EURT.transferFrom(msg.sender, wallet, _amount);
-            _mint(msg.sender, _amount * 10 **12);
+            _mint(msg.sender, _amount * 10 ** 12);
         }
     }
 
-    function remove_liquidity(address _token, uint256 _amount)
-        external
-        returns (uint256)
-    {
+    function remove_liquidity(
+        address _token,
+        uint256 _amount
+    ) external returns (uint256) {
         if (IERC20Upgradeable(_token) == EURT) {
             _burn(msg.sender, _amount * 10 ** 12);
             uint256 amountWithFee = (_amount * (10000 - eurtFee)) / 10000;
             EURT.transferFrom(wallet, msg.sender, amountWithFee);
             return amountWithFee;
         } else if (IERC20Upgradeable(_token) == EURS) {
-            _burn(msg.sender, _amount * 10**16);
+            _burn(msg.sender, _amount * 10 ** 16);
             EURS.transferFrom(wallet, msg.sender, _amount);
             return _amount;
         } else if (IERC20Upgradeable(_token) == JEUR) {
@@ -87,17 +91,16 @@ contract FakeCurveEur is
         }
     }
 
-    function setWallet(address newWallet)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function setWallet(
+        address newWallet
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         wallet = newWallet;
     }
 
-    function changeFee(uint256 jeur, uint256 eurt)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function changeFee(
+        uint256 jeur,
+        uint256 eurt
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         jeurFee = jeur;
         eurtFee = eurt;
     }
@@ -110,17 +113,14 @@ contract FakeCurveEur is
         _unpause();
     }
 
-    function grantRole(bytes32 role, address account)
-        public
-        override
-        onlyRole(getRoleAdmin(role))
-    {
+    function grantRole(
+        bytes32 role,
+        address account
+    ) public override onlyRole(getRoleAdmin(role)) {
         _grantRole(role, account);
     }
 
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        onlyRole(UPGRADER_ROLE)
-    {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(UPGRADER_ROLE) {}
 }

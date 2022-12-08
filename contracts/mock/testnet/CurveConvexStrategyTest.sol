@@ -19,9 +19,10 @@ interface IAlluoStrategy {
     /// @param data whatever data you want to pass to strategy from vote extry.
     /// @param amount amount of your tokens that will be invested.
     /// @return data that MUST be passed in exiting functions
-    function invest(bytes calldata data, uint256 amount)
-        external
-        returns (bytes memory);
+    function invest(
+        bytes calldata data,
+        uint256 amount
+    ) external returns (bytes memory);
 
     /// @notice Uninvest value and tranfer exchanged value to receiver.
     /// @param data whatever data you want to pass to strategy from vote extry.
@@ -58,6 +59,7 @@ interface IAlluoStrategy {
         bytes[] calldata calldatas
     ) external;
 }
+
 interface ICvxBooster {
     function FEE_DENOMINATOR() external view returns (uint256);
 
@@ -111,7 +113,9 @@ interface ICvxBooster {
 
     function platformFee() external view returns (uint256);
 
-    function poolInfo(uint256)
+    function poolInfo(
+        uint256
+    )
         external
         view
         returns (
@@ -164,8 +168,10 @@ interface ICvxBooster {
 
     function setPoolManager(address _poolM) external;
 
-    function setRewardContracts(address _rewards, address _stakerRewards)
-        external;
+    function setRewardContracts(
+        address _rewards,
+        address _stakerRewards
+    ) external;
 
     function setTreasury(address _treasury) external;
 
@@ -195,9 +201,10 @@ interface ICvxBooster {
 
     function voteDelegate() external view returns (address);
 
-    function voteGaugeWeight(address[] memory _gauge, uint256[] memory _weight)
-        external
-        returns (bool);
+    function voteGaugeWeight(
+        address[] memory _gauge,
+        uint256[] memory _weight
+    ) external returns (bool);
 
     function voteOwnership() external view returns (address);
 
@@ -213,7 +220,6 @@ interface ICvxBooster {
         address _to
     ) external returns (bool);
 }
-
 
 interface ICvxBaseRewardPool {
     function addExtraReward(address _reward) external returns (bool);
@@ -236,9 +242,10 @@ interface ICvxBaseRewardPool {
 
     function getReward() external returns (bool);
 
-    function getReward(address _account, bool _claimExtras)
-        external
-        returns (bool);
+    function getReward(
+        address _account,
+        bool _claimExtras
+    ) external returns (bool);
 
     function historicalRewards() external view returns (uint256);
 
@@ -288,24 +295,38 @@ interface ICvxBaseRewardPool {
 
     function withdrawAllAndUnwrap(bool claim) external;
 
-    function withdrawAndUnwrap(uint256 amount, bool claim)
-        external
-        returns (bool);
+    function withdrawAndUnwrap(
+        uint256 amount,
+        bool claim
+    ) external returns (bool);
 }
 
-    interface ICurve2Pool {
+interface ICurve2Pool {
     // add liquidity (dai or usdc) to receive back DAI+USDC
-    function add_liquidity(uint256[2] memory _deposit_amounts, uint256 _min_mint_amount) external returns(uint256);
+    function add_liquidity(
+        uint256[2] memory _deposit_amounts,
+        uint256 _min_mint_amount
+    ) external returns (uint256);
+
     // remove liquidity (DAI+USDC) to recieve back dai or usdc
-    function remove_liquidity_one_coin(uint256 _burn_amount, int128 i, uint256 _min_amount) external returns(uint256);
-    function calc_withdraw_one_coin(uint256 _burn_amount, int128 i) external view returns(uint256);
-    function coins(uint256 index) external view returns(address);
+    function remove_liquidity_one_coin(
+        uint256 _burn_amount,
+        int128 i,
+        uint256 _min_amount
+    ) external returns (uint256);
+
+    function calc_withdraw_one_coin(
+        uint256 _burn_amount,
+        int128 i
+    ) external view returns (uint256);
+
+    function coins(uint256 index) external view returns (address);
 }
+
 contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
     using Address for address;
     using SafeERC20 for IERC20;
     // For polygon remember to change these constants
-
 
     ICvxBooster public constant cvxBooster =
         ICvxBooster(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
@@ -320,12 +341,8 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
 
     IWrappedEther public constant wETH =
         IWrappedEther(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-        
-    constructor(
-        address voteExecutor,
-        address gnosis,
-        bool isTesting
-    ) {
+
+    constructor(address voteExecutor, address gnosis, bool isTesting) {
         if (isTesting) _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         else {
             require(
@@ -338,14 +355,12 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
         }
     }
 
-    receive() external payable {
-    }
+    receive() external payable {}
 
-    function invest(bytes calldata data, uint256 amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        returns (bytes memory)
-    {
+    function invest(
+        bytes calldata data,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) returns (bytes memory) {
         (
             address curvePool,
             IERC20 lpToken,
@@ -355,7 +370,7 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
             uint256 poolId
         ) = decodeEntryParams(data);
         uint256 valueETH;
-        
+
         if (address(poolToken) == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) {
             wETH.withdraw(amount);
             valueETH = amount;
@@ -365,15 +380,14 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
         uint256[4] memory fourPoolTokensAmount;
         fourPoolTokensAmount[tokenIndexInCurve] = amount;
         bytes memory curveCall;
-      
 
-      if (poolSize == 2 ) {
+        if (poolSize == 2) {
             curveCall = abi.encodeWithSelector(
                 0x0b4c7e4d,
                 uint256[2]([fourPoolTokensAmount[0], fourPoolTokensAmount[1]]),
                 0
             );
-        }  else if (poolSize == 3) {
+        } else if (poolSize == 3) {
             curveCall = abi.encodeWithSelector(
                 0x4515cef3,
                 uint256[3](
@@ -415,7 +429,6 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
             );
     }
 
-    
     function exitAll(
         bytes calldata data,
         uint256 unwindPercent,
@@ -435,29 +448,38 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
         if (convexPoolId != type(uint256).max) {
             ICvxBaseRewardPool rewards = getCvxRewardPool(convexPoolId);
             lpAmount =
-                (rewards.balanceOf(address(this)) * unwindPercent) / 10000;
+                (rewards.balanceOf(address(this)) * unwindPercent) /
+                10000;
 
             // withdraw Curve LPs and all rewards
             rewards.withdrawAndUnwrap(lpAmount, true);
         } else {
-            lpAmount = lpToken.balanceOf(address(this)) * unwindPercent / 10000;
+            lpAmount =
+                (lpToken.balanceOf(address(this)) * unwindPercent) /
+                10000;
         }
 
         if (lpAmount == 0) return;
         // exit with coin that we used for entry
         bytes memory curveCall = abi.encodeWithSignature(
-            string(bytes.concat("remove_liquidity_one_coin(uint256,", typeOfTokenIndex,",uint256)")),
+            string(
+                bytes.concat(
+                    "remove_liquidity_one_coin(uint256,",
+                    typeOfTokenIndex,
+                    ",uint256)"
+                )
+            ),
             lpAmount,
             tokenIndexInCurve,
             0
         );
-        uint256  valueETHBefore = address(this).balance;
+        uint256 valueETHBefore = address(this).balance;
         curvePool.functionCall(curveCall);
         uint256 ethDelta = address(this).balance - valueETHBefore;
         if (ethDelta > 0) {
             wETH.deposit{value: ethDelta}();
             poolToken = IERC20(address(wETH));
-        } 
+        }
         // execute exchanges and transfer all tokens to receiver
         exchangeAll(poolToken, IERC20(outputCoin));
         manageRewardsAndWithdraw(swapRewards, IERC20(outputCoin), receiver);
@@ -525,37 +547,24 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
             );
     }
 
-    function decodeEntryParams(bytes calldata data)
-        public
-        pure
-        returns (
-            address,
-            IERC20,
-            IERC20,
-            uint8,
-            uint8,
-            uint256
-        )
-    {
+    function decodeEntryParams(
+        bytes calldata data
+    ) public pure returns (address, IERC20, IERC20, uint8, uint8, uint256) {
         require(data.length == 32 * 6, "CurveConvexStrategy: length en");
         return
             abi.decode(data, (address, IERC20, IERC20, uint8, uint8, uint256));
     }
 
-    function decodeExitParams(bytes calldata data)
+    function decodeExitParams(
+        bytes calldata data
+    )
         public
         pure
-        returns (
-            address,
-            IERC20,
-            IERC20,
-            bytes memory,
-            uint8,
-            uint256
-        )
+        returns (address, IERC20, IERC20, bytes memory, uint8, uint256)
     {
         require(data.length == 32 * 8, "CurveConvexStrategy: length ex");
-        return abi.decode(data, (address, IERC20, IERC20, bytes, uint8, uint256));
+        return
+            abi.decode(data, (address, IERC20, IERC20, bytes, uint8, uint256));
     }
 
     function exchangeAll(IERC20 fromCoin, IERC20 toCoin) private {
@@ -589,11 +598,9 @@ contract CurveConvexStrategyTest is AccessControl, IAlluoStrategy {
         outputCoin.safeTransfer(receiver, outputCoin.balanceOf(address(this)));
     }
 
-    function getCvxRewardPool(uint256 poolId)
-        private
-        view
-        returns (ICvxBaseRewardPool)
-    {
+    function getCvxRewardPool(
+        uint256 poolId
+    ) private view returns (ICvxBaseRewardPool) {
         (, , , address pool, , ) = cvxBooster.poolInfo(poolId);
         return ICvxBaseRewardPool(pool);
     }

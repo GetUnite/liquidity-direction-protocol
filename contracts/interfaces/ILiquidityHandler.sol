@@ -3,9 +3,10 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/access/IAccessControl.sol";
 
-interface ILiquidityHandler is IAccessControl{
-
-    function adapterIdsToAdapterInfo(uint256)
+interface ILiquidityHandler is IAccessControl {
+    function adapterIdsToAdapterInfo(
+        uint256
+    )
         external
         view
         returns (
@@ -20,12 +21,20 @@ interface ILiquidityHandler is IAccessControl{
     function changeUpgradeStatus(bool _status) external;
 
     function deposit(address _token, uint256 _amount) external;
-    function deposit ( address _token, uint256 _amount, address _targetToken) external;
+
+    function deposit(
+        address _token,
+        uint256 _amount,
+        address _targetToken
+    ) external;
 
     function getActiveAdapters()
         external
         view
-        returns (ILiquidityHandlerStructs.AdapterInfo[] memory, address[] memory);
+        returns (
+            ILiquidityHandlerStructs.AdapterInfo[] memory,
+            address[] memory
+        );
 
     function getAdapterAmount(address _ibAlluo) external view returns (uint256);
 
@@ -34,29 +43,32 @@ interface ILiquidityHandler is IAccessControl{
     function getAllAdapters()
         external
         view
-        returns (ILiquidityHandlerStructs.AdapterInfo[] memory, address[] memory);
+        returns (
+            ILiquidityHandlerStructs.AdapterInfo[] memory,
+            address[] memory
+        );
 
-    function getExpectedAdapterAmount(address _ibAlluo, uint256 _newAmount)
-        external
-        view
-        returns (uint256);
+    function getExpectedAdapterAmount(
+        address _ibAlluo,
+        uint256 _newAmount
+    ) external view returns (uint256);
 
-    function getIbAlluoByAdapterId(uint256 _adapterId)
-        external
-        view
-        returns (address);
+    function getIbAlluoByAdapterId(
+        uint256 _adapterId
+    ) external view returns (address);
 
     function getLastAdapterIndex() external view returns (uint256);
 
     function getListOfIbAlluos() external view returns (address[] memory);
 
-    function getWithdrawal(address _ibAlluo, uint256 _id)
-        external
-        view
-        returns (ILiquidityHandlerStructs.Withdrawal memory);
+    function getWithdrawal(
+        address _ibAlluo,
+        uint256 _id
+    ) external view returns (ILiquidityHandlerStructs.Withdrawal memory);
 
-
-    function ibAlluoToWithdrawalSystems(address)
+    function ibAlluoToWithdrawalSystems(
+        address
+    )
         external
         view
         returns (
@@ -66,10 +78,10 @@ interface ILiquidityHandler is IAccessControl{
             bool resolverTrigger
         );
 
-    function isUserWaiting(address _ibAlluo, address _user)
-        external
-        view
-        returns (bool);
+    function isUserWaiting(
+        address _ibAlluo,
+        address _user
+    ) external view returns (bool);
 
     function pause() external;
 
@@ -80,7 +92,6 @@ interface ILiquidityHandler is IAccessControl{
         address _to,
         uint256 _amount
     ) external;
-
 
     function satisfyAdapterWithdrawals(address _ibAlluo) external;
 
@@ -94,22 +105,27 @@ interface ILiquidityHandler is IAccessControl{
         bool _status
     ) external;
 
-    function setIbAlluoToAdapterId(address _ibAlluo, uint256 _adapterId)
-        external;
+    function setIbAlluoToAdapterId(
+        address _ibAlluo,
+        uint256 _adapterId
+    ) external;
 
     function supportsInterface(bytes4 interfaceId) external view returns (bool);
 
     function upgradeStatus() external view returns (bool);
 
+    function withdraw(address _user, address _token, uint256 _amount) external;
+
     function withdraw(
         address _user,
         address _token,
-        uint256 _amount
+        uint256 _amount,
+        address _outputToken
     ) external;
-    function withdraw ( address _user, address _token, uint256 _amount, address _outputToken ) external;
 
-    function getAdapterCoreTokensFromIbAlluo(address _ibAlluo) external view returns (address,address);
-
+    function getAdapterCoreTokensFromIbAlluo(
+        address _ibAlluo
+    ) external view returns (address, address);
 }
 
 interface ILiquidityHandlerStructs {

@@ -55,7 +55,7 @@ contract IbAlluoMainnet is
 
     // list of tokens from which deposit available
     EnumerableSetUpgradeable.AddressSet private supportedTokens;
-    
+
     address public exchangeAddress;
 
     event BurnedForWithdraw(address indexed user, uint256 amount);
@@ -63,14 +63,14 @@ contract IbAlluoMainnet is
     event NewHandlerSet(address oldHandler, address newHandler);
     event UpdateTimeLimitSet(uint256 oldValue, uint256 newValue);
     event DepositTokenStatusChanged(address token, bool status);
-    
+
     event InterestChanged(
         uint256 oldYearInterest,
         uint256 newYearInterest,
         uint256 oldInterestPerSecond,
         uint256 newInterestPerSecond
     );
-    
+
     event TransferAssetValue(
         address indexed from,
         address indexed to,
@@ -82,7 +82,7 @@ contract IbAlluoMainnet is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-   function initialize(
+    function initialize(
         string memory _name,
         string memory _symbol,
         address _multiSigWallet,
@@ -108,10 +108,10 @@ contract IbAlluoMainnet is
             emit DepositTokenStatusChanged(_supportedTokens[i], true);
         }
 
-        interestPerSecond = _interestPerSecond * 10**10;
+        interestPerSecond = _interestPerSecond * 10 ** 10;
         annualInterest = _annualInterest;
-        multiplier = 10**18;
-        growingRatio = 10**18;
+        multiplier = 10 ** 18;
+        growingRatio = 10 ** 18;
         updateTimeLimit = 60;
         lastInterestCompound = block.timestamp;
         exchangeAddress = _exchangeAddress;
@@ -141,15 +141,14 @@ contract IbAlluoMainnet is
      *
      * NOTE: If `amount` is the maximum `uint256`, the allowance is not updated on
      * `transferFrom`. This is semantically equivalent to an infinite approval.
-     * 
+     *
      * NOTE: Because of constantly growing ratio between IbAlluo and asset value
      *       we recommend to approve amount slightly more
      */
-    function approveAssetValue(address spender, uint256 amount)
-        public
-        whenNotPaused
-        returns (bool)
-    {
+    function approveAssetValue(
+        address spender,
+        uint256 amount
+    ) public whenNotPaused returns (bool) {
         address owner = msg.sender;
         updateRatio();
         uint256 adjustedAmount = (amount * multiplier) / growingRatio;
@@ -161,16 +160,21 @@ contract IbAlluoMainnet is
      * @dev See {IERC20-transfer} but it transfers amount of tokens
      *      which represents asset value
      */
-    function transferAssetValue(address to, uint256 amount)
-        public
-        whenNotPaused
-        returns (bool)
-    {
+    function transferAssetValue(
+        address to,
+        uint256 amount
+    ) public whenNotPaused returns (bool) {
         address owner = msg.sender;
         updateRatio();
         uint256 adjustedAmount = (amount * multiplier) / growingRatio;
         _transfer(owner, to, adjustedAmount);
-        emit TransferAssetValue(owner, to, adjustedAmount, amount, growingRatio);
+        emit TransferAssetValue(
+            owner,
+            to,
+            adjustedAmount,
+            amount,
+            growingRatio
+        );
         return true;
     }
 
@@ -208,21 +212,48 @@ contract IbAlluoMainnet is
         // The main token is the one which isn't converted to primary tokens.
         // Small issue with deposits and withdrawals though. Need to approve.
         if (supportedTokens.contains(_token) == false) {
-            IERC20Upgradeable(_token).safeTransferFrom(msg.sender, address(this), _amount);
-            (, address primaryToken) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
-            IERC20Upgradeable(_token).safeIncreaseAllowance(exchangeAddress, _amount);
-            _amount = IExchange(exchangeAddress).exchange(_token, primaryToken, _amount, 0);
+            IERC20Upgradeable(_token).safeTransferFrom(
+                msg.sender,
+                address(this),
+                _amount
+            );
+            (, address primaryToken) = ILiquidityHandler(liquidityHandler)
+                .getAdapterCoreTokensFromIbAlluo(address(this));
+            IERC20Upgradeable(_token).safeIncreaseAllowance(
+                exchangeAddress,
+                _amount
+            );
+            _amount = IExchange(exchangeAddress).exchange(
+                _token,
+                primaryToken,
+                _amount,
+                0
+            );
             _token = primaryToken;
-            IERC20Upgradeable(primaryToken).safeTransfer(address(liquidityHandler), _amount);
+            IERC20Upgradeable(primaryToken).safeTransfer(
+                address(liquidityHandler),
+                _amount
+            );
         } else {
-            IERC20Upgradeable(_token).safeTransferFrom(msg.sender,address(liquidityHandler),_amount);
+            IERC20Upgradeable(_token).safeTransferFrom(
+                msg.sender,
+                address(liquidityHandler),
+                _amount
+            );
         }
         updateRatio();
         ILiquidityHandler(liquidityHandler).deposit(_token, _amount);
-        uint256 amountIn18 = _amount * 10**(18 - AlluoERC20Upgradable(_token).decimals());
+        uint256 amountIn18 = _amount *
+            10 ** (18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = (amountIn18 * multiplier) / growingRatio;
         _mint(msg.sender, adjustedAmount);
-        emit TransferAssetValue(address(0), msg.sender, adjustedAmount, amountIn18, growingRatio);
+        emit TransferAssetValue(
+            address(0),
+            msg.sender,
+            adjustedAmount,
+            amountIn18,
+            growingRatio
+        );
         emit Deposited(msg.sender, _token, _amount);
     }
 
@@ -242,24 +273,27 @@ contract IbAlluoMainnet is
         _burn(msg.sender, adjustedAmount);
         ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
         if (supportedTokens.contains(_targetToken) == false) {
-            (address liquidToken,) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
+            (address liquidToken, ) = ILiquidityHandler(liquidityHandler)
+                .getAdapterCoreTokensFromIbAlluo(address(this));
             // This just is used to revert if there is no active route.
-            require(IExchange(exchangeAddress).buildRoute(liquidToken, _targetToken).length > 0, "!Supported");
-            handler.withdraw(
-            _recipient,
-            liquidToken,
-            _amount,
-            _targetToken
+            require(
+                IExchange(exchangeAddress)
+                    .buildRoute(liquidToken, _targetToken)
+                    .length > 0,
+                "!Supported"
             );
+            handler.withdraw(_recipient, liquidToken, _amount, _targetToken);
         } else {
-            handler.withdraw(
-            _recipient,
-            _targetToken,
-            _amount
-            );
+            handler.withdraw(_recipient, _targetToken, _amount);
         }
 
-        emit TransferAssetValue(msg.sender, address(0), adjustedAmount, _amount, growingRatio);
+        emit TransferAssetValue(
+            msg.sender,
+            address(0),
+            adjustedAmount,
+            _amount,
+            growingRatio
+        );
         emit BurnedForWithdraw(msg.sender, adjustedAmount);
     }
 
@@ -288,24 +322,32 @@ contract IbAlluoMainnet is
 
         ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
         if (supportedTokens.contains(_targetToken) == false) {
-            (address liquidToken,) = ILiquidityHandler(liquidityHandler).getAdapterCoreTokensFromIbAlluo(address(this));
+            (address liquidToken, ) = ILiquidityHandler(liquidityHandler)
+                .getAdapterCoreTokensFromIbAlluo(address(this));
             // This just is used to revert if there is no active route.
-            require(IExchange(exchangeAddress).buildRoute(liquidToken, _targetToken).length > 0, "!Supported");
+            require(
+                IExchange(exchangeAddress)
+                    .buildRoute(liquidToken, _targetToken)
+                    .length > 0,
+                "!Supported"
+            );
             handler.withdraw(
-            _recipient,
-            liquidToken,
-            assetAmount,
-            _targetToken
+                _recipient,
+                liquidToken,
+                assetAmount,
+                _targetToken
             );
         } else {
-            handler.withdraw(
-            _recipient,
-            _targetToken,
-            assetAmount
-            );
+            handler.withdraw(_recipient, _targetToken, assetAmount);
         }
 
-        emit TransferAssetValue(msg.sender, address(0), _amount, assetAmount, growingRatio);
+        emit TransferAssetValue(
+            msg.sender,
+            address(0),
+            _amount,
+            assetAmount,
+            growingRatio
+        );
         emit BurnedForWithdraw(msg.sender, _amount);
     }
 
@@ -313,7 +355,10 @@ contract IbAlluoMainnet is
     /// @param _targetToken Asset token
     /// @param _amount Amount of ibAlluos (10**18)
 
-    function withdrawTokenValue(address _targetToken, uint256 _amount) external {
+    function withdrawTokenValue(
+        address _targetToken,
+        uint256 _amount
+    ) external {
         withdrawTokenValueTo(msg.sender, _targetToken, _amount);
     }
 
@@ -325,7 +370,10 @@ contract IbAlluoMainnet is
      * - `to` cannot be the zero address.
      * - the caller must have a balance of at least `amount`.
      */
-    function transfer(address to, uint256 amount) public override whenNotPaused returns (bool) {
+    function transfer(
+        address to,
+        uint256 amount
+    ) public override whenNotPaused returns (bool) {
         address owner = msg.sender;
         _transfer(owner, to, amount);
         if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
@@ -368,7 +416,6 @@ contract IbAlluoMainnet is
         return true;
     }
 
-    
     /// @notice  Returns balance in asset value
     /// @param _address address of user
 
@@ -384,11 +431,9 @@ contract IbAlluoMainnet is
     /// @notice  Returns balance in asset value with correct info from update
     /// @param _address address of user
 
-    function getBalanceForTransfer(address _address)
-        public
-        view
-        returns (uint256)
-    {
+    function getBalanceForTransfer(
+        address _address
+    ) public view returns (uint256) {
         if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
             uint256 _growingRatio = changeRatio(
                 growingRatio,
@@ -401,11 +446,9 @@ contract IbAlluoMainnet is
         }
     }
 
-    function convertToAssetValue(uint256 _amount)
-        public
-        view
-        returns (uint256)
-    {
+    function convertToAssetValue(
+        uint256 _amount
+    ) public view returns (uint256) {
         if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
             uint256 _growingRatio = changeRatio(
                 growingRatio,
@@ -435,31 +478,45 @@ contract IbAlluoMainnet is
 
     /* ========== ADMIN CONFIGURATION ========== */
 
-    function mint(address account, uint256 amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function mint(
+        address account,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _mint(account, amount);
         if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
             updateRatio();
         }
         uint256 assetValue = (amount * growingRatio) / multiplier;
-        emit TransferAssetValue(address(0), msg.sender, amount, assetValue, growingRatio);
+        emit TransferAssetValue(
+            address(0),
+            msg.sender,
+            amount,
+            assetValue,
+            growingRatio
+        );
     }
 
-    function burn(address account, uint256 amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function burn(
+        address account,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _burn(account, amount);
         if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
             updateRatio();
         }
         uint256 assetValue = (amount * growingRatio) / multiplier;
-        emit TransferAssetValue(msg.sender, address(0), amount, assetValue, growingRatio);
+        emit TransferAssetValue(
+            msg.sender,
+            address(0),
+            amount,
+            assetValue,
+            growingRatio
+        );
     }
 
-    function setSymbol(string memory _newSymbol) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setSymbol(
+        string memory _newSymbol
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setSymbol(_newSymbol);
     }
 
@@ -476,7 +533,7 @@ contract IbAlluoMainnet is
         uint256 oldValuePerSecond = interestPerSecond;
         updateRatio();
         annualInterest = _newAnnualInterest;
-        interestPerSecond = _newInterestPerSecond * 10**10;
+        interestPerSecond = _newInterestPerSecond * 10 ** 10;
         emit InterestChanged(
             oldAnnualValue,
             annualInterest,
@@ -484,10 +541,11 @@ contract IbAlluoMainnet is
             interestPerSecond
         );
     }
-    
-    function changeTokenStatus(address _token, bool _status) external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+
+    function changeTokenStatus(
+        address _token,
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_status) {
             supportedTokens.add(_token);
         } else {
@@ -496,21 +554,18 @@ contract IbAlluoMainnet is
         emit DepositTokenStatusChanged(_token, _status);
     }
 
-    function setUpdateTimeLimit(uint256 _newLimit)
-        public
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function setUpdateTimeLimit(
+        uint256 _newLimit
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 oldValue = updateTimeLimit;
         updateTimeLimit = _newLimit;
 
         emit UpdateTimeLimitSet(oldValue, _newLimit);
     }
 
-
-    function setLiquidityHandler(address newHandler)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function setLiquidityHandler(
+        address newHandler
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(newHandler.isContract(), "IbAlluo: Not contract");
 
         address oldValue = liquidityHandler;
@@ -518,17 +573,15 @@ contract IbAlluoMainnet is
         emit NewHandlerSet(oldValue, liquidityHandler);
     }
 
-    function setExchangeAddress(address newExchangeAddress)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function setExchangeAddress(
+        address newExchangeAddress
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         exchangeAddress = newExchangeAddress;
     }
 
-    function changeUpgradeStatus(bool _status)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function changeUpgradeStatus(
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         upgradeStatus = _status;
     }
 
@@ -540,11 +593,10 @@ contract IbAlluoMainnet is
         _unpause();
     }
 
-    function grantRole(bytes32 role, address account)
-        public
-        override
-        onlyRole(getRoleAdmin(role))
-    {
+    function grantRole(
+        bytes32 role,
+        address account
+    ) public override onlyRole(getRoleAdmin(role)) {
         if (role == DEFAULT_ADMIN_ROLE) {
             require(account.isContract(), "IbAlluo: Not contract");
         }
@@ -558,12 +610,10 @@ contract IbAlluoMainnet is
     ) internal override {
         super._beforeTokenTransfer(from, to, amount);
     }
-    
-    function _authorizeUpgrade(address)
-        internal
-        override
-        onlyRole(UPGRADER_ROLE)
-    {
+
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(UPGRADER_ROLE) {
         require(upgradeStatus, "IbAlluo: Upgrade not allowed");
         upgradeStatus = false;
     }

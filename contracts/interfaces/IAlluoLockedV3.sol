@@ -6,7 +6,9 @@ interface IAlluoLockedV3 {
 
     function UPGRADER_ROLE() external view returns (bytes32);
 
-    function _lockers(address)
+    function _lockers(
+        address
+    )
         external
         view
         returns (
@@ -47,7 +49,9 @@ interface IAlluoLockedV3 {
 
     function getClaim(address _locker) external view returns (uint256 reward);
 
-    function getInfoByAddress(address _address)
+    function getInfoByAddress(
+        address _address
+    )
         external
         view
         returns (
@@ -62,20 +66,24 @@ interface IAlluoLockedV3 {
 
     function grantRole(bytes32 role, address account) external;
 
-    function hasRole(bytes32 role, address account)
-        external
-        view
-        returns (bool);
+    function hasRole(
+        bytes32 role,
+        address account
+    ) external view returns (bool);
 
-    function initialize(address _multiSigWallet, uint256 _rewardPerDistribution)
-        external;
+    function initialize(
+        address _multiSigWallet,
+        uint256 _rewardPerDistribution
+    ) external;
 
     function lock(uint256 _amount) external;
 
     function lockWETH(uint256 _amount) external;
 
-    function migrationLock(address[] memory _users, uint256[] memory _amounts)
-        external;
+    function migrationLock(
+        address[] memory _users,
+        uint256[] memory _amounts
+    ) external;
 
     function name() external view returns (string memory);
 
@@ -109,10 +117,9 @@ interface IAlluoLockedV3 {
 
     function unlockAll() external;
 
-    function unlockedBalanceOf(address _address)
-        external
-        view
-        returns (uint256 amount);
+    function unlockedBalanceOf(
+        address _address
+    ) external view returns (uint256 amount);
 
     function unpause() external;
 
@@ -126,8 +133,10 @@ interface IAlluoLockedV3 {
 
     function upgradeTo(address newImplementation) external;
 
-    function upgradeToAndCall(address newImplementation, bytes memory data)
-        external;
+    function upgradeToAndCall(
+        address newImplementation,
+        bytes memory data
+    ) external;
 
     function waitingForWithdrawal() external view returns (uint256);
 

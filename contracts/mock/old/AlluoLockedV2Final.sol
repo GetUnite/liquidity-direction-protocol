@@ -143,11 +143,9 @@ contract AlluoLockedV2Final is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function _authorizeUpgrade(address)
-        internal
-        override
-        onlyRole(UPGRADER_ROLE)
-    {
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(UPGRADER_ROLE) {
         require(additionalLockInfo.upgradeStatus, "Upgrade not allowed");
     }
 
@@ -206,11 +204,9 @@ contract AlluoLockedV2Final is
      * @dev allows and prohibits to upgrade contract
      * @param _status flag for allowing upgrade from gnosis
      */
-    function changeUpgradeStatus(bool _status)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function changeUpgradeStatus(
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         additionalLockInfo.upgradeStatus = _status;
     }
-
 }

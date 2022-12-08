@@ -12,8 +12,8 @@ contract CurveLpReferenceFeedStrategyV2 is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable,
-    IFeedStrategy {
-
+    IFeedStrategy
+{
     using AddressUpgradeable for address;
 
     IFeedStrategy public referenceFeed;
@@ -50,27 +50,44 @@ contract CurveLpReferenceFeedStrategyV2 is
 
     function getPrice() external view returns (int256 value, uint8 decimals) {
         uint256 oneLpPrice;
-        
+
         bytes memory curveCall = abi.encodeWithSignature(
-            string(bytes.concat("calc_withdraw_one_coin(uint256,", typeOfTokenIndex,")")),
+            string(
+                bytes.concat(
+                    "calc_withdraw_one_coin(uint256,",
+                    typeOfTokenIndex,
+                    ")"
+                )
+            ),
             lpOneTokenAmount,
             referenceCoinIndex
         );
 
         bytes memory data = curvePool.functionStaticCall(curveCall);
         oneLpPrice = abi.decode(data, (uint256));
-        
+
         (int256 usdPrice, uint8 usdDecimals) = referenceFeed.getPrice();
         require(usdPrice > 0, "CurvePRFS: feed lte 0");
 
-        return (int256(oneLpPrice) * usdPrice, usdDecimals + referenceCoinDecimals);
+        return (
+            int256(oneLpPrice) * usdPrice,
+            usdDecimals + referenceCoinDecimals
+        );
     }
 
-    function getPriceOfAmount(uint256 amount) external view returns (int256 value, uint8 decimals){
+    function getPriceOfAmount(
+        uint256 amount
+    ) external view returns (int256 value, uint8 decimals) {
         uint256 lpAmountPrice;
 
         bytes memory curveCall = abi.encodeWithSignature(
-            string(bytes.concat("calc_withdraw_one_coin(uint256,", typeOfTokenIndex,")")),
+            string(
+                bytes.concat(
+                    "calc_withdraw_one_coin(uint256,",
+                    typeOfTokenIndex,
+                    ")"
+                )
+            ),
             amount,
             referenceCoinIndex
         );
@@ -80,15 +97,13 @@ contract CurveLpReferenceFeedStrategyV2 is
 
         (int256 usdPrice, uint8 usdDecimals) = referenceFeed.getPrice();
         require(usdPrice > 0, "CurvePRFS: feed lte 0");
-        return (int256(lpAmountPrice) * usdPrice, usdDecimals + referenceCoinDecimals);
+        return (
+            int256(lpAmountPrice) * usdPrice,
+            usdDecimals + referenceCoinDecimals
+        );
     }
 
-
-
-    function _authorizeUpgrade(address newImplementation)
-    internal
-    onlyRole(DEFAULT_ADMIN_ROLE)
-    override {
-    }
-
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

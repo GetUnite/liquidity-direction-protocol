@@ -60,7 +60,9 @@ interface ICvxBooster {
 
     function platformFee() external view returns (uint256);
 
-    function poolInfo(uint256)
+    function poolInfo(
+        uint256
+    )
         external
         view
         returns (
@@ -113,8 +115,10 @@ interface ICvxBooster {
 
     function setPoolManager(address _poolM) external;
 
-    function setRewardContracts(address _rewards, address _stakerRewards)
-        external;
+    function setRewardContracts(
+        address _rewards,
+        address _stakerRewards
+    ) external;
 
     function setTreasury(address _treasury) external;
 
@@ -144,9 +148,10 @@ interface ICvxBooster {
 
     function voteDelegate() external view returns (address);
 
-    function voteGaugeWeight(address[] memory _gauge, uint256[] memory _weight)
-        external
-        returns (bool);
+    function voteGaugeWeight(
+        address[] memory _gauge,
+        uint256[] memory _weight
+    ) external returns (bool);
 
     function voteOwnership() external view returns (address);
 

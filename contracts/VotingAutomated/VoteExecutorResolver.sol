@@ -9,12 +9,12 @@ contract VoteExecutorResolver {
         uint256 commandIndex;
         bytes commandData;
     }
-    IVoteExecutorMaster VoteExecutorMaster;
+    IVoteExecutorMaster public voteExecutorMaster;
 
-    constructor(address _VoteExecutorMaster) {
-        VoteExecutorMaster = IVoteExecutorMaster(_VoteExecutorMaster);
+    constructor(address _voteExecutorMaster) {
+        voteExecutorMaster = IVoteExecutorMaster(_voteExecutorMaster);
     }
-    
+
     function VoteExecutorChecker()
         external
         view
@@ -22,12 +22,17 @@ contract VoteExecutorResolver {
     {
         uint256 lastDataId = _checkLastDataId();
 
-        for (uint256 i; i < lastDataId ; i++) {
-            (bytes memory _data,,bytes[] memory _signs) = VoteExecutorMaster.getSubmittedData(i);
-            (bytes32 hashed,) = abi.decode(_data, (bytes32, Message[]));
-            (, uint256 timeSubmitted)= VoteExecutorMaster.submittedData(i);
+        for (uint256 i; i < lastDataId; i++) {
+            (bytes memory _data, , bytes[] memory _signs) = voteExecutorMaster
+                .getSubmittedData(i);
+            (bytes32 hashed, ) = abi.decode(_data, (bytes32, Message[]));
+            (, uint256 timeSubmitted) = voteExecutorMaster.submittedData(i);
             // Disable first condition for test
-            if (_signs.length >= VoteExecutorMaster.minSigns() &&  VoteExecutorMaster.hashExecutionTime(hashed) == 0 && timeSubmitted + VoteExecutorMaster.timeLock() < block.timestamp) {
+            if (
+                _signs.length >= voteExecutorMaster.minSigns() &&
+                voteExecutorMaster.hashExecutionTime(hashed) == 0 &&
+                timeSubmitted + voteExecutorMaster.timeLock() < block.timestamp
+            ) {
                 canExec = true;
                 execPayload = abi.encodeWithSelector(
                     IVoteExecutorMaster.executeSpecificData.selector,
@@ -43,12 +48,12 @@ contract VoteExecutorResolver {
         bool checking = true;
         uint256 lastDataId;
         while (checking) {
-            try VoteExecutorMaster.getSubmittedData(lastDataId)  {
+            try voteExecutorMaster.getSubmittedData(lastDataId) {
                 lastDataId++;
-            } catch  {
+            } catch {
                 checking = false;
             }
         }
         return lastDataId;
     }
-  }
+}
