@@ -10,8 +10,8 @@ async function main() {
   const exchangeAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec";
 
   let contract = await upgrades.deployProxy(contractFactory,
-        [gnosis, vlAlluo, rewardTokenAddress, exchangeAddress],
-        {initializer: 'initialize', kind:'uups'}
+    [gnosis, vlAlluo, rewardTokenAddress, exchangeAddress],
+    { initializer: 'initialize', kind: 'uups' }
   );
 
   console.log("CVX distributor upgradable deployed to:", contract.address);

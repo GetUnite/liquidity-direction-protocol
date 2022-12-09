@@ -69,8 +69,8 @@ interface ICvxDistributor {
         external
         view
         returns (
-            IAlluoVault.RewardData[] memory,
-            IAlluoVault.RewardData[] memory
+            IAlluoVaultInternal.RewardData[] memory,
+            IAlluoVaultInternal.RewardData[] memory
         );
 
     function addCvxVault(address _alluoCvxVault) external;
@@ -142,8 +142,8 @@ interface ICvxDistributor {
         external
         view
         returns (
-            IAlluoVault.RewardData[] memory,
-            IAlluoVault.RewardData[] memory
+            IAlluoVaultInternal.RewardData[] memory,
+            IAlluoVaultInternal.RewardData[] memory
         );
 
     function strategyHandler() external view returns (address);
@@ -176,7 +176,7 @@ interface ICvxDistributor {
     ) external;
 }
 
-interface IAlluoVault {
+interface IAlluoVaultInternal {
     struct RewardData {
         address token;
         uint256 amount;

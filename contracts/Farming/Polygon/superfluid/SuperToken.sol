@@ -67,10 +67,9 @@ contract SuperToken is UUPSProxiable, SuperfluidToken, ISuperToken {
 
     constructor(
         ISuperfluid host
-    ) SuperfluidToken(host) // solhint-disable-next-line no-empty-blocks
-    {
-
-    }
+    )
+        SuperfluidToken(host) // solhint-disable-next-line no-empty-blocks
+    {}
 
     function initialize(
         IERC20 underlyingToken,

@@ -5,7 +5,7 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { ChainlinkFeedStrategy, ChainlinkFeedStrategyV2, CurveLpReferenceFeedStrategyV2, CurvePoolReferenceFeedStrategy, CurvePoolReferenceFeedStrategyV2, IERC20Metadata, IFeedStrategy, PriceFeedRouter, PriceFeedRouterV2, PriceFeedRouterV2__factory } from "../typechain";
 
-describe("Price Feed Router", function () {
+describe("Price Feed RouterV2", function () {
     type FiatRoute = {
         name: string,
         id: number;
@@ -38,7 +38,7 @@ describe("Price Feed Router", function () {
     let usdc: IERC20Metadata, usdt: IERC20Metadata, dai: IERC20Metadata, weth: IERC20Metadata,
         wbtc: IERC20Metadata, eurt: IERC20Metadata, jeur: IERC20Metadata, par: IERC20Metadata,
         eurs: IERC20Metadata, frax: IERC20Metadata, susd: IERC20Metadata, crv3: IERC20Metadata,
-        mimLp: IERC20Metadata; 
+        mimLp: IERC20Metadata;
 
     let fiatRoutes: FiatRoute[];
     let cryptoRoutes: CryptoRoute[];
@@ -56,7 +56,7 @@ describe("Price Feed Router", function () {
                 forking: {
                     enabled: true,
                     jsonRpcUrl: process.env.MAINNET_FORKING_URL as string,
-                    blockNumber: 15713655, 
+                    blockNumber: 15713655,
                 },
             },],
         });
@@ -70,7 +70,7 @@ describe("Price Feed Router", function () {
         susd = await ethers.getContractAt("IERC20Metadata", "0x57Ab1ec28D129707052df4dF418D58a2D46d5f51");
         crv3 = await ethers.getContractAt("IERC20Metadata", "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490");
         mimLp = await ethers.getContractAt("IERC20Metadata", "0x5a6A4D54456819380173272A5E8E9B9904BdF41B");
-      
+
         // eurt = await ethers.getContractAt("IERC20Metadata", "0xC581b735A1688071A1746c968e0798D642EDE491");
 
         cryptoRoutes = [
@@ -165,7 +165,7 @@ describe("Price Feed Router", function () {
 
         router = await upgrades.deployProxy(Router,
             [constants.AddressZero],
-            { initializer: 'initialize', kind: 'uups' }
+            { initializer: 'initialize', kind: 'uups', }
         ) as PriceFeedRouterV2;
 
     })
@@ -239,7 +239,7 @@ describe("Price Feed Router", function () {
                     { initializer: 'initialize', kind: 'uups' }
                 ) as ChainlinkFeedStrategyV2;
                 element.strategy = strategy
-                
+
                 await router.setFiatStrategy(element.name, element.id, strategy.address);
             }
 
@@ -257,13 +257,13 @@ describe("Price Feed Router", function () {
                 const element = curveRoutes[i];
 
                 const strategy = await upgrades.deployProxy(CurveStrategy,
-                    [   constants.AddressZero,
-                        await router.cryptoToUsdStrategies(usdc.address),
+                    [constants.AddressZero,
+                    await router.cryptoToUsdStrategies(usdc.address),
                         curvePoolAddress,
                         curveReferenceCoinIndex,
-                        element.desiredIndex,
+                    element.desiredIndex,
                         curveReferenceCoinDecimals,
-                        element.oneTokenAmount],
+                    element.oneTokenAmount],
                     { initializer: 'initialize', kind: 'uups' }
                 ) as CurvePoolReferenceFeedStrategyV2;
 
@@ -274,20 +274,21 @@ describe("Price Feed Router", function () {
             for (let i = 0; i < curveLpRoutes.length; i++) {
                 const element = curveLpRoutes[i];
                 let feed
-                if(i == 0){
+                if (i == 0) {
                     feed = await router.cryptoToUsdStrategies(usdc.address);
                 }
-                else{
+                else {
                     feed = await router.cryptoToUsdStrategies(crv3.address);
                 }
 
                 const strategy = await upgrades.deployProxy(CurveLpStrategy,
-                    [   constants.AddressZero,
+                    [constants.AddressZero,
                         feed,
-                        element.poolAddress,
-                        element.referenceCoinIndex,
-                        element.referenceCoinDecimals,
-                        element.oneTokenAmount],
+                    element.poolAddress,
+                    element.referenceCoinIndex,
+                    element.referenceCoinDecimals,
+                    element.oneTokenAmount,
+                    ethers.utils.toUtf8Bytes("int128")],
                     { initializer: 'initialize', kind: 'uups' }
                 ) as CurveLpReferenceFeedStrategyV2;
 
@@ -319,7 +320,7 @@ describe("Price Feed Router", function () {
             for (let i = 0; i < curveRoutes.length; i++) {
                 const element = curveRoutes[i];
                 const strategy = element!.strategy;
-                
+
                 expect(await router.cryptoToUsdStrategies(element.coin)).to.be.equal(element.strategy?.address);
 
                 expect(await strategy?.referenceFeed()).to.be.equal(await router.cryptoToUsdStrategies(usdc.address));
@@ -413,7 +414,7 @@ describe("Price Feed Router", function () {
                     const crypto = cryptos[j];
                     let amount = parseUnits("3000", await crypto.decimals())
                     const price = await router["getPriceOfAmount(address,uint256,string)"](crypto.address, amount, fiat);
-                    
+
                     console.log(`3000 ${await crypto.symbol()} costs ${formatUnits(price.value, price.decimals)} ${fiat}`);
                 }
                 console.log();

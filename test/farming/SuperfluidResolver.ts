@@ -89,6 +89,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
     let resolver: SuperfluidResolver;
 
     before(async function () {
+        upgrades.silenceWarnings()
 
         //We are forking Polygon mainnet, please set Alchemy key in .env
         await network.provider.request({
@@ -100,7 +101,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
                     //you can fork from last block by commenting next line
                     blockNumber: 29518660,
                 },
-            }, ],
+            },],
         });
 
         signers = await ethers.getSigners();
@@ -134,7 +135,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
         multisig = await Multisig.deploy(true);
 
         exchangeAddress = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773";
-        
+
         handler = await ethers.getContractAt("LiquidityHandler", "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1");
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), multisig.address)
@@ -162,17 +163,19 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
                 multisig.address,
                 handler.address,
                 [dai.address,
-                    usdc.address,
-                    usdt.address
+                usdc.address,
+                usdt.address
                 ],
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as IbAlluo;
 
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoCurrent.address, lastAdapterId)
@@ -184,9 +187,11 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
         StIbAlluo = await upgrades.deployProxy(StIbAlluoFactory,
             [ibAlluoCurrent.address, 18, "Streaming IbAlluo USD", "StIbAlluoUSD", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", multisig.address, [ibAlluoCurrent.address]
             ], {
-                initializer: 'alluoInitialize',
-                kind: 'uups'
-            }
+            initializer: 'alluoInitialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as StIbAlluo;
 
         let ABI = ["function setSuperToken(address _superToken)"];
@@ -203,17 +208,19 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
                 multisig.address,
                 handler.address,
                 [dai.address,
-                    usdc.address,
-                    usdt.address
+                usdc.address,
+                usdt.address
                 ],
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as IbAlluo;
 
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoCurrent2.address, lastAdapterId)
@@ -222,9 +229,11 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
         StIbAlluo2 = await upgrades.deployProxy(StIbAlluoFactory,
             [ibAlluoCurrent2.address, 18, "Streaming IbAlluo USD", "StIbAlluoUSD", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", multisig.address, [ibAlluoCurrent2.address]
             ], {
-                initializer: 'alluoInitialize',
-                kind: 'uups'
-            }
+            initializer: 'alluoInitialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as StIbAlluo;
 
         const SuperfluidResolver = await ethers.getContractFactory("SuperfluidResolver");
@@ -258,8 +267,8 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
     });
 
     describe('Test superfluid resolver', function () {
-      
-        it("When critical (8 hr or less buffer), checker should return true and liquidateSender should wrap ibAlluos to prevent liquidation.", async function() {
+
+        it("When critical (8 hr or less buffer), checker should return true and liquidateSender should wrap ibAlluos to prevent liquidation.", async function () {
             await deposit(signers[1], dai, parseUnits("10000", 18));
             await setSuperfluidPermissions(signers[1], ibAlluoCurrent);
 
@@ -278,7 +287,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
 
         })
 
-        it("When critical (8 hr or less buffer), checker should return true and liquidateSender should pause the stream to prevent liquidation", async function() {
+        it("When critical (8 hr or less buffer), checker should return true and liquidateSender should pause the stream to prevent liquidation", async function () {
             await deposit(signers[1], dai, parseUnits("2000", 18));
             await setSuperfluidPermissions(signers[1], ibAlluoCurrent);
 
@@ -294,25 +303,25 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
             await resolver.connect(signers[0]).liquidateSender(signers[1].address, [signers[2].address], ibAlluoCurrent.address)
             console.log((await StIbAlluo.realtimeBalanceOfNow(signers[1].address)).availableBalance)
             console.log(await ibAlluoCurrent.balanceOf(signers[1].address))
-            
+
 
         })
 
-        it("Should allow multiple wrapping for a single ibAlluo", async function() {
+        it("Should allow multiple wrapping for a single ibAlluo", async function () {
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("10000", 18));
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent);
                 await ibAlluoCurrent.connect(signers[i])["createFlow(address,int96,uint256)"](signers[2].address, parseEther("0.1"), parseEther("2000"))
 
             }
-            
+
             expect((await resolver.checker()).canExec).equal(true);
             for (let i = 3; i < 10; i++) {
                 await expect(resolver.connect(signers[0]).liquidateSender(signers[i].address, [signers[2].address], ibAlluoCurrent.address)).to.emit(resolver, "WrappedTokenToPreventLiquidation").withArgs(signers[i].address, signers[2].address)
             }
         })
 
-        it("Should allow multiple liquidations by closing streams for a single ibAlluo", async function() {
+        it("Should allow multiple liquidations by closing streams for a single ibAlluo", async function () {
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("5000", 18));
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent);
@@ -325,7 +334,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
             }
         })
 
-        it("Should allow multiple wrapping for multiple ibAlluos", async function() {
+        it("Should allow multiple wrapping for multiple ibAlluos", async function () {
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("10000", 18));
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent);
@@ -344,7 +353,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
             }
         })
 
-        it("Should allow multiple liquidations by closing streams for multiple ibAlluos", async function() {
+        it("Should allow multiple liquidations by closing streams for multiple ibAlluos", async function () {
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("5000", 18));
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent);
@@ -364,7 +373,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
             }
         })
 
-        it("Should allow multiple liquidations by closing streams as well as wrapping tokens for multiple ibAlluos ", async function() {
+        it("Should allow multiple liquidations by closing streams as well as wrapping tokens for multiple ibAlluos ", async function () {
             for (let i = 3; i < 10; i++) {
                 await deposit(signers[i], dai, parseUnits("2000", 18));
                 await setSuperfluidPermissions(signers[i], ibAlluoCurrent);
@@ -387,7 +396,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
         })
     })
 
-    async function deposit(recipient: SignerWithAddress, token: IERC20, amount: BigNumberish, ibAlluo : IbAlluo = ibAlluoCurrent) {
+    async function deposit(recipient: SignerWithAddress, token: IERC20, amount: BigNumberish, ibAlluo: IbAlluo = ibAlluoCurrent) {
         await token.connect(usdWhale).transfer(recipient.address, amount);
 
         await token.connect(recipient).approve(ibAlluo.address, amount);

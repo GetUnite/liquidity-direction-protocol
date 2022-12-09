@@ -66,6 +66,8 @@ describe("IbAlluo and Exchange", function () {
     let exchangeAddress;
 
     before(async function () {
+        upgrades.silenceWarnings()
+
         //We are forking Polygon mainnet, please set Alchemy key in .env
         await network.provider.request({
             method: "hardhat_reset",
@@ -118,7 +120,7 @@ describe("IbAlluo and Exchange", function () {
         await sendEth([usdWhale, jeurWhale, eurtWhale, eursWhale, wethWhale])
     });
 
-    
+
     beforeEach(async function () {
 
         // Deploy fake exchange with PolygonCurve3 Route
@@ -139,7 +141,10 @@ describe("IbAlluo and Exchange", function () {
 
         handler = await upgrades.deployProxy(Handler,
             [admin.address, exchangeAddress],
-            { initializer: 'initialize', kind: 'uups' }
+            {
+                initializer: 'initialize', kind: 'uups',
+                unsafeAllow: ["delegatecall"]
+            }
         ) as LiquidityHandler;
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), admin.address)
@@ -191,7 +196,9 @@ describe("IbAlluo and Exchange", function () {
                 1600,
                 trustedForwarder,
                 exchangeAddress],
-            { initializer: 'initialize', kind: 'uups' }
+            {
+                initializer: 'initialize', kind: 'uups', unsafeAllow: ["delegatecall"]
+            }
         ) as IbAlluo;
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoUsd.address)
@@ -209,7 +216,9 @@ describe("IbAlluo and Exchange", function () {
                 BigNumber.from("100000000470636740"),
                 1600,
                 trustedForwarder, exchangeAddress],
-            { initializer: 'initialize', kind: 'uups' }
+            {
+                initializer: 'initialize', kind: 'uups', unsafeAllow: ["delegatecall"]
+            }
         ) as IbAlluo;
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEur.address)
@@ -226,7 +235,9 @@ describe("IbAlluo and Exchange", function () {
                 1600,
                 trustedForwarder,
                 exchangeAddress],
-            { initializer: 'initialize', kind: 'uups' }
+            {
+                initializer: 'initialize', kind: 'uups', unsafeAllow: ["delegatecall"]
+            }
         ) as IbAlluo;
 
 
@@ -238,7 +249,7 @@ describe("IbAlluo and Exchange", function () {
     async function testSwap(fromAddress: string, toAddress: string, amount: BigNumberish) {
         const from = await ethers.getContractAt("IERC20Metadata", fromAddress);
         await from.connect(usdWhale).approve(exchange.address, amount);
-        
+
         // Usd whale doesn't have eurt, so change slightly,
         if (fromAddress == eurt.address) {
             await eurt.connect(eurtWhale).transfer(usdWhale.address, parseUnits("100", 6))
@@ -275,7 +286,7 @@ describe("IbAlluo and Exchange", function () {
             await deposit(signers[0], eurt, parseUnits("100", 6));
             const ibAlluoBalance = await ibAlluoUsd.balanceOf(signers[0].address);
             expect(Number(ibAlluoBalance)).greaterThan(Number(0))
-            
+
         })
         it("Depositing in eurt and then withdrawing in Dai should give you eurt back (without being added to withdrawal queue) ", async function () {
             await deposit(signers[0], eurt, parseUnits("100", 6));
@@ -285,7 +296,7 @@ describe("IbAlluo and Exchange", function () {
             await deposit(signers[8], eurt, parseUnits("1000", 6));
 
             // Once there are sufficient buffer
-            
+
             await ibAlluoUsd.connect(signers[0]).withdraw(eurt.address, parseEther("70"));
             const balAfter = await eurt.balanceOf(signers[0].address);
             // console.log(balAfter);

@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20Metadat
 import "./IFeedStrategy.sol";
 import "./../../interfaces/IChainlinkPriceFeed.sol";
 
-contract IStrategyHandler is
+contract PriceFeedRouterV2 is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable

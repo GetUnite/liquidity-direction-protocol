@@ -232,13 +232,13 @@ describe("Price Feed Router", function () {
                 const element = curveRoutes[i];
 
                 const strategy = await upgrades.deployProxy(CurveStrategy,
-                    [   constants.AddressZero,
-                        await router.cryptoToUsdStrategies(eurt.address),
+                    [constants.AddressZero,
+                    await router.cryptoToUsdStrategies(eurt.address),
                         curvePoolAddress,
                         curveReferenceCoinIndex,
-                        element.outIndex,
+                    element.outIndex,
                         curveReferenceCoinDecimals,
-                        element.oneTokenAmount],
+                    element.oneTokenAmount],
                     { initializer: 'initialize', kind: 'uups' }
                 ) as CurvePoolReferenceFeedStrategyV2;
 

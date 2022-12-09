@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/access/IAccessControl.sol";
-import "alluo-strategies/contracts/ethereum/CurveConvex/interfaces/ICvxBaseRewardPool.sol";
+import "alluo-strategies/contracts/interfaces/ICvxBaseRewardPool.sol";
 
 interface IUniversalCurveConvexStrategy is IAccessControl, IERC20 {
     function claimAll(ICvxBaseRewardPool pool) external;

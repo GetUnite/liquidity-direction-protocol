@@ -157,7 +157,8 @@ contract SuperTokenFactory is SuperTokenFactoryBase {
     constructor(
         ISuperfluid host,
         SuperTokenFactoryHelper helper
-    ) SuperTokenFactoryBase(host) // solhint-disable-next-line no-empty-blocks
+    )
+        SuperTokenFactoryBase(host) // solhint-disable-next-line no-empty-blocks
     {
         _helper = helper;
     }
