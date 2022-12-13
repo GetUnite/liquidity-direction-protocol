@@ -505,7 +505,6 @@ contract LiquidityHandler is
         return false;
     }
 
-
     /* ========== ADMIN CONFIGURATION ========== */
 
     function setIbAlluoToAdapterId(address _ibAlluo, uint256 _adapterId)

@@ -17,7 +17,7 @@ contract EurCurveAdapter is AccessControl {
     address public constant EURS = 0xE111178A87A3BFf0c8d18DECBa5798827539Ae99;
     address public constant EURT = 0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f;
     address public constant curvePool = 0xAd326c253A84e9805559b73A08724e11E49ca651;
-    address public wallet;
+    address public buffer;
     uint64 public slippage;
 
     uint64 public primaryTokenIndex;
@@ -26,12 +26,12 @@ contract EurCurveAdapter is AccessControl {
     mapping(address => uint128) public indexes;
 
     // 0 = jEUR-18dec, 1 = PAR-18dec , 2 = EURS-2dec, 3 = EURT-6dec
-    constructor (address _multiSigWallet, address _liquidityHandler, uint64 _slippage) {
+    constructor (address _multiSigWallet, address _bufferManager, address _liquidityHandler, uint64 _slippage) {
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
-        wallet = _multiSigWallet;
+        buffer = _bufferManager;
         slippage = _slippage;
 
         indexes[jEUR] = 0;
@@ -54,13 +54,13 @@ contract EurCurveAdapter is AccessControl {
     /// @notice When called by liquidity handler, moves some funds to the Gnosis multisig and others into a LP to be kept as a 'buffer'
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
-    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Gnosis wallet (the "buffer" amount)
+    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Buffer Manager contract (the "buffer" amount)
     function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         address primaryToken = ICurvePoolEUR(curvePool).coins(primaryTokenIndex);
         if(_token == primaryToken){
             if (toSend != 0) {
-                IERC20(primaryToken).safeTransfer(wallet, toSend / 10**(18 - IERC20Metadata(primaryToken).decimals()));
+                IERC20(primaryToken).safeTransfer(buffer, toSend / 10**(18 - IERC20Metadata(primaryToken).decimals()));
             }
             if (_leaveInPool != 0) {
                 uint256[4] memory amounts;
@@ -80,7 +80,7 @@ contract EurCurveAdapter is AccessControl {
                 ICurvePoolEUR(curvePool).remove_liquidity_imbalance(
                             amounts, 
                             lpAmount * (10000+slippage)/10000);
-                IERC20(primaryToken).safeTransfer(wallet, toSend);
+                IERC20(primaryToken).safeTransfer(buffer, toSend);
             }
         }
     } 
@@ -149,8 +149,9 @@ contract EurCurveAdapter is AccessControl {
     function setSlippage(uint64 _newSlippage) external onlyRole(DEFAULT_ADMIN_ROLE) {
         slippage = _newSlippage;
     }
-    function setWallet(address _newWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        wallet = _newWallet;
+
+    function setBuffer(address _newBufferManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        buffer = _newBufferManager;
     }
 
     /**

@@ -19,7 +19,7 @@ contract UsdCurveAdapter is AccessControl {
     address public constant USDT = 0xc2132D05D31c914a87C6611C10748AEb04B58e8F;
     address public constant curvePool = 0x445FE580eF8d70FF569aB36e80c647af338db351;
     address public constant curveLp = 0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171;
-    address public wallet;
+    address public buffer;
     uint64 public slippage;
 
     uint64 public primaryTokenIndex;
@@ -27,12 +27,12 @@ contract UsdCurveAdapter is AccessControl {
     
     mapping(address => uint128) public indexes;
 
-    constructor (address _multiSigWallet, address _liquidityHandler, uint64 _slippage) {
+    constructor (address _multiSigWallet, address _bufferManager, address _liquidityHandler, uint64 _slippage) {
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
-        wallet = _multiSigWallet;
+        buffer = _bufferManager;
         slippage = _slippage;
 
         indexes[DAI] = 0;
@@ -53,13 +53,13 @@ contract UsdCurveAdapter is AccessControl {
     /// @notice When called by liquidity handler, moves some funds to the Gnosis multisig and others into a LP to be kept as a 'buffer'
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
-    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Gnosis wallet (the "buffer" amount)
+    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Buffer Manager contract (the "buffer" amount)
     function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         address primaryToken = ICurvePoolUSD(curvePool).underlying_coins(primaryTokenIndex);
         if(_token == primaryToken){
             if (toSend != 0) {
-                IERC20(primaryToken).safeTransfer(wallet, toSend / 10**(18 - IERC20Metadata(primaryToken).decimals()));
+                IERC20(primaryToken).safeTransfer(buffer, toSend / 10**(18 - IERC20Metadata(primaryToken).decimals()));
             }
             if (_leaveInPool != 0) {
                 uint256[3] memory amounts;
@@ -80,7 +80,7 @@ contract UsdCurveAdapter is AccessControl {
                             amounts, 
                             lpAmount * (10000+slippage)/10000,
                             true);
-                IERC20(primaryToken).safeTransfer(wallet, toSend);
+                IERC20(primaryToken).safeTransfer(buffer, toSend);
             }
         }
     } 
@@ -147,12 +147,12 @@ contract UsdCurveAdapter is AccessControl {
         primaryTokenIndex = _newPrimaryTokenIndex;
     }
 
-
     function setSlippage(uint64 _newSlippage) external onlyRole(DEFAULT_ADMIN_ROLE) {
         slippage = _newSlippage;
     }
-    function setWallet(address _newWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        wallet = _newWallet;
+
+    function setBuffer(address _newBufferManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        buffer = _newBufferManager;
     }
 
     /**
