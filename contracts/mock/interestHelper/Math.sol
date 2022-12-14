@@ -35,6 +35,4 @@ contract Math {
         // always rounds up
         z = safeAdd(safeMul(x, ONE), safeSub(y, 1)) / y;
     }
-
-
 }

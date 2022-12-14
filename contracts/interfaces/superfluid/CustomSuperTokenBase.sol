@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: AGPLv3
-pragma solidity >= 0.8.0;
+pragma solidity >=0.8.0;
 
-import {
-    ISuperToken
-} from "../../interfaces/superfluid/ISuperToken.sol";
+import {ISuperToken} from "../../interfaces/superfluid/ISuperToken.sol";
 
 /**
  * @title Custom super token base contract

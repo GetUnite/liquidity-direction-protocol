@@ -23,26 +23,24 @@ contract PriceFeedRouter is Ownable {
         }
     }
 
-    function getPrice(address token, string calldata fiatName)
-        external
-        view
-        returns (uint256 value, uint8 decimals)
-    {
+    function getPrice(
+        address token,
+        string calldata fiatName
+    ) external view returns (uint256 value, uint8 decimals) {
         return _getPrice(token, fiatNameToFiatId[fiatName]);
     }
 
-    function getPrice(address token, uint256 fiatId)
-        external
-        view
-        returns (uint256 value, uint8 decimals)
-    {
+    function getPrice(
+        address token,
+        uint256 fiatId
+    ) external view returns (uint256 value, uint8 decimals) {
         return _getPrice(token, fiatId);
     }
 
-    function setCrytoStrategy(address strategy, address coin)
-        external
-        onlyOwner
-    {
+    function setCrytoStrategy(
+        address strategy,
+        address coin
+    ) external onlyOwner {
         crytoToUsdStrategies[coin] = IFeedStrategy(strategy);
     }
 
@@ -63,11 +61,10 @@ contract PriceFeedRouter is Ownable {
     }
 
     // 1.0 `token` costs `value` of [fiatId] (in decimals of `token`)
-    function _getPrice(address token, uint256 fiatId)
-        private
-        view
-        returns (uint256 value, uint8 decimals)
-    {
+    function _getPrice(
+        address token,
+        uint256 fiatId
+    ) private view returns (uint256 value, uint8 decimals) {
         IFeedStrategy priceFeed = crytoToUsdStrategies[token];
         require(
             address(priceFeed) != address(0),
@@ -90,7 +87,7 @@ contract PriceFeedRouter is Ownable {
             require(fiatPrice > 0, "PriceFeedRouter: 2feed lte 0");
 
             return (
-                (uint256(usdPrice) * 10**fiatDecimals) / uint256(fiatPrice),
+                (uint256(usdPrice) * 10 ** fiatDecimals) / uint256(fiatPrice),
                 usdDecimals
             );
         }

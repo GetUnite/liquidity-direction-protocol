@@ -13,7 +13,7 @@ async function getLastWithdrawalInfo(token: IbAlluoMainnet, handler: LiquidityHa
     return [request, satisfied, total]
 }
 
-async function getImpersonatedSigner(address: string): Promise < SignerWithAddress > {
+async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
     await ethers.provider.send(
         'hardhat_impersonateAccount',
         [address]
@@ -72,6 +72,7 @@ describe("Mainnet Handler and different adapters", function () {
     let wbtcWhale: SignerWithAddress;
 
     before(async function () {
+        upgrades.silenceWarnings()
 
         await network.provider.request({
             method: "hardhat_reset",
@@ -82,7 +83,7 @@ describe("Mainnet Handler and different adapters", function () {
                     //you can fork from last block by commenting next line
                     blockNumber: 15266430,
                 },
-            }, ],
+            },],
         });
 
         signers = await ethers.getSigners();
@@ -131,16 +132,19 @@ describe("Mainnet Handler and different adapters", function () {
 
 
     beforeEach(async function () {
-        const exchangeAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec"; 
+
+        const exchangeAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec";
         const IbAlluo = await ethers.getContractFactory("IbAlluoMainnet") as IbAlluoMainnet__factory;
 
         const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
 
         handler = await upgrades.deployProxy(Handler,
             [admin.address, exchangeAddress], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as LiquidityHandler;
 
         const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapterMainnet") as UsdCurveAdapterMainnet__factory;
@@ -154,9 +158,11 @@ describe("Mainnet Handler and different adapters", function () {
                 handler.address,
                 200
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as UsdCurveAdapterMainnet;
 
         eurAdapter = await upgrades.deployProxy(EurAdapter,
@@ -165,9 +171,11 @@ describe("Mainnet Handler and different adapters", function () {
                 handler.address,
                 200
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as EurCurveAdapterMainnet;
 
         ethAdapter = await upgrades.deployProxy(EthAdapter,
@@ -175,9 +183,11 @@ describe("Mainnet Handler and different adapters", function () {
                 admin.address,
                 handler.address
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as EthNoPoolAdapterMainnet;
 
         btcAdapter = await upgrades.deployProxy(BtcAdapter,
@@ -185,9 +195,11 @@ describe("Mainnet Handler and different adapters", function () {
                 admin.address,
                 handler.address
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as BtcNoPoolAdapterMainnet;
 
 
@@ -232,16 +244,16 @@ describe("Mainnet Handler and different adapters", function () {
                 admin.address,
                 handler.address,
                 [dai.address,
-                    usdc.address,
-                    usdt.address
+                usdc.address,
+                usdt.address
                 ],
                 BigNumber.from("100000000470636740"),
                 1600,
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups'
+        }
         ) as IbAlluoMainnet;
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoUsd.address)
@@ -254,16 +266,16 @@ describe("Mainnet Handler and different adapters", function () {
                 admin.address,
                 handler.address,
                 [ageur.address,
-                    eurt.address,
-                    eurs.address
+                eurt.address,
+                eurs.address
                 ],
                 BigNumber.from("100000000470636740"),
                 1600,
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups'
+        }
         ) as IbAlluoMainnet;
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEur.address)
@@ -280,9 +292,11 @@ describe("Mainnet Handler and different adapters", function () {
                 1600,
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as IbAlluoMainnet;
 
 
@@ -300,9 +314,11 @@ describe("Mainnet Handler and different adapters", function () {
                 1600,
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as IbAlluoMainnet;
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoBtc.address)
@@ -370,7 +386,7 @@ describe("Mainnet Handler and different adapters", function () {
                 await ibAlluoBtc.connect(signers[1]).withdraw(wbtc.address, parseUnits("0.5", 18));
                 let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
-                
+
                 await deposit(signers[2], wbtc, parseUnits("3", 8));
                 await handler.satisfyAdapterWithdrawals(ibAlluoBtc.address);
 

@@ -9,6 +9,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "hardhat/console.sol";
+
 /**
  * @dev Implementation of the {IERC20} interface.
  *
@@ -34,7 +35,13 @@ import "hardhat/console.sol";
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IERC20-approve}.
  */
-contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgradeable, IERC20MetadataUpgradeable, PausableUpgradeable {
+contract AlluoERC20Upgradable is
+    Initializable,
+    ContextUpgradeable,
+    IERC20Upgradeable,
+    IERC20MetadataUpgradeable,
+    PausableUpgradeable
+{
     mapping(address => uint256) private _balances;
 
     mapping(address => mapping(address => uint256)) private _allowances;
@@ -53,11 +60,17 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    function __ERC20_init(string memory name_, string memory symbol_) internal onlyInitializing {
+    function __ERC20_init(
+        string memory name_,
+        string memory symbol_
+    ) internal onlyInitializing {
         __ERC20_init_unchained(name_, symbol_);
     }
 
-    function __ERC20_init_unchained(string memory name_, string memory symbol_) internal onlyInitializing {
+    function __ERC20_init_unchained(
+        string memory name_,
+        string memory symbol_
+    ) internal onlyInitializing {
         _name = name_;
         _symbol = symbol_;
     }
@@ -108,7 +121,9 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
     /**
      * @dev See {IERC20-balanceOf}.
      */
-    function balanceOf(address account) public view virtual override returns (uint256) {
+    function balanceOf(
+        address account
+    ) public view virtual override returns (uint256) {
         return _balances[account];
     }
 
@@ -120,7 +135,10 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
      * - `to` cannot be the zero address.
      * - the caller must have a balance of at least `amount`.
      */
-    function transfer(address to, uint256 amount) public virtual override whenNotPaused returns (bool) {
+    function transfer(
+        address to,
+        uint256 amount
+    ) public virtual override whenNotPaused returns (bool) {
         address owner = _msgSender();
         _transfer(owner, to, amount);
         return true;
@@ -129,7 +147,10 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
     /**
      * @dev See {IERC20-allowance}.
      */
-    function allowance(address owner, address spender) public view virtual override returns (uint256) {
+    function allowance(
+        address owner,
+        address spender
+    ) public view virtual override returns (uint256) {
         return _allowances[owner][spender];
     }
 
@@ -143,7 +164,10 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
      *
      * - `spender` cannot be the zero address.
      */
-    function approve(address spender, uint256 amount) public virtual override whenNotPaused returns (bool) {
+    function approve(
+        address spender,
+        uint256 amount
+    ) public virtual override whenNotPaused returns (bool) {
         address owner = _msgSender();
         _approve(owner, spender, amount);
         return true;
@@ -188,7 +212,10 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
      *
      * - `spender` cannot be the zero address.
      */
-    function increaseAllowance(address spender, uint256 addedValue) public virtual whenNotPaused returns (bool) {
+    function increaseAllowance(
+        address spender,
+        uint256 addedValue
+    ) public virtual whenNotPaused returns (bool) {
         address owner = _msgSender();
         _approve(owner, spender, _allowances[owner][spender] + addedValue);
         return true;
@@ -208,10 +235,16 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
      * - `spender` must have allowance for the caller of at least
      * `subtractedValue`.
      */
-    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual whenNotPaused returns (bool) {
+    function decreaseAllowance(
+        address spender,
+        uint256 subtractedValue
+    ) public virtual whenNotPaused returns (bool) {
         address owner = _msgSender();
         uint256 currentAllowance = _allowances[owner][spender];
-        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        require(
+            currentAllowance >= subtractedValue,
+            "ERC20: decreased allowance below zero"
+        );
         unchecked {
             _approve(owner, spender, currentAllowance - subtractedValue);
         }
@@ -245,7 +278,10 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
 
         uint256 fromBalance = _balances[from];
 
-        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        require(
+            fromBalance >= amount,
+            "ERC20: transfer amount exceeds balance"
+        );
         unchecked {
             _balances[from] = fromBalance - amount;
         }
@@ -345,7 +381,10 @@ contract AlluoERC20Upgradable is Initializable, ContextUpgradeable, IERC20Upgrad
     ) internal virtual {
         uint256 currentAllowance = allowance(owner, spender);
         if (currentAllowance != type(uint256).max) {
-            require(currentAllowance >= amount, "ERC20: insufficient allowance");
+            require(
+                currentAllowance >= amount,
+                "ERC20: insufficient allowance"
+            );
             unchecked {
                 _approve(owner, spender, currentAllowance - amount);
             }

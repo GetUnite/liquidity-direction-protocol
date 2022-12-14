@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 import "./../../../interfaces/IIbAlluo.sol";
 import "./../../../interfaces/ILiquidityHandler.sol";
 
-contract IbAlluoPriceResolver{
+contract IbAlluoPriceResolver {
     address public alluoBank;
     address public liquidityHandlerAddress;
 
@@ -18,17 +18,15 @@ contract IbAlluoPriceResolver{
         uint256 oneIbAlluoValue
     );
 
-    constructor(
-        address _liquidityHandlerAddress,
-        address _alluoBank
-    ) {
+    constructor(address _liquidityHandlerAddress, address _alluoBank) {
         liquidityHandlerAddress = _liquidityHandlerAddress;
         alluoBank = _alluoBank;
     }
 
     function emitter() external {
-        address[] memory ibAlluos  = ILiquidityHandler(liquidityHandlerAddress).getListOfIbAlluos();
-        for (uint i=0; i<ibAlluos.length; i++) {
+        address[] memory ibAlluos = ILiquidityHandler(liquidityHandlerAddress)
+            .getListOfIbAlluos();
+        for (uint i = 0; i < ibAlluos.length; i++) {
             IIbAlluo(ibAlluos[i]).updateRatio();
             emit IbAlluoValue(
                 alluoBank,

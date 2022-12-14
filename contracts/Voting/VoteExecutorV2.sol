@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
@@ -10,11 +10,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import "../interfaces/IAlluoStrategy.sol";
 import "../interfaces/IExchange.sol";
-import "./../interfaces/curve/mainnet/ICurveCVXETH.sol";
 
-import "./../Locking/CvxDistributor.sol";
-
-contract VoteExecutorV2 is 
+contract VoteExecutorV2 is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable
@@ -23,14 +20,11 @@ contract VoteExecutorV2 is
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-    ICurveCVXETH public constant CurveCVXETH = ICurveCVXETH(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4);
-    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public constant crvCVXETH = 0x3A283D9c08E8b55966afb64C515f5143cf907611;
 
-    struct Entry{
+    struct Entry {
         // Percentage of the total contract balance
         // that goes to the exact strategy
-        // with 2 desimals, so 6753 == 67.53% 
+        // with 2 desimals, so 6753 == 67.53%
         uint256 weight;
         // strategy that distributes money to a specific pool
         address strategyAddress;
@@ -42,7 +36,7 @@ contract VoteExecutorV2 is
         bytes data;
     }
 
-    struct EntryData{
+    struct EntryData {
         // strategy that distributes money to a specific pool
         address strategyAddress;
         //
@@ -62,14 +56,13 @@ contract VoteExecutorV2 is
     // Address of the contract responsible for each exchange
     address public exchangeAddress;
 
-    // Acceptable slippage for stablecoin exchange 
+    // Acceptable slippage for stablecoin exchange
     // with 2 decimals, so 200 == 2%
     uint32 public slippage;
 
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
-    
+
     /**
      * @dev Contract initializer
      * @param _gnosis gnosis address
@@ -77,8 +70,8 @@ contract VoteExecutorV2 is
      * @param _startEntryTokens list of supported entry tokens from the beginning
      */
     function initialize(
-        address _gnosis, 
-        address _exchange, 
+        address _gnosis,
+        address _exchange,
         address[] memory _startEntryTokens
     ) public initializer {
         __AccessControl_init();
@@ -87,7 +80,7 @@ contract VoteExecutorV2 is
         exchangeAddress = _exchange;
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        for(uint256 i = 0; i < _startEntryTokens.length; i++){
+        for (uint256 i = 0; i < _startEntryTokens.length; i++) {
             changeEntryTokenStatus(_startEntryTokens[i], true);
         }
         _revokeRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -102,90 +95,117 @@ contract VoteExecutorV2 is
      * by providing enries
      * @param _entries full info about entry
      */
-    function execute(Entry[] memory _entries) external onlyRole(DEFAULT_ADMIN_ROLE){
+    function execute(
+        Entry[] memory _entries
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 totalWeight;
-        for(uint256 i = 0; i < _entries.length; i++){
+        for (uint256 i = 0; i < _entries.length; i++) {
             totalWeight += _entries[i].weight;
-            require(entryTokens.contains(_entries[i].entryToken), "!such entry token");
-            require(activeStrategies[_entries[i].strategyAddress], "!such strategy");
+            require(
+                entryTokens.contains(_entries[i].entryToken),
+                "!such entry token"
+            );
+            require(
+                activeStrategies[_entries[i].strategyAddress],
+                "!such strategy"
+            );
         }
 
         require(totalWeight <= 10000, ">100");
 
         uint256 totalBalance = getTotalBalance();
 
-        for(uint256 i = 0; i < _entries.length; i++){
-
+        for (uint256 i = 0; i < _entries.length; i++) {
             Entry memory entry = _entries[i];
 
-            uint256 amount = entry.weight * totalBalance / 10000;
+            uint256 amount = (entry.weight * totalBalance) / 10000;
 
             // Stablecoins have different decimals, so we need to have one base
             // (18 decimals) for calculation at each step
-            uint256 entryDecimalsMult = 10**(18 - IERC20MetadataUpgradeable(entry.entryToken).decimals());
-            uint256 poolDecimalsMult = 10**(18 - IERC20MetadataUpgradeable(entry.poolToken).decimals());
+            uint256 entryDecimalsMult = 10 **
+                (18 - IERC20MetadataUpgradeable(entry.entryToken).decimals());
+            uint256 poolDecimalsMult = 10 **
+                (18 - IERC20MetadataUpgradeable(entry.poolToken).decimals());
 
-            uint256 actualAmount = IERC20MetadataUpgradeable(entry.entryToken).balanceOf(address(this)) * entryDecimalsMult;
+            uint256 actualAmount = IERC20MetadataUpgradeable(entry.entryToken)
+                .balanceOf(address(this)) * entryDecimalsMult;
 
             // if entry token not enough contact should exchange other stablecoins
-            if(actualAmount < amount){
-
+            if (actualAmount < amount) {
                 uint256 amountLeft = amount - actualAmount;
 
                 uint256 maxLoop = entryTokens.length();
-                while(amountLeft > 0 && maxLoop != 0){
+                while (amountLeft > 0 && maxLoop != 0) {
                     maxLoop--;
-                    (address helpToken, uint256 helpAmount) = findBiggest(entry.entryToken);
-                    if(amountLeft <= helpAmount){
+                    (address helpToken, uint256 helpAmount) = findBiggest(
+                        entry.entryToken
+                    );
+                    if (amountLeft <= helpAmount) {
+                        uint256 exchangeAmountIn = amountLeft /
+                            10 **
+                                (18 -
+                                    IERC20MetadataUpgradeable(helpToken)
+                                        .decimals());
+                        uint256 exchangeAmountOut = amountLeft /
+                            entryDecimalsMult;
 
-                        uint256 exchangeAmountIn = amountLeft / 10**(18 - IERC20MetadataUpgradeable(helpToken).decimals());
-                        uint256 exchangeAmountOut = amountLeft / entryDecimalsMult;
-
-                          actualAmount += IExchange(exchangeAddress).exchange(
-                            helpToken, 
-                            entry.entryToken, 
-                            exchangeAmountIn,
-                            exchangeAmountOut * (10000 - slippage) / 10000
-                        ) * entryDecimalsMult;
+                        actualAmount +=
+                            IExchange(exchangeAddress).exchange(
+                                helpToken,
+                                entry.entryToken,
+                                exchangeAmountIn,
+                                (exchangeAmountOut * (10000 - slippage)) / 10000
+                            ) *
+                            entryDecimalsMult;
                         amountLeft = 0;
-                    }
-                    else{
-                        uint256 exchangeAmountIn = helpAmount / 10**(18 - IERC20MetadataUpgradeable(helpToken).decimals());
-                        uint256 exchangeAmountOut = helpAmount / entryDecimalsMult;
+                    } else {
+                        uint256 exchangeAmountIn = helpAmount /
+                            10 **
+                                (18 -
+                                    IERC20MetadataUpgradeable(helpToken)
+                                        .decimals());
+                        uint256 exchangeAmountOut = helpAmount /
+                            entryDecimalsMult;
 
-                       actualAmount += IExchange(exchangeAddress).exchange(
-                            helpToken, 
-                            entry.entryToken, 
-                            exchangeAmountIn,
-                            exchangeAmountOut * (10000 - slippage) / 10000
-                        ) * entryDecimalsMult;
+                        actualAmount +=
+                            IExchange(exchangeAddress).exchange(
+                                helpToken,
+                                entry.entryToken,
+                                exchangeAmountIn,
+                                (exchangeAmountOut * (10000 - slippage)) / 10000
+                            ) *
+                            entryDecimalsMult;
                         amountLeft -= helpAmount;
                     }
                 }
                 amount = actualAmount;
             }
             // final exchange before strategy if needed
-            if(entry.entryToken != entry.poolToken){
-
+            if (entry.entryToken != entry.poolToken) {
                 amount = IExchange(exchangeAddress).exchange(
-                    entry.entryToken, 
-                    entry.poolToken, 
+                    entry.entryToken,
+                    entry.poolToken,
                     amount / entryDecimalsMult,
                     0
                 );
-            }
-            else{
+            } else {
                 amount = amount / poolDecimalsMult;
             }
 
-            IERC20MetadataUpgradeable(entry.poolToken).safeTransfer(entry.strategyAddress, amount);
+            IERC20MetadataUpgradeable(entry.poolToken).safeTransfer(
+                entry.strategyAddress,
+                amount
+            );
 
-            bytes memory exitData = IAlluoStrategy(entry.strategyAddress).invest(entry.data, amount);
+            bytes memory exitData = IAlluoStrategy(entry.strategyAddress)
+                .invest(entry.data, amount);
 
-            executedEntries.push(EntryData({
-                strategyAddress: entry.strategyAddress,
-                data: exitData
-            }));
+            executedEntries.push(
+                EntryData({
+                    strategyAddress: entry.strategyAddress,
+                    data: exitData
+                })
+            );
         }
     }
 
@@ -205,59 +225,35 @@ contract VoteExecutorV2 is
         );
     }
 
-    function initRewards() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        // required step to enable deliverRewards(): approving infinite WETH to CVX-ETH pool
-        IERC20MetadataUpgradeable(WETH).safeApprove(address(CurveCVXETH), type(uint256).max);
-    }
-
-    function deliverRewards(
-        address cvxDistributor,
-        address tokenFrom,
-        uint256 amount
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        // exchange `tokenFrom` to WETH, deposit WETH to CVX-ETH pool, send received tokens to 
-        // `cvxDistributor` and notify `cvxDistributor` to start distributing CVXs in LP value.
-        IERC20MetadataUpgradeable(tokenFrom).safeIncreaseAllowance(exchangeAddress, amount);
-        
-        uint256 amountOut = tokenFrom == WETH ? amount : IExchange(exchangeAddress).exchange(
-                tokenFrom, 
-                WETH,
-                amount,
-                0
-            );
-        uint256 lpAmount = CurveCVXETH.add_liquidity([amountOut, 0], 0);
-        IERC20MetadataUpgradeable(crvCVXETH).safeTransfer(cvxDistributor, lpAmount);
-
-        CvxDistributor(cvxDistributor).receiveReward(amount);
-    }
-
     function exitStrategyRewards(
         uint256 entryId,
         address outputCoin,
         address receiver,
         bool swapRewards
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        IAlluoStrategy(executedEntries[entryId].strategyAddress).exitOnlyRewards(
-            executedEntries[entryId].data,
-            outputCoin,
-            receiver,
-            swapRewards
-        );
+        IAlluoStrategy(executedEntries[entryId].strategyAddress)
+            .exitOnlyRewards(
+                executedEntries[entryId].data,
+                outputCoin,
+                receiver,
+                swapRewards
+            );
     }
-
 
     /**
      * @dev function for calculating the total balance in USD
      * @return totalBalance total value of all entry stableoins on contract
      */
-    function getTotalBalance() 
-        public 
-        view 
-        returns(uint256 totalBalance)
-    {
-        for(uint256 i = 0; i < entryTokens.length(); i++){
-            totalBalance += IERC20MetadataUpgradeable(entryTokens.at(i)).balanceOf(address(this)) * 
-            10**(18 - IERC20MetadataUpgradeable(entryTokens.at(i)).decimals()); 
+    function getTotalBalance() public view returns (uint256 totalBalance) {
+        for (uint256 i = 0; i < entryTokens.length(); i++) {
+            totalBalance +=
+                IERC20MetadataUpgradeable(entryTokens.at(i)).balanceOf(
+                    address(this)
+                ) *
+                10 **
+                    (18 -
+                        IERC20MetadataUpgradeable(entryTokens.at(i))
+                            .decimals());
         }
     }
 
@@ -276,14 +272,19 @@ contract VoteExecutorV2 is
     function changeEntryTokenStatus(
         address _tokenAddress,
         bool _status
-    ) public onlyRole(DEFAULT_ADMIN_ROLE){
-        if(_status){
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_status) {
             entryTokens.add(_tokenAddress);
-            IERC20MetadataUpgradeable(_tokenAddress).safeApprove(exchangeAddress, type(uint256).max);
-        }
-        else{
+            IERC20MetadataUpgradeable(_tokenAddress).safeApprove(
+                exchangeAddress,
+                type(uint256).max
+            );
+        } else {
             entryTokens.remove(_tokenAddress);
-            IERC20MetadataUpgradeable(_tokenAddress).safeApprove(exchangeAddress, 0);
+            IERC20MetadataUpgradeable(_tokenAddress).safeApprove(
+                exchangeAddress,
+                0
+            );
         }
     }
 
@@ -295,7 +296,7 @@ contract VoteExecutorV2 is
     function changeStrategyStatus(
         address _strategyAddress,
         bool _status
-    ) public onlyRole(DEFAULT_ADMIN_ROLE){
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         activeStrategies[_strategyAddress] = _status;
     }
 
@@ -305,7 +306,7 @@ contract VoteExecutorV2 is
      */
     function changeSlippage(
         uint32 _slippage
-    ) external onlyRole(DEFAULT_ADMIN_ROLE){
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         slippage = _slippage;
     }
 
@@ -315,7 +316,7 @@ contract VoteExecutorV2 is
      */
     function addExchange(
         address _exchangeAddress
-    ) external onlyRole(DEFAULT_ADMIN_ROLE){
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         exchangeAddress = _exchangeAddress;
     }
 
@@ -323,17 +324,19 @@ contract VoteExecutorV2 is
      * @dev function for getting biggest amount in one token
      * between all stablecoins in contract
      * @param _entry entryToken for not including it in search
-     * @return token_ address of biggest by funds in contract token 
-     * @return amount_ amount of funds 
+     * @return token_ address of biggest by funds in contract token
+     * @return amount_ amount of funds
      */
-    function findBiggest(address _entry) internal view returns(address token_, uint256 amount_){
-        for(uint256 i = 0; i < entryTokens.length(); i++){
-
-            if(entryTokens.at(i) != _entry){
+    function findBiggest(
+        address _entry
+    ) internal view returns (address token_, uint256 amount_) {
+        for (uint256 i = 0; i < entryTokens.length(); i++) {
+            if (entryTokens.at(i) != _entry) {
                 address token = entryTokens.at(i);
-                uint256 newAmount = IERC20MetadataUpgradeable(token).balanceOf(address(this)) * 
-                10**(18 - IERC20MetadataUpgradeable(token).decimals());
-                if(amount_ < newAmount){
+                uint256 newAmount = IERC20MetadataUpgradeable(token).balanceOf(
+                    address(this)
+                ) * 10 ** (18 - IERC20MetadataUpgradeable(token).decimals());
+                if (amount_ < newAmount) {
                     amount_ = newAmount;
                     token_ = token;
                 }
@@ -346,22 +349,18 @@ contract VoteExecutorV2 is
      * @param _address address of the token being removed
      * @param _amount amount of the token being removed
      */
-    function removeTokenByAddress(address _address, uint256 _amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function removeTokenByAddress(
+        address _address,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_address != address(0), "Wrong address");
         IERC20MetadataUpgradeable(_address).safeTransfer(msg.sender, _amount);
     }
 
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        onlyRole(UPGRADER_ROLE)
-        override
-    {
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(UPGRADER_ROLE) {
         require(upgradeStatus, "Upgrade !allowed");
         upgradeStatus = false;
     }
-
 }
-

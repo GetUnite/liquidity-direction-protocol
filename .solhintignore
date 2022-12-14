@@ -1,1 +1,4 @@
 node_modules
+contracts/mock
+contracts/Farming/Polygon/superfluid
+contracts/interfaces

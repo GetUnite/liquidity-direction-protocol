@@ -13,7 +13,7 @@ async function getLastWithdrawalInfo(token: IbAlluo, handler: LiquidityHandler) 
     return [request, satisfied, total]
 }
 
-async function getImpersonatedSigner(address: string): Promise < SignerWithAddress > {
+async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
     await ethers.provider.send(
         'hardhat_impersonateAccount',
         [address]
@@ -80,6 +80,8 @@ describe("Handler and different adapters", function () {
     let renBtcWhale: SignerWithAddress;
 
     before(async function () {
+        upgrades.silenceWarnings()
+
         //We are forking Polygon mainnet, please set Alchemy key in .env
         await network.provider.request({
             method: "hardhat_reset",
@@ -90,7 +92,7 @@ describe("Handler and different adapters", function () {
                     //you can fork from last block by commenting next line
                     blockNumber: 28955535,
                 },
-            }, ],
+            },],
         });
 
         signers = await ethers.getSigners();
@@ -147,7 +149,8 @@ describe("Handler and different adapters", function () {
 
 
     beforeEach(async function () {
-        const exchangeAddress = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773"; 
+
+        const exchangeAddress = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773";
         const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
         //We are using this contract to simulate Gnosis multisig wallet
 
@@ -155,9 +158,11 @@ describe("Handler and different adapters", function () {
         // Temp values for exchange stuff.
         handler = await upgrades.deployProxy(Handler,
             [admin.address, exchangeAddress], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as LiquidityHandler;
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), admin.address)
@@ -213,17 +218,18 @@ describe("Handler and different adapters", function () {
                 admin.address,
                 handler.address,
                 [dai.address,
-                    usdc.address,
-                    usdt.address
+                usdc.address,
+                usdt.address
                 ],
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+        }
         ) as IbAlluo;
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoUsd.address)
@@ -238,18 +244,20 @@ describe("Handler and different adapters", function () {
                 admin.address,
                 handler.address,
                 [jeur.address,
-                    par.address,
-                    eurt.address,
-                    eurs.address
+                par.address,
+                eurt.address,
+                eurs.address
                 ],
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as IbAlluo;
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEur.address)
@@ -266,9 +274,11 @@ describe("Handler and different adapters", function () {
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as IbAlluo;
 
 
@@ -282,60 +292,70 @@ describe("Handler and different adapters", function () {
                 admin.address,
                 handler.address,
                 [wbtc.address,
-                    renBtc.address
+                renBtc.address
                 ],
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as IbAlluo;
 
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoBtc.address)
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoBtc.address, 4)
 
-        
+
         let StIbAlluoEur: StIbAlluo;
         let StIbAlluoEth: StIbAlluo;
         let StIbAlluoBtc: StIbAlluo;
         const StIbAlluoFactory = await ethers.getContractFactory("StIbAlluo") as StIbAlluo__factory;
 
         StIbAlluoUsd = await upgrades.deployProxy(StIbAlluoFactory,
-            [ibAlluoUsd.address, 18, "Streaming IbAlluo USD", "StIbAlluoUSD", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", admin.address,[ibAlluoUsd.address]
+            [ibAlluoUsd.address, 18, "Streaming IbAlluo USD", "StIbAlluoUSD", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", admin.address, [ibAlluoUsd.address]
             ], {
-                initializer: 'alluoInitialize',
-                kind: 'uups'
-            }
+            initializer: 'alluoInitialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as StIbAlluo;
 
         StIbAlluoEth = await upgrades.deployProxy(StIbAlluoFactory,
-            [ibAlluoEth.address, 18, "Streaming IbAlluo ETH", "StIbAlluoEth", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7",admin.address, [ibAlluoEth.address]
+            [ibAlluoEth.address, 18, "Streaming IbAlluo ETH", "StIbAlluoEth", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", admin.address, [ibAlluoEth.address]
             ], {
-                initializer: 'alluoInitialize',
-                kind: 'uups'
-            }
+            initializer: 'alluoInitialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as StIbAlluo;
 
 
         StIbAlluoEur = await upgrades.deployProxy(StIbAlluoFactory,
-            [ibAlluoEur.address, 18, "Streaming IbAlluo Eur", "StIbAlluoEUR", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", admin.address,[ibAlluoEur.address]
+            [ibAlluoEur.address, 18, "Streaming IbAlluo Eur", "StIbAlluoEUR", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", admin.address, [ibAlluoEur.address]
             ], {
-                initializer: 'alluoInitialize',
-                kind: 'uups'
-            }
+            initializer: 'alluoInitialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as StIbAlluo;
 
 
         StIbAlluoBtc = await upgrades.deployProxy(StIbAlluoFactory,
-            [ibAlluoBtc.address, 18, "Streaming IbAlluo Btc", "StIbAlluoBTC", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", admin.address,[ibAlluoBtc.address]
+            [ibAlluoBtc.address, 18, "Streaming IbAlluo Btc", "StIbAlluoBTC", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", admin.address, [ibAlluoBtc.address]
             ], {
-                initializer: 'alluoInitialize',
-                kind: 'uups'
-            }
+            initializer: 'alluoInitialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as StIbAlluo;
 
 

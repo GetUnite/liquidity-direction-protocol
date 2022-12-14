@@ -8,9 +8,10 @@ interface IAlluoStrategy {
     /// @param data whatever data you want to pass to strategy from vote extry.
     /// @param amount amount of your tokens that will be invested.
     /// @return data that MUST be passed in exiting functions
-    function invest(bytes calldata data, uint256 amount)
-        external
-        returns (bytes memory);
+    function invest(
+        bytes calldata data,
+        uint256 amount
+    ) external returns (bytes memory);
 
     /// @notice Uninvest value and tranfer exchanged value to receiver.
     /// @param data whatever data you want to pass to strategy from vote extry.

@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: AGPLv3
-pragma solidity >= 0.8.0;
+pragma solidity >=0.8.0;
 
-import { ISuperfluidToken } from "./ISuperfluidToken.sol";
+import {ISuperfluidToken} from "./ISuperfluidToken.sol";
 
 /**
  * @title Super agreement interface
  * @author Superfluid
  */
 interface ISuperAgreement {
-
     /**
      * @dev Get the type of the agreement class
      */
@@ -29,10 +28,5 @@ interface ISuperAgreement {
     )
         external
         view
-        returns (
-            int256 dynamicBalance,
-            uint256 deposit,
-            uint256 owedDeposit
-        );
-
+        returns (int256 dynamicBalance, uint256 deposit, uint256 owedDeposit);
 }

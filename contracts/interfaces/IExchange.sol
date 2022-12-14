@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-interface IExchange{
+interface IExchange {
     struct RouteEdge {
         uint32 swapProtocol; // 0 - unknown edge, 1 - UniswapV2, 2 - Curve...
         address pool; // address of pool to call
@@ -16,8 +16,8 @@ interface IExchange{
         uint256 minAmountOut
     ) external payable returns (uint256);
 
-     function buildRoute(address from, address to)
-        external
-        view
-        returns (RouteEdge[] memory);
+    function buildRoute(
+        address from,
+        address to
+    ) external view returns (RouteEdge[] memory);
 }

@@ -10,12 +10,16 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract EthNoPoolAdapterMainnet is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
+contract EthNoPoolAdapterMainnet is
+    Initializable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable
+{
     using Address for address;
     using SafeERC20 for IERC20;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-    
+
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public wallet;
     bool public upgradeStatus;
@@ -23,7 +27,10 @@ contract EthNoPoolAdapterMainnet is Initializable, AccessControlUpgradeable, UUP
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-   function initialize(address _multiSigWallet, address _liquidityHandler) public initializer {
+    function initialize(
+        address _multiSigWallet,
+        address _liquidityHandler
+    ) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
@@ -35,26 +42,40 @@ contract EthNoPoolAdapterMainnet is Initializable, AccessControlUpgradeable, UUP
         wallet = _multiSigWallet;
     }
 
-    function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function deposit(
+        address _token,
+        uint256 _fullAmount,
+        uint256 _leaveInPool
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
-        if(toSend != 0){
+        if (toSend != 0) {
             IERC20(WETH).safeTransfer(wallet, toSend);
         }
-    } 
+    }
 
-    function withdraw(address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function withdraw(
+        address _user,
+        address _token,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(WETH).safeTransfer(_user, _amount);
     }
-    
+
     function getAdapterAmount() external view returns (uint256) {
         return IERC20(WETH).balanceOf(address(this));
     }
 
-    function getCoreTokens() external pure returns ( address mathToken, address primaryToken ){
+    function getCoreTokens()
+        external
+        pure
+        returns (address mathToken, address primaryToken)
+    {
         return (WETH, WETH);
     }
 
-    function setWallet(address _newWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setWallet(
+        address _newWallet
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         wallet = _newWallet;
     }
 
@@ -63,25 +84,23 @@ contract EthNoPoolAdapterMainnet is Initializable, AccessControlUpgradeable, UUP
      * @param _address address of the token being removed
      * @param _amount amount of the token being removed
      */
-    function removeTokenByAddress(address _address, address _to, uint256 _amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function removeTokenByAddress(
+        address _address,
+        address _to,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(_address).safeTransfer(_to, _amount);
     }
 
-    function changeUpgradeStatus(bool _status)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function changeUpgradeStatus(
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         upgradeStatus = _status;
     }
-    
-    function _authorizeUpgrade(address)
-        internal
-        override
-        onlyRole(UPGRADER_ROLE)
-    {
+
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(UPGRADER_ROLE) {
         require(upgradeStatus, "Adapter: Upgrade not allowed");
         upgradeStatus = false;
     }

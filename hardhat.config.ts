@@ -32,7 +32,7 @@ const config: HardhatUserConfig = {
     },
     mainnet: {
       url: process.env.MAINNET_URL,
-      gasPrice: "auto",
+      gasPrice: 8000000000,
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
@@ -88,9 +88,10 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     // apiKey: process.env.ETHERSCAN_API_KEY,
-        apiKey: process.env.POLYGONSCAN_API_KEY,
+    apiKey: process.env.POLYGONSCAN_API_KEY,
 
   },
+
   mocha: {
     timeout: 3600000,
   },

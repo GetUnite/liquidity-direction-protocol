@@ -73,6 +73,7 @@ describe("IbAlluoUSD and Handler Mainnet", function () {
     let exchangeAddress: string;
 
     before(async function () {
+        upgrades.silenceWarnings()
 
         await network.provider.request({
             method: "hardhat_reset",
@@ -83,7 +84,7 @@ describe("IbAlluoUSD and Handler Mainnet", function () {
                     //you can fork from last block by commenting next line
                     blockNumber: 15266430,
                 },
-            }, ],
+            },],
         });
 
         signers = await ethers.getSigners();
@@ -118,15 +119,17 @@ describe("IbAlluoUSD and Handler Mainnet", function () {
         multisig = await Multisig.deploy(true);
 
         exchangeAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec";
-        
+
         handler = await upgrades.deployProxy(LiquidityHandler,
             [
                 admin.address,
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as LiquidityHandler;
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), multisig.address)
@@ -139,9 +142,11 @@ describe("IbAlluoUSD and Handler Mainnet", function () {
                 handler.address,
                 200
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as UsdCurveAdapterMainnet;
 
         await usdAdapter.connect(admin).adapterApproveAll()
@@ -170,9 +175,11 @@ describe("IbAlluoUSD and Handler Mainnet", function () {
                 1600,
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+
+        }
         ) as IbAlluoMainnet;
 
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoCurrent.address, lastAdapterId)
@@ -536,13 +543,13 @@ describe("IbAlluoUSD and Handler Mainnet", function () {
                 expect(await ibAlluoCurrent.allowance(signers[1].address, signers[2].address)).to.equal(parseEther('50'));
 
                 await expect(
-                        ibAlluoCurrent.connect(signers[2]).transferFrom(signers[1].address, signers[2].address, parseEther("60")))
+                    ibAlluoCurrent.connect(signers[2]).transferFrom(signers[1].address, signers[2].address, parseEther("60")))
                     .to.be.revertedWith("ERC20: insufficient allowance");
                 await ibAlluoCurrent.connect(signers[1]).increaseAllowance(signers[2].address, parseEther('20'));
                 await ibAlluoCurrent.connect(signers[1]).decreaseAllowance(signers[2].address, parseEther('10'));
                 await ibAlluoCurrent.connect(signers[2]).transferFrom(signers[1].address, signers[2].address, parseEther("60"))
                 await expect(
-                        ibAlluoCurrent.connect(signers[1]).decreaseAllowance(signers[2].address, parseEther("50")))
+                    ibAlluoCurrent.connect(signers[1]).decreaseAllowance(signers[2].address, parseEther("50")))
                     .to.be.revertedWith("ERC20: decreased allowance below zero");
 
                 let balance = await ibAlluoCurrent.balanceOf(signers[1].address);

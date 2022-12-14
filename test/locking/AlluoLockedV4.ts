@@ -5,7 +5,7 @@ import { Contract, ContractFactory } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { parseEther } from "@ethersproject/units";
 import { keccak256 } from "ethers/lib/utils";
-import { AlluoLockedV4, IAlluoToken, PseudoMultisigWallet, TestERC20, AlluoLockedV2Final, CvxDistributor } from '../../typechain';
+import { AlluoLockedV4, IAlluoToken, PseudoMultisigWallet, TestERC20, AlluoLockedV2Final, CvxDistributorV2 } from '../../typechain';
 import { getLockers } from "../../scripts/dev/getLockers";
 import { writeFileSync } from 'fs';
 import { join } from "path";
@@ -19,7 +19,7 @@ let multisig: PseudoMultisigWallet;
 
 let Locker: ContractFactory;
 let locker: AlluoLockedV4;
-let cvxDistributor: CvxDistributor;
+let cvxDistributor: CvxDistributorV2;
 let cvx: TestERC20;
 let oldLockerFinal: AlluoLockedV2Final;
 
@@ -157,10 +157,10 @@ describe("Locking contract", function () {
         const CvxToken = await ethers.getContractFactory("TestERC20");
         cvx = await CvxToken.deploy("CvxToken", "CVX", 18, false, admin.address);
 
-        const CvxDistributor = await ethers.getContractFactory("CvxDistributor");
+        const CvxDistributorV2 = await ethers.getContractFactory("CvxDistributor");
         const exchangeAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec";
 
-        cvxDistributor = await upgrades.deployProxy(CvxDistributor,
+        cvxDistributor = await upgrades.deployProxy(CvxDistributorV2,
             [
                 admin.address,
                 locker.address,
@@ -168,7 +168,7 @@ describe("Locking contract", function () {
                 exchangeAddress
             ],
             { initializer: 'initialize', kind: 'uups' }
-        ) as CvxDistributor;
+        ) as CvxDistributorV2;
 
         await locker.setCvxDistributor(cvxDistributor.address);
 
@@ -206,7 +206,7 @@ describe("Locking contract", function () {
 
         //     let OldFinalState = await ethers.getContractFactory("AlluoLockedV2Final")
 
-            // oldLockerFinal = await upgrades.upgradeProxy(oldLocker.address, OldFinalState) as AlluoLockedV2Final
+        // oldLockerFinal = await upgrades.upgradeProxy(oldLocker.address, OldFinalState) as AlluoLockedV2Final
 
 
         //     let amountOfLp = await balancerAlluoLp.balanceOf(oldLockerFinal.address)

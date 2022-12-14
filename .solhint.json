@@ -1,7 +1,32 @@
 {
   "extends": "solhint:recommended",
   "rules": {
-    "compiler-version": ["error", "^0.8.0"],
-    "func-visibility": ["warn", { "ignoreConstructors": true }]
-  }
+    "compiler-version": [
+      "error",
+      "^0.8.0"
+    ],
+    "func-visibility": [
+      "error",
+      {
+        "ignoreConstructors": true
+      }
+    ],
+    "reason-string": [
+      "off"
+    ],
+    "not-rely-on-time": [
+      "off"
+    ],
+    "no-empty-blocks": [
+      "off"
+    ],
+    "const-name-snakecase": "error",
+    "no-inline-assembly": "off",
+    "state-visibility": "error",
+    "var-name-mixedcase": "error",
+    "max-states-count": "off"
+  },
+  "plugins": [
+    "prettier"
+  ]
 }

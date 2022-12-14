@@ -5,35 +5,35 @@ import { ethers, network, upgrades } from "hardhat";
 import { CurveConvexStrategy, CurveConvexStrategy__factory, IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, VoteExecutorV2, VoteExecutorV2__factory } from "../../typechain";
 
 describe("VoteExecutor", function () {
-  let strategy: CurveConvexStrategy;
-  let multisig: PseudoMultisigWallet;
-  let executor: VoteExecutorV2
-  let dai: IERC20,  curve3CrvLp: IERC20, crv: IERC20, cvx: IERC20, usdc: IERC20, usdt: IERC20, ust: IERC20, ustW: IERC20, frax: IERC20;
+    let strategy: CurveConvexStrategy;
+    let multisig: PseudoMultisigWallet;
+    let executor: VoteExecutorV2
+    let dai: IERC20, curve3CrvLp: IERC20, crv: IERC20, cvx: IERC20, usdc: IERC20, usdt: IERC20, ust: IERC20, ustW: IERC20, frax: IERC20;
 
-  let signers: SignerWithAddress[];
-  let investor: SignerWithAddress;
-  let fraxHolder: SignerWithAddress;
+    let signers: SignerWithAddress[];
+    let investor: SignerWithAddress;
+    let fraxHolder: SignerWithAddress;
 
-  const exchange = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec";
+    const exchange = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec";
 
-  async function skipDays(d: number) {
-    ethers.provider.send('evm_increaseTime', [d * 86400]);
-    ethers.provider.send('evm_mine', []);
-}
+    async function skipDays(d: number) {
+        ethers.provider.send('evm_increaseTime', [d * 86400]);
+        ethers.provider.send('evm_mine', []);
+    }
 
-        before(async () => {
+    before(async () => {
 
-            await network.provider.request({
-              method: "hardhat_reset",
-              params: [{
-                  forking: {
-                      enabled: true,
-                      jsonRpcUrl: process.env.MAINNET_FORKING_URL as string,
-                      //you can fork from last block by commenting next line
-                      blockNumber: 14577320, 
-                  },
-              },],
-          });
+        await network.provider.request({
+            method: "hardhat_reset",
+            params: [{
+                forking: {
+                    enabled: true,
+                    jsonRpcUrl: process.env.MAINNET_FORKING_URL as string,
+                    //you can fork from last block by commenting next line
+                    blockNumber: 14577320,
+                },
+            },],
+        });
         signers = await ethers.getSigners();
 
         const investorAddress = "0xE78388b4CE79068e89Bf8aA7f218eF6b9AB0e9d0";
@@ -80,28 +80,28 @@ describe("VoteExecutor", function () {
     async function exitFully(id: number, percent: number, token: IERC20, rewards: boolean) {
         await multisig.connect(signers[1]).executeCall(
             executor.address,
-            executor.interface.encodeFunctionData('exitStrategyFully', [      
-                id, 
-                percent, 
-                token.address, 
-                multisig.address, 
+            executor.interface.encodeFunctionData('exitStrategyFully', [
+                id,
+                percent,
+                token.address,
+                multisig.address,
                 rewards]
             )
-        );  
+        );
     }
     async function exitRewards(id: number, token: IERC20, rewards: boolean) {
         await multisig.connect(signers[1]).executeCall(
             executor.address,
-            executor.interface.encodeFunctionData('exitStrategyRewards', [      
-                id, 
-                token.address, 
-                multisig.address, 
+            executor.interface.encodeFunctionData('exitStrategyRewards', [
+                id,
+                token.address,
+                multisig.address,
                 rewards]
             )
-        );  
+        );
     }
-    
-    
+
+
 
     beforeEach(async () => {
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
@@ -114,8 +114,8 @@ describe("VoteExecutor", function () {
                 multisig.address,
                 exchange,
                 [frax.address, usdt.address]
-            ], 
-            {initializer: 'initialize', kind: 'uups'}
+            ],
+            { initializer: 'initialize', kind: 'uups' }
         ) as VoteExecutorV2;
 
         const Strategy = await ethers.getContractFactory("CurveConvexStrategy") as CurveConvexStrategy__factory;
@@ -170,7 +170,7 @@ describe("VoteExecutor", function () {
                 entryToken: frax.address,
                 poolToken: frax.address,
                 data: entryData2
-            }, ]
+            },]
 
             await multisig.connect(signers[1]).executeCall(
                 executor.address,
@@ -192,9 +192,9 @@ describe("VoteExecutor", function () {
             await frax.connect(fraxHolder).transfer(executor.address, fraxAmmount);
             await usdt.connect(investor).transfer(executor.address, usdtAmount);
             await dai.connect(investor).transfer(executor.address, daiAmount);
-        
+
             await executor.changeEntryTokenStatus(dai.address, true);
-        
+
 
             let entryData1 = await strategy.encodeEntryParams(
                 "0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B",
@@ -226,7 +226,7 @@ describe("VoteExecutor", function () {
                 entryToken: dai.address,
                 poolToken: frax.address,
                 data: entryData2
-            }, ]
+            },]
 
             await multisig.connect(signers[1]).executeCall(
                 executor.address,
@@ -247,9 +247,9 @@ describe("VoteExecutor", function () {
             await frax.connect(fraxHolder).transfer(executor.address, fraxAmmount);
             await usdt.connect(investor).transfer(executor.address, usdtAmount);
             await dai.connect(investor).transfer(executor.address, daiAmount);
-        
+
             await executor.changeEntryTokenStatus(dai.address, true);
-        
+
             let entryData1 = await strategy.encodeEntryParams(
                 "0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B",
                 "0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B",
@@ -283,7 +283,7 @@ describe("VoteExecutor", function () {
                 data: entryData2
             }
 
-            let entries = [entry1 , entry2]
+            let entries = [entry1, entry2]
 
             await multisig.connect(signers[1]).executeCall(
                 executor.address,

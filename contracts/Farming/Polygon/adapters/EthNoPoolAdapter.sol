@@ -13,7 +13,7 @@ contract EthNoPoolAdapter is AccessControl {
     address public constant WETH = 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619;
     address public wallet;
 
-    constructor (address _multiSigWallet, address _liquidityHandler) {
+    constructor(address _multiSigWallet, address _liquidityHandler) {
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
@@ -21,26 +21,40 @@ contract EthNoPoolAdapter is AccessControl {
         wallet = _multiSigWallet;
     }
 
-    function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function deposit(
+        address _token,
+        uint256 _fullAmount,
+        uint256 _leaveInPool
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
-        if(toSend != 0){
+        if (toSend != 0) {
             IERC20(WETH).safeTransfer(wallet, toSend);
         }
-    } 
+    }
 
-    function withdraw(address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function withdraw(
+        address _user,
+        address _token,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(WETH).safeTransfer(_user, _amount);
     }
-    
+
     function getAdapterAmount() external view returns (uint256) {
         return IERC20(WETH).balanceOf(address(this));
     }
 
-    function getCoreTokens() external pure returns ( address mathToken, address primaryToken ){
+    function getCoreTokens()
+        external
+        pure
+        returns (address mathToken, address primaryToken)
+    {
         return (WETH, WETH);
     }
 
-    function setWallet(address _newWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setWallet(
+        address _newWallet
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         wallet = _newWallet;
     }
 
@@ -49,10 +63,11 @@ contract EthNoPoolAdapter is AccessControl {
      * @param _address address of the token being removed
      * @param _amount amount of the token being removed
      */
-    function removeTokenByAddress(address _address, address _to, uint256 _amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function removeTokenByAddress(
+        address _address,
+        address _to,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(_address).safeTransfer(_to, _amount);
     }
 }
