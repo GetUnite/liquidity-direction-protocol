@@ -185,7 +185,7 @@ describe("Locking contract with CVX", async () => {
         claimCvx = await cvx.balanceOf(accounts[1].address);
 
         expect(claim).to.be.gt(parseEther("172800"));
-        expect(claim).to.be.lt(parseEther("172808"));
+        expect(claim).to.be.lt(parseEther("172900"));
 
         // check claimCvx to be in +-5% calculated amount
         expect(claimCvx).to.be.gte(cvxPerDay.mul(2).div(100).mul(95));
