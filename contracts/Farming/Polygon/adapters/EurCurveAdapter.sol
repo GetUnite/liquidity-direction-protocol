@@ -7,6 +7,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "../../../interfaces/curve/ICurvePoolEUR.sol";
+import "../../../interfaces/IPriceFeedRouter.sol";
+
 
 contract EurCurveAdapter is AccessControl {
     using Address for address;
@@ -20,9 +22,9 @@ contract EurCurveAdapter is AccessControl {
         0xAd326c253A84e9805559b73A08724e11E49ca651;
     address public wallet;
     uint64 public slippage;
-
+    address public priceFeedRouter;
     uint64 public primaryTokenIndex;
-    uint128 public liquidTokenIndex;
+    uint256 public fiatIndex;
 
     mapping(address => uint128) public indexes;
 
@@ -44,7 +46,6 @@ contract EurCurveAdapter is AccessControl {
         indexes[EURS] = 2;
         indexes[EURT] = 3;
 
-        liquidTokenIndex = 2;
         primaryTokenIndex = 3;
     }
 
@@ -73,22 +74,21 @@ contract EurCurveAdapter is AccessControl {
             if (toSend != 0) {
                 IERC20(primaryToken).safeTransfer(
                     wallet,
-                    toSend /
-                        10 ** (18 - IERC20Metadata(primaryToken).decimals())
+                    toSend / 10**(18 - IERC20Metadata(primaryToken).decimals())
                 );
             }
             if (_leaveInPool != 0) {
                 uint256[4] memory amounts;
                 amounts[primaryTokenIndex] =
                     _leaveInPool /
-                    10 ** (18 - IERC20Metadata(primaryToken).decimals());
+                    10**(18 - IERC20Metadata(primaryToken).decimals());
                 ICurvePoolEUR(CURVE_POOL).add_liquidity(amounts, 0);
             }
         } else {
             uint256[4] memory amounts;
             amounts[indexes[_token]] =
                 _fullAmount /
-                10 ** (18 - IERC20Metadata(_token).decimals());
+                10**(18 - IERC20Metadata(_token).decimals());
 
             uint256 lpAmount = ICurvePoolEUR(CURVE_POOL).add_liquidity(
                 amounts,
@@ -98,7 +98,7 @@ contract EurCurveAdapter is AccessControl {
             if (toSend != 0) {
                 toSend =
                     toSend /
-                    10 ** (18 - IERC20Metadata(primaryToken).decimals());
+                    10**(18 - IERC20Metadata(primaryToken).decimals());
                 amounts[primaryTokenIndex] = toSend;
                 ICurvePoolEUR(CURVE_POOL).remove_liquidity_imbalance(
                     amounts,
@@ -120,86 +120,72 @@ contract EurCurveAdapter is AccessControl {
         uint256 _amount
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256[4] memory amounts;
-        address liquidToken = ICurvePoolEUR(CURVE_POOL).coins(liquidTokenIndex);
-        uint256 amount = _amount /
-            10 ** (18 - IERC20Metadata(liquidToken).decimals());
-        amounts[liquidTokenIndex] = amount;
-
-        if (_token == liquidToken) {
-            ICurvePoolEUR(CURVE_POOL).remove_liquidity_imbalance(
-                amounts,
-                (_amount * (10000 + slippage)) / 10000
-            );
-            IERC20(_token).safeTransfer(_user, amount);
-        } else {
-            // We want to be save agains arbitragers so at any withraw contract checks
-            // how much will be burned curveLp by withrawing this amount in token with most liquidity
-            // and passes this burned amount to get tokens
-            uint256 toBurn = ICurvePoolEUR(CURVE_POOL).calc_token_amount(
-                amounts,
-                false
-            );
-            uint256 minAmountOut = _amount /
-                10 ** (18 - IERC20Metadata(_token).decimals());
-            uint256 toUser = ICurvePoolEUR(CURVE_POOL)
-                .remove_liquidity_one_coin(
-                    toBurn,
-                    int128(indexes[_token]),
-                    (minAmountOut * (10000 - slippage)) / 10000
-                );
-            IERC20(_token).safeTransfer(_user, toUser);
-        }
+        uint256 amount = _amount / 10**(18 - IERC20Metadata(_token).decimals());
+        amounts[indexes[_token]] = amount;
+        ICurvePoolEUR(CURVE_POOL).remove_liquidity_imbalance(
+            amounts,
+            (_amount * (10000 + slippage)) / 10000
+        );
+        IERC20(_token).safeTransfer(_user, amount);
     }
 
     function getAdapterAmount() external view returns (uint256) {
         uint256 curveLpAmount = IERC20(CURVE_POOL).balanceOf((address(this)));
         if (curveLpAmount != 0) {
-            address liquidToken = ICurvePoolEUR(CURVE_POOL).coins(
-                liquidTokenIndex
+            address primaryToken = ICurvePoolEUR(CURVE_POOL).coins(
+                primaryTokenIndex
             );
-            uint256 amount = ICurvePoolEUR(CURVE_POOL).calc_withdraw_one_coin(
-                curveLpAmount,
-                int128(liquidTokenIndex)
-            );
-            return amount * 10 ** (18 - IERC20Metadata(liquidToken).decimals());
+            uint256 amount = (
+                ICurvePoolEUR(CURVE_POOL).calc_withdraw_one_coin(
+                    curveLpAmount,
+                    int128(uint128(primaryTokenIndex))
+                )
+            ) * 10 ** (18 - IERC20Metadata(primaryToken).decimals());
+
+            if (priceFeedRouter != address(0)) {
+                (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
+                    priceFeedRouter
+                ).getPrice(primaryToken, fiatIndex);
+                amount = (amount * price) / 10 ** (uint256(priceDecimals));
+            }
+
+            return amount;
         } else {
             return 0;
         }
     }
 
-    function getCoreTokens()
+    function getCoreTokens() external view returns (address primaryToken) {
+        return (ICurvePoolEUR(CURVE_POOL).coins(primaryTokenIndex));
+    }
+
+    function changePrimaryTokenIndex(uint64 _newPrimaryTokenIndex)
         external
-        view
-        returns (address liquidToken, address primaryToken)
+        onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        return (
-            ICurvePoolEUR(CURVE_POOL).coins(liquidTokenIndex),
-            ICurvePoolEUR(CURVE_POOL).coins(primaryTokenIndex)
-        );
-    }
-
-    function changeLiquidTokenIndex(
-        uint128 _newLiquidTokenIndex
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        liquidTokenIndex = _newLiquidTokenIndex;
-    }
-
-    function changePrimaryTokenIndex(
-        uint64 _newPrimaryTokenIndex
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         primaryTokenIndex = _newPrimaryTokenIndex;
     }
 
-    function setSlippage(
-        uint64 _newSlippage
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setSlippage(uint64 _newSlippage)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         slippage = _newSlippage;
     }
 
-    function setWallet(
-        address _newWallet
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setWallet(address _newWallet)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         wallet = _newWallet;
+    }
+
+    function setPriceRouterInfo(address _priceFeedRouter, uint256 _fiatIndex)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        priceFeedRouter = _priceFeedRouter;
+        fiatIndex = _fiatIndex;
     }
 
     /**

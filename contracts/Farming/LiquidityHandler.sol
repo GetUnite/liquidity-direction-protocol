@@ -478,7 +478,7 @@ contract LiquidityHandler is
 
     function getAdapterCoreTokensFromIbAlluo(
         address _ibAlluo
-    ) public view returns (address, address) {
+    ) public view returns (address) {
         uint256 adapterId = ibAlluoToAdapterId.get(_ibAlluo);
         address adapterAddress = adapterIdsToAdapterInfo[adapterId]
             .adapterAddress;
