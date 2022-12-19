@@ -18,6 +18,7 @@ contract BtcCurveAdapter is AccessControl {
     address public constant renBTC = 0xDBf31dF14B66535aF65AaC99C32e9eA844e14501;
     address public constant curvePool = 0xC2d95EEF97Ec6C17551d45e77B590dc1F9117C67;
     address public constant curveLp = 0xf8a57c1d3b9629b77b6726a042ca48990A84Fb49;
+    address public buffer;
     uint64 public slippage;
 
     uint64 public primaryTokenIndex;

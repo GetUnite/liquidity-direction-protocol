@@ -67,6 +67,23 @@ contract VoteExecutorSlave is
 
     mapping(bytes32 => uint256) public hashExecutionTime;
 
+    struct Entry {
+        // Percentage of the total contract balance
+        // that goes to the exact strategy
+        // with 2 desimals, so 6753 == 67.53%
+        uint256 weight;
+        // strategy that distributes money to a specific pool
+        address strategyAddress;
+        // Preferred token for which most exchanges will be made
+        address entryToken;
+        // Token with which we enter the pool
+        address poolToken;
+        //
+        bytes data;
+    }
+ 
+    Entry public entries;
+    
 
     struct Message {
         uint256 commandIndex;
@@ -124,6 +141,7 @@ contract VoteExecutorSlave is
         hashExecutionTime[hashed] = block.timestamp;
         if (nextChain != 0) {
             IAnyCall(anyCallAddress).anyCall(nextChainExecutor, _data, address(0), nextChain, 0);
+            // ??????
         }
         success=true;
         result="";
@@ -140,7 +158,15 @@ contract VoteExecutorSlave is
             if (currentMessage.commandIndex == 0) {
                 (string memory ibAlluoSymbol, uint256 newAnnualInterest, uint256 newInterestPerSecond) = abi.decode(currentMessage.commandData, (string, uint256, uint256));
                 _changeAPY(newAnnualInterest, newInterestPerSecond, ibAlluoSymbol);
+            } else if (currentMessage.commandIndex == 2) {
+                (uint256 weight, address strategyAddr, address entryToken, address poolToken) = abi.decode(currentMessage.commandData, (uint256, address, address, address));
+
+                entries.weight = weight;
+                entries.strategyAddress = strategyAddr;
+                entries.entryToken = entryToken;
+                entries.poolToken = poolToken;
             }
+
         }
     }
   

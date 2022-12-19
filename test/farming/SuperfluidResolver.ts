@@ -87,7 +87,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
     let exchangeAddress: string;
     let superFactory: ISuperTokenFactory;
     let resolver: SuperfluidResolver;
-
+    
     before(async function () {
 
         //We are forking Polygon mainnet, please set Alchemy key in .env
@@ -140,7 +140,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), multisig.address)
 
         const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapter") as UsdCurveAdapter__factory;
-
+        
         usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200)
 
         await usdAdapter.connect(admin).adapterApproveAll()

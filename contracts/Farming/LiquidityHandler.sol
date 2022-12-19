@@ -115,9 +115,9 @@ contract LiquidityHandler is
      ** @param _amount Amount of tokens in correct deimals (10**18 for DAI, 10**6 for USDT)
      */
     function deposit(address _token, uint256 _amount)
-        external
-        whenNotPaused
-        onlyRole(DEFAULT_ADMIN_ROLE)
+         external 
+         whenNotPaused
+          onlyRole(DEFAULT_ADMIN_ROLE) 
     {
         uint256 amount18 = _amount *
             10**(18 - ERC20Upgradeable(_token).decimals());
@@ -154,7 +154,8 @@ contract LiquidityHandler is
         ) {
             uint256 inAdapterAfterDeposit = getAdapterAmount(msg.sender);
             uint256 firstInQueueAmount = withdrawalSystem
-                .withdrawals[withdrawalSystem.lastSatisfiedWithdrawal + 1].amount;
+                .withdrawals[withdrawalSystem.lastSatisfiedWithdrawal + 1]
+.amount;
             if (firstInQueueAmount <= inAdapterAfterDeposit) {
                 withdrawalSystem.resolverTrigger = true;
                 emit EnoughToSatisfy(
@@ -254,7 +255,7 @@ contract LiquidityHandler is
             require(
                 _token == _outputToken,
                 "Handler: Only supported tokens"
-            );
+                );
             uint256 lastWithdrawalRequest = withdrawalSystem
                 .lastWithdrawalRequest;
             withdrawalSystem.lastWithdrawalRequest++;
@@ -377,11 +378,10 @@ contract LiquidityHandler is
         return IHandlerAdapter(adapter).getAdapterAmount();
     }
 
-    function getExpectedAdapterAmount(address _ibAlluo, uint256 _newAmount)
-        public
-        view
-        returns (uint256)
-    {
+    function getExpectedAdapterAmount(
+        address _ibAlluo,
+        uint256 _newAmount
+    ) public view returns (uint256) {
         uint256 adapterId = ibAlluoToAdapterId.get(_ibAlluo);
         uint256 percentage = adapterIdsToAdapterInfo[adapterId].percentage;
 
@@ -399,11 +399,11 @@ contract LiquidityHandler is
         return ibAlluoToAdapterId.get(_ibAlluo);
     }
 
-    function getIbAlluoByAdapterId(uint256 _adapterId)
+    function getIbAlluoByAdapterId(uint256 _adapterId) 
         public
         view
-        returns (address)
-    {
+        returns (address) 
+      {
         address ibAlluo_;
         uint256 numberOfIbAlluos = ibAlluoToAdapterId.length();
 
@@ -472,9 +472,9 @@ contract LiquidityHandler is
         return (adapters, ibAlluos);
     }
 
-    function getAdapterCoreTokensFromIbAlluo(address _ibAlluo)
-        public
-        view
+    function getAdapterCoreTokensFromIbAlluo(address _ibAlluo) 
+        public 
+        view 
         returns (address, address)
     {
         uint256 adapterId = ibAlluoToAdapterId.get(_ibAlluo);
@@ -486,7 +486,7 @@ contract LiquidityHandler is
     function getWithdrawal(address _ibAlluo, uint256 _id)
         external
         view
-        returns (Withdrawal memory)
+        returns (Withdrawal memory) 
     {
         return ibAlluoToWithdrawalSystems[_ibAlluo].withdrawals[_id];
     }
@@ -531,8 +531,8 @@ contract LiquidityHandler is
     }
 
     function changeAdapterStatus(uint256 _id, bool _status)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+    external
+    onlyRole(DEFAULT_ADMIN_ROLE)
     {
         adapterIdsToAdapterInfo[_id].status = _status;
     }
@@ -557,8 +557,8 @@ contract LiquidityHandler is
     }
 
     function setExchangeAddress(address newExchangeAddress)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
     {
         exchangeAddress = newExchangeAddress;
     }
@@ -576,17 +576,17 @@ contract LiquidityHandler is
         IERC20Upgradeable(_address).safeTransfer(_to, _amount);
     }
 
-    function changeUpgradeStatus(bool _status)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+    function changeUpgradeStatus(bool _status) 
+        external 
+        onlyRole(DEFAULT_ADMIN_ROLE) 
     {
         upgradeStatus = _status;
     }
 
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        onlyRole(UPGRADER_ROLE)
+    function _authorizeUpgrade(address newImplementation) 
+        internal 
+        override 
+        onlyRole(UPGRADER_ROLE) 
     {
         require(upgradeStatus, "Handler: Upgrade not allowed");
         upgradeStatus = false;
