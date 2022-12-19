@@ -1,6 +1,11 @@
 import { ethers, upgrades } from "hardhat"
 
 async function main() {
+
+  // const IbAlluoOld = await ethers.getContractFactory("IbAlluoOld");
+
+  // await upgrades.forceImport("0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6", IbAlluoOld);
+
   const IbAlluoNew = await ethers.getContractFactory("IbAlluo");
 
   let IbAlluoUsd = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
@@ -10,12 +15,17 @@ async function main() {
 
   await upgrades.upgradeProxy(IbAlluoUsd.address, IbAlluoNew);
   console.log('IbAlluoUsd upgraded');
-  await upgrades.upgradeProxy(IbAlluoEur.address, IbAlluoNew);
-  console.log('IbAlluoEur upgraded');
-  await upgrades.upgradeProxy(IbAlluoEth.address, IbAlluoNew);
-  console.log('IbAlluoEth upgraded');
-  await upgrades.upgradeProxy(IbAlluoBtc.address, IbAlluoNew);
-  console.log('IbAlluoBtc upgraded');
+  // await upgrades.upgradeProxy(IbAlluoEur.address, IbAlluoNew);
+  // console.log('IbAlluoEur upgraded');
+  // await upgrades.upgradeProxy(IbAlluoEth.address, IbAlluoNew);
+  // console.log('IbAlluoEth upgraded');
+  // await upgrades.upgradeProxy(IbAlluoBtc.address, IbAlluoNew);
+  // console.log('IbAlluoBtc upgraded');
+
+  const StIbAlluoNew = await ethers.getContractFactory("StIbAlluo");
+
+  let stIbAlluoNew = await StIbAlluoNew.deploy()
+
 }
 
 main()

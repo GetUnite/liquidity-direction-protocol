@@ -727,27 +727,27 @@ describe("IbAlluoUSD and Handler", function () {
             expect(await ibAlluoCurrent.paused()).to.be.false;
         });
 
-        it("Should set new updateRatio time limit", async () => {
-            const newLimit = 120;
-            const oldLimit = await ibAlluoCurrent.updateTimeLimit();
+        // it("Should set new updateRatio time limit", async () => {
+        //     const newLimit = 120;
+        //     const oldLimit = await ibAlluoCurrent.updateTimeLimit();
 
-            expect(newLimit).to.not.be.equal(oldLimit);
+        //     expect(newLimit).to.not.be.equal(oldLimit);
 
-            let ABI = ["function setUpdateTimeLimit(uint256 _newLimit)"];
-            let iface = new ethers.utils.Interface(ABI);
-            const calldata = iface.encodeFunctionData("setUpdateTimeLimit", [newLimit]);
+        //     let ABI = ["function setUpdateTimeLimit(uint256 _newLimit)"];
+        //     let iface = new ethers.utils.Interface(ABI);
+        //     const calldata = iface.encodeFunctionData("setUpdateTimeLimit", [newLimit]);
 
-            await expect(multisig.executeCall(ibAlluoCurrent.address, calldata)).to.emit(ibAlluoCurrent, "UpdateTimeLimitSet").withArgs(oldLimit, newLimit);
-        });
+        //     await expect(multisig.executeCall(ibAlluoCurrent.address, calldata)).to.emit(ibAlluoCurrent, "UpdateTimeLimitSet").withArgs(oldLimit, newLimit);
+        // });
 
-        it("Should not set new updateRatio time limit (caller without DEFAULT_ADMIN_ROLE)", async () => {
-            const newLimit = 7200;
-            const notAdmin = signers[1];
-            const role = await ibAlluoCurrent.DEFAULT_ADMIN_ROLE();
+        // it("Should not set new updateRatio time limit (caller without DEFAULT_ADMIN_ROLE)", async () => {
+        //     const newLimit = 7200;
+        //     const notAdmin = signers[1];
+        //     const role = await ibAlluoCurrent.DEFAULT_ADMIN_ROLE();
 
-            await expect(ibAlluoCurrent.connect(notAdmin).setUpdateTimeLimit(newLimit)).to.be
-                .revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
-        });
+        //     await expect(ibAlluoCurrent.connect(notAdmin).setUpdateTimeLimit(newLimit)).to.be
+        //         .revertedWith(`AccessControl: account ${notAdmin.address.toLowerCase()} is missing role ${role}`);
+        // });
 
         it("Should add new deposit token and allow to deposit with it", async () => {
 
