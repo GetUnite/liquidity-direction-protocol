@@ -2,6 +2,7 @@ const { SolidityMetricsContainer } = require('solidity-code-metrics');
 const fs = require('fs');
 const path = require('path');
 
+
 function enumerateFiles(dir) {
     const fileList = [];
     const queue = [dir];
@@ -42,8 +43,8 @@ let options = {
     }
 }
 
-let metrics = new SolidityMetricsContainer("metricsContainerName", options);
-let allFiles = enumerateFiles("contracts/");
+let metrics = new SolidityMetricsContainer("GetAlluo/liquidity-direction-protocol", options);
+let allFiles = enumerateFiles("./contracts/");
 
 for (let i = 0; i < allFiles.length; i++) {
     const file = allFiles[i];
@@ -51,8 +52,8 @@ for (let i = 0; i < allFiles.length; i++) {
     metrics.analyze(file);
 }
 
-// output
-console.log(metrics.totals());
+console.log("Generating report...");
 metrics.generateReportMarkdown().then((text) => {
-    saveStringToFile("report.md", text);
+    saveStringToFile("solidity-metrics-report.md", text);
+    console.log("Report saved in ./solidity-metrics-report.md");
 });

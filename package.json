@@ -58,7 +58,8 @@
     "solhint": "solhint -f table contracts/**/*.sol",
     "prettier:solidity": "prettier --write contracts/**/*.sol",
     "alluo-ready": "solhint -f table contracts/**/*.sol && prettier --write contracts/**/*.sol && hardhat test",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "solidity-metrics": "npx hardhat run scripts/audit/metrics.js"
   },
   "dependencies": {
     "solidity-code-metrics": "^0.0.22"
