@@ -29,15 +29,32 @@ contract SuperfluidResolver is AccessControl {
     constructor(
         address[] memory _ibAlluoAddresses,
         address _cfaContract,
-        address _gelato
+        address _multisig
     ) {
         for (uint i; i < _ibAlluoAddresses.length; i++) {
             _grantRole(DEFAULT_ADMIN_ROLE, _ibAlluoAddresses[i]);
         }
+
+        _grantRole(DEFAULT_ADMIN_ROLE, _multisig);
+        _grantRole(GELATO, _multisig);
+        _grantRole(GELATO, 0x0391ceD60d22Bc2FadEf543619858b12155b7030);
         ibAlluoAddresses = _ibAlluoAddresses;
         cfaContract = _cfaContract;
-        _grantRole(GELATO, _gelato);
-        _grantRole(GELATO, msg.sender);
+    }
+
+    function migratePreExistingStreams(
+        address[] memory _tokens,
+        address[] memory _from,
+        address[] memory _to
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(
+            _tokens.length == _from.length && _from.length == _to.length,
+            "SuperfluidResolver: INVALID_INPUT_LENGTH"
+        );
+        for (uint i; i < _tokens.length; i++) {
+            ibAlluoToStreamingData[_tokens[i]][_from[i]].add(_to[i]);
+            ibAlluoToActiveStreamers[_tokens[i]].add(_from[i]);
+        }
     }
 
     function addToChecker(
@@ -135,6 +152,9 @@ contract SuperfluidResolver is AccessControl {
         address _token
     ) external onlyRole(GELATO) {
         for (uint256 i; i < _receivers.length; i++) {
+            if (!_isUserCloseToLiquidation(_sender, _token)) {
+                continue;
+            }
             if (_isUserCloseToLiquidationAfterWrapping(_sender, _token)) {
                 try
                     IIbAlluo(_token).stopFlowWhenCritical(
