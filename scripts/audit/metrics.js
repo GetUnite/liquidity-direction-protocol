@@ -27,7 +27,19 @@ function enumerateFiles(dir) {
 }
 
 function saveStringToFile(filePath, str) {
+    if (fs.existsSync(filePath)) {
+        fs.rmSync(filePath);
+    }
     fs.writeFileSync(filePath, str);
+}
+
+function isExcluded(path) {
+    for (let i = 0; i < excludePaths.length; i++) {
+        if (path.startsWith(excludePaths[i])) {
+            return true;
+        }        
+    }
+    return false;
 }
 
 let options = {
@@ -43,11 +55,23 @@ let options = {
     }
 }
 
+const basePath = "contracts";
+
+let excludePaths = [
+    `${basePath}\\Farming\\priceFeeds\\`,
+    `${basePath}\\Farming\\Polygon\\superfluid\\`,
+    `${basePath}\\mock\\`,
+];
+
 let metrics = new SolidityMetricsContainer("GetAlluo/liquidity-direction-protocol", options);
-let allFiles = enumerateFiles("./contracts/");
+let allFiles = enumerateFiles(basePath);
 
 for (let i = 0; i < allFiles.length; i++) {
     const file = allFiles[i];
+    if (isExcluded(file)) {
+        continue;
+    }
+
     console.log(`Analyzing '${file}'...`);
     metrics.analyze(file);
 }
