@@ -43,9 +43,9 @@ contract BufferManager is
     uint256 public lastExecuted;
     uint256 public bridgeInterval;
 
-    bytes32 public constant SWAPPER = keccak256("SWAPPER");
     bytes32 constant public UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 constant public GELATO = keccak256("GELATO");
+    bytes32 constant public SWAPPER = keccak256("SWAPPER");
 
     ILiquidityHandler public handler;
 
@@ -130,8 +130,7 @@ contract BufferManager is
             address iballuo = activeIbAlluos.at(i); 
             uint256 amount = IERC20Upgradeable(ibAlluoToToken[iballuo]).balanceOf(address(this));
             if(!isAdapterPendingWithdrawal(iballuo)) {
-                if(adapterRequiredRefill(iballuo) > 0 &&
-                    amount >= minBridgeAmount * 10 ** IERC20MetadataUpgradeable(ibAlluoToToken[iballuo]).decimals() &&
+                if(amount >= minBridgeAmount * 10 ** IERC20MetadataUpgradeable(ibAlluoToToken[iballuo]).decimals() &&
                     block.timestamp >= lastExecuted + bridgeInterval) {
                         canExec = true;
                         address originToken = ibAlluoToToken[iballuo];
@@ -146,12 +145,13 @@ contract BufferManager is
 
                     break; 
                 }
-            } else {
-                canExec = true;
-                execPayload = abi.encodeWithSelector(
-                BufferManager.refillBuffer.selector,
-                iballuo
-                );
+            } else if (adapterRequiredRefill(iballuo) > 0 &&
+                    adapterRequiredRefill(iballuo) < amount) {
+                    canExec = true;
+                    execPayload = abi.encodeWithSelector(
+                    BufferManager.refillBuffer.selector,
+                    iballuo
+                    );
 
                 break;
             }
@@ -271,15 +271,6 @@ contract BufferManager is
         }
         return false;
     }
-
-    // ??????? Do we need this? refillBuffer.selector doesn't work if its visibility is public and not external
-
-    // function loopRefill() public onlyRole(GELATO) returns (bool) {
-    //     for (uint256 i; i < activeIbAlluos.length(); i++) {
-    //         refillBuffer(activeIbAlluos.at(i));
-    //     }
-    //     return true;
-    // }
     
     /**
     * @notice Initialize function faces stack too deep error, due to too many arguments
@@ -318,12 +309,22 @@ contract BufferManager is
         bridgeInterval = _bridgeInterval;
     }
 
+    function setMaxRefillPerEpoch(address _ibAlluo, uint256 _maxRefillPerEpoch) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        ibAlluoToMaxRefillPerEpoch[_ibAlluo] = _maxRefillPerEpoch;
+    }
+
+    function setEpochDuration(uint256 _epochDuration) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        epochDuration = _epochDuration;
+    }
+
     /**
     * @notice Function is called by gnosis
     * @dev Adds IBAlluo pool to the list of active pools
     * @param ibAlluo Address of the IBAlluo pool to be added
     */
     function addIBAlluoPool(address ibAlluo, address adapter) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(!activeIbAlluos.contains(ibAlluo), "Already active");
+
         activeIbAlluos.add(ibAlluo);
         ibAlluoToAdapter[ibAlluo] = adapter;
     }

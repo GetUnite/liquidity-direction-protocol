@@ -88,7 +88,7 @@ contract EurCurveAdapter is AccessControl {
                     toSend /
                     10 ** (18 - IERC20Metadata(primaryToken).decimals());
                 amounts[primaryTokenIndex] = toSend;
-                ICurvePoolEUR(curvePool).remove_liquidity_imbalance(
+                ICurvePoolEUR(CURVE_POOL).remove_liquidity_imbalance(
                             amounts, 
                             lpAmount * (10000+slippage)/10000);
                 IERC20(primaryToken).safeTransfer(buffer, toSend);
