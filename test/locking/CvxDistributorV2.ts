@@ -3,8 +3,7 @@ import { expect } from "chai";
 import { constants } from "ethers";
 import { formatEther, formatUnits, parseEther, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
-import { AlluoLockedV4, CvxDistributor, IAlluoToken, IAlluoVault, ICurveCVXETH, IERC20Metadata, IWrappedEther, VoteExecutor, VoteExecutorV2 } from "../../typechain";
-import { CvxDistributorV2 } from "../../typechain/CvxDistributorV2";
+import { AlluoLockedV4, CvxDistributorV2, IAlluoToken, IAlluoVault, ICurveCVXETH, IERC20Metadata, IWrappedEther, VoteExecutor, VoteExecutorV2 } from "../../typechain";
 
 async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
     await ethers.provider.send(
@@ -26,7 +25,7 @@ describe("CvxDistributorV2", async () => {
 
     let alluoToken: IAlluoToken, usdc: IERC20Metadata, cvxEthToken: IERC20Metadata;
 
-    let locker: AlluoLockedV4, cvxDistributor: CvxDistributorV2, weth: IWrappedEther, vault: IAlluoVault;
+    let locker: AlluoLockedV4, cvxDistributorV2: CvxDistributorV2, weth: IWrappedEther, vault: IAlluoVault;
 
 
     before(async function () {
@@ -65,9 +64,9 @@ describe("CvxDistributorV2", async () => {
             { initializer: 'initialize', kind: 'uups' }
         ) as AlluoLockedV4;
 
-        const CvxDistributor = await ethers.getContractFactory("CvxDistributorV2");
+        const CvxDistributorV2 = await ethers.getContractFactory("CvxDistributorV2");
 
-        cvxDistributor = await upgrades.deployProxy(CvxDistributor,
+        cvxDistributorV2 = await upgrades.deployProxy(CvxDistributorV2,
             [
                 admin.address,
                 locker.address,
@@ -77,7 +76,7 @@ describe("CvxDistributorV2", async () => {
             { initializer: 'initialize', kind: 'uups' }
         ) as CvxDistributorV2;
 
-        await locker.setCvxDistributor(cvxDistributor.address);
+        await locker.setCvxDistributor(cvxDistributorV2.address);
 
         await alluoToken.connect(admin).mint(accounts[0].address, parseEther("2000000"))
 
@@ -89,17 +88,17 @@ describe("CvxDistributorV2", async () => {
         await alluoToken.approve(locker.address, parseEther("1000000"));
         await locker.addReward(parseEther("1000000"))
 
-        await cvxDistributor.connect(admin).grantRole(await cvxDistributor.PROTOCOL_ROLE(), accounts[0].address);
+        await cvxDistributorV2.connect(admin).grantRole(await cvxDistributorV2.PROTOCOL_ROLE(), accounts[0].address);
 
-        await cvxDistributor.connect(admin).addStrategyHandler("0x385AB598E7DBF09951ba097741d2Fa573bDe94A5");
-        await cvxDistributor.connect(admin).addCvxVault(vault.address);
+        await cvxDistributorV2.connect(admin).addStrategyHandler("0x385AB598E7DBF09951ba097741d2Fa573bDe94A5");
+        await cvxDistributorV2.connect(admin).addCvxVault(vault.address);
 
         await alluoToken.connect(accounts[1]).approve(locker.address, parseEther("2500"));
         await alluoToken.connect(accounts[2]).approve(locker.address, parseEther("7000"));
         await alluoToken.connect(accounts[3]).approve(locker.address, parseEther("3500"));
         await alluoToken.connect(accounts[4]).approve(locker.address, parseEther("35000"));
 
-        await cvxDistributor.connect(admin).multicall(
+        await cvxDistributorV2.connect(admin).multicall(
             [cvxEthToken.address],
             [
                 cvxEthToken.interface.encodeFunctionData(
@@ -130,7 +129,7 @@ describe("CvxDistributorV2", async () => {
                 constants.AddressZero
             ],
             { initializer: 'initialize', kind: 'uups' }
-        ) as CvxDistributor;
+        ) as CvxDistributorV2;
 
         await oldCvxDistributor.grantRole(
             await oldCvxDistributor.UPGRADER_ROLE(),
@@ -138,7 +137,7 @@ describe("CvxDistributorV2", async () => {
         )
         await oldCvxDistributor.changeUpgradeStatus(true);
 
-        const NewCvxDistributor = await ethers.getContractFactory("CvxDistributorV2");
+        const NewCvxDistributor = await ethers.getContractFactory("CvxDistributor");
 
         await upgrades.upgradeProxy(
             oldCvxDistributor,
@@ -178,16 +177,16 @@ describe("CvxDistributorV2", async () => {
         await weth.deposit({ value: parseEther("1.0") });
         console.log("Admin owns", formatUnits(await usdc.balanceOf(admin.address), 6), "USDC");
 
-        await weth.transfer(cvxDistributor.address, parseEther("1.0"));
-        await usdc.connect(admin).transfer(cvxDistributor.address, parseUnits("100.0", 6));
+        await weth.transfer(cvxDistributorV2.address, parseEther("1.0"));
+        await usdc.connect(admin).transfer(cvxDistributorV2.address, parseUnits("100.0", 6));
 
-        const balanceBefore = await vault.balanceOf(cvxDistributor.address);
-        await cvxDistributor.updateReward(true, true);
+        const balanceBefore = await vault.balanceOf(cvxDistributorV2.address);
+        await cvxDistributorV2.updateReward(true, true);
         console.log("Deposited")
-        const balanceAfter = await vault.balanceOf(cvxDistributor.address);
+        const balanceAfter = await vault.balanceOf(cvxDistributorV2.address);
         expect(balanceAfter).to.be.gt(balanceBefore);
 
-        const tx = await (await cvxDistributor.exchangePrimaryTokens()).wait();
+        const tx = await (await cvxDistributorV2.exchangePrimaryTokens()).wait();
         console.log("Events in exchangePrimaryTokens", tx.events?.length);
     })
 
@@ -195,46 +194,46 @@ describe("CvxDistributorV2", async () => {
         await weth.deposit({ value: parseEther("1.0") });
         console.log("Admin owns", formatUnits(await usdc.balanceOf(admin.address), 6), "USDC");
 
-        await weth.transfer(cvxDistributor.address, parseEther("1.0"));
-        await usdc.connect(admin).transfer(cvxDistributor.address, parseUnits("100.0", 6));
+        await weth.transfer(cvxDistributorV2.address, parseEther("1.0"));
+        await usdc.connect(admin).transfer(cvxDistributorV2.address, parseUnits("100.0", 6));
 
-        const tx = await (await cvxDistributor.exchangePrimaryTokens()).wait();
+        const tx = await (await cvxDistributorV2.exchangePrimaryTokens()).wait();
         console.log("Events in exchangePrimaryTokens", tx.events?.length);
 
-        const balanceBefore = await vault.balanceOf(cvxDistributor.address);
-        await cvxDistributor.updateReward(true, true);
-        const balanceAfter = await vault.balanceOf(cvxDistributor.address);
+        const balanceBefore = await vault.balanceOf(cvxDistributorV2.address);
+        await cvxDistributorV2.updateReward(true, true);
+        const balanceAfter = await vault.balanceOf(cvxDistributorV2.address);
         expect(balanceAfter).to.be.gt(balanceBefore);
 
         console.log("Deposited")
     })
 
     it("Should not fail when making empty updateReward", async () => {
-        await cvxDistributor.updateReward(true, true);
-        await cvxDistributor.updateReward(true, false);
-        await cvxDistributor.updateReward(false, true);
-        await cvxDistributor.updateReward(false, false);
+        await cvxDistributorV2.updateReward(true, true);
+        await cvxDistributorV2.updateReward(true, false);
+        await cvxDistributorV2.updateReward(false, true);
+        await cvxDistributorV2.updateReward(false, false);
     })
 
     it("If there only one locker all rewards will go to him", async function () {
         await locker.connect(admin).setReward(parseEther("86400"));
 
-        expect(await vault.balanceOf(cvxDistributor.address)).to.be.equal(0);
+        expect(await vault.balanceOf(cvxDistributorV2.address)).to.be.equal(0);
         await weth.deposit({ value: parseEther("1.0") });
-        await weth.transfer(cvxDistributor.address, parseEther("1.0"));
-        await cvxDistributor.updateReward(true, true);
+        await weth.transfer(cvxDistributorV2.address, parseEther("1.0"));
+        await cvxDistributorV2.updateReward(true, true);
 
-        const cvxEthBalance = await vault.balanceOf(cvxDistributor.address);
+        const cvxEthBalance = await vault.balanceOf(cvxDistributorV2.address);
         const cvxLpPerDay = cvxEthBalance.div(14);
 
         await locker.connect(accounts[1]).lock(parseEther("2500"));
         await skipDays(1);
 
         let claim = await locker.getClaim(accounts[1].address);
-        let claimCvx = await cvxDistributor.getClaim(accounts[1].address);
+        let claimCvx = await cvxDistributorV2.getClaim(accounts[1].address);
 
         expect(claim).to.be.gte(parseEther("86400"));
-        expect(claim).to.be.lte(parseEther("86404"));
+        expect(claim).to.be.lte(parseEther("86406"));
 
         // check claimCvx to be in +-5% of calculated amount
         expect(claimCvx).to.be.gte(cvxLpPerDay.div(100).mul(95));
@@ -257,12 +256,12 @@ describe("CvxDistributorV2", async () => {
     it("If there are two lockers lock at the same time rewards are distributed between them equally", async () => {
         await locker.connect(admin).setReward(parseEther("86400"))
 
-        expect(await vault.balanceOf(cvxDistributor.address)).to.be.equal(0);
+        expect(await vault.balanceOf(cvxDistributorV2.address)).to.be.equal(0);
         await weth.deposit({ value: parseEther("1.0") });
-        await weth.transfer(cvxDistributor.address, parseEther("1.0"));
-        await cvxDistributor.updateReward(true, true);
+        await weth.transfer(cvxDistributorV2.address, parseEther("1.0"));
+        await cvxDistributorV2.updateReward(true, true);
 
-        const cvxEthBalance = await vault.balanceOf(cvxDistributor.address);
+        const cvxEthBalance = await vault.balanceOf(cvxDistributorV2.address);
         const cvxLpPerDay = cvxEthBalance.div(14);
 
         await locker.connect(accounts[1]).lock(parseEther("2500"));
@@ -270,7 +269,7 @@ describe("CvxDistributorV2", async () => {
         await skipDays(1);
 
         let claim = await locker.getClaim(accounts[1].address);
-        let claimCvx = await cvxDistributor.getClaim(accounts[1].address);
+        let claimCvx = await cvxDistributorV2.getClaim(accounts[1].address);
 
         expect(claim).to.be.gt(parseEther("43200"));
         expect(claim).to.be.lt(parseEther("43207"));

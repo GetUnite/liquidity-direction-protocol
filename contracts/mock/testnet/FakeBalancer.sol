@@ -12,12 +12,12 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
-contract FakeBalancer is 
-    Initializable, 
-    PausableUpgradeable, 
-    AlluoERC20Upgradable, 
-    AccessControlUpgradeable, 
-    UUPSUpgradeable 
+contract FakeBalancer is
+    Initializable,
+    PausableUpgradeable,
+    AlluoERC20Upgradable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable
 {
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -36,10 +36,7 @@ contract FakeBalancer is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(
-        address _alluo,
-        address _weth
-    ) public initializer {
+    function initialize(address _alluo, address _weth) public initializer {
         __ERC20_init("Fake Alluo Balancer LP", "FABLP");
         __Pausable_init();
         __AccessControl_init();
@@ -53,24 +50,23 @@ contract FakeBalancer is
         alluoPerLp = 562;
     }
 
-    function enterPoolAlluo(uint256 amount) public returns(uint256){
+    function enterPoolAlluo(uint256 amount) public returns (uint256) {
         ALLUO.safeTransferFrom(msg.sender, address(this), amount);
-        uint256 amountLp = amount * 100 / alluoPerLp;
+        uint256 amountLp = (amount * 100) / alluoPerLp;
         _mint(msg.sender, amountLp);
         return amountLp;
     }
 
-    function enterPoolWeth(uint256 amount) public returns(uint256){
+    function enterPoolWeth(uint256 amount) public returns (uint256) {
         WETH.safeTransferFrom(msg.sender, address(this), amount);
-        uint256 amountLp = amount * 1000000 / alluoPerLp;
+        uint256 amountLp = (amount * 1000000) / alluoPerLp;
         _mint(msg.sender, amountLp);
         return amountLp;
     }
 
-
-    function exitPoolAlluo(uint256 amount) public returns(uint256){
+    function exitPoolAlluo(uint256 amount) public returns (uint256) {
         _burn(msg.sender, amount);
-        uint256 alluoAmount =  amount * alluoPerLp / 100;
+        uint256 alluoAmount = (amount * alluoPerLp) / 100;
         ALLUO.safeTransfer(msg.sender, alluoAmount);
         return alluoAmount;
     }
@@ -83,18 +79,14 @@ contract FakeBalancer is
         _unpause();
     }
 
-    function grantRole(bytes32 role, address account)
-        public
-        override
-        onlyRole(getRoleAdmin(role))
-    {
+    function grantRole(
+        bytes32 role,
+        address account
+    ) public override onlyRole(getRoleAdmin(role)) {
         _grantRole(role, account);
     }
 
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        onlyRole(UPGRADER_ROLE)
-        override
-    {
-    }
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(UPGRADER_ROLE) {}
 }

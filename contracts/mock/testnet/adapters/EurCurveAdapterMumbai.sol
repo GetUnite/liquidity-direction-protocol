@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeab
 
 import "../curve/FakeCurveEur.sol";
 
-contract EurCurveAdapterMumbai is 
+contract EurCurveAdapterMumbai is
     Initializable,
     PausableUpgradeable,
     AccessControlUpgradeable,
@@ -31,7 +31,10 @@ contract EurCurveAdapterMumbai is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(address _liquidityHandler, address _curvePool) public initializer {
+    function initialize(
+        address _liquidityHandler,
+        address _curvePool
+    ) public initializer {
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -42,7 +45,7 @@ contract EurCurveAdapterMumbai is
         curvePool = _curvePool;
     }
 
-    function adapterApproveAll() external onlyRole(DEFAULT_ADMIN_ROLE){
+    function adapterApproveAll() external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20Upgradeable(jEUR).safeApprove(curvePool, type(uint256).max);
         IERC20Upgradeable(EURS).safeApprove(curvePool, type(uint256).max);
         IERC20Upgradeable(EURT).safeApprove(curvePool, type(uint256).max);
@@ -52,72 +55,84 @@ contract EurCurveAdapterMumbai is
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity buffer
     /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Gnosis wallet (the "buffer" amount)
-    function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function deposit(
+        address _token,
+        uint256 _fullAmount,
+        uint256 _leaveInPool
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         if (_token == jEUR) {
             FakeCurveEur(curvePool).add_liquidity(jEUR, _fullAmount);
             if (toSend != 0) {
                 uint amountBack = FakeCurveEur(curvePool).remove_liquidity(
-                            EURT, 
-                            toSend / 10**12);
+                    EURT,
+                    toSend / 10 ** 12
+                );
                 IERC20Upgradeable(EURT).safeTransfer(wallet, amountBack);
             }
-        }
-
-        else if (_token == EURT) {
+        } else if (_token == EURT) {
             if (toSend != 0) {
-                IERC20Upgradeable(EURT).safeTransfer(wallet, toSend / 10**12);
+                IERC20Upgradeable(EURT).safeTransfer(wallet, toSend / 10 ** 12);
             }
             if (_leaveInPool != 0) {
-                FakeCurveEur(curvePool).add_liquidity(EURT, _leaveInPool / 10**12);
+                FakeCurveEur(curvePool).add_liquidity(
+                    EURT,
+                    _leaveInPool / 10 ** 12
+                );
             }
-        }
-
-        else if (_token == EURS) {
-            FakeCurveEur(curvePool).add_liquidity(EURS, _fullAmount / 10**16);
+        } else if (_token == EURS) {
+            FakeCurveEur(curvePool).add_liquidity(EURS, _fullAmount / 10 ** 16);
             if (toSend != 0) {
                 uint amountBack = FakeCurveEur(curvePool).remove_liquidity(
-                            EURT, 
-                            toSend / 10**12);
+                    EURT,
+                    toSend / 10 ** 12
+                );
                 IERC20Upgradeable(EURT).safeTransfer(wallet, amountBack);
             }
         }
-    } 
-    
+    }
+
     /// @notice When called by liquidity buffer, withdraws funds from liquidity pool
     /// @dev It checks against arbitragers attempting to exploit spreads in stablecoins. EURS is chosen as it has the most liquidity.
     /// @param _user Recipient address
     /// @param _token Deposit token address (eg. USDC)
     /// @param _amount  Amount to be withdrawn in 10*18
-    function withdraw (address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-          if (_token == jEUR) {
+    function withdraw(
+        address _user,
+        address _token,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_token == jEUR) {
             uint amountBack = FakeCurveEur(curvePool).remove_liquidity(
-                        jEUR, 
-                        _amount);
+                jEUR,
+                _amount
+            );
             IERC20Upgradeable(jEUR).safeTransfer(_user, amountBack);
-        }
-
-        else if (_token == EURT) {
+        } else if (_token == EURT) {
             uint amountBack = FakeCurveEur(curvePool).remove_liquidity(
-                        EURT, 
-                        _amount / 10**12);
+                EURT,
+                _amount / 10 ** 12
+            );
             IERC20Upgradeable(EURT).safeTransfer(_user, amountBack);
-        }
-
-        else if (_token == EURS) {
+        } else if (_token == EURS) {
             uint amountBack = FakeCurveEur(curvePool).remove_liquidity(
-                        EURS, 
-                        _amount / 10**16);
+                EURS,
+                _amount / 10 ** 16
+            );
             IERC20Upgradeable(EURS).safeTransfer(_user, amountBack);
         }
     }
-    
-    function getAdapterAmount () external view returns (uint256) {
-        uint256 curveLpAmount = IERC20Upgradeable(curvePool).balanceOf((address(this)));
+
+    function getAdapterAmount() external view returns (uint256) {
+        uint256 curveLpAmount = IERC20Upgradeable(curvePool).balanceOf(
+            (address(this))
+        );
         return curveLpAmount;
     }
-    
-    function setWallet(address _newWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
+
+    function setWallet(
+        address _newWallet
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         wallet = _newWallet;
     }
 
@@ -126,16 +141,15 @@ contract EurCurveAdapterMumbai is
      * @param _address address of the token being removed
      * @param _amount amount of the token being removed
      */
-    function removeTokenByAddress(address _address, address _to, uint256 _amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function removeTokenByAddress(
+        address _address,
+        address _to,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20Upgradeable(_address).safeTransfer(_to, _amount);
     }
 
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        onlyRole(UPGRADER_ROLE)
-    {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(UPGRADER_ROLE) {}
 }

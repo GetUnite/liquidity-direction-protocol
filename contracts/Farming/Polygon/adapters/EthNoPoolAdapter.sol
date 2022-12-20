@@ -22,22 +22,34 @@ contract EthNoPoolAdapter is AccessControl {
         buffer = _bufferManager;
     }
 
-    function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function deposit(
+        address _token,
+        uint256 _fullAmount,
+        uint256 _leaveInPool
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         if(toSend != 0){
             IERC20(WETH).safeTransfer(buffer, toSend);
         }
-    } 
+    }
 
-    function withdraw(address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function withdraw(
+        address _user,
+        address _token,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(WETH).safeTransfer(_user, _amount);
     }
-    
+
     function getAdapterAmount() external view returns (uint256) {
         return IERC20(WETH).balanceOf(address(this));
     }
 
-    function getCoreTokens() external pure returns ( address mathToken, address primaryToken ){
+    function getCoreTokens()
+        external
+        pure
+        returns (address mathToken, address primaryToken)
+    {
         return (WETH, WETH);
     }
 
@@ -50,10 +62,11 @@ contract EthNoPoolAdapter is AccessControl {
      * @param _address address of the token being removed
      * @param _amount amount of the token being removed
      */
-    function removeTokenByAddress(address _address, address _to, uint256 _amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function removeTokenByAddress(
+        address _address,
+        address _to,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(_address).safeTransfer(_to, _amount);
     }
 }

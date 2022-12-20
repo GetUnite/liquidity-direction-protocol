@@ -25,17 +25,17 @@ contract CvxDistributorV2 is
 
     bytes32 public constant PROTOCOL_ROLE = keccak256("PROTOCOL_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-    uint256 public constant distributionTime = 14 days;
+    uint256 public constant DISTRIBUTION_TIME = 14 days;
 
-    IERC20MetadataUpgradeable public constant crvCVXETH =
+    IERC20MetadataUpgradeable public constant CRV_CVX_ETH =
         IERC20MetadataUpgradeable(0x3A283D9c08E8b55966afb64C515f5143cf907611);
-    IERC20MetadataUpgradeable public constant cvxRewards =
+    IERC20MetadataUpgradeable public constant CVX_REWARDS =
         IERC20MetadataUpgradeable(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
-    IERC20MetadataUpgradeable public constant crvRewards =
+    IERC20MetadataUpgradeable public constant CRV_REWARDS =
         IERC20MetadataUpgradeable(0xD533a949740bb3306d119CC777fa900bA034cd52);
     IERC20MetadataUpgradeable public constant WETH =
         IERC20MetadataUpgradeable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    ICurveCVXETH public constant CurveCVXETH =
+    ICurveCVXETH public constant CURVE_CVX_ETH =
         ICurveCVXETH(0xB576491F1E6e5E62f1d8F26062Ee822B40B0E0d4);
 
     ///@dev Stakers info by token holders.
@@ -48,7 +48,7 @@ contract CvxDistributorV2 is
         uint256 rewardDebt; // param is needed for correct calculation staker's share
         uint256 distributed; // amount of distributed tokens
     }
-    
+
     ///@dev ERC20 token earned by stakers as reward.
     IERC20MetadataUpgradeable public rewardToken;
 
@@ -73,13 +73,12 @@ contract CvxDistributorV2 is
     bool public upgradeStatus;
 
     // Convex rewards pool
-    ICvxBaseRewardPool rewards;
+    ICvxBaseRewardPool public rewards;
 
     // Alluo exchange address
     address public exchangeAddress;
     address public alluoCvxVault;
     address public strategyHandler;
-
 
     /**
      * @dev Emitted in `receiveStakeInfo` when the user locked the tokens
@@ -94,7 +93,7 @@ contract CvxDistributorV2 is
      * @dev Emitted in `claim` when the user claimed his reward tokens
      */
     event CvxClaimed(uint256 amount, uint256 time, address indexed sender);
-    
+
     /**
      * @dev Emitted in `receiveUnstakeInfo` when the user unbinded his locked tokens
      */
@@ -116,7 +115,7 @@ contract CvxDistributorV2 is
     constructor() initializer {}
 
     /**
-     * @dev Contract initializer 
+     * @dev Contract initializer
      */
     function initialize(
         address _multiSigWallet,
@@ -135,7 +134,7 @@ contract CvxDistributorV2 is
 
         exchangeAddress = _exchangeAddress;
 
-        WETH.safeApprove(address(CurveCVXETH), type(uint256).max);
+        WETH.safeApprove(address(CURVE_CVX_ETH), type(uint256).max);
     }
 
     /**
@@ -143,10 +142,10 @@ contract CvxDistributorV2 is
      * @param user User who locked tokens
      * @param _amount An amount of Alluo locked
      */
-    function receiveStakeInfo(address user, uint256 _amount)
-        external
-        onlyRole(PROTOCOL_ROLE)
-    {
+    function receiveStakeInfo(
+        address user,
+        uint256 _amount
+    ) external onlyRole(PROTOCOL_ROLE) {
         Staker storage staker = _stakers[user];
 
         if (totalStaked > 0) {
@@ -167,10 +166,10 @@ contract CvxDistributorV2 is
      * @param user User who unlocked tokens
      * @param _amount An amount of Alluo unlocked
      */
-    function receiveUnstakeInfo(address user, uint256 _amount)
-        external
-        onlyRole(PROTOCOL_ROLE)
-    {
+    function receiveUnstakeInfo(
+        address user,
+        uint256 _amount
+    ) external onlyRole(PROTOCOL_ROLE) {
         Staker storage staker = _stakers[user];
 
         update();
@@ -207,15 +206,18 @@ contract CvxDistributorV2 is
         emit CvxClaimed(reward, block.timestamp, user);
     }
 
-    function updateReward(bool exchangePrimary, bool claimBooster) external onlyRole(PROTOCOL_ROLE) {
-        if(exchangePrimary){
+    function updateReward(
+        bool exchangePrimary,
+        bool claimBooster
+    ) external onlyRole(PROTOCOL_ROLE) {
+        if (exchangePrimary) {
             exchangePrimaryTokens();
         }
-        if(claimBooster){
+        if (claimBooster) {
             IAlluoVault(alluoCvxVault).claimRewards();
         }
-        uint lpBalance = crvCVXETH.balanceOf(address(this));
-        if(lpBalance > 0){
+        uint lpBalance = CRV_CVX_ETH.balanceOf(address(this));
+        if (lpBalance > 0) {
             IAlluoVault(alluoCvxVault).deposit(lpBalance, address(this));
         }
         allProduced = produced();
@@ -225,10 +227,13 @@ contract CvxDistributorV2 is
     }
 
     function exchangePrimaryTokens() public {
-        uint numberOfAssets = IStrategyHandler(strategyHandler).numberOfAssets();
+        uint numberOfAssets = IStrategyHandler(strategyHandler)
+            .numberOfAssets();
         for (uint256 i; i < numberOfAssets; i++) {
-            address primaryToken = IStrategyHandler(strategyHandler).getPrimaryTokenByAssetId(i, 1);
-            uint256 tokenAmount = IERC20MetadataUpgradeable(primaryToken).balanceOf(address(this));
+            address primaryToken = IStrategyHandler(strategyHandler)
+                .getPrimaryTokenByAssetId(i, 1);
+            uint256 tokenAmount = IERC20MetadataUpgradeable(primaryToken)
+                .balanceOf(address(this));
 
             if (tokenAmount > 0 && primaryToken != address(WETH)) {
                 IERC20MetadataUpgradeable(primaryToken).safeApprove(
@@ -244,9 +249,9 @@ contract CvxDistributorV2 is
             }
         }
         uint wethAmount = WETH.balanceOf(address(this));
-        if(wethAmount != 0){
-            CurveCVXETH.add_liquidity([wethAmount, 0], 0);
-        } 
+        if (wethAmount != 0) {
+            CURVE_CVX_ETH.add_liquidity([wethAmount, 0], 0);
+        }
     }
 
     /**
@@ -254,11 +259,10 @@ contract CvxDistributorV2 is
      * @param _staker Address of the locker
      * @param _tps Tokens per lock parameter
      */
-    function calcReward(address _staker, uint256 _tps)
-        private
-        view
-        returns (uint256 reward)
-    {
+    function calcReward(
+        address _staker,
+        uint256 _tps
+    ) private view returns (uint256 reward) {
         Staker storage staker = _stakers[_staker];
 
         reward =
@@ -276,13 +280,10 @@ contract CvxDistributorV2 is
      */
     function produced() private view returns (uint256) {
         uint256 timePassed = (block.timestamp - producedTime);
-        if (timePassed > distributionTime) {
-            timePassed = distributionTime;
+        if (timePassed > DISTRIBUTION_TIME) {
+            timePassed = DISTRIBUTION_TIME;
         }
-        return
-            allProduced +
-            (rewardTotal * timePassed) /
-            distributionTime;
+        return allProduced + (rewardTotal * timePassed) / DISTRIBUTION_TIME;
     }
 
     /**
@@ -323,10 +324,9 @@ contract CvxDistributorV2 is
      * @dev allows and prohibits to upgrade contract
      * @param _status flag for allowing upgrade from gnosis
      */
-    function changeUpgradeStatus(bool _status)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function changeUpgradeStatus(
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         upgradeStatus = _status;
     }
 
@@ -334,10 +334,9 @@ contract CvxDistributorV2 is
      * @dev admin function for adding/changing exchange address
      * @param _exchangeAddress new exchange address
      */
-    function addExchange(address _exchangeAddress)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function addExchange(
+        address _exchangeAddress
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         exchangeAddress = _exchangeAddress;
     }
 
@@ -345,10 +344,9 @@ contract CvxDistributorV2 is
      * @dev admin function for adding/changing Alluo CVX booster vault
      * @param _alluoCvxVault new Alluo CVX booster vault address
      */
-    function addCvxVault(address _alluoCvxVault)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function addCvxVault(
+        address _alluoCvxVault
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         alluoCvxVault = _alluoCvxVault;
     }
 
@@ -356,26 +354,26 @@ contract CvxDistributorV2 is
      * @dev admin function for adding/changing Alluo Strategy handler
      * @param _strategyHandler new Alluo Strategy handler address
      */
-    function addStrategyHandler(address _strategyHandler)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function addStrategyHandler(
+        address _strategyHandler
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         strategyHandler = _strategyHandler;
     }
 
     function migrate() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        crvCVXETH.safeApprove(alluoCvxVault, type(uint256).max);
+        CRV_CVX_ETH.safeApprove(alluoCvxVault, type(uint256).max);
 
-        ICvxBaseRewardPool(0xb1Fb0BA0676A1fFA83882c7F4805408bA232C1fA).withdrawAllAndUnwrap(true);
+        ICvxBaseRewardPool(0xb1Fb0BA0676A1fFA83882c7F4805408bA232C1fA)
+            .withdrawAllAndUnwrap(true);
 
-        uint256 crvAmount = crvRewards.balanceOf(address(this));
-        uint256 cvxAmount = cvxRewards.balanceOf(address(this));
+        uint256 crvAmount = CRV_REWARDS.balanceOf(address(this));
+        uint256 cvxAmount = CVX_REWARDS.balanceOf(address(this));
 
         uint256 wethReceived;
 
         if (crvAmount > 0) {
             wethReceived = IExchange(exchangeAddress).exchange(
-                address(crvRewards),
+                address(CRV_REWARDS),
                 address(WETH),
                 crvAmount,
                 0
@@ -383,11 +381,11 @@ contract CvxDistributorV2 is
         }
 
         if (crvAmount > 0 || cvxAmount > 0) {
-            CurveCVXETH.add_liquidity([wethReceived, cvxAmount], 0);
+            CURVE_CVX_ETH.add_liquidity([wethReceived, cvxAmount], 0);
         }
 
-        uint lpBalance = crvCVXETH.balanceOf(address(this));
-        if(lpBalance > 0){
+        uint lpBalance = CRV_CVX_ETH.balanceOf(address(this));
+        if (lpBalance > 0) {
             IAlluoVault(alluoCvxVault).deposit(lpBalance, address(this));
         }
     }
@@ -400,11 +398,9 @@ contract CvxDistributorV2 is
         IERC20MetadataUpgradeable(withdrawToken).safeTransfer(to, amount);
     }
 
-    function _authorizeUpgrade(address)
-        internal
-        override
-        onlyRole(UPGRADER_ROLE)
-    {
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(UPGRADER_ROLE) {
         require(upgradeStatus, "Upgrade !allowed");
         upgradeStatus = false;
     }
@@ -420,27 +416,47 @@ contract CvxDistributorV2 is
         }
     }
 
-    function accruedRewards() public view returns (IAlluoVault.RewardData[] memory, IAlluoVault.RewardData[] memory) {
-        return IAlluoVault(alluoCvxVault).shareholderAccruedRewards(address(this));
+    function accruedRewards()
+        public
+        view
+        returns (
+            IAlluoVault.RewardData[] memory,
+            IAlluoVault.RewardData[] memory
+        )
+    {
+        return
+            IAlluoVault(alluoCvxVault).shareholderAccruedRewards(address(this));
     }
 
-    function stakerAccruedRewards(address _staker) public view returns (IAlluoVault.RewardData[] memory, IAlluoVault.RewardData[] memory) {
+    function stakerAccruedRewards(
+        address _staker
+    )
+        public
+        view
+        returns (
+            IAlluoVault.RewardData[] memory,
+            IAlluoVault.RewardData[] memory
+        )
+    {
         (
             IAlluoVault.RewardData[] memory vaultAccruals,
             IAlluoVault.RewardData[] memory poolAccruals
         ) = IAlluoVault(alluoCvxVault).shareholderAccruedRewards(address(this));
 
-
         uint256 stakerAmount = getClaim(_staker);
-        uint256 totalStakedAmount = IAlluoVault(alluoCvxVault).balanceOf(address(this));
+        uint256 totalStakedAmount = IAlluoVault(alluoCvxVault).balanceOf(
+            address(this)
+        );
 
         for (uint256 i; i < vaultAccruals.length; i++) {
-            uint256 stakerShareOfVaulAccruals = vaultAccruals[i].amount * stakerAmount / totalStakedAmount;
+            uint256 stakerShareOfVaulAccruals = (vaultAccruals[i].amount *
+                stakerAmount) / totalStakedAmount;
             vaultAccruals[i].amount = stakerShareOfVaulAccruals;
         }
 
         for (uint256 i; i < poolAccruals.length; i++) {
-            uint256 stakerShareOfPoolAccruals = poolAccruals[i].amount * stakerAmount / totalStakedAmount;
+            uint256 stakerShareOfPoolAccruals = (poolAccruals[i].amount *
+                stakerAmount) / totalStakedAmount;
             poolAccruals[i].amount = stakerShareOfPoolAccruals;
         }
         return (vaultAccruals, poolAccruals);

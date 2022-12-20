@@ -14,10 +14,10 @@ interface ICurvePoolUSD {
 
     function get_virtual_price() external view returns (uint256);
 
-    function calc_token_amount(uint256[3] calldata _amounts, bool is_deposit)
-        external
-        view
-        returns (uint256);
+    function calc_token_amount(
+        uint256[3] calldata _amounts,
+        bool is_deposit
+    ) external view returns (uint256);
 
     function add_liquidity(
         uint256[3] calldata _amounts,
@@ -56,9 +56,10 @@ interface ICurvePoolUSD {
         uint256 min_dy
     ) external returns (uint256);
 
-    function remove_liquidity(uint256 _amount, uint256[3] calldata _min_amounts)
-        external
-        returns (uint256[3] calldata);
+    function remove_liquidity(
+        uint256 _amount,
+        uint256[3] calldata _min_amounts
+    ) external returns (uint256[3] calldata);
 
     function remove_liquidity(
         uint256 _amount,
@@ -77,10 +78,10 @@ interface ICurvePoolUSD {
         bool _use_underlying
     ) external returns (uint256);
 
-    function calc_withdraw_one_coin(uint256 _token_amount, int128 i)
-        external
-        view
-        returns (uint256);
+    function calc_withdraw_one_coin(
+        uint256 _token_amount,
+        int128 i
+    ) external view returns (uint256);
 
     function remove_liquidity_one_coin(
         uint256 _token_amount,

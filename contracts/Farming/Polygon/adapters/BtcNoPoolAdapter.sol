@@ -21,22 +21,34 @@ contract BtcNoPoolAdapter is AccessControl {
         buffer = _bufferManager;
     }
 
-    function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function deposit(
+        address _token,
+        uint256 _fullAmount,
+        uint256 _leaveInPool
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         if(toSend != 0){
             IERC20(WBTC).safeTransfer(buffer, toSend / 10**10);
         }
-    } 
-
-    function withdraw(address _user, address _token, uint256 _amount ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        IERC20(WBTC).safeTransfer(_user, _amount / 10**10);
     }
-    
+
+    function withdraw(
+        address _user,
+        address _token,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IERC20(WBTC).safeTransfer(_user, _amount / 10 ** 10);
+    }
+
     function getAdapterAmount() external view returns (uint256) {
-        return IERC20(WBTC).balanceOf(address(this)) * 10**10;
+        return IERC20(WBTC).balanceOf(address(this)) * 10 ** 10;
     }
 
-    function getCoreTokens() external pure returns ( address mathToken, address primaryToken ){
+    function getCoreTokens()
+        external
+        pure
+        returns (address mathToken, address primaryToken)
+    {
         return (WBTC, WBTC);
     }
 
@@ -49,10 +61,11 @@ contract BtcNoPoolAdapter is AccessControl {
      * @param _address address of the token being removed
      * @param _amount amount of the token being removed
      */
-    function removeTokenByAddress(address _address, address _to, uint256 _amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function removeTokenByAddress(
+        address _address,
+        address _to,
+        uint256 _amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(_address).safeTransfer(_to, _amount);
     }
 }

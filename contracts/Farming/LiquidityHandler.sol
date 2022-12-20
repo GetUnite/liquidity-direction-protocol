@@ -114,13 +114,12 @@ contract LiquidityHandler is
      ** @param _token Address of token (USDC, DAI, USDT...)
      ** @param _amount Amount of tokens in correct deimals (10**18 for DAI, 10**6 for USDT)
      */
-    function deposit(address _token, uint256 _amount)
-         external 
-         whenNotPaused
-          onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
+    function deposit(
+        address _token,
+        uint256 _amount
+    ) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 amount18 = _amount *
-            10**(18 - ERC20Upgradeable(_token).decimals());
+            10 ** (18 - ERC20Upgradeable(_token).decimals());
 
         uint256 inAdapter = getAdapterAmount(msg.sender);
         uint256 expectedAdapterAmount = getExpectedAdapterAmount(
@@ -150,12 +149,13 @@ contract LiquidityHandler is
         ];
 
         if (
-            withdrawalSystem.totalWithdrawalAmount > 0 && !withdrawalSystem.resolverTrigger
+            withdrawalSystem.totalWithdrawalAmount > 0 &&
+            !withdrawalSystem.resolverTrigger
         ) {
             uint256 inAdapterAfterDeposit = getAdapterAmount(msg.sender);
             uint256 firstInQueueAmount = withdrawalSystem
                 .withdrawals[withdrawalSystem.lastSatisfiedWithdrawal + 1]
-.amount;
+                .amount;
             if (firstInQueueAmount <= inAdapterAfterDeposit) {
                 withdrawalSystem.resolverTrigger = true;
                 emit EnoughToSatisfy(
@@ -183,7 +183,9 @@ contract LiquidityHandler is
         WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[
             msg.sender
         ];
-        if (inAdapter >= _amount && withdrawalSystem.totalWithdrawalAmount == 0) {
+        if (
+            inAdapter >= _amount && withdrawalSystem.totalWithdrawalAmount == 0
+        ) {
             uint256 adapterId = ibAlluoToAdapterId.get(msg.sender);
             address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
             IHandlerAdapter(adapter).withdraw(_user, _token, _amount);
@@ -238,7 +240,11 @@ contract LiquidityHandler is
             uint256 adapterId = ibAlluoToAdapterId.get(msg.sender);
             address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
             if (_token != _outputToken) {
-                IHandlerAdapter(adapter).withdraw(address(this), _token, _amount);
+                IHandlerAdapter(adapter).withdraw(
+                    address(this),
+                    _token,
+                    _amount
+                );
                 _withdrawThroughExchange(_token, _outputToken, _amount, _user);
             } else {
                 IHandlerAdapter(adapter).withdraw(_user, _token, _amount);
@@ -252,10 +258,7 @@ contract LiquidityHandler is
                 block.timestamp
             );
         } else {
-            require(
-                _token == _outputToken,
-                "Handler: Only supported tokens"
-                );
+            require(_token == _outputToken, "Handler: Only supported tokens");
             uint256 lastWithdrawalRequest = withdrawalSystem
                 .lastWithdrawalRequest;
             withdrawalSystem.lastWithdrawalRequest++;
@@ -286,7 +289,7 @@ contract LiquidityHandler is
         address _user
     ) internal {
         uint256 amountinInputTokens = (_amount18 *
-            10**ERC20Upgradeable(_inputToken).decimals()) / 10**18;
+            10 ** ERC20Upgradeable(_inputToken).decimals()) / 10 ** 18;
         IERC20Upgradeable(_inputToken).safeIncreaseAllowance(
             exchangeAddress,
             amountinInputTokens
@@ -297,7 +300,10 @@ contract LiquidityHandler is
             amountinInputTokens,
             0
         );
-        IERC20Upgradeable(_targetToken).safeTransfer(_user, amountinTargetTokens);
+        IERC20Upgradeable(_targetToken).safeTransfer(
+            _user,
+            amountinTargetTokens
+        );
     }
 
     function satisfyAdapterWithdrawals(address _ibAlluo) public whenNotPaused {
@@ -399,11 +405,9 @@ contract LiquidityHandler is
         return ibAlluoToAdapterId.get(_ibAlluo);
     }
 
-    function getIbAlluoByAdapterId(uint256 _adapterId) 
-        public
-        view
-        returns (address) 
-      {
+    function getIbAlluoByAdapterId(
+        uint256 _adapterId
+    ) public view returns (address) {
         address ibAlluo_;
         uint256 numberOfIbAlluos = ibAlluoToAdapterId.length();
 
@@ -472,32 +476,39 @@ contract LiquidityHandler is
         return (adapters, ibAlluos);
     }
 
-    function getAdapterCoreTokensFromIbAlluo(address _ibAlluo) 
-        public 
-        view 
-        returns (address, address)
-    {
+    function getAdapterCoreTokensFromIbAlluo(
+        address _ibAlluo
+    ) public view returns (address, address) {
         uint256 adapterId = ibAlluoToAdapterId.get(_ibAlluo);
         address adapterAddress = adapterIdsToAdapterInfo[adapterId]
             .adapterAddress;
         return (IHandlerAdapter(adapterAddress).getCoreTokens());
     }
 
-    function getWithdrawal(address _ibAlluo, uint256 _id)
-        external
-        view
-        returns (Withdrawal memory) 
-    {
+    function getWithdrawal(
+        address _ibAlluo,
+        uint256 _id
+    ) external view returns (Withdrawal memory) {
         return ibAlluoToWithdrawalSystems[_ibAlluo].withdrawals[_id];
     }
 
-    function isUserWaiting(address _ibAlluo, address _user) external view returns(bool){
-        WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[_ibAlluo];
+    function isUserWaiting(
+        address _ibAlluo,
+        address _user
+    ) external view returns (bool) {
+        WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[
+            _ibAlluo
+        ];
         uint256 lastWithdrawalRequest = withdrawalSystem.lastWithdrawalRequest;
-        uint256 lastSatisfiedWithdrawal = withdrawalSystem.lastSatisfiedWithdrawal;
-        if(lastWithdrawalRequest != lastSatisfiedWithdrawal){
-            for(uint i = lastSatisfiedWithdrawal + 1; i <= lastWithdrawalRequest; i++){
-                if(withdrawalSystem.withdrawals[i].user == _user){
+        uint256 lastSatisfiedWithdrawal = withdrawalSystem
+            .lastSatisfiedWithdrawal;
+        if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
+            for (
+                uint i = lastSatisfiedWithdrawal + 1;
+                i <= lastWithdrawalRequest;
+                i++
+            ) {
+                if (withdrawalSystem.withdrawals[i].user == _user) {
                     return true;
                 }
             }
@@ -507,10 +518,10 @@ contract LiquidityHandler is
 
     /* ========== ADMIN CONFIGURATION ========== */
 
-    function setIbAlluoToAdapterId(address _ibAlluo, uint256 _adapterId)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function setIbAlluoToAdapterId(
+        address _ibAlluo,
+        uint256 _adapterId
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         ibAlluoToAdapterId.set(_ibAlluo, _adapterId);
     }
 
@@ -530,10 +541,10 @@ contract LiquidityHandler is
         adapter.status = _status;
     }
 
-    function changeAdapterStatus(uint256 _id, bool _status)
-    external
-    onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function changeAdapterStatus(
+        uint256 _id,
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         adapterIdsToAdapterInfo[_id].status = _status;
     }
 
@@ -545,21 +556,19 @@ contract LiquidityHandler is
         _unpause();
     }
 
-    function grantRole(bytes32 role, address account)
-        public
-        override
-        onlyRole(getRoleAdmin(role))
-    {
+    function grantRole(
+        bytes32 role,
+        address account
+    ) public override onlyRole(getRoleAdmin(role)) {
         if (role == DEFAULT_ADMIN_ROLE) {
             require(account.isContract(), "Handler: Not contract");
         }
         _grantRole(role, account);
     }
 
-    function setExchangeAddress(address newExchangeAddress)
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
+    function setExchangeAddress(
+        address newExchangeAddress
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         exchangeAddress = newExchangeAddress;
     }
 
@@ -576,18 +585,15 @@ contract LiquidityHandler is
         IERC20Upgradeable(_address).safeTransfer(_to, _amount);
     }
 
-    function changeUpgradeStatus(bool _status) 
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
+    function changeUpgradeStatus(
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         upgradeStatus = _status;
     }
 
-    function _authorizeUpgrade(address newImplementation) 
-        internal 
-        override 
-        onlyRole(UPGRADER_ROLE) 
-    {
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(UPGRADER_ROLE) {
         require(upgradeStatus, "Handler: Upgrade not allowed");
         upgradeStatus = false;
     }

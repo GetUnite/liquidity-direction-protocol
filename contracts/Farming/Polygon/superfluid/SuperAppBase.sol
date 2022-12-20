@@ -1,28 +1,16 @@
 // SPDX-License-Identifier: AGPLv3
-pragma solidity >= 0.8.0;
+pragma solidity >=0.8.0;
 
-import {
-    ISuperfluid,
-    ISuperToken,
-    ISuperApp,
-    SuperAppDefinitions
-} from "../../../interfaces/superfluid/ISuperfluid.sol";
+import {ISuperfluid, ISuperToken, ISuperApp, SuperAppDefinitions} from "../../../interfaces/superfluid/ISuperfluid.sol";
 
 abstract contract SuperAppBase is ISuperApp {
-
     function beforeAgreementCreated(
         ISuperToken superToken,
         address agreementClass,
         bytes32 agreementId,
         bytes calldata agreementData,
         bytes calldata ctx
-    )
-        external
-        view
-        virtual
-        override
-        returns (bytes memory cbdata)
-    {
+    ) external view virtual override returns (bytes memory cbdata) {
         revert("Unsupported callback - Before Agreement Created");
     }
 
@@ -33,12 +21,7 @@ abstract contract SuperAppBase is ISuperApp {
         bytes calldata agreementData,
         bytes calldata cbdata,
         bytes calldata ctx
-    )
-        external
-        virtual
-        override
-        returns (bytes memory newCtx)
-    {
+    ) external virtual override returns (bytes memory newCtx) {
         revert("Unsupported callback - After Agreement Created");
     }
 
@@ -48,13 +31,7 @@ abstract contract SuperAppBase is ISuperApp {
         bytes32 agreementId,
         bytes calldata agreementData,
         bytes calldata ctx
-    )
-        external
-        view
-        virtual
-        override
-        returns (bytes memory cbdata)
-    {
+    ) external view virtual override returns (bytes memory cbdata) {
         revert("Unsupported callback - Before Agreement updated");
     }
 
@@ -65,12 +42,7 @@ abstract contract SuperAppBase is ISuperApp {
         bytes calldata agreementData,
         bytes calldata cbdata,
         bytes calldata ctx
-    )
-        external
-        virtual
-        override
-        returns (bytes memory newCtx)
-    {
+    ) external virtual override returns (bytes memory newCtx) {
         revert("Unsupported callback - After Agreement Updated");
     }
 
@@ -80,13 +52,7 @@ abstract contract SuperAppBase is ISuperApp {
         bytes32 agreementId,
         bytes calldata agreementData,
         bytes calldata ctx
-    )
-        external
-        view
-        virtual
-        override
-        returns (bytes memory cbdata)
-    {
+    ) external view virtual override returns (bytes memory cbdata) {
         revert("Unsupported callback -  Before Agreement Terminated");
     }
 
@@ -97,13 +63,7 @@ abstract contract SuperAppBase is ISuperApp {
         bytes calldata agreementData,
         bytes calldata cbdata,
         bytes calldata ctx
-    )
-        external
-        virtual
-        override
-        returns (bytes memory newCtx)
-    {
+    ) external virtual override returns (bytes memory newCtx) {
         revert("Unsupported callback - After Agreement Terminated");
     }
-
 }

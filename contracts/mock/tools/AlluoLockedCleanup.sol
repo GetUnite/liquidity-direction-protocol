@@ -27,7 +27,7 @@ contract AlluoLockedCleanup is
     // Locking's reward amount produced per distribution time.
     uint256 public rewardPerDistribution;
     // Locking's reward distribution time.
-    uint256 public constant distributionTime = 86400; 
+    uint256 public constant distributionTime = 86400;
     // Amount of currently locked tokens from all users (in lp).
     uint256 public totalLocked;
 
@@ -48,7 +48,7 @@ contract AlluoLockedCleanup is
     // Amount of locked tokens waiting for withdraw (in Alluo).
     uint256 public waitingForWithdrawal;
     // Amount of currently claimed rewards by the users.
-    uint256  public totalDistributed;
+    uint256 public totalDistributed;
     // flag for allowing upgrade
     bool public upgradeStatus;
 
@@ -85,7 +85,7 @@ contract AlluoLockedCleanup is
         IBalancer(0xBA12222222228d8Ba445958a75a0704d566BF2C8);
     IERC20Upgradeable public constant alluoBalancerLp =
         IERC20Upgradeable(0x85Be1e46283f5f438D1f864c2d925506571d544f);
-    IERC20Upgradeable public constant weth = 
+    IERC20Upgradeable public constant weth =
         IERC20Upgradeable(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     bytes32 public constant poolId =
         0x85be1e46283f5f438d1f864c2d925506571d544f0002000000000000000001aa;
@@ -110,9 +110,9 @@ contract AlluoLockedCleanup is
      */
     event TokensLocked(
         address indexed sender,
-        address tokenAddress, 
-        uint256 tokenAmount, 
-        uint256 lpAmount, 
+        address tokenAddress,
+        uint256 tokenAmount,
+        uint256 lpAmount,
         uint256 time
     );
 
@@ -125,7 +125,7 @@ contract AlluoLockedCleanup is
         uint256 lpAmount,
         uint256 time
     );
-    
+
     /**
      * @dev Emitted in `withdraw` when the user withdrew his locked tokens from the contract
      */
@@ -140,11 +140,11 @@ contract AlluoLockedCleanup is
      */
     event TokensClaimed(
         address indexed sender,
-        uint256 alluoAmount, 
+        uint256 alluoAmount,
         uint256 time
     );
 
-    // allows to see balances on etherscan  
+    // allows to see balances on etherscan
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     /**
@@ -152,14 +152,14 @@ contract AlluoLockedCleanup is
      */
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
- 
+
     /**
-     * @dev Contract initializer 
+     * @dev Contract initializer
      */
     function initialize(
         address _multiSigWallet,
         uint256 _rewardPerDistribution
-    ) public initializer{
+    ) public initializer {
         __AccessControl_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
@@ -176,10 +176,10 @@ contract AlluoLockedCleanup is
             decimals: 18
         });
 
-        rewardPerDistribution = _rewardPerDistribution; 
+        rewardPerDistribution = _rewardPerDistribution;
         producedTime = block.timestamp;
 
-        depositLockDuration = 86400 * 7; 
+        depositLockDuration = 86400 * 7;
         withdrawLockDuration = 86400 * 5;
 
         alluoToken.approve(address(exchange), type(uint256).max);
@@ -232,14 +232,9 @@ contract AlluoLockedCleanup is
      * @param _amount An amount of Alluo tokens to lock
      */
     function lock(uint256 _amount) public {
-
         Locker storage locker = _lockers[msg.sender];
 
-        alluoToken.safeTransferFrom(
-            msg.sender,
-            address(this),
-            _amount
-        );
+        alluoToken.safeTransferFrom(msg.sender, address(this), _amount);
 
         uint256 lpAmount = exchange.exchange(
             address(alluoToken),
@@ -259,7 +254,13 @@ contract AlluoLockedCleanup is
         locker.amount = locker.amount + lpAmount;
         locker.depositUnlockTime = block.timestamp + depositLockDuration;
 
-        emit TokensLocked(msg.sender, address(alluoToken), _amount, lpAmount, block.timestamp );
+        emit TokensLocked(
+            msg.sender,
+            address(alluoToken),
+            _amount,
+            lpAmount,
+            block.timestamp
+        );
         emit Transfer(address(0), msg.sender, lpAmount);
     }
 
@@ -268,14 +269,9 @@ contract AlluoLockedCleanup is
      * @param _amount An amount of WETH tokens to lock
      */
     function lockWETH(uint256 _amount) public {
-
         Locker storage locker = _lockers[msg.sender];
 
-        weth.safeTransferFrom(
-            msg.sender,
-            address(this),
-            _amount
-        );
+        weth.safeTransferFrom(msg.sender, address(this), _amount);
 
         uint256 lpAmount = exchange.exchange(
             address(weth),
@@ -295,7 +291,13 @@ contract AlluoLockedCleanup is
         locker.amount = locker.amount + lpAmount;
         locker.depositUnlockTime = block.timestamp + depositLockDuration;
 
-        emit TokensLocked(msg.sender, address(weth), _amount, lpAmount, block.timestamp);
+        emit TokensLocked(
+            msg.sender,
+            address(weth),
+            _amount,
+            lpAmount,
+            block.timestamp
+        );
         emit Transfer(address(0), msg.sender, lpAmount);
     }
 
@@ -305,9 +307,11 @@ contract AlluoLockedCleanup is
      * @param _amounts list of amounts each equal to the share of locker on old contract
      *          (locked amount + unlocked + claim)
      */
-    function migrationLock(address[] memory _users, uint256[] memory _amounts) external onlyRole(DEFAULT_ADMIN_ROLE){
-
-        for(uint i = 0; i < _users.length; i++){
+    function migrationLock(
+        address[] memory _users,
+        uint256[] memory _amounts
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint i = 0; i < _users.length; i++) {
             Locker storage locker = _lockers[_users[i]];
 
             if (totalLocked > 0) {
@@ -321,7 +325,13 @@ contract AlluoLockedCleanup is
             locker.amount = _amounts[i];
             locker.depositUnlockTime = block.timestamp + depositLockDuration;
 
-            emit TokensLocked(_users[i], address(0), 0, _amounts[i], block.timestamp);
+            emit TokensLocked(
+                _users[i],
+                address(0),
+                0,
+                _amounts[i],
+                block.timestamp
+            );
             emit Transfer(address(0), _users[i], _amounts[i]);
         }
     }
@@ -338,13 +348,9 @@ contract AlluoLockedCleanup is
             "Locking: tokens not available"
         );
 
-        require(
-            locker.amount >= _amount,
-            "Locking: not enough lp tokens" 
-        );
+        require(locker.amount >= _amount, "Locking: not enough lp tokens");
 
         update();
-
 
         uint256 alluoAmount = _exitAlluoPoolExactLp(_amount);
 
@@ -403,10 +409,7 @@ contract AlluoLockedCleanup is
     function withdraw() public whenNotPaused {
         Locker storage locker = _lockers[msg.sender];
 
-        require(
-            locker.unlockAmount > 0,
-            "Locking: not enough tokens"
-        );
+        require(locker.unlockAmount > 0, "Locking: not enough tokens");
 
         require(
             block.timestamp >= locker.withdrawUnlockTime,
@@ -446,11 +449,10 @@ contract AlluoLockedCleanup is
      * @param _locker Address of the locker
      * @param _tpl Tokens per lock parameter
      */
-    function calcReward(address _locker, uint256 _tpl)
-        private
-        view
-        returns (uint256 reward)
-    {
+    function calcReward(
+        address _locker,
+        uint256 _tpl
+    ) private view returns (uint256 reward) {
         Locker storage locker = _lockers[_locker];
 
         reward =
@@ -486,11 +488,9 @@ contract AlluoLockedCleanup is
      * @param _address Locker's address
      * @return amount of vote/locked tokens
      */
-    function balanceOf(address _address)
-        external
-        view
-        returns (uint256 amount)
-    {
+    function balanceOf(
+        address _address
+    ) external view returns (uint256 amount) {
         return 0;
     }
 
@@ -499,11 +499,9 @@ contract AlluoLockedCleanup is
      * @param _address Locker's address
      * @return amount of unlocked tokens
      */
-    function unlockedBalanceOf(address _address)
-        external
-        view
-        returns (uint256 amount)
-    {
+    function unlockedBalanceOf(
+        address _address
+    ) external view returns (uint256 amount) {
         return _lockers[_address].unlockAmount;
     }
 
@@ -512,16 +510,15 @@ contract AlluoLockedCleanup is
      * @param _amount amount of Alluo tokens
      * @return amount amount of Lp tokens
      */
-    function convertAlluoToLp(uint256 _amount)
-        external
-        view
-        returns (uint256)
-    {
+    function convertAlluoToLp(uint256 _amount) external view returns (uint256) {
         uint256 alluoOnBalancer = alluoToken.balanceOf(address(balancer));
-        uint256 totalBalancerAlluoLp = ERC20Upgradeable(address(alluoBalancerLp)).totalSupply();
-        uint256 alluoPerLp = alluoOnBalancer * 100 * 100000000 / totalBalancerAlluoLp / 80;
-        return 
-        _amount * 100000000 / alluoPerLp;
+        uint256 totalBalancerAlluoLp = ERC20Upgradeable(
+            address(alluoBalancerLp)
+        ).totalSupply();
+        uint256 alluoPerLp = (alluoOnBalancer * 100 * 100000000) /
+            totalBalancerAlluoLp /
+            80;
+        return (_amount * 100000000) / alluoPerLp;
     }
 
     /**
@@ -529,21 +526,20 @@ contract AlluoLockedCleanup is
      * @param _amount amount of Lp tokens
      * @return amount amount of Alluo tokens
      */
-    function convertLpToAlluo(uint256 _amount)
-        external
-        view
-        returns (uint256)
-    {
+    function convertLpToAlluo(uint256 _amount) external view returns (uint256) {
         uint256 alluoOnBalancer = alluoToken.balanceOf(address(balancer));
-        uint256 totalBalancerAlluoLp = ERC20Upgradeable(address(alluoBalancerLp)).totalSupply();
-        uint256 alluoPerLp = alluoOnBalancer * 100 * 100000000 / totalBalancerAlluoLp / 80;
-        return 
-        _amount * alluoPerLp / 100000000;
+        uint256 totalBalancerAlluoLp = ERC20Upgradeable(
+            address(alluoBalancerLp)
+        ).totalSupply();
+        uint256 alluoPerLp = (alluoOnBalancer * 100 * 100000000) /
+            totalBalancerAlluoLp /
+            80;
+        return (_amount * alluoPerLp) / 100000000;
     }
 
     /**
      * @dev Returns total amount of locked tokens (in lp)
-     * @return amount of locked 
+     * @return amount of locked
      */
     function totalSupply() external view returns (uint256 amount) {
         return 0;
@@ -558,7 +554,9 @@ contract AlluoLockedCleanup is
      * @return depositUnlockTime_ Timestamp when tokens will be available to unlock
      * @return withdrawUnlockTime_ Timestamp when tokens will be available to withdraw
      */
-    function getInfoByAddress(address _address)
+    function getInfoByAddress(
+        address _address
+    )
         external
         view
         returns (
@@ -602,21 +600,14 @@ contract AlluoLockedCleanup is
      * @param _amount Specifies the amount of tokens to be transferred to the contract
      */
     function addReward(uint256 _amount) external {
-        alluoToken.safeTransferFrom(
-            msg.sender,
-            address(this),
-            _amount
-        );
+        alluoToken.safeTransferFrom(msg.sender, address(this), _amount);
     }
 
     /**
      * @dev Sets amount of reward during `distributionTime`
      * @param _amount Sets total reward amount per `distributionTime`
      */
-    function setReward(uint256 _amount) 
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
+    function setReward(uint256 _amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
         allProduced = produced();
         producedTime = block.timestamp;
         rewardPerDistribution = _amount;
@@ -627,24 +618,25 @@ contract AlluoLockedCleanup is
      * @dev Allows to update the time when the rewards are available to unlock
      * @param _depositLockDuration Date in unix timestamp format
      */
-    function updateDepositLockDuration(uint256 _depositLockDuration)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function updateDepositLockDuration(
+        uint256 _depositLockDuration
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         depositLockDuration = _depositLockDuration;
         emit DepositLockDurationUpdated(_depositLockDuration, block.timestamp);
     }
-    
+
     /**
      * @dev Allows to update the time when the rewards are available to withdraw
      * @param _withdrawLockDuration Date in unix timestamp format
      */
-    function updateWithdrawLockDuration(uint256 _withdrawLockDuration)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function updateWithdrawLockDuration(
+        uint256 _withdrawLockDuration
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         withdrawLockDuration = _withdrawLockDuration;
-        emit WithdrawLockDurationUpdated(_withdrawLockDuration, block.timestamp);
+        emit WithdrawLockDurationUpdated(
+            _withdrawLockDuration,
+            block.timestamp
+        );
     }
 
     function withdrawTokens(
@@ -652,7 +644,6 @@ contract AlluoLockedCleanup is
         address to,
         uint256 amount
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-
         IERC20Upgradeable(withdrawToken).safeTransfer(to, amount);
     }
 
@@ -696,19 +687,16 @@ contract AlluoLockedCleanup is
      * @dev allows and prohibits to upgrade contract
      * @param _status flag for allowing upgrade from gnosis
      */
-    function changeUpgradeStatus(bool _status)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function changeUpgradeStatus(
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         upgradeStatus = _status;
     }
 
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        onlyRole(UPGRADER_ROLE)
-    { 
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(UPGRADER_ROLE) {
         require(upgradeStatus, "Locking: upgrade not allowed");
         upgradeStatus = false;
-    } 
+    }
 }

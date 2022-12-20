@@ -30,7 +30,9 @@ interface IChainlinkPriceFeed {
 
     function getAnswer(uint256 _roundId) external view returns (int256);
 
-    function getRoundData(uint80 _roundId)
+    function getRoundData(
+        uint80 _roundId
+    )
         external
         view
         returns (
@@ -70,7 +72,9 @@ interface IChainlinkPriceFeed {
 
     function proposedAggregator() external view returns (address);
 
-    function proposedGetRoundData(uint80 _roundId)
+    function proposedGetRoundData(
+        uint80 _roundId
+    )
         external
         view
         returns (

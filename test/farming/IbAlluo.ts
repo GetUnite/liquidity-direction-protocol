@@ -77,6 +77,7 @@ describe("IbAlluoUSD and Handler", function () {
     let superFactory: ISuperTokenFactory;
     let resolver: SuperfluidResolver;
     before(async function () {
+        upgrades.silenceWarnings()
 
         //We are forking Polygon mainnet, please set Alchemy key in .env
         await network.provider.request({
@@ -88,7 +89,7 @@ describe("IbAlluoUSD and Handler", function () {
                     //you can fork from last block by commenting next line
                     blockNumber: 29518660,
                 },
-            }, ],
+            },],
         });
 
         signers = await ethers.getSigners();
@@ -115,14 +116,13 @@ describe("IbAlluoUSD and Handler", function () {
     });
 
     beforeEach(async function () {
-
         const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
         //We are using this contract to simulate Gnosis multisig wallet
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
         multisig = await Multisig.deploy(true);
 
         exchangeAddress = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773";
-        
+
         handler = await ethers.getContractAt("LiquidityHandler", "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1");
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), multisig.address)
@@ -150,17 +150,18 @@ describe("IbAlluoUSD and Handler", function () {
                 multisig.address,
                 handler.address,
                 [dai.address,
-                    usdc.address,
-                    usdt.address
+                usdc.address,
+                usdt.address
                 ],
                 BigNumber.from("100000000470636740"),
                 1600,
                 "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
                 exchangeAddress
             ], {
-                initializer: 'initialize',
-                kind: 'uups'
-            }
+            initializer: 'initialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+        }
         ) as IbAlluo;
 
         await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoCurrent.address, lastAdapterId)
@@ -172,9 +173,10 @@ describe("IbAlluoUSD and Handler", function () {
         StIbAlluo = await upgrades.deployProxy(StIbAlluoFactory,
             [ibAlluoCurrent.address, 18, "Streaming IbAlluo USD", "StIbAlluoUSD", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", multisig.address, [ibAlluoCurrent.address]
             ], {
-                initializer: 'alluoInitialize',
-                kind: 'uups'
-            }
+            initializer: 'alluoInitialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+        }
         ) as StIbAlluo;
 
         let ABI = ["function setSuperToken(address _superToken)"];
@@ -194,7 +196,7 @@ describe("IbAlluoUSD and Handler", function () {
     });
 
     describe('All IbAlluo tests with StIbAlluo integration', function () {
-        it("Test upgradeability of original ibAlluo contract", async function() {
+        it("Test upgradeability of original ibAlluo contract", async function () {
 
             let ibAlluoCurrentUsd = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
             await ibAlluoCurrentUsd.connect(admin).grantRole("0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3", "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266")
@@ -562,13 +564,13 @@ describe("IbAlluoUSD and Handler", function () {
                 expect(await ibAlluoCurrent.allowance(signers[1].address, signers[2].address)).to.equal(parseEther('50'));
 
                 await expect(
-                        ibAlluoCurrent.connect(signers[2]).transferFrom(signers[1].address, signers[2].address, parseEther("60")))
+                    ibAlluoCurrent.connect(signers[2]).transferFrom(signers[1].address, signers[2].address, parseEther("60")))
                     .to.be.revertedWith("ERC20: insufficient allowance");
                 await ibAlluoCurrent.connect(signers[1]).increaseAllowance(signers[2].address, parseEther('20'));
                 await ibAlluoCurrent.connect(signers[1]).decreaseAllowance(signers[2].address, parseEther('10'));
                 await ibAlluoCurrent.connect(signers[2]).transferFrom(signers[1].address, signers[2].address, parseEther("60"))
                 await expect(
-                        ibAlluoCurrent.connect(signers[1]).decreaseAllowance(signers[2].address, parseEther("50")))
+                    ibAlluoCurrent.connect(signers[1]).decreaseAllowance(signers[2].address, parseEther("50")))
                     .to.be.revertedWith("ERC20: decreased allowance below zero");
 
                 let balance = await ibAlluoCurrent.balanceOf(signers[1].address);

@@ -158,7 +158,7 @@ describe("Locking contract with CVX", async () => {
     it("If there only one locker all rewards will go to him", async function () {
         await locker.connect(admin).setReward(parseEther("86400"));
         const cvxEthBalance = await cvxEthToken.balanceOf(cvxDistributor.address);
-        await cvxDistributor.receiveReward(cvxEthBalance);
+        await cvxDistributor.receiveReward(cvxEthBalance)
         const cvxLpPerDay = cvxEthBalance.div(14);
         const cvxPerDay = await cvxEthPool.calc_withdraw_one_coin(
             cvxLpPerDay,
@@ -172,7 +172,7 @@ describe("Locking contract with CVX", async () => {
         let claimCvx = await cvxDistributor.getClaim(accounts[1].address);
 
         expect(claim).to.be.gte(parseEther("86400"));
-        expect(claim).to.be.lte(parseEther("86404"));
+        expect(claim).to.be.lte(parseEther("86544"));
 
         // check claimCvx to be in +-5% of calculated amount
         expect(claimCvx).to.be.gte(cvxPerDay.div(100).mul(95));
@@ -185,7 +185,7 @@ describe("Locking contract with CVX", async () => {
         claimCvx = await cvx.balanceOf(accounts[1].address);
 
         expect(claim).to.be.gt(parseEther("172800"));
-        expect(claim).to.be.lt(parseEther("172808"));
+        expect(claim).to.be.lt(parseEther("172900"));
 
         // check claimCvx to be in +-5% calculated amount
         expect(claimCvx).to.be.gte(cvxPerDay.mul(2).div(100).mul(95));
@@ -195,7 +195,7 @@ describe("Locking contract with CVX", async () => {
     it("If there are two lockers lock at the same time rewards are distributed between them equally", async () => {
         await locker.connect(admin).setReward(parseEther("86400"))
         const cvxEthBalance = await cvxEthToken.balanceOf(cvxDistributor.address);
-        await cvxDistributor.receiveReward(cvxEthBalance);
+        await cvxDistributor.receiveReward(cvxEthBalance)
         const cvxLpPerDay = cvxEthBalance.div(14);
         const cvxPerDay = await cvxEthPool.calc_withdraw_one_coin(
             cvxLpPerDay,
@@ -233,10 +233,10 @@ describe("Locking contract with CVX", async () => {
 
     it("Check rewards management cycle works properly", async () => {
         const cvxEthBalance = await cvxEthToken.balanceOf(cvxDistributor.address);
-        await cvxDistributor.receiveReward(cvxEthBalance.div(3));
+        await cvxDistributor.receiveReward(cvxEthBalance.div(3))
         skipDays(14);
-        await cvxDistributor.receiveReward(cvxEthBalance.div(3));
+        await cvxDistributor.receiveReward(cvxEthBalance.div(3))
         skipDays(100);
-        await cvxDistributor.receiveReward(cvxEthBalance.div(3));
+        await cvxDistributor.receiveReward(cvxEthBalance.div(3))
     });
 });

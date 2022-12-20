@@ -290,10 +290,10 @@ library Address {
      *
      * _Available since v3.1._
      */
-    function functionCall(address target, bytes memory data)
-        internal
-        returns (bytes memory)
-    {
+    function functionCall(
+        address target,
+        bytes memory data
+    ) internal returns (bytes memory) {
         return functionCall(target, data, "Address: low-level call failed");
     }
 
@@ -554,12 +554,9 @@ contract ERC20 is Context, IERC20, IERC20Internal {
     /**
      * @dev See {IERC20-balanceOf}.
      */
-    function balanceOf(address account)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function balanceOf(
+        address account
+    ) external view override returns (uint256) {
         return _balances[account];
     }
 
@@ -571,12 +568,10 @@ contract ERC20 is Context, IERC20, IERC20Internal {
      * - `recipient` cannot be the zero address.
      * - the caller must have a balance of at least `amount`.
      */
-    function transfer(address recipient, uint256 amount)
-        external
-        virtual
-        override
-        returns (bool)
-    {
+    function transfer(
+        address recipient,
+        uint256 amount
+    ) external virtual override returns (bool) {
         _transfer(_msgSender(), recipient, amount);
         return true;
     }
@@ -584,13 +579,10 @@ contract ERC20 is Context, IERC20, IERC20Internal {
     /**
      * @dev See {IERC20-allowance}.
      */
-    function allowance(address owner, address spender)
-        external
-        view
-        virtual
-        override
-        returns (uint256)
-    {
+    function allowance(
+        address owner,
+        address spender
+    ) external view virtual override returns (uint256) {
         return _allowances[owner][spender];
     }
 
@@ -601,12 +593,10 @@ contract ERC20 is Context, IERC20, IERC20Internal {
      *
      * - `spender` cannot be the zero address.
      */
-    function approve(address spender, uint256 amount)
-        external
-        virtual
-        override
-        returns (bool)
-    {
+    function approve(
+        address spender,
+        uint256 amount
+    ) external virtual override returns (bool) {
         _approve(_msgSender(), spender, amount);
         return true;
     }
@@ -644,11 +634,10 @@ contract ERC20 is Context, IERC20, IERC20Internal {
      *
      * - `spender` cannot be the zero address.
      */
-    function increaseAllowance(address spender, uint256 addedValue)
-        external
-        virtual
-        returns (bool)
-    {
+    function increaseAllowance(
+        address spender,
+        uint256 addedValue
+    ) external virtual returns (bool) {
         _increaseAllowance(_msgSender(), spender, addedValue);
         return true;
     }
@@ -667,11 +656,10 @@ contract ERC20 is Context, IERC20, IERC20Internal {
      * - `spender` must have allowance for the caller of at least
      * `subtractedValue`.
      */
-    function decreaseAllowance(address spender, uint256 subtractedValue)
-        external
-        virtual
-        returns (bool)
-    {
+    function decreaseAllowance(
+        address spender,
+        uint256 subtractedValue
+    ) external virtual returns (bool) {
         _decreaseAllowance(_msgSender(), spender, subtractedValue);
         return true;
     }
@@ -955,11 +943,10 @@ library EnumerableSet {
     /**
      * @dev Returns true if the value is in the set. O(1).
      */
-    function _contains(Set storage set, bytes32 value)
-        private
-        view
-        returns (bool)
-    {
+    function _contains(
+        Set storage set,
+        bytes32 value
+    ) private view returns (bool) {
         return set._indexes[value] != 0;
     }
 
@@ -980,11 +967,10 @@ library EnumerableSet {
      *
      * - `index` must be strictly less than {length}.
      */
-    function _at(Set storage set, uint256 index)
-        private
-        view
-        returns (bytes32)
-    {
+    function _at(
+        Set storage set,
+        uint256 index
+    ) private view returns (bytes32) {
         require(
             set._values.length > index,
             "EnumerableSet: index out of bounds"
@@ -1004,10 +990,10 @@ library EnumerableSet {
      * Returns true if the value was added to the set, that is if it was not
      * already present.
      */
-    function add(AddressSet storage set, address value)
-        internal
-        returns (bool)
-    {
+    function add(
+        AddressSet storage set,
+        address value
+    ) internal returns (bool) {
         return _add(set._inner, bytes32(uint256(uint160(value))));
     }
 
@@ -1017,21 +1003,20 @@ library EnumerableSet {
      * Returns true if the value was removed from the set, that is if it was
      * present.
      */
-    function remove(AddressSet storage set, address value)
-        internal
-        returns (bool)
-    {
+    function remove(
+        AddressSet storage set,
+        address value
+    ) internal returns (bool) {
         return _remove(set._inner, bytes32(uint256(uint160(value))));
     }
 
     /**
      * @dev Returns true if the value is in the set. O(1).
      */
-    function contains(AddressSet storage set, address value)
-        internal
-        view
-        returns (bool)
-    {
+    function contains(
+        AddressSet storage set,
+        address value
+    ) internal view returns (bool) {
         return _contains(set._inner, bytes32(uint256(uint160(value))));
     }
 
@@ -1052,11 +1037,10 @@ library EnumerableSet {
      *
      * - `index` must be strictly less than {length}.
      */
-    function at(AddressSet storage set, uint256 index)
-        internal
-        view
-        returns (address)
-    {
+    function at(
+        AddressSet storage set,
+        uint256 index
+    ) internal view returns (address) {
         return address(uint160(uint256(_at(set._inner, index))));
     }
 
@@ -1082,21 +1066,20 @@ library EnumerableSet {
      * Returns true if the value was removed from the set, that is if it was
      * present.
      */
-    function remove(UintSet storage set, uint256 value)
-        internal
-        returns (bool)
-    {
+    function remove(
+        UintSet storage set,
+        uint256 value
+    ) internal returns (bool) {
         return _remove(set._inner, bytes32(value));
     }
 
     /**
      * @dev Returns true if the value is in the set. O(1).
      */
-    function contains(UintSet storage set, uint256 value)
-        internal
-        view
-        returns (bool)
-    {
+    function contains(
+        UintSet storage set,
+        uint256 value
+    ) internal view returns (bool) {
         return _contains(set._inner, bytes32(value));
     }
 
@@ -1117,11 +1100,10 @@ library EnumerableSet {
      *
      * - `index` must be strictly less than {length}.
      */
-    function at(UintSet storage set, uint256 index)
-        internal
-        view
-        returns (uint256)
-    {
+    function at(
+        UintSet storage set,
+        uint256 index
+    ) internal view returns (uint256) {
         return uint256(_at(set._inner, index));
     }
 }
@@ -1244,11 +1226,10 @@ abstract contract AccessControl is Context {
      * https://forum.openzeppelin.com/t/iterating-over-elements-on-enumerableset-in-openzeppelin-contracts/2296[forum post]
      * for more information.
      */
-    function getRoleMember(bytes32 role, uint256 index)
-        public
-        view
-        returns (address)
-    {
+    function getRoleMember(
+        bytes32 role,
+        uint256 index
+    ) public view returns (address) {
         return _roles[role].members.at(index);
     }
 
@@ -1509,11 +1490,10 @@ library EIP712 {
      * @param version   Contract version
      * @return Domain separator
      */
-    function makeDomainSeparator(string memory name, string memory version)
-        internal
-        view
-        returns (bytes32)
-    {
+    function makeDomainSeparator(
+        string memory name,
+        string memory version
+    ) internal view returns (bytes32) {
         uint256 chainId;
         assembly {
             chainId := chainid()
@@ -1565,9 +1545,10 @@ pragma solidity 0.8.11;
 abstract contract EIP712Domain {
     bytes32 public DOMAIN_SEPARATOR;
 
-    function _setDomainSeparator(string memory name, string memory version)
-        internal
-    {
+    function _setDomainSeparator(
+        string memory name,
+        string memory version
+    ) internal {
         DOMAIN_SEPARATOR = EIP712.makeDomainSeparator(name, version);
     }
 }
@@ -1837,11 +1818,10 @@ abstract contract GasAbstraction is IERC20Internal, EIP712Domain {
      * @param nonce         Nonce of the authorization
      * @return Authorization state
      */
-    function authorizationState(address authorizer, bytes32 nonce)
-        external
-        view
-        returns (AuthorizationState)
-    {
+    function authorizationState(
+        address authorizer,
+        bytes32 nonce
+    ) external view returns (AuthorizationState) {
         return _authorizationStates[authorizer][nonce];
     }
 
@@ -2055,10 +2035,10 @@ abstract contract GasAbstraction is IERC20Internal, EIP712Domain {
      * @param authorizer    Authorizer's address
      * @param nonce         Nonce of the authorization
      */
-    function _requireUnusedAuthorization(address authorizer, bytes32 nonce)
-        private
-        view
-    {
+    function _requireUnusedAuthorization(
+        address authorizer,
+        bytes32 nonce
+    ) private view {
         require(
             _authorizationStates[authorizer][nonce] ==
                 AuthorizationState.Unused,
@@ -2095,9 +2075,10 @@ abstract contract GasAbstraction is IERC20Internal, EIP712Domain {
      * @param authorizer    Authorizer's address
      * @param nonce         Nonce of the authorization
      */
-    function _markAuthorizationAsUsed(address authorizer, bytes32 nonce)
-        internal
-    {
+    function _markAuthorizationAsUsed(
+        address authorizer,
+        bytes32 nonce
+    ) internal {
         _authorizationStates[authorizer][nonce] = AuthorizationState.Used;
         emit AuthorizationUsed(authorizer, nonce);
     }
@@ -2192,10 +2173,10 @@ contract UChildERC20 is
         return ContextMixin.msgSender();
     }
 
-    function updateMetadata(string calldata newName, string calldata newSymbol)
-        external
-        only(DEFAULT_ADMIN_ROLE)
-    {
+    function updateMetadata(
+        string calldata newName,
+        string calldata newSymbol
+    ) external only(DEFAULT_ADMIN_ROLE) {
         _setName(newName);
         _setSymbol(newSymbol);
         _setDomainSeparator(newName, EIP712_VERSION);
@@ -2209,11 +2190,10 @@ contract UChildERC20 is
      * @param user user address for whom deposit is being done
      * @param depositData abi encoded amount
      */
-    function deposit(address user, bytes calldata depositData)
-        external
-        override
-        only(DEPOSITOR_ROLE)
-    {
+    function deposit(
+        address user,
+        bytes calldata depositData
+    ) external override only(DEPOSITOR_ROLE) {
         // 0x0000000000000000000000000000000000000001431E0FAE6D7217CAA0000000
         uint256 amount = abi.decode(depositData, (uint256));
         _mint(user, amount);
@@ -2591,11 +2571,7 @@ library SafeERC20 {
     using SafeMath for uint256;
     using Address for address;
 
-    function safeTransfer(
-        IERC20 token,
-        address to,
-        uint256 value
-    ) internal {
+    function safeTransfer(IERC20 token, address to, uint256 value) internal {
         _callOptionalReturn(
             token,
             abi.encodeWithSelector(token.transfer.selector, to, value)
@@ -2755,11 +2731,9 @@ contract UChildAdministrableERC20 is
     Rescuable,
     UUPSUpgradeable
 {
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        only(DEFAULT_ADMIN_ROLE)
-    {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override only(DEFAULT_ADMIN_ROLE) {}
 
     function _msgSender()
         internal
@@ -2770,15 +2744,16 @@ contract UChildAdministrableERC20 is
         return ContextMixin.msgSender();
     }
 
-    function withdraw(uint256 amount)
-        external
-        override
-        notBlacklisted(_msgSender())
-    {
+    function withdraw(
+        uint256 amount
+    ) external override notBlacklisted(_msgSender()) {
         _burn(_msgSender(), amount);
     }
 
-    function transfer(address recipient, uint256 amount)
+    function transfer(
+        address recipient,
+        uint256 amount
+    )
         external
         override
         whenNotPaused
@@ -2790,7 +2765,10 @@ contract UChildAdministrableERC20 is
         return true;
     }
 
-    function approve(address spender, uint256 amount)
+    function approve(
+        address spender,
+        uint256 amount
+    )
         external
         override
         whenNotPaused
@@ -2819,7 +2797,10 @@ contract UChildAdministrableERC20 is
         return true;
     }
 
-    function increaseAllowance(address spender, uint256 addedValue)
+    function increaseAllowance(
+        address spender,
+        uint256 addedValue
+    )
         external
         override
         whenNotPaused
@@ -2831,7 +2812,10 @@ contract UChildAdministrableERC20 is
         return true;
     }
 
-    function decreaseAllowance(address spender, uint256 subtractedValue)
+    function decreaseAllowance(
+        address spender,
+        uint256 subtractedValue
+    )
         external
         override
         whenNotPaused
