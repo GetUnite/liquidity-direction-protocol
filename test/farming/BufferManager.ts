@@ -319,46 +319,6 @@ describe("BufferManager tests", () => {
 
     });
 
-    it("Checker triggers refill when there is a pending withdrawal, retuns false if withdrawal is satisfied", async() => {
-      // Calling checker before any withdrawals exist causes panic, due to diving by 0, while checking expected adapter amount
-      // await deposit(signers[2], usdc, parseUnits("1000", 6))
-      // await ibAlluoUsd.connect(signers[2]).withdraw(usdc.address, parseUnits("300", 18));
-      // await deposit(signers[3], usdc, parseUnits("700", 6))
-      // await jeur.connect(jeurWhale).transfer(gnosis.address, parseEther("2"))
-      // await jeur.connect(gnosis).approve(ibAlluoEur.address, parseEther("2"));
-      // await ibAlluoEur.connect(gnosis).deposit(jeur.address, parseEther("1"));
-      // await ibAlluoEur.connect(gnosis).withdraw(jeur.address, parseEther("0.7"))
-      // await ibAlluoEur.connect(gnosis).deposit(jeur.address, parseEther("0.7"));
-
-      // const [canExecBefore] = await buffer.checker()
-      // console.log(await buffer.checker())
-      // expect(canExecBefore).to.be.equal(true)
-      // await handler.satisfyAdapterWithdrawals(ibAlluoEur.address);
-      // await handler.satisfyAdapterWithdrawals(ibAlluoUsd.address)
-      // await buffer.isAdapterPendingWithdrawal(ibAlluoUsd.address);
-      // await buffer.adapterRequiredRefill(ibAlluoUsd.address);
-      // console.log(await buffer.checker())
-      // const [canExecAfter] = await buffer.checker()
-      // expect(canExecAfter).to.be.equal(false)
-
-    });
-
-    it("Should trigger gelato to refill if buffer requires one", async() => {
-      // await (await (await ethers.getContractFactory("ForceSender")).deploy({
-      //   value: parseEther("10.0")
-      // })).forceSend(gelatoExecutor.address); 
-        
-      // await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("50000", 6))
-      // await deposit(signers[2], usdc, parseUnits("1000", 6))
-      // await ibAlluoUsd.connect(signers[2]).withdraw(usdc.address, parseUnits("300", 18));
-
-      // const [canExec] = await buffer.checker()
-      // expect(canExec).to.be.equal(true);
-
-      // await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
-      
-    })
-
     it("Should not refill if adapter exceeded it's cumulative refill limit", async () => {
       // await (await (await ethers.getContractFactory("ForceSender")).deploy({
       //   value: parseEther("10.0")
