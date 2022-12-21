@@ -1,28 +1,47 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract BtcNoPoolAdapter is AccessControl {
-    using Address for address;
-    using SafeERC20 for IERC20;
+import {SafeERC20Upgradeable, IERC20Upgradeable as IERC20} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+
+contract BtcNoPoolAdapterUpgradeable is
+    Initializable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable
+{
+    using AddressUpgradeable for address;
+    using SafeERC20Upgradeable for IERC20;
+
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     address public constant WBTC = 0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6;
     address public wallet;
+    bool public upgradeStatus;
 
-    constructor(address _multiSigWallet, address _liquidityHandler) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() initializer {}
+
+    function initialize(
+        address _multiSigWallet,
+        address _liquidityHandler
+    ) public initializer {
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
+        _grantRole(UPGRADER_ROLE, _multiSigWallet);
         wallet = _multiSigWallet;
     }
 
     function deposit(
-        address _token,
+        address,
         uint256 _fullAmount,
         uint256 _leaveInPool
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -34,7 +53,7 @@ contract BtcNoPoolAdapter is AccessControl {
 
     function withdraw(
         address _user,
-        address _token,
+        address,
         uint256 _amount
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(WBTC).safeTransfer(_user, _amount / 10 ** 10);
@@ -44,12 +63,8 @@ contract BtcNoPoolAdapter is AccessControl {
         return IERC20(WBTC).balanceOf(address(this)) * 10 ** 10;
     }
 
-    function getCoreTokens()
-        external
-        pure
-        returns (address mathToken, address primaryToken)
-    {
-        return (WBTC, WBTC);
+    function getCoreTokens() external pure returns (address primaryToken) {
+        return (WBTC);
     }
 
     function setWallet(
@@ -69,5 +84,18 @@ contract BtcNoPoolAdapter is AccessControl {
         uint256 _amount
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(_address).safeTransfer(_to, _amount);
+    }
+
+    function changeUpgradeStatus(
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        upgradeStatus = _status;
+    }
+
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(UPGRADER_ROLE) {
+        require(upgradeStatus, "Adapter: Upgrade not allowed");
+        upgradeStatus = false;
     }
 }

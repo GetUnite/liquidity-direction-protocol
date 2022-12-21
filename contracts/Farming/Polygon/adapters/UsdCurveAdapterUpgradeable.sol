@@ -1,20 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+import {IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
+import {SafeERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "../../../interfaces/curve/ICurvePoolUSD.sol";
 import "../../../interfaces/IPriceFeedRouter.sol";
 
 import "hardhat/console.sol";
 
-contract UsdCurveAdapter is AccessControl {
-    using Address for address;
-    using SafeERC20 for IERC20;
+contract UsdCurveAdapterUpgradeable is
+    Initializable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable
+{
+    using AddressUpgradeable for address;
+    using SafeERC20Upgradeable for IERC20;
+
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     // All address are Polygon addresses.
     address public constant DAI = 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063;
@@ -25,6 +34,7 @@ contract UsdCurveAdapter is AccessControl {
     address public constant CURVE_LP =
         0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171;
     address public wallet;
+    bool public upgradeStatus;
     uint64 public slippage;
     address public priceFeedRouter;
     uint64 public primaryTokenIndex;
@@ -32,15 +42,19 @@ contract UsdCurveAdapter is AccessControl {
 
     mapping(address => uint128) public indexes;
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() initializer {}
+
+    function initialize(
         address _multiSigWallet,
         address _liquidityHandler,
         uint64 _slippage
-    ) {
+    ) public initializer {
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
+        _grantRole(UPGRADER_ROLE, _multiSigWallet);
         wallet = _multiSigWallet;
         slippage = _slippage;
 
@@ -205,5 +219,18 @@ contract UsdCurveAdapter is AccessControl {
         uint256 _amount
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(_address).safeTransfer(_to, _amount);
+    }
+
+    function changeUpgradeStatus(
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        upgradeStatus = _status;
+    }
+
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(UPGRADER_ROLE) {
+        require(upgradeStatus, "Adapter: Upgrade not allowed");
+        upgradeStatus = false;
     }
 }
