@@ -381,6 +381,7 @@ describe("BufferManager tests", () => {
       expect(buffer.connect(signers[1]).changeBridgeSettings(100, 420)).to.be.reverted
       expect(buffer.connect(signers[1]).addIBAlluoPool(handler.address, gnosis.address)).to.be.reverted
       expect(buffer.connect(signers[1]).removeIBAlluoPool(ibAlluoUsd.address)).to.be.reverted
+      expect(buffer.connect(signers[1]).setEthToken(ibAlluoUsd.address, dai.address)).to.be.reverted
     })
 
     it("Should add IBAlluo", async () => {
@@ -393,13 +394,28 @@ describe("BufferManager tests", () => {
       expect(await buffer.ibAlluoToAdapter(gnosis.address)).to.equal(handler.address);
 
       await buffer.connect(gnosis).removeIBAlluoPool(gnosis.address);
-      expect(await buffer.ibAlluoToAdapter(gnosis.address)).to.equal(ZERO_ADDR)
+      expect(await buffer.ibAlluoToAdapter(gnosis.address)).to.equal(ZERO_ADDR);
     })
 
     it("Should change the bridge settings", async() => {
       await buffer.connect(gnosis).changeBridgeSettings(1250, 60000);
       expect(await buffer.minBridgeAmount()).to.be.equal(1250);
       expect(await buffer.bridgeInterval()).to.be.equal(60000);
+    })
+
+    it("Should set Mainnet corresponding token", async() => {
+      await buffer.connect(gnosis).setEthToken(ibAlluoUsd.address, dai.address);
+      expect(await buffer.tokenToEth(ibAlluoUsd.address)).to.eq(dai.address);
+    })
+
+    it("Should set maxRefillPerEpoch", async() => {
+      await buffer.connect(gnosis).setMaxRefillPerEpoch(ibAlluoUsd.address, 420);
+      expect(await buffer.ibAlluoToMaxRefillPerEpoch(ibAlluoUsd.address)).to.eq(420)
+    })
+
+    it("Should set Epoch duration", async() => {
+      await buffer.connect(gnosis).setEpochDuration(420);
+      expect(await buffer.epochDuration()).to.eq(420)
     })
   })
   

@@ -39,6 +39,7 @@ contract BufferManager is
     // address of the DepositDistributor on mainnet
     address public distributor;
     
+    // bridge settings
     uint256 public minBridgeAmount;
     uint256 public lastExecuted;
     uint256 public bridgeInterval;
@@ -46,7 +47,8 @@ contract BufferManager is
     bytes32 constant public UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 constant public GELATO = keccak256("GELATO");
     bytes32 constant public SWAPPER = keccak256("SWAPPER");
-
+    
+    // liquidity handler
     ILiquidityHandler public handler;
 
     mapping(address => Epoch[]) public ibAlluoToEpoch;
@@ -237,6 +239,11 @@ contract BufferManager is
         }
     }
     
+    /**
+    * @dev Function returns relevant refill settings by IBAlluo address
+    * @param _ibAlluo address of the IBAlluo
+    * @return Epoch struct with settings
+    */
     function _confirmEpoch(address _ibAlluo) internal returns (Epoch storage) {
         Epoch[] storage relevantEpochs = ibAlluoToEpoch[_ibAlluo];
         Epoch storage lastEpoch = relevantEpochs[relevantEpochs.length - 1];
@@ -254,7 +261,8 @@ contract BufferManager is
 
 
     /**
-    * @dev
+    * @dev Refills corresponding IBAlluo adapter with prior checks and triggers executing queued withdrawals on the adapter
+    * @param _ibAlluo address of corresponding IBAlluo
     */
     function refillBuffer(address _ibAlluo) external onlyRole(GELATO) returns (bool) {
         uint256 refillAmount = adapterRequiredRefill(_ibAlluo);
@@ -304,15 +312,38 @@ contract BufferManager is
     
     /* ========== ADMIN CONFIGURATION ========== */
 
+    /**
+    * @dev Admin function to change bridge settings
+    * @param _minBridgeAmount minimum threshold in usd, crossing which should allow bridging funds
+    * @param _bridgeInterval interval in seconds, to put limitations for an amount to be bridged 
+    */
     function changeBridgeSettings(uint256 _minBridgeAmount, uint256 _bridgeInterval) external onlyRole(DEFAULT_ADMIN_ROLE) {
         minBridgeAmount = _minBridgeAmount;
         bridgeInterval = _bridgeInterval;
     }
-
+    
+    /**
+    * @notice Needed for bridging
+    * @dev Admin function to change the address of the respective token on Mainnet
+    * @param _token address of the token on Polygon
+    * @param _tokenEth address of the same token on Mainnet
+    */
+    function setEthToken(address _token, address _tokenEth) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        tokenToEth[_token] = _tokenEth;
+    }
+    /**
+    * @dev Admin function for setting max amount an adapter can be refilled per interval
+    * @param _ibAlluo address of the IBAlluo of the respective adapter
+    * @param _maxRefillPerEpoch max amount to be refilled
+    */
     function setMaxRefillPerEpoch(address _ibAlluo, uint256 _maxRefillPerEpoch) external onlyRole(DEFAULT_ADMIN_ROLE) {
         ibAlluoToMaxRefillPerEpoch[_ibAlluo] = _maxRefillPerEpoch;
     }
 
+    /**
+    * @dev Admin function for setting the aforementioned interval
+    * @param _epochDuration time of the epoch in seconds
+    */
     function setEpochDuration(uint256 _epochDuration) external onlyRole(DEFAULT_ADMIN_ROLE) {
         epochDuration = _epochDuration;
     }
