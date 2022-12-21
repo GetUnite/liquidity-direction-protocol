@@ -8,8 +8,8 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
 import "../interfaces/IIbAlluo.sol";
 import "../interfaces/IHandlerAdapter.sol";
@@ -22,7 +22,7 @@ contract LiquidityHandler is
     AccessControlUpgradeable,
     UUPSUpgradeable
 {
-    using Address for address;
+    using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using EnumerableMapUpgradeable for EnumerableMapUpgradeable.AddressToUintMap;
 
@@ -592,7 +592,7 @@ contract LiquidityHandler is
     }
 
     function _authorizeUpgrade(
-        address newImplementation
+        address
     ) internal override onlyRole(UPGRADER_ROLE) {
         require(upgradeStatus, "Handler: Upgrade not allowed");
         upgradeStatus = false;
