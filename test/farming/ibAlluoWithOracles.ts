@@ -2,7 +2,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { ethers, network, upgrades } from "hardhat";
 import { BtcNoPoolAdapterUpgradeable, EthNoPoolAdapterUpgradeable, EurCurveAdapterUpgradeable, IbAlluo, IERC20Metadata, LiquidityHandler, UsdCurveAdapterUpgradeable } from "../../typechain";
 
-describe("IbAlluo With Price Oracles", async () => {
+describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
     let signers: SignerWithAddress[];
     let admin: SignerWithAddress;
 
@@ -10,6 +10,9 @@ describe("IbAlluo With Price Oracles", async () => {
     let curveLpUSD: IERC20Metadata;
 
     let ibAlluoUSD: IbAlluo;
+    let ibAlluoEUR: IbAlluo;
+    let ibAlluoETH: IbAlluo;
+    let ibAlluoBTC: IbAlluo;
 
     let liquidityHandler: LiquidityHandler;
 
@@ -56,6 +59,9 @@ describe("IbAlluo With Price Oracles", async () => {
         const UsdCurveAdapter = await ethers.getContractFactory("UsdCurveAdapterUpgradeable");
 
         ibAlluoUSD = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
+        ibAlluoEUR = await ethers.getContractAt("IbAlluo", "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92");
+        ibAlluoETH = await ethers.getContractAt("IbAlluo", "0xc677B0918a96ad258A68785C2a3955428DeA7e50");
+        ibAlluoBTC = await ethers.getContractAt("IbAlluo", "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2");
         liquidityHandler = await ethers.getContractAt("LiquidityHandler", "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1");
 
         await ibAlluoUSD.connect(admin).grantRole(
@@ -63,6 +69,24 @@ describe("IbAlluo With Price Oracles", async () => {
             signers[0].address
         );
         await ibAlluoUSD.connect(admin).changeUpgradeStatus(true);
+
+        await ibAlluoEUR.connect(admin).grantRole(
+            await ibAlluoEUR.UPGRADER_ROLE(),
+            signers[0].address
+        );
+        await ibAlluoEUR.connect(admin).changeUpgradeStatus(true);
+
+        await ibAlluoETH.connect(admin).grantRole(
+            await ibAlluoETH.UPGRADER_ROLE(),
+            signers[0].address
+        );
+        await ibAlluoETH.connect(admin).changeUpgradeStatus(true);
+
+        await ibAlluoBTC.connect(admin).grantRole(
+            await ibAlluoBTC.UPGRADER_ROLE(),
+            signers[0].address
+        );
+        await ibAlluoBTC.connect(admin).changeUpgradeStatus(true);
 
         await liquidityHandler.connect(admin).grantRole(
             await liquidityHandler.UPGRADER_ROLE(),
@@ -72,6 +96,15 @@ describe("IbAlluo With Price Oracles", async () => {
 
         await upgrades.forceImport(ibAlluoUSD.address, OldIbAlluoFactory);
         await upgrades.upgradeProxy(ibAlluoUSD.address, IbAlluo);
+
+        await upgrades.forceImport(ibAlluoEUR.address, OldIbAlluoFactory);
+        await upgrades.upgradeProxy(ibAlluoEUR.address, IbAlluo);
+
+        await upgrades.forceImport(ibAlluoETH.address, OldIbAlluoFactory);
+        await upgrades.upgradeProxy(ibAlluoETH.address, IbAlluo);
+
+        await upgrades.forceImport(ibAlluoBTC.address, OldIbAlluoFactory);
+        await upgrades.upgradeProxy(ibAlluoBTC.address, IbAlluo);
 
         await upgrades.forceImport(liquidityHandler.address, OldLiquidityHandler);
         await upgrades.upgradeProxy(liquidityHandler.address, LiquidityHandler);
@@ -113,6 +146,53 @@ describe("IbAlluo With Price Oracles", async () => {
             ],
             { initializer: "initialize", kind: "uups" }
         ) as UsdCurveAdapterUpgradeable;
+
+        await usdAdapter.connect(admin).adapterApproveAll();
+        await eurAdapter.connect(admin).adapterApproveAll();
+
+        await liquidityHandler.connect(admin).setAdapter(
+            1,
+            "USD Curve-3pool",
+            500,
+            usdAdapter.address,
+            true
+        )
+        
+        await liquidityHandler.connect(admin).setAdapter(
+            2,
+            "EUR Curve-3eur",
+            500,
+            eurAdapter.address,
+            true
+        )
+        
+        await liquidityHandler.connect(admin).setAdapter(
+            3,
+            "ETH No Pool Adapter",
+            500,
+            ethAdapter.address,
+            true
+        )
+        
+        await liquidityHandler.connect(admin).setAdapter(
+            4,
+            "BTC No Pool Adapter",
+            500,
+            btcAdapter.address,
+            true
+        );
+
+        let adminRole = ethers.constants.HashZero;
+
+        await liquidityHandler.connect(admin).grantRole(adminRole, ibAlluoUSD.address)
+        await liquidityHandler.connect(admin).grantRole(adminRole, ibAlluoEUR.address)
+        await liquidityHandler.connect(admin).grantRole(adminRole, ibAlluoETH.address)
+        await liquidityHandler.connect(admin).grantRole(adminRole, ibAlluoBTC.address)
+            
+        await liquidityHandler.connect(admin).setIbAlluoToAdapterId(ibAlluoUSD.address, 1)
+        await liquidityHandler.connect(admin).setIbAlluoToAdapterId(ibAlluoEUR.address, 2)
+        await liquidityHandler.connect(admin).setIbAlluoToAdapterId(ibAlluoETH.address, 3)
+        await liquidityHandler.connect(admin).setIbAlluoToAdapterId(ibAlluoBTC.address, 4)      
     });
 
     it("Should allow beforeEach to pass", async () => {
