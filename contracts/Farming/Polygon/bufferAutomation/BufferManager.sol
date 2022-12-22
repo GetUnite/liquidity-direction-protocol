@@ -43,6 +43,7 @@ contract BufferManager is
     uint256 public minBridgeAmount;
     uint256 public lastExecuted;
     uint256 public bridgeInterval;
+    uint256 public relayerFeePct;
 
     bytes32 constant public UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 constant public GELATO = keccak256("GELATO");
@@ -54,7 +55,6 @@ contract BufferManager is
     mapping(address => Epoch[]) public ibAlluoToEpoch;
     mapping(address => address) public ibAlluoToAdapter;
     mapping(address => uint256) public ibAlluoToMaxRefillPerEpoch;
-    mapping(address => address) public ibAlluoToToken;
     mapping(address => address) public tokenToEth;
 
     EnumerableSetUpgradeable.AddressSet private activeIbAlluos;
@@ -104,6 +104,7 @@ contract BufferManager is
 
         spokepool = _spokepool;
         anycall = _anycall;
+        gnosis = _gnosis;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _gnosis);
         _grantRole(UPGRADER_ROLE, _gnosis);
@@ -118,37 +119,31 @@ contract BufferManager is
     * @dev Function checker for gelato, after the balance crosses the threshold initates the swap function
     * @dev Checks minimumBridging amout, attempts to reffil the adapters
     * @return canExec Bool, if true - initiates the call by gelato
-    * @return execPayLoad Data to be called by gelato
+    * @return execPayload Data to be called by gelato
     */
     function checker() 
         external
         view
-        returns(bool canExec, bytes memory execPayLoad) 
+        returns(bool canExec, bytes memory execPayload) 
     {
-        bool canExec;
-        bytes memory execPayload;
-
         for(uint256 i; i < activeIbAlluos.length(); i++) {
-            address iballuo = activeIbAlluos.at(i); 
-            uint256 amount = IERC20Upgradeable(ibAlluoToToken[iballuo]).balanceOf(address(this));
-            if(!isAdapterPendingWithdrawal(iballuo)) {
-                if(amount >= minBridgeAmount * 10 ** IERC20MetadataUpgradeable(ibAlluoToToken[iballuo]).decimals() &&
-                    block.timestamp >= lastExecuted + bridgeInterval) {
+            address iballuo = activeIbAlluos.at(i);
+            (,address token) = IHandlerAdapter(ibAlluoToAdapter[iballuo]).getCoreTokens();
+            uint256 amount = IERC20Upgradeable(token).balanceOf(address(this));
+            if(adapterRequiredRefill(iballuo) == 0) {
+                if(canBridge(token, amount)) {
                         canExec = true;
-                        address originToken = ibAlluoToToken[iballuo];
                         execPayload = abi.encodeWithSelector(
                         BufferManager.swap.selector,
-                        amount * 10 ** IERC20MetadataUpgradeable(ibAlluoToToken[iballuo]).decimals(),
-                        originToken,
-                        // !!!change after mumbai testing
-                        5 * 10 ** 16,
+                        amount,
+                        token,
+                        relayerFeePct,
                         iballuo
                         );
 
                     break; 
                 }
-            } else if (adapterRequiredRefill(iballuo) > 0 &&
-                    adapterRequiredRefill(iballuo) < amount) {
+            } else if (canRefill(iballuo, token)) {
                     canExec = true;
                     execPayload = abi.encodeWithSelector(
                     BufferManager.refillBuffer.selector,
@@ -168,8 +163,8 @@ contract BufferManager is
     * @param amount Amount of the funds to be transferred
     * @param relayerFeePct Fee percantage for relayers on Across bridge side
     */
-    function swap(uint256 amount, address originToken, uint64 relayerFeePct, address iballuo) external onlyRole(SWAPPER) {
-        require(amount >= 700 * 10 ** IERC20MetadataUpgradeable(ibAlluoToToken[iballuo]).decimals(), "Swap: <minAmount!");
+    function swap(uint256 amount, address originToken, uint64 relayerFeePct) external onlyRole(SWAPPER) {
+        require(amount >= 700 * 10 ** IERC20MetadataUpgradeable(originToken).decimals(), "Swap: <minAmount!");
         require(block.timestamp >= lastExecuted + bridgeInterval, "Swap: <minInterval!");
         
         IERC20Upgradeable(originToken).approve(spokepool, amount);
@@ -177,7 +172,7 @@ contract BufferManager is
         ISpokePool(spokepool).deposit(distributor, originToken, amount, 1, relayerFeePct, uint32(block.timestamp));
         address tokenEth = tokenToEth[originToken];
         CallProxy(anycall).anyCall(
-            // address of the collector contraact on mainnet
+            // address of the collector contract on mainnet
             distributor,
             abi.encode(
                 tokenEth,
@@ -210,11 +205,11 @@ contract BufferManager is
     
     /**
     * @dev Function checks if IBAlluos respective adapter has queued withdrawals
-    * @param ibAlluo Address of the IBAlluo pool 
+    * @param _ibAlluo Address of the IBAlluo pool 
     * @return True if there is a pending withdrawal on correspoding to an IBAlluo pool adapter
     */
-    function isAdapterPendingWithdrawal(address ibAlluo) public view returns (bool) {
-        (,,uint256 totalWithdrawalAmount,) = handler.ibAlluoToWithdrawalSystems(ibAlluo);
+    function isAdapterPendingWithdrawal(address _ibAlluo) public view returns (bool) {
+        (,,uint256 totalWithdrawalAmount,) = handler.ibAlluoToWithdrawalSystems(_ibAlluo);
         if (totalWithdrawalAmount > 0) {
             return true;
         } 
@@ -265,17 +260,66 @@ contract BufferManager is
     * @param _ibAlluo address of corresponding IBAlluo
     */
     function refillBuffer(address _ibAlluo) external onlyRole(GELATO) returns (bool) {
-        uint256 refillAmount = adapterRequiredRefill(_ibAlluo);
         address adapterAddress = ibAlluoToAdapter[_ibAlluo];
         (address bufferToken,) = IHandlerAdapter(adapterAddress).getCoreTokens();
-        Epoch storage currentEpoch = _confirmEpoch(_ibAlluo);
-        require(ibAlluoToMaxRefillPerEpoch[_ibAlluo] >= currentEpoch.refilledPerEpoch + refillAmount, "Cumulative refills exceeds limit");
-        require(refillAmount > 0, "No refill required");
-        currentEpoch.refilledPerEpoch += refillAmount;
-        IERC20Upgradeable(bufferToken).transfer(adapterAddress, refillAmount);
-        if (isAdapterPendingWithdrawal(_ibAlluo)) {
-            handler.satisfyAdapterWithdrawals(_ibAlluo);
-            return true;
+        uint256 totalAmount = adapterRequiredRefill(_ibAlluo);
+
+        require(totalAmount > 0, "No refill required");
+
+        uint256 bufferBalance = IERC20Upgradeable(bufferToken).balanceOf(address(this));
+        uint256 gnosisAmount = totalAmount - bufferBalance;
+        uint256 bufferAmount = totalAmount;
+        if(gnosisAmount >= totalAmount * 5 / 100) {
+            // if(gnosisAmount < totalAmount) {
+            //     require(gnosisAmount <= totalAmount * 5 / 100, "Refill: Buffer <5pct");
+            // }
+            require((IERC20Upgradeable(bufferToken)).balanceOf(gnosis) >= gnosisAmount, "Refill: Gnosis low on funds");
+            bufferAmount = totalAmount - gnosisAmount;
+            require(bufferAmount <= bufferBalance, "Refill: gnosisAmount below treshold");
+
+            Epoch storage currentEpoch = _confirmEpoch(_ibAlluo);
+
+            require(ibAlluoToMaxRefillPerEpoch[_ibAlluo] >= currentEpoch.refilledPerEpoch + gnosisAmount, "Cumulative refills exceeds limit");
+
+            currentEpoch.refilledPerEpoch += totalAmount;
+            IERC20Upgradeable(bufferToken).transferFrom(gnosis, adapterAddress, gnosisAmount);
+            
+        }
+        if(bufferAmount > 0) {
+            IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferAmount);
+            if (isAdapterPendingWithdrawal(_ibAlluo)) {
+                handler.satisfyAdapterWithdrawals(_ibAlluo);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function canBridge(address token, uint256 amount) public view returns(bool) {
+        if(amount >= minBridgeAmount * 10 ** IERC20MetadataUpgradeable(token).decimals()) {
+            if(block.timestamp >= lastExecuted + bridgeInterval) {
+                return true;
+            }    
+        } 
+        return false;
+    }
+
+    function canRefill(address _iballuo, address token) public view returns(bool) {
+        uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
+        uint256 decDif = 18 - IERC20MetadataUpgradeable(token).decimals();
+        uint256 gnosisBalance = IERC20Upgradeable(token).balanceOf(gnosis);
+        if(decDif > 0){
+            balance = balance * 10 ** decDif;
+            gnosisBalance = gnosisBalance * 10 ** decDif;
+        }
+        uint256 refill = adapterRequiredRefill(_iballuo);
+        if(refill > 0){
+            if(refill < balance) {
+                return true;
+                }
+                if(refill < gnosisBalance + balance) {
+                return true;
+            }
         }
         return false;
     }
@@ -300,7 +344,6 @@ contract BufferManager is
             for (uint256 i; i < _activeIbAlluos.length; i++) {
                 activeIbAlluos.add(_activeIbAlluos[i]);
                 ibAlluoToAdapter[_activeIbAlluos[i]] = _ibAlluoAdapters[i];
-                ibAlluoToToken[_activeIbAlluos[i]] = _ibAlluoTokens[i];
                 tokenToEth[_activeIbAlluos[i]] = _tokensEth[i];
                 ibAlluoToMaxRefillPerEpoch[_activeIbAlluos[i]] = _maxRefillPerEpoch[i];
                 epochDuration = _epochDuration;
@@ -320,6 +363,10 @@ contract BufferManager is
     function changeBridgeSettings(uint256 _minBridgeAmount, uint256 _bridgeInterval) external onlyRole(DEFAULT_ADMIN_ROLE) {
         minBridgeAmount = _minBridgeAmount;
         bridgeInterval = _bridgeInterval;
+    }
+
+    function setRelayerFeePct(uint256 _relayerFeePct) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        relayerFeePct = _relayerFeePct;
     }
     
     /**

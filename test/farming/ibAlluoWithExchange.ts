@@ -5,7 +5,7 @@ import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { formatUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, IWrappedEther, IERC20Metadata, IExchange, Exchange, } from "../../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, IWrappedEther, IERC20Metadata, IExchange, Exchange, BufferManager, BufferManager__factory } from "../../typechain";
 
 async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
     await ethers.provider.send(
@@ -42,6 +42,7 @@ describe("IbAlluo and Exchange", function () {
 
     let multisig: PseudoMultisigWallet;
     let handler: LiquidityHandler;
+    let buffer: BufferManager;
 
     let dai: IERC20Metadata, usdc: IERC20Metadata, usdt: IERC20Metadata;
     let curveLpUSD: IERC20;
@@ -64,6 +65,13 @@ describe("IbAlluo and Exchange", function () {
     let exchange: Exchange
 
     let exchangeAddress;
+
+    const spokepooladdress = "0x69B5c72837769eF1e7C164Abc6515DcFf217F920";
+    const anycalladdress = "0xC10Ef9F491C9B59f936957026020C321651ac078";
+    const gelatoaddress = "0x7A34b2f0DA5ea35b5117CaC735e99Ba0e2aCEECD";
+    const iballuoaddress = "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6";
+
+    const ZERO_ADDR = ethers.constants.AddressZero;
 
     before(async function () {
         upgrades.silenceWarnings()
@@ -149,13 +157,31 @@ describe("IbAlluo and Exchange", function () {
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), admin.address)
 
+        const Buffer = await ethers.getContractFactory("BufferManager") as BufferManager__factory;
+    
+        buffer = await upgrades.deployProxy(Buffer,
+        [ 604800,
+          1000,
+          604800,
+          1000,
+          admin.address,
+          gelatoaddress,
+          spokepooladdress,
+          anycalladdress,
+          ZERO_ADDR,
+        ], {
+          initializer: 'initialize', unsafeAllow: ["delegatecall"],
+          kind: 'uups'
+         }
+        ) as BufferManager;
+
         const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapter") as UsdCurveAdapter__factory;
         const EurAdapter = await ethers.getContractFactory("EurCurveAdapter") as EurCurveAdapter__factory;
         const EthAdapter = await ethers.getContractFactory("EthNoPoolAdapter") as EthNoPoolAdapter__factory;
 
-        eurAdapter = await EurAdapter.deploy(admin.address, handler.address, 200);
-        usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200);
-        ethAdapter = await EthAdapter.deploy(admin.address, handler.address);
+        eurAdapter = await EurAdapter.deploy(admin.address, buffer.address, handler.address, 200);
+        usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200);
+        ethAdapter = await EthAdapter.deploy(admin.address, buffer.address, handler.address);
 
         await usdAdapter.connect(admin).adapterApproveAll()
         await handler.connect(admin).setAdapter(

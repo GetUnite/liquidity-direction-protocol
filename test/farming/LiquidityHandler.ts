@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory, StIbAlluo, StIbAlluo__factory } from "../../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory, StIbAlluo, StIbAlluo__factory, BufferManager, BufferManager__factory } from "../../typechain";
 
 async function getLastWithdrawalInfo(token: IbAlluo, handler: LiquidityHandler) {
     let request = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastWithdrawalRequest
@@ -54,6 +54,7 @@ describe("Handler and different adapters", function () {
     let btcAdapter: BtcCurveAdapter;
 
     let handler: LiquidityHandler;
+    let buffer: BufferManager;
 
     let dai: IERC20, usdc: IERC20, usdt: IERC20;
     let curveLpUSD: IERC20;
@@ -78,6 +79,13 @@ describe("Handler and different adapters", function () {
 
     let wbtcWhale: SignerWithAddress;
     let renBtcWhale: SignerWithAddress;
+
+    const spokepooladdress = "0x69B5c72837769eF1e7C164Abc6515DcFf217F920";
+    const anycalladdress = "0xC10Ef9F491C9B59f936957026020C321651ac078";
+    const gelatoaddress = "0x7A34b2f0DA5ea35b5117CaC735e99Ba0e2aCEECD";
+    const iballuoaddress = "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6";
+
+    const ZERO_ADDR = ethers.constants.AddressZero;
 
     before(async function () {
         upgrades.silenceWarnings()
@@ -167,15 +175,33 @@ describe("Handler and different adapters", function () {
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), admin.address)
 
+        const Buffer = await ethers.getContractFactory("BufferManager") as BufferManager__factory;
+    
+        buffer = await upgrades.deployProxy(Buffer,
+        [ 604800,
+          1000,
+          604800,
+          1000,
+          admin.address,
+          gelatoaddress,
+          spokepooladdress,
+          anycalladdress,
+          ZERO_ADDR,
+        ], {
+          initializer: 'initialize', unsafeAllow: ["delegatecall"],
+          kind: 'uups'
+         }
+        ) as BufferManager;
+
         const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapter") as UsdCurveAdapter__factory;
         const EurAdapter = await ethers.getContractFactory("EurCurveAdapter") as EurCurveAdapter__factory;
         const EthAdapter = await ethers.getContractFactory("EthNoPoolAdapter") as EthNoPoolAdapter__factory;
         const BtcAdapter = await ethers.getContractFactory("BtcCurveAdapter") as BtcCurveAdapter__factory;
 
-        eurAdapter = await EurAdapter.deploy(admin.address, handler.address, 200);
-        usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200);
-        ethAdapter = await EthAdapter.deploy(admin.address, handler.address);
-        btcAdapter = await BtcAdapter.deploy(admin.address, handler.address, 200);
+        eurAdapter = await EurAdapter.deploy(admin.address, buffer.address, handler.address, 200);
+        usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200);
+        ethAdapter = await EthAdapter.deploy(admin.address, buffer.address, handler.address);
+        btcAdapter = await BtcAdapter.deploy(admin.address, handler.address, buffer.address, 200);
 
         await usdAdapter.connect(admin).adapterApproveAll()
         await handler.connect(admin).setAdapter(
@@ -407,53 +433,53 @@ describe("Handler and different adapters", function () {
             expect(Number(await renBtc.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("0.049", 8)))
         })
 
-        it("The balance of the multisig wallet should increase with deposits.", async function () {
-            let walletBalance = await wbtc.balanceOf(admin.address);
+        it("The balance of the buffer should increase with deposits.", async function () {
+            let bufferBalance = await wbtc.balanceOf(buffer.address);
 
             await deposit(signers[0], wbtc, parseUnits("1", 8));
-            expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await wbtc.balanceOf(admin.address);
+            expect(Number(await wbtc.balanceOf(buffer.address))).greaterThan(Number(bufferBalance))
+            bufferBalance = await wbtc.balanceOf(buffer.address);
 
             await deposit(signers[0], renBtc, parseUnits("0.1", 8));
-            expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await wbtc.balanceOf(admin.address);
+            expect(Number(await wbtc.balanceOf(buffer.address))).greaterThan(Number(bufferBalance))
+            bufferBalance = await wbtc.balanceOf(buffer.address);
 
             await deposit(signers[0], wbtc, parseUnits("1", 8));
-            expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await wbtc.balanceOf(admin.address);
+            expect(Number(await wbtc.balanceOf(buffer.address))).greaterThan(Number(bufferBalance))
+            bufferBalance = await wbtc.balanceOf(buffer.address);
 
             await deposit(signers[0], renBtc, parseUnits("0.1", 8));
-            expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await wbtc.balanceOf(admin.address);
+            expect(Number(await wbtc.balanceOf(buffer.address))).greaterThan(Number(bufferBalance))
+            bufferBalance = await wbtc.balanceOf(buffer.address);
 
             await deposit(signers[0], wbtc, parseUnits("1", 8));
-            expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await wbtc.balanceOf(admin.address);
+            expect(Number(await wbtc.balanceOf(buffer.address))).greaterThan(Number(bufferBalance))
+            bufferBalance = await wbtc.balanceOf(buffer.address);
 
             await deposit(signers[0], renBtc, parseUnits("0.1", 8));
-            expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await wbtc.balanceOf(admin.address);
-            console.log("Final multisig balance:", walletBalance);
+            expect(Number(await wbtc.balanceOf(buffer.address))).greaterThan(Number(bufferBalance))
+            bufferBalance = await wbtc.balanceOf(buffer.address);
+            console.log("Final multisig balance:", bufferBalance);
 
         })
         it("Attemping to withdraw more than allowed causes revert.", async function () {
-            let walletBalance = await wbtc.balanceOf(admin.address);
+            let bufferBalance = await wbtc.balanceOf(buffer.address);
             await deposit(signers[1], wbtc, parseUnits("1", 8));
-            expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+            expect(Number(await wbtc.balanceOf(buffer.address))).greaterThan(Number(bufferBalance))
             await expect(ibAlluoBtc.connect(signers[1]).withdraw(wbtc.address, parseUnits("2", 18))).to.be.revertedWith('SuperfluidToken: burn amount exceeds balance')
         })
         describe('BTC Mass deposits and withdrawal test cases', function () {
             it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
-                let walletBalance = await wbtc.balanceOf(admin.address);
+                let bufferBalance = await wbtc.balanceOf(buffer.address);
                 let userBalanceAtStart = await wbtc.balanceOf(signers[0].address);
 
                 await deposit(signers[0], wbtc, parseUnits("1", 8));
-                expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                walletBalance = await wbtc.balanceOf(admin.address);
+                expect(Number(await wbtc.balanceOf(buffer.address))).greaterThan(Number(bufferBalance))
+                bufferBalance = await wbtc.balanceOf(buffer.address);
 
                 await deposit(signers[2], renBtc, parseUnits("0.1", 8));
-                expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                walletBalance = await wbtc.balanceOf(admin.address);
+                expect(Number(await wbtc.balanceOf(buffer.address))).greaterThan(Number(bufferBalance))
+                bufferBalance = await wbtc.balanceOf(buffer.address);
 
                 await ibAlluoBtc.connect(signers[0]).withdraw(wbtc.address, parseUnits("0.5", 18));
                 let withdrawalArray = await getLastWithdrawalInfo(ibAlluoBtc, handler)
@@ -466,7 +492,7 @@ describe("Handler and different adapters", function () {
                 // When there are deposits, should pay everyone back.
                 await deposit(signers[2], renBtc, parseUnits("2", 8));
                 await handler.satisfyAdapterWithdrawals(ibAlluoBtc.address);
-                expect(Number(await wbtc.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                expect(Number(await wbtc.balanceOf(buffer.address))).greaterThan(Number(bufferBalance))
 
                 let delta = (await wbtc.balanceOf(signers[0].address)).sub(userBalanceAtStart)
 
@@ -500,44 +526,44 @@ describe("Handler and different adapters", function () {
         })
 
         it("The balance of the multisig wallet should increase with weth deposits.", async function () {
-            let walletBalance = await weth.balanceOf(admin.address);
+            let walletBalance = await weth.balanceOf(buffer.address);
 
             await deposit(signers[0], weth, parseEther("100"));
-            expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await weth.balanceOf(admin.address);
+            expect(Number(await weth.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await weth.balanceOf(buffer.address);
 
             await deposit(signers[0], weth, parseEther("100"));
-            expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await weth.balanceOf(admin.address);
+            expect(Number(await weth.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await weth.balanceOf(buffer.address);
 
             await deposit(signers[0], weth, parseEther("100"));
-            expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await weth.balanceOf(admin.address);
+            expect(Number(await weth.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await weth.balanceOf(buffer.address);
 
             await deposit(signers[0], weth, parseEther("100"));
-            expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await weth.balanceOf(admin.address);
+            expect(Number(await weth.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await weth.balanceOf(buffer.address);
 
             await deposit(signers[0], weth, parseEther("100"));
-            expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await weth.balanceOf(admin.address);
+            expect(Number(await weth.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await weth.balanceOf(buffer.address);
 
             await deposit(signers[0], weth, parseEther("100"));
-            expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await weth.balanceOf(admin.address);
+            expect(Number(await weth.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await weth.balanceOf(buffer.address);
 
             await deposit(signers[0], weth, parseEther("100"));
-            expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await weth.balanceOf(admin.address);
+            expect(Number(await weth.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await weth.balanceOf(buffer.address);
 
             //console.log("Final multisig balance:", walletBalance);
 
         })
         it("Attemping to withdraw more weth than allowed causes revert.", async function () {
-            let walletBalance = await weth.balanceOf(admin.address);
+            let walletBalance = await weth.balanceOf(buffer.address);
             await deposit(signers[0], weth, parseEther("100"));
-            expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await weth.balanceOf(admin.address);
+            expect(Number(await weth.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await weth.balanceOf(buffer.address);
 
             await expect(ibAlluoEth.connect(signers[1]).withdraw(weth.address, parseUnits("500", 18))).to.be.revertedWith('SuperfluidToken: burn amount exceeds balance')
         })
@@ -546,20 +572,20 @@ describe("Handler and different adapters", function () {
     })
     describe('weth Mass deposits and withdrawal test cases', function () {
         it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
-            let walletBalance = await weth.balanceOf(admin.address);
+            let walletBalance = await weth.balanceOf(buffer.address);
             let userBalanceAtStart = await weth.balanceOf(signers[0].address);
 
             await deposit(signers[0], weth, parseEther("100"));
-            expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await weth.balanceOf(admin.address);
+            expect(Number(await weth.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await weth.balanceOf(buffer.address);
 
             await deposit(signers[1], weth, parseEther("50"));
-            expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await weth.balanceOf(admin.address);
+            expect(Number(await weth.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await weth.balanceOf(buffer.address);
 
             await deposit(signers[2], weth, parseEther("180"));
-            expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await weth.balanceOf(admin.address);
+            expect(Number(await weth.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await weth.balanceOf(buffer.address);
 
             await ibAlluoEth.connect(signers[0]).withdraw(weth.address, parseEther("50"));
             let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEth, handler)
@@ -576,7 +602,7 @@ describe("Handler and different adapters", function () {
             // When there are deposits, should pay everyone back.
             await deposit(signers[2], weth, parseUnits("1000", 18));
             await handler.satisfyAdapterWithdrawals(ibAlluoEth.address);
-            expect(Number(await weth.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+            expect(Number(await weth.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
 
             let delta = (await weth.balanceOf(signers[0].address)).sub(userBalanceAtStart)
 
@@ -669,76 +695,76 @@ describe("Handler and different adapters", function () {
         })
 
         it("The balance of the multisig wallet should increase with deposits.", async function () {
-            let walletBalance = await eurt.balanceOf(admin.address);
+            let walletBalance = await eurt.balanceOf(buffer.address);
 
             await deposit(signers[0], jeur, parseEther("100"));
-            expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await eurt.balanceOf(admin.address);
+            expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await eurt.balanceOf(buffer.address);
 
 
             await deposit(signers[0], eurt, parseUnits("100", 6));
-            expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await eurt.balanceOf(admin.address);
+            expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await eurt.balanceOf(buffer.address);
 
             await deposit(signers[0], eurs, parseUnits("100", 2));
-            expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await eurt.balanceOf(admin.address);
+            expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await eurt.balanceOf(buffer.address);
 
             await deposit(signers[0], jeur, parseEther("100"));
-            expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await eurt.balanceOf(admin.address);
+            expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await eurt.balanceOf(buffer.address);
 
 
             await deposit(signers[0], eurt, parseUnits("100", 6));
-            expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await eurt.balanceOf(admin.address);
+            expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await eurt.balanceOf(buffer.address);
 
             await deposit(signers[0], eurs, parseUnits("100", 2));
-            expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await eurt.balanceOf(admin.address);
+            expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await eurt.balanceOf(buffer.address);
 
             await deposit(signers[0], jeur, parseEther("100"));
-            expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await eurt.balanceOf(admin.address);
+            expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await eurt.balanceOf(buffer.address);
 
 
             await deposit(signers[0], eurt, parseUnits("100", 6));
-            expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await eurt.balanceOf(admin.address);
+            expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await eurt.balanceOf(buffer.address);
 
             await deposit(signers[0], eurs, parseUnits("100", 2));
-            expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-            walletBalance = await eurt.balanceOf(admin.address);
+            expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+            walletBalance = await eurt.balanceOf(buffer.address);
 
             console.log("Final multisig balance:", walletBalance);
 
         })
         it("Attemping to withdraw more than allowed causes revert.", async function () {
-            let walletBalance = await eurt.balanceOf(admin.address);
+            let walletBalance = await eurt.balanceOf(buffer.address);
             await deposit(signers[1], eurt, parseUnits("100", 6));
-            expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+            expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
             await expect(ibAlluoEur.connect(signers[1]).withdraw(eurt.address, parseUnits("500", 18))).to.be.revertedWith('SuperfluidToken: burn amount exceeds balance')
         })
         describe('EUR Mass deposits and withdrawal test cases', function () {
             it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
-                let walletBalance = await eurt.balanceOf(admin.address);
+                let walletBalance = await eurt.balanceOf(buffer.address);
                 let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
 
                 await deposit(signers[0], jeur, parseEther("100"));
-                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                walletBalance = await eurt.balanceOf(admin.address);
+                expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(buffer.address);
 
                 await deposit(signers[0], par, parseEther("100"));
-                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                walletBalance = await eurt.balanceOf(admin.address);
+                expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(buffer.address);
 
                 await deposit(signers[1], eurt, parseUnits("100", 6));
-                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                walletBalance = await eurt.balanceOf(admin.address);
+                expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(buffer.address);
 
                 await deposit(signers[2], eurs, parseUnits("100", 2));
-                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                walletBalance = await eurt.balanceOf(admin.address);
+                expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(buffer.address);
 
                 await ibAlluoEur.connect(signers[0]).withdraw(jeur.address, parseEther("50"));
                 withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
@@ -756,62 +782,62 @@ describe("Handler and different adapters", function () {
                 // When there are deposits, should pay everyone back.
                 await deposit(signers[2], eurs, parseUnits("1000", 2));
                 await handler.satisfyAdapterWithdrawals(ibAlluoEur.address);
-                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
 
                 expect(Number(await jeur.balanceOf(signers[0].address))).greaterThanOrEqual(Number(parseUnits("49", 18)))
                 expect(Number(await eurt.balanceOf(signers[1].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
                 expect(Number(await eurs.balanceOf(signers[2].address))).greaterThanOrEqual(Number(parseUnits("49", 2)))
 
                 await deposit(signers[0], par, parseEther("100"));
-                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                walletBalance = await eurt.balanceOf(admin.address);
+                expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(buffer.address);
 
 
                 await deposit(signers[0], eurs, parseUnits("100", 2));
-                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                walletBalance = await eurt.balanceOf(admin.address);
+                expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(buffer.address);
 
                 await deposit(signers[0], jeur, parseEther("100"));
-                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                walletBalance = await eurt.balanceOf(admin.address);
+                expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(buffer.address);
 
                 await deposit(signers[0], par, parseEther("100"));
-                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                walletBalance = await eurt.balanceOf(admin.address);
+                expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(buffer.address);
 
                 await deposit(signers[0], eurt, parseUnits("100", 6));
-                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                walletBalance = await eurt.balanceOf(admin.address);
+                expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(buffer.address);
 
                 await deposit(signers[0], eurs, parseUnits("100", 2));
-                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                walletBalance = await eurt.balanceOf(admin.address);
+                expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                walletBalance = await eurt.balanceOf(buffer.address);
 
                 console.log("Final multisig balance:", walletBalance);
 
             })
             it("Attemping to withdraw more than allowed causes revert.", async function () {
-                let walletBalance = await eurt.balanceOf(admin.address);
+                let walletBalance = await eurt.balanceOf(buffer.address);
                 await deposit(signers[1], eurt, parseUnits("100", 6));
-                expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
                 await expect(ibAlluoEur.connect(signers[1]).withdraw(eurt.address, parseUnits("500", 18))).to.be.revertedWith('SuperfluidToken: burn amount exceeds balance')
             })
             describe('EUR Mass deposits and withdrawal test cases', function () {
                 it("Multiple deposits and withdrawals: Eventually, all withdrawers should be paid", async function () {
-                    let walletBalance = await eurt.balanceOf(admin.address);
+                    let walletBalance = await eurt.balanceOf(buffer.address);
                     let userBalanceAtStart = await jeur.balanceOf(signers[0].address);
 
                     await deposit(signers[0], jeur, parseEther("100"));
-                    expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                    walletBalance = await eurt.balanceOf(admin.address);
+                    expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                    walletBalance = await eurt.balanceOf(buffer.address);
 
                     await deposit(signers[11], eurt, parseUnits("100", 6));
-                    expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                    walletBalance = await eurt.balanceOf(admin.address);
+                    expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                    walletBalance = await eurt.balanceOf(buffer.address);
 
                     await deposit(signers[12], eurs, parseUnits("100", 2));
-                    expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
-                    walletBalance = await eurt.balanceOf(admin.address);
+                    expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
+                    walletBalance = await eurt.balanceOf(buffer.address);
 
                     await ibAlluoEur.connect(signers[0]).withdraw(jeur.address, parseEther("50"));
                     let withdrawalArray = await getLastWithdrawalInfo(ibAlluoEur, handler)
@@ -826,16 +852,16 @@ describe("Handler and different adapters", function () {
                     // When there are deposits, should pay everyone back.
                     await deposit(signers[2], eurs, parseUnits("1000", 2));
                     await handler.satisfyAdapterWithdrawals(ibAlluoEur.address);
-                    expect(Number(await eurt.balanceOf(admin.address))).greaterThan(Number(walletBalance))
+                    expect(Number(await eurt.balanceOf(buffer.address))).greaterThan(Number(walletBalance))
 
                     let delta = (await jeur.balanceOf(signers[0].address)).sub(userBalanceAtStart)
 
                     expect(Number(delta)).lessThan(Number(parseUnits("51", 18)))
                     expect(Number(delta)).greaterThanOrEqual(Number(parseUnits("49", 18)))
-                    expect(Number(await eurt.balanceOf(signers[1].address))).lessThan(Number(parseUnits("51", 6)))
-                    expect(Number(await eurt.balanceOf(signers[1].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
-                    expect(Number(await eurs.balanceOf(signers[2].address))).lessThan(Number(parseUnits("51", 2)))
-                    expect(Number(await eurs.balanceOf(signers[2].address))).greaterThanOrEqual(Number(parseUnits("49", 2)))
+                    expect(Number(await eurt.balanceOf(signers[11].address))).lessThan(Number(parseUnits("51", 6)))
+                    expect(Number(await eurt.balanceOf(signers[11].address))).greaterThanOrEqual(Number(parseUnits("49", 6)))
+                    expect(Number(await eurs.balanceOf(signers[12].address))).lessThan(Number(parseUnits("51", 2)))
+                    expect(Number(await eurs.balanceOf(signers[12].address))).greaterThanOrEqual(Number(parseUnits("49", 2)))
                 })
             })
         })

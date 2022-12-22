@@ -31,6 +31,7 @@ contract BtcCurveAdapter is AccessControl {
     constructor(
         address _multiSigWallet,
         address _liquidityHandler,
+        address _buffer,
         uint64 _slippage
     ) {
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
@@ -38,6 +39,7 @@ contract BtcCurveAdapter is AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
         slippage = _slippage;
+        buffer = _buffer;
 
         indexes[WBTC] = 0;
         indexes[RENBTC] = 1;

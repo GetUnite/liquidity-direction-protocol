@@ -235,11 +235,11 @@ describe("BufferManager tests", () => {
 
     await buffer.connect(gnosis).initializeValues(handler.address, ibAlluos, adapters, tokens, tokensEth, maxEpoch, epoch)
 
-    // 1 percent so it's easier to test some cases
+    // 0.1 percent so it's easier to test some cases
     await handler.connect(gnosis).setAdapter(
       1,
       "USD Curve-Aave",
-      100,
+      500,
       usdAdapter.address,
       true
     )
@@ -277,30 +277,69 @@ describe("BufferManager tests", () => {
 
   describe("Gelato Checker", async () => {
     it("Adapter needs a refill, returns true and refillBuffer call", async () => {
-      await deposit(signers[1], usdc, parseUnits("1000000", 6))
+      await deposit(signers[1], usdc, parseUnits("100000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("10000", 18))
+
+      await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("50000", 6))
+
+      console.log(await buffer.canRefill(ibAlluoUsd.address, usdc.address))
+      console.log(await buffer.canBridge(usdc.address, await usdc.balanceOf(buffer.address)))
 
       const [canExec, execPayload] = await buffer.checker()
       expect(canExec).to.eq(true)
       console.log("refill", execPayload)
-      
     })
 
     it("Adapters don't need a refill, balance exceeds minBridgeAmount, returns true, and swap call", async() => {
-      await deposit(signers[1], usdc, parseUnits("100000", 6))
+      console.log(await usdc.balanceOf(buffer.address))
+      await deposit(signers[1], usdc, parseUnits("40000", 6))
+      
       const [canExec, execPayload] = await buffer.checker()
+      await buffer.connect(gnosis).changeBridgeSettings(10000, 0);
       expect(canExec).to.eq(true)
       console.log("swap", execPayload)
     })
 
-    it("Adapters don't need a refill, balance is below minBridge, returns false", async () => {
-      await deposit(signers[1], usdc, parseUnits("100000", 6))
+    it("Adapters don't need a refill, true when minBridge 0, false when mindBridge more than buffer balance", async () => {
+      await deposit(signers[1], usdc, parseUnits("50000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("10000", 18))
       await deposit(signers[1], usdc, parseUnits("100000", 6))
       
-      const [canExec, execPayload] = await buffer.checker()
-      expect(canExec).to.eq(false)
+      let [canExec, execPayload] = await buffer.checker()
+      expect(canExec).to.eq(true)
+      
+      await buffer.connect(gnosis).changeBridgeSettings(1000000, 0)
+      let [canExec1, execPayload1] = await buffer.checker()
+      expect(canExec1).to.eq(false)
     })
+
+    it("Adapter needs a refill, buffer balance < refill, gnosis has enough funds, returns true", async() => {
+      await deposit(signers[1], usdc, parseUnits("50000", 6))
+      await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("40000", 18))
+
+      await buffer.connect(gnosis).swap(42000000000, usdc.address, 5)
+      let [canExec, execPayload] = await buffer.checker()
+      expect(canExec).to.eq(false)
+
+      await usdc.connect(usdWhale).transfer(gnosis.address, parseUnits("20000", 6))
+      let [canExec1, execPayload1] = await buffer.checker()
+      expect(canExec1).to.eq(true)
+    })
+
+    it("Adapter needs a refill, buffer balance is 0, gnosis has enough, returns true", async () => {
+      await deposit(signers[1], usdc, parseUnits("40000", 6))
+      await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
+      await buffer.connect(gnosis).swap(await usdc.balanceOf(buffer.address), usdc.address, 5);
+      await usdc.connect(gnosis).transfer(usdWhale.address, await usdc.balanceOf(gnosis.address));
+      let [canExec, execPayload] = await buffer.checker()
+      expect(canExec).to.eq(false)
+
+      await usdc.connect(usdWhale).transfer(gnosis.address, parseUnits("45000", 6))
+      let [canExec1, execPayload1] = await buffer.checker()
+      expect(canExec1).to.eq(true)
+    })
+
+    it("")
   })
   
   describe("Case Testing", async () => {
@@ -346,11 +385,11 @@ describe("BufferManager tests", () => {
     })
   describe("Swapping", async () => {
     it("Should only allow Gelato to execute the swap", async () => {
-      expect(buffer.connect(gnosis).swap(800, ZERO_ADDR, parseUnits("2", 16), ibAlluoUsd.address)).to.be.revertedWith('revertMessage')
+      expect(buffer.connect(gnosis).swap(800, ZERO_ADDR, parseUnits("2", 16))).to.be.revertedWith('revertMessage')
     })
 
     it("Should not allow swapping below minimum amount", async () => {
-      expect(buffer.connect(gelatoExecutor).swap(800, ZERO_ADDR, parseUnits("2", 16), ibAlluoUsd.address)).to.be.revertedWith("Swap: <minAmount!")
+      expect(buffer.connect(gelatoExecutor).swap(800, ZERO_ADDR, parseUnits("2", 16))).to.be.revertedWith("Swap: <minAmount!")
     })
 
     it("Should execute swap", async () => {
@@ -360,7 +399,7 @@ describe("BufferManager tests", () => {
   
         await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("2000", 6))
   
-        await buffer.connect(gelatoExecutor).swap(parseUnits("1800", 6), usdc.address, parseUnits("2", 16), ibAlluoUsd.address);
+        await buffer.connect(gelatoExecutor).swap(parseUnits("1800", 6), usdc.address, parseUnits("2", 16));
     })
 
     it("Should not allow to swap twice immediately", async () => {
@@ -370,8 +409,8 @@ describe("BufferManager tests", () => {
 
       await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("2000", 6))
 
-      await buffer.connect(gelatoExecutor).swap(parseUnits("1800", 6), usdc.address, parseUnits("2", 16), ibAlluoUsd.address);
-      expect(buffer.connect(gelatoExecutor).swap(parseUnits("2300", 6), usdc.address, parseUnits("2", 16), ibAlluoUsd.address)).to.be.revertedWith("Swap: <minInterval!")
+      await buffer.connect(gelatoExecutor).swap(parseUnits("1800", 6), usdc.address, parseUnits("2", 16));
+      expect(buffer.connect(gelatoExecutor).swap(parseUnits("2300", 6), usdc.address, parseUnits("2", 16))).to.be.revertedWith("Swap: <minInterval!")
     })
 
   })   

@@ -86,9 +86,8 @@ contract VoteExecutorSlaveFinal is
         //
         bytes data;
     }
- 
+
     Entry public entries;
-    
 
     struct Message {
         uint256 commandIndex;
@@ -198,9 +197,16 @@ contract VoteExecutorSlaveFinal is
                     newInterestPerSecond,
                     ibAlluoSymbol
                 );
-
-        } else if (currentMessage.commandIndex == 2) {
-                (uint256 weight, address strategyAddr, address entryToken, address poolToken) = abi.decode(currentMessage.commandData, (uint256, address, address, address));
+            } else if (currentMessage.commandIndex == 2) {
+                (
+                    uint256 weight,
+                    address strategyAddr,
+                    address entryToken,
+                    address poolToken
+                ) = abi.decode(
+                        currentMessage.commandData,
+                        (uint256, address, address, address)
+                    );
 
                 entries.weight = weight;
                 entries.strategyAddress = strategyAddr;
