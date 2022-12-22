@@ -358,12 +358,39 @@ describe("BufferManager tests", () => {
     it("Should refill adapter using gnosis funds", async() => {
       await deposit(signers[1], usdc, parseUnits("20000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
-      await buffer.connect(gnosis).swap(await usdc.balanceOf(buffer.address), usdc.address, 5);
-      console.log(await usdc.balanceOf(gnosis.address));
+      await buffer.connect(gnosis).swap(await usdc.balanceOf(buffer.address), usdc.address, 5)
+      console.log("Gnosis balance before", await usdc.balanceOf(gnosis.address))
+      await usdc.connect(gnosis).approve(buffer.address, await usdc.balanceOf(gnosis.address))
+      await buffer.connect(gnosis).setMaxRefillPerEpoch(ibAlluoUsd.address, parseUnits("50000", 18))
       await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
-      console.log(await usdc.balanceOf(gnosis.address));
+      console.log("Gnosis balance after", await usdc.balanceOf(gnosis.address))
 
+      expect(await buffer.adapterRequiredRefill(ibAlluoUsd.address)).to.eq(0)
     })
+
+    it("Should refill using both buffer and gnosis", async() => {
+      await deposit(signers[1], usdc, parseUnits("20000", 6))
+      await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
+      await buffer.connect(gnosis).swap(parseUnits("10000", 6), usdc.address, 5)
+      await buffer.connect(gnosis).setMaxRefillPerEpoch(ibAlluoUsd.address, parseUnits("50000", 18))
+      await usdc.connect(gnosis).approve(buffer.address, await usdc.balanceOf(gnosis.address))
+      await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
+    })
+
+    it("Should not refill: Cumulative refills exceeds limit", async() => {
+      await deposit(signers[1], usdc, parseUnits("20000", 6))
+      await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
+      await buffer.connect(gnosis).swap(parseUnits("10000", 6), usdc.address, 5)
+      expect(buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)).to.be.revertedWith("Cumulative refills exceeds limit")
+    })
+
+    it("Should not refill, refill not needed", async() => {
+      await buffer.connect(gnosis).setMaxRefillPerEpoch(ibAlluoUsd.address, parseUnits("50000", 18))
+      await usdc.connect(gnosis).approve(buffer.address, await usdc.balanceOf(gnosis.address))
+      expect(buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)).to.be.revertedWith("No refill required");
+    })
+
+    
   })
   
   describe("Case Testing", async () => {
@@ -397,15 +424,6 @@ describe("BufferManager tests", () => {
     })
   }) 
 
-    it("Should send funds to buffer if there are no pending withdrawals", async () => {
-      const balanceBefore = await usdc.balanceOf(buffer.address);
-      expect(balanceBefore).to.be.equal(0);
-
-      await deposit(signers[1], usdc, parseUnits("1000", 6))
-      const balanceAfter = await usdc.balanceOf(buffer.address)
-      expect(Number(balanceAfter)).to.be.greaterThanOrEqual(Number(parseUnits("900", 6)))
-      
-    })
   describe("Swapping", async () => {
     it("Should only allow Gelato to execute the swap", async () => {
       expect(buffer.connect(gnosis).swap(800, ZERO_ADDR, parseUnits("2", 16))).to.be.revertedWith('revertMessage')
