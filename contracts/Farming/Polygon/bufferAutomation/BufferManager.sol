@@ -283,8 +283,9 @@ contract BufferManager is
 
                 currentEpoch.refilledPerEpoch += totalAmount;
                 IERC20Upgradeable(bufferToken).transferFrom(gnosis, adapterAddress, gnosisAmount / 10 ** decDif);
+                if(gnosisAmount != totalAmount) {
                 IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance / 10 ** decDif);
-
+                }
                 // IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance);
 
                 IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
