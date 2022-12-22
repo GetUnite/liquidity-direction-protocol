@@ -73,21 +73,11 @@ contract VoteExecutorSlaveFinal is
     mapping(bytes32 => uint256) public hashExecutionTime;
 
     struct Entry {
-        // Percentage of the total contract balance
-        // that goes to the exact strategy
-        // with 2 desimals, so 6753 == 67.53%
-        uint256 weight;
-        // strategy that distributes money to a specific pool
-        address strategyAddress;
-        // Preferred token for which most exchanges will be made
-        address entryToken;
-        // Token with which we enter the pool
-        address poolToken;
-        //
-        bytes data;
+        uint256 directionId;
+        uint256 percent;
     }
 
-    Entry public entries;
+    Entry[] public entries;
 
     struct Message {
         uint256 commandIndex;
@@ -198,20 +188,15 @@ contract VoteExecutorSlaveFinal is
                     ibAlluoSymbol
                 );
             } else if (currentMessage.commandIndex == 2) {
-                (
-                    uint256 weight,
-                    address strategyAddr,
-                    address entryToken,
-                    address poolToken
-                ) = abi.decode(
-                        currentMessage.commandData,
-                        (uint256, address, address, address)
-                    );
+                (uint256 directionId, uint256 percent) = abi.decode(
+                    currentMessage.commandData,
+                    (uint256, uint256)
+                );
 
-                entries.weight = weight;
-                entries.strategyAddress = strategyAddr;
-                entries.entryToken = entryToken;
-                entries.poolToken = poolToken;
+                Entry storage e = entries[entries.length - 1];
+                e.directionId = directionId;
+                e.percent = percent;
+                entries.push(e);
             }
         }
     }

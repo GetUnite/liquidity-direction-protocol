@@ -216,7 +216,6 @@ describe("IbAlluoUSD and Handler", function () {
         [ 604800,
           1000,
           604800,
-          1000,
           admin.address,
           gelatoaddress,
           spokepooladdress,
