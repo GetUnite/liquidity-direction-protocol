@@ -261,38 +261,44 @@ contract BufferManager is
     */
     function refillBuffer(address _ibAlluo) external onlyRole(GELATO) returns (bool) {
         address adapterAddress = ibAlluoToAdapter[_ibAlluo];
-        (address bufferToken,) = IHandlerAdapter(adapterAddress).getCoreTokens();
+        (,address bufferToken) = IHandlerAdapter(adapterAddress).getCoreTokens();
         uint256 totalAmount = adapterRequiredRefill(_ibAlluo);
 
         require(totalAmount > 0, "No refill required");
 
+        uint256 decDif = 18 - IERC20MetadataUpgradeable(bufferToken).decimals();
         uint256 bufferBalance = IERC20Upgradeable(bufferToken).balanceOf(address(this));
-        uint256 gnosisAmount = totalAmount - bufferBalance;
-        uint256 bufferAmount = totalAmount;
-        if(gnosisAmount >= totalAmount * 5 / 100) {
-            // if(gnosisAmount < totalAmount) {
-            //     require(gnosisAmount <= totalAmount * 5 / 100, "Refill: Buffer <5pct");
-            // }
-            require((IERC20Upgradeable(bufferToken)).balanceOf(gnosis) >= gnosisAmount, "Refill: Gnosis low on funds");
-            bufferAmount = totalAmount - gnosisAmount;
-            require(bufferAmount <= bufferBalance, "Refill: gnosisAmount below treshold");
-
-            Epoch storage currentEpoch = _confirmEpoch(_ibAlluo);
-
-            require(ibAlluoToMaxRefillPerEpoch[_ibAlluo] >= currentEpoch.refilledPerEpoch + gnosisAmount, "Cumulative refills exceeds limit");
-
-            currentEpoch.refilledPerEpoch += totalAmount;
-            IERC20Upgradeable(bufferToken).transferFrom(gnosis, adapterAddress, gnosisAmount);
-            
+        uint256 gnosisBalance = IERC20Upgradeable(bufferToken).balanceOf(gnosis);
+        if(decDif > 0){
+            bufferBalance = bufferBalance * 10 ** decDif;
+            gnosisBalance = gnosisBalance * 10 ** decDif;
         }
-        if(bufferAmount > 0) {
-            IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferAmount);
-            if (isAdapterPendingWithdrawal(_ibAlluo)) {
-                handler.satisfyAdapterWithdrawals(_ibAlluo);
+        if(bufferBalance < totalAmount) {
+            if(totalAmount < bufferBalance + gnosisBalance){
+                uint256 gnosisAmount = totalAmount - bufferBalance;
+                
+                Epoch storage currentEpoch = _confirmEpoch(_ibAlluo);
+
+                require(ibAlluoToMaxRefillPerEpoch[_ibAlluo] >= currentEpoch.refilledPerEpoch + gnosisAmount, "Cumulative refills exceeds limit");
+
+                currentEpoch.refilledPerEpoch += totalAmount;
+                IERC20Upgradeable(bufferToken).transferFrom(gnosis, adapterAddress, gnosisAmount / 10 ** decDif);
+                IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance / 10 ** decDif);
+
+                // IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance);
+
+                IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
                 return true;
+            } else {
+            return false;
             }
         }
-        return false;
+        IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance / 10 ** decDif);
+        IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
+        if (isAdapterPendingWithdrawal(_ibAlluo)) {
+                handler.satisfyAdapterWithdrawals(_ibAlluo);
+            }
+        return true;
     }
 
     function canBridge(address token, uint256 amount) public view returns(bool) {

@@ -12,6 +12,7 @@ import {
   IERC20, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory,
   UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory,EthNoPoolAdapter__factory, PseudoMultisigWallet, 
 } from "../../typechain";
+import { connect } from "http2";
 
 async function getImpersonatedSigner(address: string): Promise < SignerWithAddress > {
   await ethers.provider.send(
@@ -125,6 +126,10 @@ describe("BufferManager tests", () => {
     await (await (await ethers.getContractFactory("ForceSender")).deploy({
       value: parseEther("10.0")
     })).forceSend(gnosis.address); 
+
+    await (await (await ethers.getContractFactory("ForceSender")).deploy({
+      value: parseEther("10.0")
+    })).forceSend(gelatoExecutor.address); 
 
     upgrades.silenceWarnings()
   });
@@ -338,8 +343,27 @@ describe("BufferManager tests", () => {
       let [canExec1, execPayload1] = await buffer.checker()
       expect(canExec1).to.eq(true)
     })
+  })
 
-    it("")
+  describe("refillBuffer", async() => {
+    it("Should refill adapters", async() => {
+      await deposit(signers[1], usdc, parseUnits("20000", 6))
+      await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
+      await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("40000", 6))
+      expect(Number(await buffer.adapterRequiredRefill(ibAlluoUsd.address))).to.be.greaterThan(Number(parseUnits("10000", 18)))
+      let result = await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
+      expect(await buffer.adapterRequiredRefill(ibAlluoUsd.address)).to.eq(0);
+    })
+
+    it("Should refill adapter using gnosis funds", async() => {
+      await deposit(signers[1], usdc, parseUnits("20000", 6))
+      await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
+      await buffer.connect(gnosis).swap(await usdc.balanceOf(buffer.address), usdc.address, 5);
+      console.log(await usdc.balanceOf(gnosis.address));
+      await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
+      console.log(await usdc.balanceOf(gnosis.address));
+
+    })
   })
   
   describe("Case Testing", async () => {
@@ -355,22 +379,21 @@ describe("BufferManager tests", () => {
       await handler.satisfyAdapterWithdrawals(ibAlluoUsd.address);
       expect(Number(await usdc.balanceOf(signers[5].address))).lessThan(Number(parseUnits("1100", 6)))
       expect(Number(await usdc.balanceOf(signers[5].address))).greaterThanOrEqual(Number(parseUnits("900", 6)))
-
     });
 
     it("Should not refill if adapter exceeded it's cumulative refill limit", async () => {
-      // await (await (await ethers.getContractFactory("ForceSender")).deploy({
-      //   value: parseEther("10.0")
-      // })).forceSend(gelatoExecutor.address); 
+      await (await (await ethers.getContractFactory("ForceSender")).deploy({
+        value: parseEther("10.0")
+      })).forceSend(gelatoExecutor.address); 
         
-      // await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("50000", 6))
-      // await deposit(signers[2], usdc, parseUnits("1000", 6))
-      // await ibAlluoUsd.connect(signers[2]).withdraw(usdc.address, parseUnits("300", 18));
+      await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("50000", 6))
+      await deposit(signers[2], usdc, parseUnits("1000", 6))
+      await ibAlluoUsd.connect(signers[2]).withdraw(usdc.address, parseUnits("300", 18));
 
-      // const [canExec] = await buffer.checker()
-      // expect(canExec).to.be.equal(true);
+      const [canExec] = await buffer.checker()
+      expect(canExec).to.be.equal(true);
 
-      // expect(buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)).to.be.revertedWith('Cumulative refills exceeds limit')
+      expect(buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)).to.be.revertedWith('Cumulative refills exceeds limit')
     })
   }) 
 
