@@ -23,18 +23,6 @@ async function getImpersonatedSigner(address: string): Promise < SignerWithAddre
   return await ethers.getSigner(address);
 }
 
-async function sendEth(users: SignerWithAddress[]) {
-  let signers = await ethers.getSigners();
-
-  for (let i = 0; i < users.length; i++) {
-      await signers[0].sendTransaction({
-          to: users[i].address,
-          value: parseEther("1.0")
-
-      });
-  }
-}
-
 async function skipDays(days: number) {
   ethers.provider.send("evm_increaseTime", [days * 86400]);
   ethers.provider.send("evm_mine", []);
@@ -50,11 +38,11 @@ async function getLastWithdrawalInfo(token: IbAlluo, handler: LiquidityHandler) 
 
 describe("BufferManager tests", () => {
   let signers: SignerWithAddress[];
-  let signer: SignerWithAddress;
   let gnosis: SignerWithAddress;
   let gelatoExecutor: SignerWithAddress;
   let anycall: SignerWithAddress;
   let usdWhale: SignerWithAddress;
+  let eurtWhale: SignerWithAddress;
   let jeurWhale: SignerWithAddress;
   let curveUsdLpHolder: SignerWithAddress;
   let admin: SignerWithAddress;
@@ -64,9 +52,6 @@ describe("BufferManager tests", () => {
   let ibAlluoEth: IbAlluo;
   let ibAlluoBtc: IbAlluo;
 
-  let iballuousd: IbAlluo;
-  let exchange: Exchange;
-  let multisig: PseudoMultisigWallet;
   let handler: LiquidityHandler;
   let buffer: BufferManager;
 
@@ -105,6 +90,7 @@ describe("BufferManager tests", () => {
 
     usdWhale = await getImpersonatedSigner("0x075e72a5eDf65F0A5f44699c7654C1a76941Ddc8");
     jeurWhale = await getImpersonatedSigner("0x00d7c133b923548f29cc2cc01ecb1ea2acdf2d4c");
+    eurtWhale = await getImpersonatedSigner("0x1a4b038c31a8e5f98b00016b1005751296adc9a4");
     curveUsdLpHolder = await getImpersonatedSigner("0x7117de93b352ae048925323f3fcb1cd4b4d52ec4");
 
     signers = await ethers.getSigners(); 
@@ -147,7 +133,6 @@ describe("BufferManager tests", () => {
       [ 604800,
         1000,
         604800,
-        1000,
         gnosis.address,
         gelatoExecutor.address,
         spokepooladdress,
@@ -229,7 +214,7 @@ describe("BufferManager tests", () => {
     // Params for BufferManager deployment
     const ibAlluos = [ibAlluoUsd.address, ibAlluoEur.address]
     const adapters = [ usdAdapter.address, eurAdapter.address ]
-    const tokens = [ usdc.address, jeur.address ]
+    const tokens = [ usdc.address, eurt.address ]
     const tokensEth = [ "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" ]
     const maxEpoch = [parseUnits("100000", 6), parseUnits("100000", 6)];
     const epoch = 1671145687
@@ -265,6 +250,9 @@ describe("BufferManager tests", () => {
     
     await usdAdapter.connect(gnosis).grantRole(await usdAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
     await eurAdapter.connect(gnosis).grantRole(await eurAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
+
+    await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, 1000000000)
+    await buffer.connect(gnosis).setMinBridgeAmount(eurt.address, 1000000000)
   });
 
   describe("Upgrade functionality", async () => {
@@ -300,22 +288,19 @@ describe("BufferManager tests", () => {
       await deposit(signers[1], usdc, parseUnits("40000", 6))
       
       const [canExec, execPayload] = await buffer.checker()
-      await buffer.connect(gnosis).changeBridgeSettings(10000, 0);
       expect(canExec).to.eq(true)
       console.log("swap", execPayload)
     })
 
-    it("Adapters don't need a refill, true when minBridge 0, false when mindBridge more than buffer balance", async () => {
-      await deposit(signers[1], usdc, parseUnits("50000", 6))
-      await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("10000", 18))
-      await deposit(signers[1], usdc, parseUnits("100000", 6))
-      
+    it("Adapters don't need a refill, true when minBridge 0, false when minBridge more than buffer balance", async () => {
+      await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("990", 6))
       let [canExec, execPayload] = await buffer.checker()
-      expect(canExec).to.eq(true)
-      
-      await buffer.connect(gnosis).changeBridgeSettings(1000000, 0)
+      expect(canExec).to.eq(false)
+
+      await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, parseUnits("900", 6))
+
       let [canExec1, execPayload1] = await buffer.checker()
-      expect(canExec1).to.eq(false)
+      expect(canExec1).to.eq(true)
     })
 
     it("Adapter needs a refill, buffer balance < refill, gnosis has enough funds, returns true", async() => {
@@ -371,10 +356,13 @@ describe("BufferManager tests", () => {
     it("Should refill using both buffer and gnosis", async() => {
       await deposit(signers[1], usdc, parseUnits("20000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
+      console.log("Balance before refilling", await usdc.balanceOf(signers[1].address))
       await buffer.connect(gnosis).swap(parseUnits("10000", 6), usdc.address, 5)
       await buffer.connect(gnosis).setMaxRefillPerEpoch(ibAlluoUsd.address, parseUnits("50000", 18))
       await usdc.connect(gnosis).approve(buffer.address, await usdc.balanceOf(gnosis.address))
       await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
+      let balanceAfter = await usdc.balanceOf(signers[1].address)
+      console.log("Balance after refilling", balanceAfter)
     })
 
     it("Should not refill: Cumulative refills exceeds limit", async() => {
@@ -390,23 +378,12 @@ describe("BufferManager tests", () => {
       expect(buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)).to.be.revertedWith("No refill required");
     })
 
-    
-  })
-  
-  describe("Case Testing", async () => {
-    it("Deposits 1000 usdc, attempts withdrawal immediately, successes after another deposit", async () => {
-      await deposit(signers[5], usdc, parseUnits("1000", 6))
-      await ibAlluoUsd.connect(signers[5]).withdraw(usdc.address, parseUnits("1000", 18));
-      let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
-      expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
-      console.log(await usdc.balanceOf(signers[5].address));
-      expect(await usdc.balanceOf(signers[5].address)).to.be.equal(0);
-
-      await deposit(signers[4], usdc, parseUnits("10000", 6));
-      await handler.satisfyAdapterWithdrawals(ibAlluoUsd.address);
-      expect(Number(await usdc.balanceOf(signers[5].address))).lessThan(Number(parseUnits("1100", 6)))
-      expect(Number(await usdc.balanceOf(signers[5].address))).greaterThanOrEqual(Number(parseUnits("900", 6)))
-    });
+    it("Should not refill, both gnosis and buffer can't cover", async() => {
+      await deposit(signers[1], usdc, parseUnits("10000", 6))
+      await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("8000", 18))
+      await usdc.connect(gnosis).transfer(usdWhale.address, await usdc.balanceOf(gnosis.address))
+      await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
+    })
 
     it("Should not refill if adapter exceeded it's cumulative refill limit", async () => {
       await (await (await ethers.getContractFactory("ForceSender")).deploy({
@@ -422,7 +399,8 @@ describe("BufferManager tests", () => {
 
       expect(buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)).to.be.revertedWith('Cumulative refills exceeds limit')
     })
-  }) 
+
+  })
 
   describe("Swapping", async () => {
     it("Should only allow Gelato to execute the swap", async () => {
@@ -456,6 +434,45 @@ describe("BufferManager tests", () => {
 
   })   
 
+  describe("isAdapterPendingWithdrawal", async () => {
+    it("Should return false when no withdrawals, true after requested one", async() => {
+      expect(await buffer.isAdapterPendingWithdrawal(ibAlluoUsd.address)).to.eq(false)
+      await deposit(signers[2], usdc, parseUnits("500", 6))
+      await ibAlluoUsd.connect(signers[2]).withdraw(usdc.address, parseUnits("300", 18))
+      expect(await buffer.isAdapterPendingWithdrawal(ibAlluoUsd.address)).to.eq(true)
+    })
+
+    it("Should return true after one of two withdrawals was satisfied", async() => {
+      expect(await buffer.isAdapterPendingWithdrawal(ibAlluoUsd.address)).to.eq(false)
+      await deposit(signers[2], usdc, parseUnits("500", 6))
+      await ibAlluoUsd.connect(signers[2]).withdraw(usdc.address, parseUnits("300", 18))
+      await eurt.connect(eurtWhale).transfer(signers[2].address, 100000)
+      await eurt.connect(signers[2]).approve(ibAlluoEur.address, 100000)
+      await ibAlluoEur.connect(signers[2]).deposit(eurt.address, 100000)
+      await ibAlluoEur.connect(signers[2]).withdraw(eurt.address, 100000000)
+      await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("2000", 6))
+      await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
+      expect(await buffer.isAdapterPendingWithdrawal(ibAlluoUsd.address)).to.eq(false)
+      expect(await buffer.isAdapterPendingWithdrawal(ibAlluoEur.address)).to.eq(true)
+    })
+  })
+  
+  describe("Case Testing", async () => {
+    it("Deposits 1000 usdc, attempts withdrawal immediately, successes after another deposit", async () => {
+      await deposit(signers[5], usdc, parseUnits("1000", 6))
+      await ibAlluoUsd.connect(signers[5]).withdraw(usdc.address, parseUnits("1000", 18));
+      let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
+      expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+      console.log(await usdc.balanceOf(signers[5].address));
+      expect(await usdc.balanceOf(signers[5].address)).to.be.equal(0);
+
+      await deposit(signers[4], usdc, parseUnits("10000", 6));
+      await handler.satisfyAdapterWithdrawals(ibAlluoUsd.address);
+      expect(Number(await usdc.balanceOf(signers[5].address))).lessThan(Number(parseUnits("1100", 6)))
+      expect(Number(await usdc.balanceOf(signers[5].address))).greaterThanOrEqual(Number(parseUnits("900", 6)))
+    });
+  }) 
+
   describe("Admin functions", async () => {
     it("Should not allow users without admin role to call functions", async () => {
       expect(buffer.connect(signers[1]).changeBridgeSettings(100, 420)).to.be.reverted
@@ -478,9 +495,8 @@ describe("BufferManager tests", () => {
     })
 
     it("Should change the bridge settings", async() => {
-      await buffer.connect(gnosis).changeBridgeSettings(1250, 60000);
-      expect(await buffer.minBridgeAmount()).to.be.equal(1250);
-      expect(await buffer.bridgeInterval()).to.be.equal(60000);
+      await buffer.connect(gnosis).changeBridgeSettings(420000);
+      expect(await buffer.bridgeInterval()).to.be.equal(420000);
     })
 
     it("Should set Mainnet corresponding token", async() => {

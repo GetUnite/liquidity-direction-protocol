@@ -40,7 +40,6 @@ contract BufferManager is
     address public distributor;
     
     // bridge settings
-    uint256 public minBridgeAmount;
     uint256 public lastExecuted;
     uint256 public bridgeInterval;
     uint256 public relayerFeePct;
@@ -56,6 +55,7 @@ contract BufferManager is
     mapping(address => address) public ibAlluoToAdapter;
     mapping(address => uint256) public ibAlluoToMaxRefillPerEpoch;
     mapping(address => address) public tokenToEth;
+    mapping(address => uint256) public tokenToMinBridge;
 
     EnumerableSetUpgradeable.AddressSet private activeIbAlluos;
 
@@ -72,8 +72,7 @@ contract BufferManager is
     * @dev 
     * param _epochDuration Value for refill function to work properly
     * param _bridgeGenesis Unix timestamp declaring a starting point for counter
-    * param _bridgeInterval Min time to pass between bridging (UNIX timestamp)
-    * param _minBridgeAmount Min amount of asset to allow bridging
+    * param _bridgeInterval Min time to pass between bridging (Unix timestamp)
     * param _gnosis Gnosis Multisig
     * param _gelato Gelato executor address
     * param _spokepool Address of the SpokePool Polygon contract of Accross Protocol Bridge
@@ -84,7 +83,6 @@ contract BufferManager is
         uint256 _epochDuration,
         uint256 _brigeGenesis,
         uint256 _bridgeInterval,
-        uint256 _minBridgeAmount,
         address _gnosis,
         address _gelato,
         address _spokepool,
@@ -100,7 +98,6 @@ contract BufferManager is
         distributor = _distributor;
         lastExecuted = _brigeGenesis;
         bridgeInterval = _bridgeInterval;
-        minBridgeAmount = _minBridgeAmount;
 
         spokepool = _spokepool;
         anycall = _anycall;
@@ -164,8 +161,7 @@ contract BufferManager is
     * @param relayerFeePct Fee percantage for relayers on Across bridge side
     */
     function swap(uint256 amount, address originToken, uint64 relayerFeePct) external onlyRole(SWAPPER) {
-        require(amount >= 700 * 10 ** IERC20MetadataUpgradeable(originToken).decimals(), "Swap: <minAmount!");
-        require(block.timestamp >= lastExecuted + bridgeInterval, "Swap: <minInterval!");
+        require(canBridge(originToken, amount), "Buffer: <minAmount or <bridgeInterval");
         
         IERC20Upgradeable(originToken).approve(spokepool, amount);
         lastExecuted = block.timestamp;   
@@ -228,6 +224,8 @@ contract BufferManager is
             uint256 difference = expectedAmount - actualAmount;
             if (difference * 10000 / expectedAmount > 500) {
                 return difference;
+            } else {
+                return 0;
             }
         } else {
             return 0; 
@@ -289,6 +287,9 @@ contract BufferManager is
                 // IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance);
 
                 IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
+                if (isAdapterPendingWithdrawal(_ibAlluo)) {
+                handler.satisfyAdapterWithdrawals(_ibAlluo);
+                }
                 return true;
             } else {
             return false;
@@ -303,7 +304,7 @@ contract BufferManager is
     }
 
     function canBridge(address token, uint256 amount) public view returns(bool) {
-        if(amount >= minBridgeAmount * 10 ** IERC20MetadataUpgradeable(token).decimals()) {
+        if(amount >= tokenToMinBridge[token]) {
             if(block.timestamp >= lastExecuted + bridgeInterval) {
                 return true;
             }    
@@ -364,12 +365,14 @@ contract BufferManager is
 
     /**
     * @dev Admin function to change bridge settings
-    * @param _minBridgeAmount minimum threshold in usd, crossing which should allow bridging funds
     * @param _bridgeInterval interval in seconds, to put limitations for an amount to be bridged 
     */
-    function changeBridgeSettings(uint256 _minBridgeAmount, uint256 _bridgeInterval) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        minBridgeAmount = _minBridgeAmount;
+    function changeBridgeSettings(uint256 _bridgeInterval) external onlyRole(DEFAULT_ADMIN_ROLE) {
         bridgeInterval = _bridgeInterval;
+    }
+
+    function setMinBridgeAmount(address _token, uint256 _minAmount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        tokenToMinBridge[_token] = _minAmount;
     }
 
     function setRelayerFeePct(uint256 _relayerFeePct) external onlyRole(DEFAULT_ADMIN_ROLE) {
