@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
 import { formatEther, formatUnits, parseEther, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
-import { BtcNoPoolAdapterUpgradeable, EthNoPoolAdapterUpgradeable, EurCurveAdapterUpgradeable, IbAlluo, IERC20Metadata, LiquidityHandler, PriceFeedRouterV2, UsdCurveAdapterUpgradeable } from "../../typechain";
+import { BtcNoPoolAdapterUpgradeable, EthNoPoolAdapterUpgradeable, EurCurveAdapterUpgradeable, IbAlluo, ICurvePoolEUR, ICurvePoolUSD, IERC20Metadata, LiquidityHandler, PriceFeedRouterV2, UsdCurveAdapterUpgradeable } from "../../typechain";
 
 let usdc: IERC20Metadata, usdt: IERC20Metadata, dai: IERC20Metadata, weth: IERC20Metadata,
     wbtc: IERC20Metadata, eurt: IERC20Metadata, jeur: IERC20Metadata, par: IERC20Metadata,
@@ -123,6 +123,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
     let admin: SignerWithAddress;
 
     let curveLpUSD: IERC20Metadata, curveLpEUR: IERC20Metadata;
+    let usdLiquidityPool: ICurvePoolUSD, eurLiquidityPool: ICurvePoolEUR;
 
     let ibAlluoUSD: IbAlluo;
     let ibAlluoEUR: IbAlluo;
@@ -150,6 +151,9 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
         eurs = await ethers.getContractAt("IERC20Metadata", "0xE111178A87A3BFf0c8d18DECBa5798827539Ae99");
         curveLpUSD = await ethers.getContractAt("IERC20Metadata", "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171");
         curveLpEUR = await ethers.getContractAt("IERC20Metadata", "0xAd326c253A84e9805559b73A08724e11E49ca651");
+
+        usdLiquidityPool = await ethers.getContractAt("contracts/interfaces/curve/ICurvePoolUSD.sol:ICurvePoolUSD", "0x445FE580eF8d70FF569aB36e80c647af338db351");
+        eurLiquidityPool = await ethers.getContractAt("contracts/interfaces/curve/ICurvePoolUSD.sol:ICurvePoolUSD", "0xAd326c253A84e9805559b73A08724e11E49ca651");
 
         ibAlluoUSD = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
         ibAlluoEUR = await ethers.getContractAt("IbAlluo", "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92");
@@ -320,14 +324,59 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
         // Step 7: transfer liquidity
         const oldUsdAdapter = await ethers.getContractAt("UsdCurveAdapter", "0x6074007EC98EbeB99dF494D0855c7885A4810586");
         const oldEurAdapter = await ethers.getContractAt("EurCurveAdapter", "0xcca0f9d479f02e44a32cd2263997dd0192c5eeac");
-        const oldEthAdapter = await ethers.getContractAt("BtcNoPoolAdapter", "0x141e995f27A788a52cB437F0dda3508E857b4449");
-        const oldBtcAdapter = await ethers.getContractAt("EthNoPoolAdapter", "0x57Ea02C5147b3A79b5Cc27Fd30C0D9501505bE0B");
+        const oldEthAdapter = await ethers.getContractAt("BtcNoPoolAdapter", "0x57Ea02C5147b3A79b5Cc27Fd30C0D9501505bE0B");
+        const oldBtcAdapter = await ethers.getContractAt("EthNoPoolAdapter", "0x141e995f27A788a52cB437F0dda3508E857b4449");
 
         await oldUsdAdapter.connect(admin).removeTokenByAddress(curveLpUSD.address, usdAdapter.address, await curveLpUSD.balanceOf(oldUsdAdapter.address));
         await oldEurAdapter.connect(admin).removeTokenByAddress(curveLpEUR.address, eurAdapter.address, await curveLpEUR.balanceOf(oldEurAdapter.address));
         await oldEthAdapter.connect(admin).removeTokenByAddress(weth.address, ethAdapter.address, await weth.balanceOf(oldEthAdapter.address));
         await oldBtcAdapter.connect(admin).removeTokenByAddress(wbtc.address, btcAdapter.address, await wbtc.balanceOf(oldBtcAdapter.address));
     });
+
+    describe("Adapters",async () => {
+        it("Should return USD value of USD adapter", async () => {
+            const adapterAmount = await usdAdapter.getAdapterAmount();
+            console.log("Reported adapter amount: ",  formatEther(adapterAmount), "USD");
+
+            const lpUsdBalance = await curveLpUSD.balanceOf(usdAdapter.address);
+            const lpToUsdc = await usdLiquidityPool.calc_withdraw_one_coin(lpUsdBalance, await usdAdapter.indexes(usdc.address));
+
+            const usdcToUsdQuery = await priceFeedRouterV2["getPriceOfAmount(address,uint256,string)"](usdc.address, lpToUsdc, "USD");
+            const usdcToUsd = await priceFeedRouterV2.decimalsConverter(usdcToUsdQuery.value, usdcToUsdQuery.decimals, 18);
+
+            expect(usdcToUsd).to.be.equal(adapterAmount);
+        });
+
+        it("Should return EUR value of EUR adapter", async () => {
+            const adapterAmount = await eurAdapter.getAdapterAmount();
+            console.log("Reported adapter amount: ",  formatEther(adapterAmount), "EUR");
+
+            const lpEurBalance = await curveLpEUR.balanceOf(eurAdapter.address);
+            const lpToEurt = await eurLiquidityPool.calc_withdraw_one_coin(lpEurBalance, await eurAdapter.indexes(eurt.address));
+            const lpToEurt18 = await priceFeedRouterV2.decimalsConverter(lpToEurt, await eurt.decimals(), 18);
+
+            const oneEurtToEurQuery = await priceFeedRouterV2["getPrice(address,string)"](eurt.address, "EUR");
+            const oneEurtToEur = await priceFeedRouterV2.decimalsConverter(oneEurtToEurQuery.value, oneEurtToEurQuery.decimals, 18);
+
+            const eurtToEur = lpToEurt18.mul(oneEurtToEur).div(parseEther("1.0"));
+
+            expect(eurtToEur).to.be.equal(adapterAmount);
+        });
+
+        it("Should return ETH value of WETH adapter", async () => {
+            const adapterAmount = await ethAdapter.getAdapterAmount();
+            console.log("Reported adapter amount: ",  formatEther(adapterAmount), "ETH");
+
+            expect(adapterAmount).to.be.equal(await weth.balanceOf(ethAdapter.address));
+        });
+
+        it("Should return BTC value of WBTC adapter", async () => {
+            const adapterAmount = await btcAdapter.getAdapterAmount();
+            console.log("Reported adapter amount: ",  formatEther(adapterAmount), "BTC");
+
+            expect(adapterAmount).to.be.equal((await wbtc.balanceOf(btcAdapter.address)).mul("10000000000"));
+        });
+    })
 
     describe("USD", async () => {
         it("Should deposit USDC", async () => {
