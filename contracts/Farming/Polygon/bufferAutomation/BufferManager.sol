@@ -15,6 +15,7 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "../../../interfaces/ILiquidityHandler.sol";
 import "../../../interfaces/IHandlerAdapter.sol";
+import "../../../interfaces/IVoteExecutorSlave.sol";
 
 
 contract BufferManager is
@@ -38,11 +39,12 @@ contract BufferManager is
     address public gnosis;
     // address of the DepositDistributor on mainnet
     address public distributor;
+    address public slave;
     
     // bridge settings
     uint256 public lastExecuted;
     uint256 public bridgeInterval;
-    uint256 public relayerFeePct;
+    uint64 public relayerFeePct;
 
     bytes32 constant public UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 constant public GELATO = keccak256("GELATO");
@@ -134,7 +136,6 @@ contract BufferManager is
                         BufferManager.swap.selector,
                         amount,
                         token,
-                        relayerFeePct,
                         iballuo
                         );
 
@@ -158,19 +159,21 @@ contract BufferManager is
     * either Gelato or Multisig, in order to prevent malicious actions
     * @dev Bridges assets using Across Bridge and info about the amounts using Multichain AnyCallV6
     * @param amount Amount of the funds to be transferred
-    * @param relayerFeePct Fee percantage for relayers on Across bridge side
     */
-    function swap(uint256 amount, address originToken, uint64 relayerFeePct) external onlyRole(SWAPPER) {
+    function swap(uint256 amount, address originToken) external onlyRole(SWAPPER) {
         require(canBridge(originToken, amount), "Buffer: <minAmount or <bridgeInterval");
         
         IERC20Upgradeable(originToken).approve(spokepool, amount);
         lastExecuted = block.timestamp;   
         ISpokePool(spokepool).deposit(distributor, originToken, amount, 1, relayerFeePct, uint32(block.timestamp));
         address tokenEth = tokenToEth[originToken];
+        (uint256[] memory direction, uint256[] memory percentage) = IVoteExecutorSlave(slave).getEntries();
         CallProxy(anycall).anyCall(
             // address of the collector contract on mainnet
             distributor,
             abi.encode(
+                direction,
+                percentage,
                 tokenEth,
                 amount
             ),
@@ -178,7 +181,8 @@ contract BufferManager is
             1,
             // 0 flag to pay fee on destination chain
             0
-            );   
+        );   
+        
     }
     
     /**
@@ -303,6 +307,11 @@ contract BufferManager is
         return true;
     }
 
+    /**
+    * @dev Function to trigger bridging
+    * @param token Token to bridge
+    * @param amount Amount to bridge
+    */
     function canBridge(address token, uint256 amount) public view returns(bool) {
         if(amount >= tokenToMinBridge[token]) {
             if(block.timestamp >= lastExecuted + bridgeInterval) {
@@ -312,6 +321,11 @@ contract BufferManager is
         return false;
     }
 
+    /**
+    * @dev Function to trigger refillBuffer
+    * @param _iballuo Address of the IBAlluo
+    * @param token Address of the correspondin primary token of the pool
+    */
     function canRefill(address _iballuo, address token) public view returns(bool) {
         uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
         uint256 decDif = 18 - IERC20MetadataUpgradeable(token).decimals();
@@ -336,7 +350,6 @@ contract BufferManager is
     * @notice Initialize function faces stack too deep error, due to too many arguments
     * @param _activeIbAlluos Array of IBAlluo contract supported for bridging
     * @param _ibAlluoAdapters Array of corresponding Adapters
-    * @param _ibAlluoTokens Tokens to be support for each of the adapters
     * @param _tokensEth Addresses of the same tokens on mainnet
     * @param _maxRefillPerEpoch Max value of asset for an adapter to be filled in span of a predefined interval
     */
@@ -344,7 +357,6 @@ contract BufferManager is
         address _handler,
         address[] memory _activeIbAlluos,
         address[] memory _ibAlluoAdapters,
-        address[] memory _ibAlluoTokens,
         address[] memory _tokensEth,
         uint256[] memory _maxRefillPerEpoch,
         uint256 _epochDuration) public onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -375,8 +387,12 @@ contract BufferManager is
         tokenToMinBridge[_token] = _minAmount;
     }
 
-    function setRelayerFeePct(uint256 _relayerFeePct) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setRelayerFeePct(uint64 _relayerFeePct) external onlyRole(DEFAULT_ADMIN_ROLE) {
         relayerFeePct = _relayerFeePct;
+    }
+
+    function setVoteExecutorSlave(address _slave) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        slave = _slave;
     }
     
     /**

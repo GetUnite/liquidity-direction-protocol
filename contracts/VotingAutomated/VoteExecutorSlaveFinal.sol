@@ -149,7 +149,7 @@ contract VoteExecutorSlaveFinal is
                 block.timestamp >= hashExecutionTime[hashed] + 1 days,
             "Duplicate hash"
         );
-
+        delete entries;
         execute(_messages);
         executionHistory.push(_data);
         hashExecutionTime[hashed] = block.timestamp;
@@ -192,13 +192,23 @@ contract VoteExecutorSlaveFinal is
                     currentMessage.commandData,
                     (uint256, uint256)
                 );
-
-                Entry storage e = entries[entries.length - 1];
-                e.directionId = directionId;
-                e.percent = percent;
-                entries.push(e);
+                if(percent != 0) {
+                    Entry memory e = Entry(directionId,percent);
+                    entries.push(e);
+                }
             }
         }
+    }
+
+    function getEntries() external onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256[] memory, uint256[] memory) {
+        uint256[] memory drctId = new uint256[](entries.length);
+        uint256[] memory pct = new uint256[](entries.length);
+        for(uint256 i; i<entries.length; i++) {
+            Entry memory e = entries[i];
+            drctId[i] = e.directionId;
+            pct[i] = e.percent;
+        }
+        return(drctId, pct);
     }
 
     function _changeAPY(
@@ -210,6 +220,11 @@ contract VoteExecutorSlaveFinal is
             _newAnnualInterest,
             _newInterestPerSecond
         );
+    }
+
+    function test() external {
+        Entry memory e = Entry(420,420);
+        entries.push(e);
     }
 
     /// @notice Checks the array of signatures from L1 for authentication
