@@ -192,23 +192,27 @@ contract VoteExecutorSlaveFinal is
                     currentMessage.commandData,
                     (uint256, uint256)
                 );
-                if(percent != 0) {
-                    Entry memory e = Entry(directionId,percent);
+                if (percent != 0) {
+                    Entry memory e = Entry(directionId, percent);
                     entries.push(e);
                 }
             }
         }
     }
 
-    function getEntries() external onlyRole(DEFAULT_ADMIN_ROLE) returns(uint256[] memory, uint256[] memory) {
+    function getEntries()
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        returns (uint256[] memory, uint256[] memory)
+    {
         uint256[] memory drctId = new uint256[](entries.length);
         uint256[] memory pct = new uint256[](entries.length);
-        for(uint256 i; i<entries.length; i++) {
+        for (uint256 i; i < entries.length; i++) {
             Entry memory e = entries[i];
             drctId[i] = e.directionId;
             pct[i] = e.percent;
         }
-        return(drctId, pct);
+        return (drctId, pct);
     }
 
     function _changeAPY(
@@ -223,7 +227,7 @@ contract VoteExecutorSlaveFinal is
     }
 
     function test() external {
-        Entry memory e = Entry(420,420);
+        Entry memory e = Entry(420, 420);
         entries.push(e);
     }
 

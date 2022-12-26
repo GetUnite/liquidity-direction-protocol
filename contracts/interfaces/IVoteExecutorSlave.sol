@@ -8,5 +8,5 @@ interface IVoteExecutorSlave {
         uint256 percent;
     }
 
-    function getEntries() external returns(uint256[] memory, uint256[] memory);
+    function getEntries() external returns (uint256[] memory, uint256[] memory);
 }
