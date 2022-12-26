@@ -10,8 +10,9 @@ import {
   Exchange,
   BufferManager__factory, 
   IERC20, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory,
-  UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory,EthNoPoolAdapter__factory, VoteExecutorSlaveFinal, VoteExecutorSlaveFinal__factory 
+  UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory,EthNoPoolAdapter__factory, VoteExecutorSlaveFinal, VoteExecutorSlaveFinal__factory, BtcNoPoolAdapter, BtcNoPoolAdapter__factory 
 } from "../../typechain";
+import { sign } from "crypto";
 
 async function getImpersonatedSigner(address: string): Promise < SignerWithAddress > {
   await ethers.provider.send(
@@ -25,6 +26,18 @@ async function getImpersonatedSigner(address: string): Promise < SignerWithAddre
 async function skipDays(days: number) {
   ethers.provider.send("evm_increaseTime", [days * 86400]);
   ethers.provider.send("evm_mine", []);
+}
+
+async function sendEth(users: SignerWithAddress[]) {
+  let signers = await ethers.getSigners();
+
+  for (let i = 0; i < users.length; i++) {
+      await signers[0].sendTransaction({
+          to: users[i].address,
+          value: parseEther("1.0")
+
+      });
+  }
 }
 
 async function getLastWithdrawalInfo(token: IbAlluo, handler: LiquidityHandler) {
@@ -43,6 +56,8 @@ describe("BufferManager tests", () => {
   let usdWhale: SignerWithAddress;
   let eurtWhale: SignerWithAddress;
   let jeurWhale: SignerWithAddress;
+  let wethWhale: SignerWithAddress;
+  let wbtcWhale: SignerWithAddress;
   let curveUsdLpHolder: SignerWithAddress;
   let admin: SignerWithAddress;
 
@@ -58,10 +73,11 @@ describe("BufferManager tests", () => {
   let usdAdapter: UsdCurveAdapter;
   let eurAdapter: EurCurveAdapter;
   let ethAdapter: EthNoPoolAdapter;
-  let btcAdapter: BtcCurveAdapter;
+  let btcAdapter: BtcNoPoolAdapter;
 
   let dai: IERC20, usdc: IERC20, usdt: IERC20; let jeur: IERC20;
-  let par: IERC20, eurt: IERC20, eurs: IERC20
+  let par: IERC20, eurt: IERC20, eurs: IERC20; let weth: IERC20;
+  let wbtc: IERC20;
 
   const exchangeAddress = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773";
   const spokepooladdress = "0x69B5c72837769eF1e7C164Abc6515DcFf217F920";
@@ -89,6 +105,9 @@ describe("BufferManager tests", () => {
     usdWhale = await getImpersonatedSigner("0x075e72a5eDf65F0A5f44699c7654C1a76941Ddc8");
     jeurWhale = await getImpersonatedSigner("0x00d7c133b923548f29cc2cc01ecb1ea2acdf2d4c");
     eurtWhale = await getImpersonatedSigner("0x1a4b038c31a8e5f98b00016b1005751296adc9a4");
+    wbtcWhale = await getImpersonatedSigner("0xF9930a9d65cc57d024CF9149AE67e66c7a77E167");
+    wethWhale = await getImpersonatedSigner("0x72a53cdbbcc1b9efa39c834a540550e23463aacb");
+
     curveUsdLpHolder = await getImpersonatedSigner("0x7117de93b352ae048925323f3fcb1cd4b4d52ec4");
 
     signers = await ethers.getSigners(); 
@@ -107,6 +126,9 @@ describe("BufferManager tests", () => {
     eurt = await ethers.getContractAt("IERC20", "0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f");
     eurs = await ethers.getContractAt("IERC20", "0xE111178A87A3BFf0c8d18DECBa5798827539Ae99");
 
+    weth = await ethers.getContractAt("IERC20", "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619");
+    wbtc = await ethers.getContractAt("IERC20", "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6");
+
     await (await (await ethers.getContractFactory("ForceSender")).deploy({
       value: parseEther("10.0")
     })).forceSend(gnosis.address); 
@@ -115,6 +137,8 @@ describe("BufferManager tests", () => {
       value: parseEther("10.0")
     })).forceSend(gelatoExecutor.address); 
 
+    await sendEth([usdWhale, jeurWhale, eurtWhale, wethWhale, wbtcWhale])
+
     upgrades.silenceWarnings()
   });
 
@@ -122,6 +146,7 @@ describe("BufferManager tests", () => {
     const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapter") as UsdCurveAdapter__factory;
     const EurAdapter = await ethers.getContractFactory("EurCurveAdapter") as EurCurveAdapter__factory;
     const EthAdapter = await ethers.getContractFactory("EthNoPoolAdapter") as EthNoPoolAdapter__factory;
+    const BtcAdapter = await ethers.getContractFactory("BtcNoPoolAdapter") as BtcNoPoolAdapter__factory;
     
     const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
     const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
@@ -159,15 +184,18 @@ describe("BufferManager tests", () => {
 
     usdAdapter = await UsdAdapter.deploy(gnosis.address, buffer.address, handler.address, 200)
     eurAdapter = await EurAdapter.deploy(gnosis.address, buffer.address, handler.address, 200)
-    ethAdapter = await EthAdapter.deploy(gnosis.address, buffer.address, handler.address,);
+    ethAdapter = await EthAdapter.deploy(gnosis.address, buffer.address, handler.address)
+    btcAdapter = await BtcAdapter.deploy(gnosis.address, buffer.address, handler.address)
 
     await usdAdapter.connect(gnosis).grantRole(await usdAdapter.DEFAULT_ADMIN_ROLE(), buffer.address)
     await eurAdapter.connect(gnosis).grantRole(await eurAdapter.DEFAULT_ADMIN_ROLE(), buffer.address)
     await ethAdapter.connect(gnosis).grantRole(await ethAdapter.DEFAULT_ADMIN_ROLE(), buffer.address)
+    await btcAdapter.connect(gnosis).grantRole(await ethAdapter.DEFAULT_ADMIN_ROLE(), buffer.address)
 
     await usdAdapter.connect(gnosis).grantRole(await usdAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
     await eurAdapter.connect(gnosis).grantRole(await eurAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
     await ethAdapter.connect(gnosis).grantRole(await ethAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
+    await btcAdapter.connect(gnosis).grantRole(await ethAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
 
     ibAlluoUsd = await upgrades.deployProxy(IbAlluo,
       [
@@ -212,17 +240,61 @@ describe("BufferManager tests", () => {
       }
     ) as IbAlluo;
 
+    ibAlluoEth = await upgrades.deployProxy(IbAlluo,
+      [
+          "Interest Bearing Alluo ETH",
+          "ibAlluoEth",
+          admin.address,
+          handler.address,
+          [weth.address],
+          BigNumber.from("100000000470636740"),
+          1600,
+          "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
+          exchangeAddress
+      ], {
+      initializer: 'initialize',
+      kind: 'uups',
+      unsafeAllow: ["delegatecall"]
+
+    }
+    ) as IbAlluo;
+
+    ibAlluoBtc = await upgrades.deployProxy(IbAlluo,
+      [
+          "Interest Bearing Alluo BTC",
+          "ibAlluoBtc",
+          admin.address,
+          handler.address,
+          [wbtc.address],
+          BigNumber.from("100000000470636740"),
+          1600,
+          "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
+          exchangeAddress
+      ], {
+      initializer: 'initialize',
+      kind: 'uups',
+      unsafeAllow: ["delegatecall"]
+
+  }
+  ) as IbAlluo;
+
+    await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoUsd.address)
     await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEur.address)
-    await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoUsd.address, 1)
-    await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEur.address, 2)
+    await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEth.address)
+    await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoBtc.address)
+    // await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoUsd.address, 1)
+    // await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEur.address, 2)
 
     await ibAlluoUsd.connect(gnosis).grantRole(await ibAlluoUsd.DEFAULT_ADMIN_ROLE(), handler.address)
+    await ibAlluoEur.connect(gnosis).grantRole(await ibAlluoEur.DEFAULT_ADMIN_ROLE(), handler.address)
+    await ibAlluoEth.connect(gnosis).grantRole(await ibAlluoEth.DEFAULT_ADMIN_ROLE(), handler.address)
+    await ibAlluoBtc.connect(gnosis).grantRole(await ibAlluoBtc.DEFAULT_ADMIN_ROLE(), handler.address)
     // Params for BufferManager deployment
-    const iballuos = [ibAlluoUsd.address, ibAlluoEur.address]
-    const adapters = [ usdAdapter.address, eurAdapter.address ]
-    const tokens = [ usdc.address, eurt.address ]
-    const tokensEth = [ "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" ]
-    const maxEpoch = [parseUnits("100000", 6), parseUnits("100000", 6)];
+    const iballuos = [ ibAlluoUsd.address, ibAlluoEur.address, ibAlluoEth.address, ibAlluoBtc.address ]
+    const adapters = [ usdAdapter.address, eurAdapter.address, ethAdapter.address, btcAdapter.address ]
+    const tokens = [ usdc.address, eurt.address, weth.address, wbtc.address ]
+    const tokensEth = [ "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", weth.address, wbtc.address ]
+    const maxEpoch = [parseUnits("100000", 6), parseUnits("100000", 6), parseUnits("100000", 6), parseUnits("100000", 6)];
     const epoch = 1671145687
 
     await handler.connect(gnosis).grantRole(await handler.DEFAULT_ADMIN_ROLE(), gnosis.address)
@@ -248,17 +320,39 @@ describe("BufferManager tests", () => {
       true
     )
 
+    await handler.connect(gnosis).setAdapter(
+      3,
+      "ETH No-Pool",
+      500,
+      ethAdapter.address,
+      true
+    )
+
+    await handler.connect(gnosis).setAdapter(
+      4,
+      "BTC No-pool",
+      500,
+      btcAdapter.address,
+      true
+    )
+
     await usdAdapter.connect(gnosis).adapterApproveAll()
     await eurAdapter.connect(gnosis).adapterApproveAll()
 
     await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoUsd.address, 1)
     await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEur.address, 2)
-    
-    await usdAdapter.connect(gnosis).grantRole(await usdAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
-    await eurAdapter.connect(gnosis).grantRole(await eurAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
+    await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoEth.address, 3)
+    await handler.connect(admin).setIbAlluoToAdapterId(ibAlluoBtc.address, 4)
+
+    await usdAdapter.connect(admin).grantRole(await usdAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
+    await eurAdapter.connect(admin).grantRole(await eurAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
+    await ethAdapter.connect(admin).grantRole(await ethAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
+    await btcAdapter.connect(admin).grantRole(await btcAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
 
     await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, 1000000000)
     await buffer.connect(gnosis).setMinBridgeAmount(eurt.address, 1000000000)
+    await buffer.connect(gnosis).setMinBridgeAmount(weth.address, 1000000000)
+    await buffer.connect(gnosis).setMinBridgeAmount(wbtc.address, 1000000000)
 
     await buffer.connect(gnosis).setVoteExecutorSlave(slave.address);
     await slave.test()
@@ -467,19 +561,76 @@ describe("BufferManager tests", () => {
   })
   
   describe("Case Testing", async () => {
-    it("Deposits 1000 usdc, attempts withdrawal immediately, successes after another deposit", async () => {
+    it("USDC deposit, attempted withdrawal immediately, success after another deposit", async () => {
       await deposit(signers[5], usdc, parseUnits("1000", 6))
       await ibAlluoUsd.connect(signers[5]).withdraw(usdc.address, parseUnits("1000", 18));
       let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
       expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
-      console.log(await usdc.balanceOf(signers[5].address));
       expect(await usdc.balanceOf(signers[5].address)).to.be.equal(0);
 
       await deposit(signers[4], usdc, parseUnits("10000", 6));
       await handler.satisfyAdapterWithdrawals(ibAlluoUsd.address);
       expect(Number(await usdc.balanceOf(signers[5].address))).lessThan(Number(parseUnits("1100", 6)))
       expect(Number(await usdc.balanceOf(signers[5].address))).greaterThanOrEqual(Number(parseUnits("900", 6)))
-    });
+    })
+
+    it("EURT deposit, attempted withdrawal, success after buffer is refilled", async() => {
+      // Deposit
+      await eurt.connect(eurtWhale).transfer(signers[2].address, parseUnits("700", 6));
+      await eurt.connect(signers[2]).approve(ibAlluoEur.address, parseUnits("700", 6));
+      await ibAlluoEur.connect(signers[2]).deposit(eurt.address, parseUnits("700", 6));
+
+      // Withdrawal request
+      await ibAlluoEur.connect(signers[2]).withdraw(eurt.address, parseUnits("500", 18));
+      expect(await eurt.balanceOf(signers[2].address)).to.eq(0);
+
+      // Executing refill after gelato is flagged
+      await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoEur.address)
+      expect(Number(await eurt.balanceOf(signers[2].address))).to.be.greaterThan(Number(parseUnits("495", 6)))
+
+    })
+
+    it("WETH deposit, attempted withdrawal, success after buffer is refilled", async() => {
+      // Deposit
+      await weth.connect(wethWhale).transfer(signers[2].address, parseUnits("2", 18));
+      await weth.connect(signers[2]).approve(ibAlluoEth.address, parseUnits("2", 18));
+      await ibAlluoEth.connect(signers[2]).deposit(weth.address, parseUnits("2", 18));
+
+      // Withdrawal request
+      await ibAlluoEth.connect(signers[2]).withdraw(weth.address, parseUnits("1", 18));
+      expect(await weth.balanceOf(signers[2].address)).to.eq(0);
+
+      // Gelato checker is now true
+      const [canExec, execPayload] = await buffer.checker();
+      expect(canExec).to.eq(true)
+      
+      // Executing refill after gelato is flagged
+      await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoEth.address)
+      expect(Number(await weth.balanceOf(signers[2].address))).to.eq(Number(parseUnits("1", 18)))
+    })
+
+    it("WBTC deposit, attempted withdrawal, success after buffer is refilled", async() => {
+      // Deposit
+      await wbtc.connect(wbtcWhale).transfer(signers[2].address, parseUnits("2", 8));
+      await wbtc.connect(signers[2]).approve(ibAlluoBtc.address, parseUnits("2", 8));
+      await ibAlluoBtc.connect(signers[2]).deposit(wbtc.address, parseUnits("2", 8));
+
+      // Making sure checker is false before the withdrawal request
+      const [canExecBefore, execPayloadBefore] = await buffer.checker();
+      expect(canExecBefore).to.eq(false)
+
+      // Withdrawal request
+      await ibAlluoBtc.connect(signers[2]).withdraw(wbtc.address, parseUnits("1", 18));
+      expect(await wbtc.balanceOf(signers[2].address)).to.eq(0);
+
+      // Gelato checker is now true
+      const [canExec, execPayload] = await buffer.checker();
+      expect(canExec).to.eq(true)
+
+      // Executing refill after gelato is flagged
+      await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoBtc.address)
+      expect(Number(await wbtc.balanceOf(signers[2].address))).to.eq(Number(parseUnits("1", 8)))
+    })
   }) 
 
   describe("Admin functions", async () => {
