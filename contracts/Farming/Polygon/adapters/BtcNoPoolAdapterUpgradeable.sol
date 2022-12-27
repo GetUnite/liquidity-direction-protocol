@@ -19,7 +19,7 @@ contract BtcNoPoolAdapterUpgradeable is
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     address public constant WBTC = 0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6;
-    address public wallet;
+    address public buffer;
     bool public upgradeStatus;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -27,6 +27,7 @@ contract BtcNoPoolAdapterUpgradeable is
 
     function initialize(
         address _multiSigWallet,
+        address _buffer,
         address _liquidityHandler
     ) public initializer {
         __AccessControl_init();
@@ -37,7 +38,8 @@ contract BtcNoPoolAdapterUpgradeable is
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
-        wallet = _multiSigWallet;
+        _grantRole(DEFAULT_ADMIN_ROLE, _buffer);
+        buffer = _buffer;
     }
 
     function deposit(
@@ -47,7 +49,7 @@ contract BtcNoPoolAdapterUpgradeable is
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         if (toSend != 0) {
-            IERC20(WBTC).safeTransfer(wallet, toSend / 10 ** 10);
+            IERC20(WBTC).safeTransfer(buffer, toSend / 10 ** 10);
         }
     }
 
@@ -67,10 +69,10 @@ contract BtcNoPoolAdapterUpgradeable is
         return (WBTC);
     }
 
-    function setWallet(
-        address _newWallet
+    function setBuffer(
+        address _newBuffer
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        wallet = _newWallet;
+        buffer = _newBuffer;
     }
 
     /**

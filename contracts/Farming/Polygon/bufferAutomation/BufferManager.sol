@@ -127,7 +127,7 @@ contract BufferManager is
     {
         for(uint256 i; i < activeIbAlluos.length(); i++) {
             address iballuo = activeIbAlluos.at(i);
-            (,address token) = IHandlerAdapter(ibAlluoToAdapter[iballuo]).getCoreTokens();
+            address token = IHandlerAdapter(ibAlluoToAdapter[iballuo]).getCoreTokens();
             uint256 amount = IERC20Upgradeable(token).balanceOf(address(this));
             if(adapterRequiredRefill(iballuo) == 0) {
                 if(canBridge(token, amount)) {
@@ -263,7 +263,7 @@ contract BufferManager is
     */
     function refillBuffer(address _ibAlluo) external onlyRole(GELATO) returns (bool) {
         address adapterAddress = ibAlluoToAdapter[_ibAlluo];
-        (,address bufferToken) = IHandlerAdapter(adapterAddress).getCoreTokens();
+        address bufferToken = IHandlerAdapter(adapterAddress).getCoreTokens();
         uint256 totalAmount = adapterRequiredRefill(_ibAlluo);
 
         require(totalAmount > 0, "No refill required");
@@ -298,14 +298,14 @@ contract BufferManager is
             } else {
             return false;
             }
-        } else {
+        } 
         IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance / 10 ** decDif);
         IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
         if (isAdapterPendingWithdrawal(_ibAlluo)) {
                 handler.satisfyAdapterWithdrawals(_ibAlluo);
             }
         return true;
-        }
+    
     }
 
     /**

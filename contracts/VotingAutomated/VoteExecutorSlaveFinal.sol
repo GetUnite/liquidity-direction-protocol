@@ -201,7 +201,8 @@ contract VoteExecutorSlaveFinal is
     }
 
     function getEntries()
-        external view
+        external
+        view
         onlyRole(DEFAULT_ADMIN_ROLE)
         returns (uint256[] memory, uint256[] memory)
     {
@@ -215,7 +216,9 @@ contract VoteExecutorSlaveFinal is
         return (drctId, pct);
     }
 
-    function setEntries(Entry[] memory _entries) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setEntries(
+        Entry[] memory _entries
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         delete entries;
         for (uint256 i; i < _entries.length; i++) {
             entries.push(_entries[i]);
