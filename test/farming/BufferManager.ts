@@ -9,10 +9,9 @@ import {
   IERC20MetadataUpgradeable,
   Exchange,
   BufferManager__factory, 
-  IERC20, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory,
-  UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory,EthNoPoolAdapter__factory, VoteExecutorSlaveFinal, VoteExecutorSlaveFinal__factory, BtcNoPoolAdapter, BtcNoPoolAdapter__factory 
+  IERC20, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter,
+  EurCurveAdapter__factory,EthNoPoolAdapter__factory, VoteExecutorSlaveFinal, VoteExecutorSlaveFinal__factory, BtcNoPoolAdapter, BtcNoPoolAdapter__factory 
 } from "../../typechain";
-import { sign } from "crypto";
 
 async function getImpersonatedSigner(address: string): Promise < SignerWithAddress > {
   await ethers.provider.send(
@@ -294,8 +293,8 @@ describe("BufferManager tests", () => {
     const adapters = [ usdAdapter.address, eurAdapter.address, ethAdapter.address, btcAdapter.address ]
     const tokens = [ usdc.address, eurt.address, weth.address, wbtc.address ]
     const tokensEth = [ "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", weth.address, wbtc.address ]
-    const maxEpoch = [parseUnits("100000", 6), parseUnits("100000", 6), parseUnits("100000", 6), parseUnits("100000", 6)];
-    const epoch = 1671145687
+    const maxEpoch = [parseUnits("3000", 18), parseUnits("100000", 6), parseUnits("100000", 6), parseUnits("100000", 6)];
+    const epoch = 86400
 
     await handler.connect(gnosis).grantRole(await handler.DEFAULT_ADMIN_ROLE(), gnosis.address)
     await handler.connect(gnosis).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoUsd.address)
@@ -355,7 +354,12 @@ describe("BufferManager tests", () => {
     await buffer.connect(gnosis).setMinBridgeAmount(wbtc.address, 1000000000)
 
     await buffer.connect(gnosis).setVoteExecutorSlave(slave.address);
-    await slave.test()
+
+    let entry = {
+      directionId: 420,
+      percent: 99
+    }
+    await slave.connect(gnosis).setEntries([entry])
     await slave.connect(gnosis).grantRole(await slave.DEFAULT_ADMIN_ROLE(), buffer.address)
   });
 
@@ -490,18 +494,36 @@ describe("BufferManager tests", () => {
     })
 
     it("Should not refill if adapter exceeded it's cumulative refill limit", async () => {
-      await (await (await ethers.getContractFactory("ForceSender")).deploy({
-        value: parseEther("10.0")
-      })).forceSend(gelatoExecutor.address); 
-        
-      await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("50000", 6))
+      await usdc.connect(gnosis).approve(buffer.address, parseUnits("1000000", 6))
+      await usdc.connect(usdWhale).transfer(gnosis.address, parseUnits("30000", 6))
       await deposit(signers[2], usdc, parseUnits("1000", 6))
-      await ibAlluoUsd.connect(signers[2]).withdraw(usdc.address, parseUnits("300", 18));
+      await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, 1)
+      await buffer.connect(gnosis).changeBridgeInterval(0)
 
+      await buffer.connect(gnosis).swap(await usdc.balanceOf(buffer.address), usdc.address)
+      await ibAlluoUsd.connect(signers[2]).withdraw(usdc.address, parseUnits("1000", 18));
+     
       const [canExec] = await buffer.checker()
       expect(canExec).to.be.equal(true);
 
+      await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
+
+      await deposit(signers[2], usdc, parseUnits("2400", 6))
+      await ibAlluoUsd.connect(signers[2]).withdraw(usdc.address, parseUnits("2400", 18));
+
+      await buffer.connect(gnosis).swap(await usdc.balanceOf(buffer.address), usdc.address)
+
       expect(buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)).to.be.revertedWith('Cumulative refills exceeds limit')
+
+      console.log(await buffer.adapterRequiredRefill(ibAlluoUsd.address))
+      console.log(await buffer.adapterRequiredRefill(ibAlluoUsd.address))
+
+      await skipDays(2)
+
+      await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
+      
+      expect(Number(await usdc.balanceOf(signers[2].address))).to.be.greaterThan(Number(parseUnits("3300", 6)))
+
     })
 
   })
@@ -557,6 +579,45 @@ describe("BufferManager tests", () => {
       await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
       expect(await buffer.isAdapterPendingWithdrawal(ibAlluoUsd.address)).to.eq(false)
       expect(await buffer.isAdapterPendingWithdrawal(ibAlluoEur.address)).to.eq(true)
+    })
+  })
+
+  describe("confirmEpoch", async() => {
+    it("Should set values", async () => {
+      await buffer.connect(gnosis).setEpochDuration(1);
+      await buffer.connect(gnosis).setMaxRefillPerEpoch(ibAlluoUsd.address, parseUnits("3000", 18))
+
+      expect(await buffer.ibAlluoToMaxRefillPerEpoch(ibAlluoUsd.address)).to.eq(parseUnits("3000", 18))
+    })
+  })
+
+  describe("getEntries", async () => {
+    it("Should output correct value", async() => {
+      let[direction, prct] = await slave.connect(gnosis.address).getEntries()
+      expect(direction[0]).to.eq(420)
+      expect(prct[0]).to.eq(99)
+    })
+  })
+
+  describe("setEntries", async () => {
+    it("Should set correct entries", async () => {
+      let entrs = [{
+        directionId: 12,
+        percent: 42,
+      },
+      {
+        directionId: 14,
+        percent: 58
+      }]
+
+      await slave.connect(gnosis).setEntries(entrs)
+
+      let[[direction, direction1], [pct, pct1]] = await slave.connect(gnosis).getEntries()
+
+      expect(direction).to.eq(12)
+      expect(direction1).to.eq(14)
+      expect(pct).to.eq(42)
+      expect(pct1).to.eq(58)
     })
   })
   
@@ -631,11 +692,38 @@ describe("BufferManager tests", () => {
       await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoBtc.address)
       expect(Number(await wbtc.balanceOf(signers[2].address))).to.eq(Number(parseUnits("1", 8)))
     })
+
+    it("WETH refill from buffer and gnosis", async() => {
+      // Depositing WETH
+      await weth.connect(wethWhale).transfer(signers[2].address, parseUnits("2", 18));
+      await weth.connect(signers[2]).approve(ibAlluoEth.address, parseUnits("2", 18));
+      await ibAlluoEth.connect(signers[2]).deposit(weth.address, parseUnits("2", 18));
+      
+      // Swapping funds so that buffer only has part of the sum needed to refill, so that he uses gnosis
+      await weth.connect(wethWhale).transfer(gnosis.address, parseUnits("1", 18))
+      await buffer.connect(gelatoExecutor).swap(parseUnits("1", 18), weth.address)
+
+      // Withdrawal request
+      await ibAlluoEth.connect(signers[2]).withdraw(weth.address, parseUnits("1", 18));
+      expect(await weth.balanceOf(signers[2].address)).to.eq(parseUnits("1", 18));
+
+      // Gelato checker is now true
+      const [canExec, execPayload] = await buffer.checker();
+      expect(canExec).to.eq(true)
+      
+      // Increasing MaxRefillPerEpoch and Granting allowance to buffer
+      await buffer.connect(gnosis).setMaxRefillPerEpoch(ibAlluoEth.address, parseUnits("10", 18))
+      await weth.connect(gnosis).approve(buffer.address, parseUnits("1", 18))
+
+      // Refilling the buffer, executing the queued withdrawal
+      await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoEth.address)
+      expect(Number(await weth.balanceOf(signers[2].address))).to.eq(Number(parseUnits("2", 18)))
+    })
   }) 
 
   describe("Admin functions", async () => {
     it("Should not allow users without admin role to call functions", async () => {
-      expect(buffer.connect(signers[1]).changeBridgeSettings(100)).to.be.reverted
+      expect(buffer.connect(signers[1]).changeBridgeInterval(100)).to.be.reverted
       expect(buffer.connect(signers[1]).addIBAlluoPool(handler.address, gnosis.address)).to.be.reverted
       expect(buffer.connect(signers[1]).removeIBAlluoPool(ibAlluoUsd.address)).to.be.reverted
       expect(buffer.connect(signers[1]).setEthToken(ibAlluoUsd.address, dai.address)).to.be.reverted
@@ -655,8 +743,13 @@ describe("BufferManager tests", () => {
     })
 
     it("Should change the bridge settings", async() => {
-      await buffer.connect(gnosis).changeBridgeSettings(420000);
+      await buffer.connect(gnosis).changeBridgeInterval(420000);
       expect(await buffer.bridgeInterval()).to.be.equal(420000);
+    })
+
+    it("Should set ethToken", async () => {
+      await buffer.connect(gnosis).setEthToken(usdc.address, gnosis.address)
+      expect(await buffer.tokenToEth(usdc.address)).to.eq(gnosis.address)
     })
 
     it("Should set Mainnet corresponding token", async() => {

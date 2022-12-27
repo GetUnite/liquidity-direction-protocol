@@ -8,21 +8,21 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
-import "../interfaces/IIbAlluo.sol";
-import "../interfaces/IHandlerAdapter.sol";
-import "../interfaces/IExchange.sol";
+import "../../interfaces/IIbAlluo.sol";
+import "./IHandlerAdapterWithoutPriceOracles.sol";
+import "../../interfaces/IExchange.sol";
 import "hardhat/console.sol";
 
-contract LiquidityHandler is
+contract LiquidityHandlerWithoutPriceOracles is
     Initializable,
     PausableUpgradeable,
     AccessControlUpgradeable,
     UUPSUpgradeable
 {
-    using AddressUpgradeable for address;
+    using Address for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using EnumerableMapUpgradeable for EnumerableMapUpgradeable.AddressToUintMap;
 
@@ -103,9 +103,9 @@ contract LiquidityHandler is
         __UUPSUpgradeable_init();
 
         require(_multiSigWallet.isContract(), "Handler: Not contract");
-        require(_exchangeAddress.isContract(), "Handler: Not contract");
         exchangeAddress = _exchangeAddress;
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
     }
 
@@ -478,7 +478,7 @@ contract LiquidityHandler is
 
     function getAdapterCoreTokensFromIbAlluo(
         address _ibAlluo
-    ) public view returns (address) {
+    ) public view returns (address, address) {
         uint256 adapterId = ibAlluoToAdapterId.get(_ibAlluo);
         address adapterAddress = adapterIdsToAdapterInfo[adapterId]
             .adapterAddress;

@@ -13,6 +13,7 @@ import "../../interfaces/superfluid/IInstantDistributionAgreementV1.sol";
 import "../../interfaces/superfluid/IAlluoSuperToken.sol";
 import "../../interfaces/ISuperfluidResolver.sol";
 import "../../interfaces/ISuperfluidEndResolver.sol";
+import "./../../interfaces/IPriceFeedRouter.sol";
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -84,6 +85,9 @@ contract IbAlluo is
     bytes32 public constant GELATO = keccak256("GELATO");
 
     mapping(address => address) public autoInvestMarketToSuperToken;
+
+    address public priceFeedRouter;
+    uint256 public fiatIndex;
 
     struct Context {
         uint8 appLevel;
@@ -242,30 +246,6 @@ contract IbAlluo is
         return true;
     }
 
-    /**
-     * @dev See {IERC20-transferFrom} but it transfers amount of tokens
-     *      which represents asset value
-     *
-     * Emits an {Approval} event indicating the updated allowance. This is not
-     * required by the EIP. See the note at the beginning of {ERC20}.
-     *
-     * NOTE: Does not update the allowance if the current allowance
-     * is the maximum `uint256`.
-     */
-    function transferFromAssetValue(
-        address from,
-        address to,
-        uint256 amount
-    ) public whenNotPaused returns (bool) {
-        address spender = _msgSender();
-        updateRatio();
-        uint256 adjustedAmount = (amount * multiplier) / growingRatio;
-        _spendAllowance(from, spender, adjustedAmount);
-        _transfer(from, to, adjustedAmount);
-        emit TransferAssetValue(from, to, adjustedAmount, amount, growingRatio);
-        return true;
-    }
-
     /// @notice  Allows deposits and updates the index, then mints the new appropriate amount.
     /// @dev When called, asset token is sent to the wallet, then the index is updated
     ///      so that the adjusted amount is accurate.
@@ -284,7 +264,7 @@ contract IbAlluo is
                 address(this),
                 _amount
             );
-            (, address primaryToken) = ILiquidityHandler(liquidityHandler)
+            address primaryToken = ILiquidityHandler(liquidityHandler)
                 .getAdapterCoreTokensFromIbAlluo(address(this));
             IERC20Upgradeable(_token).safeIncreaseAllowance(
                 exchangeAddress,
@@ -313,7 +293,20 @@ contract IbAlluo is
         uint256 amountIn18 = _amount *
             10 ** (18 - AlluoERC20Upgradable(_token).decimals());
         uint256 adjustedAmount = (amountIn18 * multiplier) / growingRatio;
+
+        if (priceFeedRouter != address(0)) {
+            (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
+                priceFeedRouter
+            ).getPrice(_token, fiatIndex);
+
+            // adjust value to have equal number of decimals as the amount
+            adjustedAmount =
+                (adjustedAmount * price) /
+                (10 ** (uint256(priceDecimals)));
+        }
+
         _mint(_msgSender(), adjustedAmount);
+
         emit TransferAssetValue(
             address(0),
             _msgSender(),
@@ -340,8 +333,17 @@ contract IbAlluo is
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(_msgSender(), adjustedAmount);
         ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
+
+        if (priceFeedRouter != address(0)) {
+            (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
+                priceFeedRouter
+            ).getPrice(_targetToken, fiatIndex);
+
+            _amount = (_amount * (10 ** priceDecimals)) / price;
+        }
+
         if (supportedTokens.contains(_targetToken) == false) {
-            (address liquidToken, ) = ILiquidityHandler(liquidityHandler)
+            address liquidToken = ILiquidityHandler(liquidityHandler)
                 .getAdapterCoreTokensFromIbAlluo(address(this));
             // This just is used to revert if there is no active route.
             require(
@@ -372,59 +374,6 @@ contract IbAlluo is
 
     function withdraw(address _targetToken, uint256 _amount) external {
         withdrawTo(_msgSender(), _targetToken, _amount);
-    }
-
-    /// @notice  Withdraws accuratel
-    /// @param _targetToken Asset token
-    /// @param _amount Amount (parsed 10**18) in ibAlluo**** value
-
-    function withdrawTokenValueTo(
-        address _recipient,
-        address _targetToken,
-        uint256 _amount
-    ) public {
-        _burn(_msgSender(), _amount);
-        updateRatio();
-        uint256 assetAmount = (_amount * growingRatio) / multiplier;
-
-        ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
-        if (supportedTokens.contains(_targetToken) == false) {
-            (address liquidToken, ) = ILiquidityHandler(liquidityHandler)
-                .getAdapterCoreTokensFromIbAlluo(address(this));
-            // This just is used to revert if there is no active route.
-            require(
-                IExchange(exchangeAddress)
-                    .buildRoute(liquidToken, _targetToken)
-                    .length > 0
-            );
-            handler.withdraw(
-                _recipient,
-                liquidToken,
-                assetAmount,
-                _targetToken
-            );
-        } else {
-            handler.withdraw(_recipient, _targetToken, assetAmount);
-        }
-
-        emit TransferAssetValue(
-            _msgSender(),
-            address(0),
-            _amount,
-            assetAmount,
-            growingRatio
-        );
-        emit BurnedForWithdraw(_msgSender(), _amount);
-    }
-
-    /// @notice  Withdraws accuratel
-    /// @param _targetToken Asset token
-    /// @param _amount Amount of ibAlluos (10**18)
-    function withdrawTokenValue(
-        address _targetToken,
-        uint256 _amount
-    ) external {
-        withdrawTokenValueTo(_msgSender(), _targetToken, _amount);
     }
 
     /// @notice Wraps and creates flow
@@ -706,21 +655,6 @@ contract IbAlluo is
         }
     }
 
-    function convertToTokenValue(
-        uint256 _amountInAssetValue
-    ) public view returns (uint256) {
-        if (block.timestamp >= lastInterestCompound + updateTimeLimit) {
-            uint256 _growingRatio = changeRatio(
-                growingRatio,
-                interestPerSecond,
-                lastInterestCompound
-            );
-            return (_amountInAssetValue * multiplier) / _growingRatio;
-        } else {
-            return (_amountInAssetValue * multiplier) / growingRatio;
-        }
-    }
-
     /// @notice  Returns total supply in asset value
 
     function totalAssetSupply() public view returns (uint256) {
@@ -890,6 +824,14 @@ contract IbAlluo is
 
     function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
+    }
+
+    function setPriceRouterInfo(
+        address _priceFeedRouter,
+        uint256 _fiatIndex
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        priceFeedRouter = _priceFeedRouter;
+        fiatIndex = _fiatIndex;
     }
 
     function grantRole(

@@ -588,30 +588,6 @@ describe("IbAlluoUSD and Handler", function () {
                 expect(balance).to.equal(0);
             });
 
-            it("Should check all transferAssetValue functions ", async function () {
-                await deposit(signers[1], dai, parseUnits("1000", 18));
-                await ibAlluoCurrent.connect(signers[1]).transfer(signers[2].address, parseEther("100"))
-                await ibAlluoCurrent.connect(signers[1]).transfer(signers[3].address, parseEther("100"))
-                await skipDays(365);
-
-                let totalAsset = await ibAlluoCurrent.totalAssetSupply()
-                expect(totalAsset).to.be.gt(parseUnits("1159", await ibAlluoCurrent.decimals()));
-                expect(totalAsset).to.be.lt(parseUnits("1160.1", await ibAlluoCurrent.decimals()));
-
-                await ibAlluoCurrent.connect(signers[2]).transferAssetValue(signers[1].address, parseEther("115.9"))
-
-                await ibAlluoCurrent.connect(signers[3]).approveAssetValue(signers[2].address, parseEther("116"))
-                await ibAlluoCurrent.connect(signers[2]).transferFromAssetValue(signers[3].address, signers[1].address, parseEther("115.9"))
-
-                let tokenBalance = await ibAlluoCurrent.balanceOf(signers[1].address);
-                expect(tokenBalance).to.be.gt(parseUnits("999", await ibAlluoCurrent.decimals()));
-                expect(tokenBalance).to.be.lt(parseUnits("1000", await ibAlluoCurrent.decimals()));
-
-                let valueBalance = await ibAlluoCurrent.getBalance(signers[1].address)
-                expect(valueBalance).to.be.gt(parseUnits("1159", await ibAlluoCurrent.decimals()));
-                expect(valueBalance).to.be.lt(parseUnits("1160", await ibAlluoCurrent.decimals()));
-            });
-
             it("Should withdraw from caller to recipient", async function () {
                 await deposit(signers[1], dai, parseUnits("3000", 18));
 

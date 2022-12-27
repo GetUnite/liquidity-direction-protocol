@@ -201,7 +201,7 @@ contract VoteExecutorSlaveFinal is
     }
 
     function getEntries()
-        external
+        external view
         onlyRole(DEFAULT_ADMIN_ROLE)
         returns (uint256[] memory, uint256[] memory)
     {
@@ -215,6 +215,13 @@ contract VoteExecutorSlaveFinal is
         return (drctId, pct);
     }
 
+    function setEntries(Entry[] memory _entries) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        delete entries;
+        for (uint256 i; i < _entries.length; i++) {
+            entries.push(_entries[i]);
+        }
+    }
+
     function _changeAPY(
         uint256 _newAnnualInterest,
         uint256 _newInterestPerSecond,
@@ -224,11 +231,6 @@ contract VoteExecutorSlaveFinal is
             _newAnnualInterest,
             _newInterestPerSecond
         );
-    }
-
-    function test() external {
-        Entry memory e = Entry(420, 420);
-        entries.push(e);
     }
 
     /// @notice Checks the array of signatures from L1 for authentication

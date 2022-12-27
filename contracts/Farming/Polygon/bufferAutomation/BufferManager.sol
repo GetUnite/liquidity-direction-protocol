@@ -223,17 +223,15 @@ contract BufferManager is
     function adapterRequiredRefill(address _ibAlluo) public view returns (uint256) {
         uint256 expectedAmount = handler.getExpectedAdapterAmount(_ibAlluo, 0);
         uint256 actualAmount = handler.getAdapterAmount(_ibAlluo);
-        if (actualAmount < expectedAmount) {
-            // Think of case if someone tries to break it by sending extra tokens to the buffer directly
-            uint256 difference = expectedAmount - actualAmount;
-            if (difference * 10000 / expectedAmount > 500) {
-                return difference;
-            } else {
-                return 0;
-            }
-        } else {
-            return 0; 
+        if (actualAmount >= expectedAmount) {
+            return 0;
         }
+        // Think of case if someone tries to break it by sending extra tokens to the buffer directly
+        uint256 difference = expectedAmount - actualAmount;
+        if (difference * 10000 / expectedAmount <= 500) {
+            return 0;
+        }
+        return difference; 
     }
     
     /**
@@ -244,13 +242,15 @@ contract BufferManager is
     function _confirmEpoch(address _ibAlluo) internal returns (Epoch storage) {
         Epoch[] storage relevantEpochs = ibAlluoToEpoch[_ibAlluo];
         Epoch storage lastEpoch = relevantEpochs[relevantEpochs.length - 1];
-        uint256 deadline = lastEpoch.startTime + epochDuration;
+        uint256 deadline = lastEpoch.startTime + epochDuration; 
         if (block.timestamp > deadline) {
             uint256 cycles = (block.timestamp - deadline) / epochDuration;
-            uint256 newStartTime = lastEpoch.startTime + (cycles * epochDuration);
-            Epoch memory newEpoch = Epoch(newStartTime, 0);
-            ibAlluoToEpoch[_ibAlluo].push(newEpoch);
-        } 
+            if (cycles != 0) {
+                uint256 newStartTime = lastEpoch.startTime + (cycles * epochDuration);
+                Epoch memory newEpoch = Epoch(newStartTime, 0);
+                ibAlluoToEpoch[_ibAlluo].push(newEpoch);
+            }
+        }
         // This should work because we are pointing at a specific memory slot.
         Epoch storage finalEpoch = relevantEpochs[relevantEpochs.length - 1];
         return finalEpoch;
@@ -298,13 +298,14 @@ contract BufferManager is
             } else {
             return false;
             }
-        }
+        } else {
         IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance / 10 ** decDif);
         IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
         if (isAdapterPendingWithdrawal(_ibAlluo)) {
                 handler.satisfyAdapterWithdrawals(_ibAlluo);
             }
         return true;
+        }
     }
 
     /**
@@ -368,7 +369,7 @@ contract BufferManager is
                 ibAlluoToMaxRefillPerEpoch[_activeIbAlluos[i]] = _maxRefillPerEpoch[i];
                 epochDuration = _epochDuration;
 
-                Epoch memory newEpoch = Epoch(_epochDuration, 0);
+                Epoch memory newEpoch = Epoch(block.timestamp, 0);
                 ibAlluoToEpoch[_activeIbAlluos[i]].push(newEpoch);
         }
     }
@@ -376,21 +377,33 @@ contract BufferManager is
     /* ========== ADMIN CONFIGURATION ========== */
 
     /**
-    * @dev Admin function to change bridge settings
+    * @dev Admin function to change bridge interval
     * @param _bridgeInterval interval in seconds, to put limitations for an amount to be bridged 
     */
-    function changeBridgeSettings(uint256 _bridgeInterval) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function changeBridgeInterval(uint256 _bridgeInterval) external onlyRole(DEFAULT_ADMIN_ROLE) {
         bridgeInterval = _bridgeInterval;
     }
 
+    /**
+    * @dev Admin function to set minimum amount for each token that will serve as threshold to trigger bridging
+    * @param _token Address of the token
+    * @param _minAmount Minimum amount to allow bridging
+    */
     function setMinBridgeAmount(address _token, uint256 _minAmount) external onlyRole(DEFAULT_ADMIN_ROLE) {
         tokenToMinBridge[_token] = _minAmount;
     }
 
+    /**
+    * @dev Admin function to manually set relayersFeePct for bridging
+    * @param _relayerFeePct relayerFeePct in uint64
+    */
     function setRelayerFeePct(uint64 _relayerFeePct) external onlyRole(DEFAULT_ADMIN_ROLE) {
         relayerFeePct = _relayerFeePct;
     }
 
+    /**
+    * @dev Admin function to change the address of VoteExecutorSlave contract
+    */
     function setVoteExecutorSlave(address _slave) external onlyRole(DEFAULT_ADMIN_ROLE) {
         slave = _slave;
     }

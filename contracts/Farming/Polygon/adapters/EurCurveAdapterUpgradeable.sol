@@ -1,17 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+import {IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
+import {SafeERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
+
 import "../../../interfaces/curve/ICurvePoolEUR.sol";
 import "../../../interfaces/IPriceFeedRouter.sol";
 
-contract EurCurveAdapter is AccessControl {
-    using Address for address;
-    using SafeERC20 for IERC20;
+contract EurCurveAdapterUpgradeable is
+    Initializable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable
+{
+    using AddressUpgradeable for address;
+    using SafeERC20Upgradeable for IERC20;
+
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     address public constant JEUR = 0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c;
     address public constant PAR = 0xE2Aa7db6dA1dAE97C5f5C6914d285fBfCC32A128;
@@ -19,7 +28,8 @@ contract EurCurveAdapter is AccessControl {
     address public constant EURT = 0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f;
     address public constant CURVE_POOL =
         0xAd326c253A84e9805559b73A08724e11E49ca651;
-    address public buffer;
+    address public wallet;
+    bool public upgradeStatus;
     uint64 public slippage;
     address public priceFeedRouter;
     uint64 public primaryTokenIndex;
@@ -27,13 +37,24 @@ contract EurCurveAdapter is AccessControl {
 
     mapping(address => uint128) public indexes;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() initializer {}
+
     // 0 = jEUR-18dec, 1 = PAR-18dec , 2 = EURS-2dec, 3 = EURT-6dec
-    constructor (address _multiSigWallet, address _bufferManager, address _liquidityHandler, uint64 _slippage) {
+    function initialize(
+        address _multiSigWallet,
+        address _liquidityHandler,
+        uint64 _slippage
+    ) public initializer {
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
-        buffer = _bufferManager;
+        _grantRole(UPGRADER_ROLE, _multiSigWallet);
+        wallet = _multiSigWallet;
         slippage = _slippage;
 
         indexes[JEUR] = 0;
@@ -55,15 +76,23 @@ contract EurCurveAdapter is AccessControl {
     /// @notice When called by liquidity handler, moves some funds to the Gnosis multisig and others into a LP to be kept as a 'buffer'
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
-    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Buffer Manager contract (the "buffer" amount)
-    function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Gnosis wallet (the "buffer" amount)
+    function deposit(
+        address _token,
+        uint256 _fullAmount,
+        uint256 _leaveInPool
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         address primaryToken = ICurvePoolEUR(CURVE_POOL).coins(
             primaryTokenIndex
         );
         if (_token == primaryToken) {
             if (toSend != 0) {
-                IERC20(primaryToken).safeTransfer(buffer, toSend / 10**(18 - IERC20Metadata(primaryToken).decimals()));
+                IERC20(primaryToken).safeTransfer(
+                    wallet,
+                    toSend /
+                        10 ** (18 - IERC20Metadata(primaryToken).decimals())
+                );
             }
             if (_leaveInPool != 0) {
                 uint256[4] memory amounts;
@@ -89,9 +118,10 @@ contract EurCurveAdapter is AccessControl {
                     10 ** (18 - IERC20Metadata(primaryToken).decimals());
                 amounts[primaryTokenIndex] = toSend;
                 ICurvePoolEUR(CURVE_POOL).remove_liquidity_imbalance(
-                            amounts, 
-                            lpAmount * (10000+slippage)/10000);
-                IERC20(primaryToken).safeTransfer(buffer, toSend);
+                    amounts,
+                    (lpAmount * (10000 + slippage)) / 10000
+                );
+                IERC20(primaryToken).safeTransfer(wallet, toSend);
             }
         }
     }
@@ -159,8 +189,10 @@ contract EurCurveAdapter is AccessControl {
         slippage = _newSlippage;
     }
 
-    function setBuffer(address _newBufferManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        buffer = _newBufferManager;
+    function setWallet(
+        address _newWallet
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        wallet = _newWallet;
     }
 
     function setPriceRouterInfo(
@@ -182,5 +214,18 @@ contract EurCurveAdapter is AccessControl {
         uint256 _amount
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(_address).safeTransfer(_to, _amount);
+    }
+
+    function changeUpgradeStatus(
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        upgradeStatus = _status;
+    }
+
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(UPGRADER_ROLE) {
+        require(upgradeStatus, "Adapter: Upgrade not allowed");
+        upgradeStatus = false;
     }
 }

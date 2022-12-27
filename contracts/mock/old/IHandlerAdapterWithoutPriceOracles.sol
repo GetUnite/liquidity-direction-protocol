@@ -12,7 +12,10 @@ interface IHandlerAdapter {
 
     function getAdapterAmount() external view returns (uint256);
 
-    function getCoreTokens() external view returns (address primaryToken);
+    function getCoreTokens()
+        external
+        view
+        returns (address liquidToken, address primaryToken);
 
     function setSlippage(uint64 _newSlippage) external;
 
