@@ -15,10 +15,10 @@ import {
   EthNoPoolAdapterUpgradeable, BtcNoPoolAdapterUpgradeable__factory, BtcNoPoolAdapterUpgradeable
 } from "../../typechain";
 
-async function getImpersonatedSigner(address: string): Promise < SignerWithAddress > {
+async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
   await ethers.provider.send(
-      'hardhat_impersonateAccount',
-      [address]
+    'hardhat_impersonateAccount',
+    [address]
   );
 
   return await ethers.getSigner(address);
@@ -33,11 +33,11 @@ async function sendEth(users: SignerWithAddress[]) {
   let signers = await ethers.getSigners();
 
   for (let i = 0; i < users.length; i++) {
-      await signers[0].sendTransaction({
-          to: users[i].address,
-          value: parseEther("1.0")
+    await signers[0].sendTransaction({
+      to: users[i].address,
+      value: parseEther("1.0")
 
-      });
+    });
   }
 }
 
@@ -90,15 +90,15 @@ describe("BufferManager tests", () => {
   before(async function () {
     //We are forking Polygon mainnet, please set Alchemy key in .env
     await network.provider.request({
-        method: "hardhat_reset",
-        params: [{
-            forking: {
-                enabled: true,
-                jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
-                //you can fork from last block by commenting next line
-                blockNumber: 29518660,
-            },
-        }, ],
+      method: "hardhat_reset",
+      params: [{
+        forking: {
+          enabled: true,
+          jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
+          //you can fork from last block by commenting next line
+          blockNumber: 29518660,
+        },
+      },],
     });
 
     admin = await getImpersonatedSigner("0x2580f9954529853Ca5aC5543cE39E9B5B1145135");
@@ -111,7 +111,7 @@ describe("BufferManager tests", () => {
 
     curveUsdLpHolder = await getImpersonatedSigner("0x7117de93b352ae048925323f3fcb1cd4b4d52ec4");
 
-    signers = await ethers.getSigners(); 
+    signers = await ethers.getSigners();
 
     gnosis = await getImpersonatedSigner("0x2580f9954529853Ca5aC5543cE39E9B5B1145135");
     anycall = await getImpersonatedSigner("0xC10Ef9F491C9B59f936957026020C321651ac078");
@@ -132,11 +132,11 @@ describe("BufferManager tests", () => {
 
     await (await (await ethers.getContractFactory("ForceSender")).deploy({
       value: parseEther("10.0")
-    })).forceSend(gnosis.address); 
+    })).forceSend(gnosis.address);
 
     await (await (await ethers.getContractFactory("ForceSender")).deploy({
       value: parseEther("10.0")
-    })).forceSend(gelatoExecutor.address); 
+    })).forceSend(gelatoExecutor.address);
 
     await sendEth([usdWhale, jeurWhale, eurtWhale, wethWhale, wbtcWhale])
 
@@ -153,9 +153,9 @@ describe("BufferManager tests", () => {
     const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
     const Buffer = await ethers.getContractFactory("BufferManager") as BufferManager__factory;
     const Slave = await ethers.getContractFactory("VoteExecutorSlaveFinal") as VoteExecutorSlaveFinal__factory;
-    
+
     buffer = await upgrades.deployProxy(Buffer,
-      [ 604800,
+      [604800,
         1000,
         604800,
         gnosis.address,
@@ -163,17 +163,17 @@ describe("BufferManager tests", () => {
         spokepooladdress,
         anycalladdress,
         ZERO_ADDR,
-        ], {
-          initializer: 'initialize', unsafeAllow: ["delegatecall"],
-          kind: 'uups'
-      }
+      ], {
+      initializer: 'initialize', unsafeAllow: ["delegatecall"],
+      kind: 'uups'
+    }
     ) as BufferManager;
 
     handler = await upgrades.deployProxy(Handler,
       [gnosis.address, exchangeAddress], {
-          initializer: 'initialize', unsafeAllow: ["delegatecall"],
-          kind: 'uups'
-      }
+      initializer: 'initialize', unsafeAllow: ["delegatecall"],
+      kind: 'uups'
+    }
     ) as LiquidityHandler;
 
     slave = await upgrades.deployProxy(Slave,
@@ -241,58 +241,58 @@ describe("BufferManager tests", () => {
 
     ibAlluoUsd = await upgrades.deployProxy(IbAlluo,
       [
-          "Interest Bearing Alluo USD",
-          "ibAlluoUsd",
-          admin.address,
-          handler.address,
-          [
-              dai.address,
-              usdc.address,
-              usdt.address
-          ],
-          BigNumber.from("100000000470636740"),
-          1600,
-          "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
-          exchangeAddress
+        "Interest Bearing Alluo USD",
+        "ibAlluoUsd",
+        admin.address,
+        handler.address,
+        [
+          dai.address,
+          usdc.address,
+          usdt.address
+        ],
+        BigNumber.from("100000000470636740"),
+        1600,
+        "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
+        exchangeAddress
       ], {
-          initializer: 'initialize',
-          kind: 'uups'
-      }
+      initializer: 'initialize',
+      kind: 'uups'
+    }
     ) as IbAlluo;
 
     ibAlluoEur = await upgrades.deployProxy(IbAlluo,
       [
-          "Interest Bearing Alluo EUR",
-          "ibAlluoEur",
-          admin.address,
-          handler.address,
-          [
-            jeur.address,
-            par.address,
-            eurt.address,
-            eurs.address
-          ],
-          BigNumber.from("100000000470636740"),
-          1600,
-          "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
-          exchangeAddress
+        "Interest Bearing Alluo EUR",
+        "ibAlluoEur",
+        admin.address,
+        handler.address,
+        [
+          jeur.address,
+          par.address,
+          eurt.address,
+          eurs.address
+        ],
+        BigNumber.from("100000000470636740"),
+        1600,
+        "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
+        exchangeAddress
       ], {
-          initializer: 'initialize',
-          kind: 'uups'
-      }
+      initializer: 'initialize',
+      kind: 'uups'
+    }
     ) as IbAlluo;
 
     ibAlluoEth = await upgrades.deployProxy(IbAlluo,
       [
-          "Interest Bearing Alluo ETH",
-          "ibAlluoEth",
-          admin.address,
-          handler.address,
-          [weth.address],
-          BigNumber.from("100000000470636740"),
-          1600,
-          "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
-          exchangeAddress
+        "Interest Bearing Alluo ETH",
+        "ibAlluoEth",
+        admin.address,
+        handler.address,
+        [weth.address],
+        BigNumber.from("100000000470636740"),
+        1600,
+        "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
+        exchangeAddress
       ], {
       initializer: 'initialize',
       kind: 'uups',
@@ -303,22 +303,22 @@ describe("BufferManager tests", () => {
 
     ibAlluoBtc = await upgrades.deployProxy(IbAlluo,
       [
-          "Interest Bearing Alluo BTC",
-          "ibAlluoBtc",
-          admin.address,
-          handler.address,
-          [wbtc.address],
-          BigNumber.from("100000000470636740"),
-          1600,
-          "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
-          exchangeAddress
+        "Interest Bearing Alluo BTC",
+        "ibAlluoBtc",
+        admin.address,
+        handler.address,
+        [wbtc.address],
+        BigNumber.from("100000000470636740"),
+        1600,
+        "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
+        exchangeAddress
       ], {
       initializer: 'initialize',
       kind: 'uups',
       unsafeAllow: ["delegatecall"]
 
-  }
-  ) as IbAlluo;
+    }
+    ) as IbAlluo;
 
     await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoUsd.address)
     await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), ibAlluoEur.address)
@@ -405,8 +405,20 @@ describe("BufferManager tests", () => {
     await slave.connect(gnosis).setEntries([entry])
     await slave.connect(gnosis).grantRole(await slave.DEFAULT_ADMIN_ROLE(), buffer.address)
   });
+  it.only("Test BufferManager confirmEpoch", async () => {
+    await buffer.connect(gnosis).setEpochDuration(600);
+    expect(await buffer.epochDuration()).to.eq(600)
+    await buffer.confirmEpoch(ibAlluoUsd.address);
+    await ethers.provider.send("evm_increaseTime", [610]);
+    await ethers.provider.send("evm_mine", []);
+    await buffer.confirmEpoch(ibAlluoUsd.address);
 
+    await ethers.provider.send("evm_increaseTime", [1200]);
+    await ethers.provider.send("evm_mine", []);
+    await buffer.confirmEpoch(ibAlluoUsd.address);
+  })
   describe("Upgrade functionality", async () => {
+
     it("Tests upgradeability of the BufferManager", async () => {
       let BufferCurrent = await ethers.getContractAt("BufferManager", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
       await BufferCurrent.connect(admin).grantRole("0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3", "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266")
@@ -434,10 +446,10 @@ describe("BufferManager tests", () => {
       console.log("refill", execPayload)
     })
 
-    it("Adapters don't need a refill, balance exceeds minBridgeAmount, returns true, and swap call", async() => {
+    it("Adapters don't need a refill, balance exceeds minBridgeAmount, returns true, and swap call", async () => {
       console.log(await usdc.balanceOf(buffer.address))
       await deposit(signers[1], usdc, parseUnits("40000", 6))
-      
+
       const [canExec, execPayload] = await buffer.checker()
       expect(canExec).to.eq(true)
       console.log("swap", execPayload)
@@ -454,7 +466,7 @@ describe("BufferManager tests", () => {
       expect(canExec1).to.eq(true)
     })
 
-    it("Adapter needs a refill, buffer balance < refill, gnosis has enough funds, returns true", async() => {
+    it("Adapter needs a refill, buffer balance < refill, gnosis has enough funds, returns true", async () => {
       await deposit(signers[1], usdc, parseUnits("50000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("40000", 18))
 
@@ -481,8 +493,8 @@ describe("BufferManager tests", () => {
     })
   })
 
-  describe("refillBuffer", async() => {
-    it("Should refill adapters", async() => {
+  describe("refillBuffer", async () => {
+    it("Should refill adapters", async () => {
       await deposit(signers[1], usdc, parseUnits("20000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
       await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("40000", 6))
@@ -491,7 +503,7 @@ describe("BufferManager tests", () => {
       expect(await buffer.adapterRequiredRefill(ibAlluoUsd.address)).to.eq(0);
     })
 
-    it("Should refill adapter using gnosis funds", async() => {
+    it("Should refill adapter using gnosis funds", async () => {
       await deposit(signers[1], usdc, parseUnits("20000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
       await buffer.connect(gnosis).swap(await usdc.balanceOf(buffer.address), usdc.address)
@@ -504,7 +516,7 @@ describe("BufferManager tests", () => {
       expect(await buffer.adapterRequiredRefill(ibAlluoUsd.address)).to.eq(0)
     })
 
-    it("Should refill using both buffer and gnosis", async() => {
+    it("Should refill using both buffer and gnosis", async () => {
       await deposit(signers[1], usdc, parseUnits("20000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
       console.log("Balance before refilling", await usdc.balanceOf(signers[1].address))
@@ -516,20 +528,20 @@ describe("BufferManager tests", () => {
       console.log("Balance after refilling", balanceAfter)
     })
 
-    it("Should not refill: Cumulative refills exceeds limit", async() => {
+    it("Should not refill: Cumulative refills exceeds limit", async () => {
       await deposit(signers[1], usdc, parseUnits("20000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
       await buffer.connect(gnosis).swap(parseUnits("10000", 6), usdc.address)
       expect(buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)).to.be.revertedWith("Cumulative refills exceeds limit")
     })
 
-    it("Should not refill, refill not needed", async() => {
+    it("Should not refill, refill not needed", async () => {
       await buffer.connect(gnosis).setMaxRefillPerEpoch(ibAlluoUsd.address, parseUnits("50000", 18))
       await usdc.connect(gnosis).approve(buffer.address, await usdc.balanceOf(gnosis.address))
       expect(buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)).to.be.revertedWith("No refill required");
     })
 
-    it("Should not refill, both gnosis and buffer can't cover", async() => {
+    it("Should not refill, both gnosis and buffer can't cover", async () => {
       await deposit(signers[1], usdc, parseUnits("10000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("8000", 18))
       await usdc.connect(gnosis).transfer(usdWhale.address, await usdc.balanceOf(gnosis.address))
@@ -587,27 +599,27 @@ describe("BufferManager tests", () => {
     it("Should execute swap", async () => {
       await (await (await ethers.getContractFactory("ForceSender")).deploy({
         value: parseEther("10.0")
-        })).forceSend(gelatoExecutor.address); 
-  
-        await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("2000", 6))
-  
-        await buffer.connect(gelatoExecutor).swap(parseUnits("1800", 6), usdc.address);
+      })).forceSend(gelatoExecutor.address);
+
+      await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("2000", 6))
+
+      await buffer.connect(gelatoExecutor).swap(parseUnits("1800", 6), usdc.address);
     })
 
     it("Should not allow to swap twice immediately", async () => {
       await (await (await ethers.getContractFactory("ForceSender")).deploy({
-      value: parseEther("10.0")
-      })).forceSend(gelatoExecutor.address); 
+        value: parseEther("10.0")
+      })).forceSend(gelatoExecutor.address);
 
       await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("2000", 6))
 
       await buffer.connect(gelatoExecutor).swap(parseUnits("1800", 6), usdc.address);
       expect(buffer.connect(gelatoExecutor).swap(parseUnits("2300", 6), usdc.address)).to.be.revertedWith("Swap: <minInterval!")
     })
-  })   
+  })
 
   describe("isAdapterPendingWithdrawal", async () => {
-    it("Should return false when no withdrawals, true after requested one", async() => {
+    it("Should return false when no withdrawals, true after requested one", async () => {
       expect(await buffer.isAdapterPendingWithdrawal(ibAlluoUsd.address)).to.eq(false)
       await deposit(signers[2], usdc, parseUnits("500", 6))
       await ibAlluoUsd.connect(signers[2]).withdraw(usdc.address, parseUnits("300", 18))
@@ -668,7 +680,7 @@ describe("BufferManager tests", () => {
       expect(pct1).to.eq(58)
     })
   })
-  
+
   describe("Case Testing", async () => {
     it("USDC deposit, attempted withdrawal immediately, success after another deposit", async () => {
       await deposit(signers[5], usdc, parseUnits("1000", 6))
@@ -683,7 +695,7 @@ describe("BufferManager tests", () => {
       expect(Number(await usdc.balanceOf(signers[5].address))).greaterThanOrEqual(Number(parseUnits("900", 6)))
     })
 
-    it("EURT deposit, attempted withdrawal, success after buffer is refilled", async() => {
+    it("EURT deposit, attempted withdrawal, success after buffer is refilled", async () => {
       // Deposit
       await eurt.connect(eurtWhale).transfer(signers[2].address, parseUnits("700", 6));
       await eurt.connect(signers[2]).approve(ibAlluoEur.address, parseUnits("700", 6));
@@ -699,7 +711,7 @@ describe("BufferManager tests", () => {
 
     })
 
-    it("WETH deposit, attempted withdrawal, success after buffer is refilled", async() => {
+    it("WETH deposit, attempted withdrawal, success after buffer is refilled", async () => {
       // Deposit
       await weth.connect(wethWhale).transfer(signers[2].address, parseUnits("2", 18));
       await weth.connect(signers[2]).approve(ibAlluoEth.address, parseUnits("2", 18));
@@ -712,13 +724,13 @@ describe("BufferManager tests", () => {
       // Gelato checker is now true
       const [canExec, execPayload] = await buffer.checker();
       expect(canExec).to.eq(true)
-      
+
       // Executing refill after gelato is flagged
       await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoEth.address)
       expect(Number(await weth.balanceOf(signers[2].address))).to.eq(Number(parseUnits("1", 18)))
     })
 
-    it("WBTC deposit, attempted withdrawal, success after buffer is refilled", async() => {
+    it("WBTC deposit, attempted withdrawal, success after buffer is refilled", async () => {
       // Deposit
       await wbtc.connect(wbtcWhale).transfer(signers[2].address, parseUnits("2", 8));
       await wbtc.connect(signers[2]).approve(ibAlluoBtc.address, parseUnits("2", 8));
@@ -805,18 +817,18 @@ describe("BufferManager tests", () => {
       expect(await buffer.tokenToEth(ibAlluoUsd.address)).to.eq(dai.address);
     })
 
-    it("Should set maxRefillPerEpoch", async() => {
+    it("Should set maxRefillPerEpoch", async () => {
       await buffer.connect(gnosis).setMaxRefillPerEpoch(ibAlluoUsd.address, 420);
       expect(await buffer.ibAlluoToMaxRefillPerEpoch(ibAlluoUsd.address)).to.eq(420)
     })
 
-    it("Should set Epoch duration", async() => {
+    it("Should set Epoch duration", async () => {
       await buffer.connect(gnosis).setEpochDuration(420);
       expect(await buffer.epochDuration()).to.eq(420)
     })
   })
 
-  
+
   async function deposit(recipient: SignerWithAddress, token: IERC20, amount: BigNumberish) {
     await token.connect(usdWhale).transfer(recipient.address, amount);
 
