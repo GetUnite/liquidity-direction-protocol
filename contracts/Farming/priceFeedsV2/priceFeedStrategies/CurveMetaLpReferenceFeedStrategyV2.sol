@@ -22,6 +22,7 @@ contract CurveMetaLpReferenceFeedStrategyV2 is
     uint128 public referenceCoinIndex;
     bytes public typeOfTokenIndex;
     uint8 public referenceCoinDecimals;
+    address public underlyingPool;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -33,7 +34,8 @@ contract CurveMetaLpReferenceFeedStrategyV2 is
         uint8 _referenceCoinIndex, // token index which feed (_referenceFeedAddress) we already have
         uint8 _referenceCoinDecimals, // decimals of coin in pool we are referring to
         uint256 _lpOneTokenAmount, // 1.0 of desired lp coin token with decimals
-        bytes memory _typeOfTokenIndex
+        bytes memory _typeOfTokenIndex,
+        address _underlyingPool
     ) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
@@ -46,6 +48,7 @@ contract CurveMetaLpReferenceFeedStrategyV2 is
         referenceFeed = IFeedStrategy(_referenceFeedAddress);
         referenceCoinDecimals = _referenceCoinDecimals;
         typeOfTokenIndex = _typeOfTokenIndex;
+        underlyingPool = _underlyingPool;
     }
 
     function getPrice() external view returns (int256 value, uint8 decimals) {
@@ -54,11 +57,12 @@ contract CurveMetaLpReferenceFeedStrategyV2 is
         bytes memory curveCall = abi.encodeWithSignature(
             string(
                 bytes.concat(
-                    "calc_withdraw_one_coin(uint256,",
+                    "calc_withdraw_one_coin(address,uint256,",
                     typeOfTokenIndex,
                     ")"
                 )
             ),
+            underlyingPool,
             lpOneTokenAmount,
             referenceCoinIndex
         );
@@ -83,11 +87,12 @@ contract CurveMetaLpReferenceFeedStrategyV2 is
         bytes memory curveCall = abi.encodeWithSignature(
             string(
                 bytes.concat(
-                    "calc_withdraw_one_coin(uint256,",
+                    "calc_withdraw_one_coin(address,uint256,",
                     typeOfTokenIndex,
                     ")"
                 )
             ),
+            underlyingPool,
             amount,
             referenceCoinIndex
         );
