@@ -328,7 +328,6 @@ contract LiquidityHandler is
                         withdrawal.token,
                         withdrawal.amount
                     );
-
                     inAdapter -= withdrawal.amount;
                     withdrawalSystem.totalWithdrawalAmount -= withdrawal.amount;
                     withdrawalSystem.lastSatisfiedWithdrawal++;
@@ -393,7 +392,9 @@ contract LiquidityHandler is
 
         uint256 totalWithdrawalAmount = ibAlluoToWithdrawalSystems[_ibAlluo]
             .totalWithdrawalAmount;
-
+        // console.log("Total supply", IIbAlluo(_ibAlluo).totalAssetSupply());
+        // console.log("pct", percentage);
+        // console.log("newAmount", _newAmount);
         return
             ((_newAmount + IIbAlluo(_ibAlluo).totalAssetSupply()) *
                 percentage) /

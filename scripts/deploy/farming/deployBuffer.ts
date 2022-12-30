@@ -7,10 +7,19 @@ async function main() {
   const gnosis = "0x2580f9954529853Ca5aC5543cE39E9B5B1145135";
 
   let buffer = await upgrades.deployProxy(Buffer,
-        [gnosis],
-        {initializer: 'initialize', kind:'uups'}
-  );
-
+    [604800,
+      1000,
+      604800,
+      gnosis,
+      gelatoExecutor.address,
+      spokepooladdress,
+      anycalladdress,
+      ZERO_ADDR,
+    ], {
+    initializer: 'initialize', unsafeAllow: ["delegatecall"],
+    kind: 'uups'
+  }
+  )
   console.log("Buffer upgradable deployed to:", buffer.address);
 }
 

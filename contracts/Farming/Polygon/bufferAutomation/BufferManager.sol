@@ -16,6 +16,8 @@ import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "../../../interfaces/ILiquidityHandler.sol";
 import "../../../interfaces/IHandlerAdapter.sol";
 import "../../../interfaces/IVoteExecutorSlave.sol";
+import "../../../interfaces/ISpokePool.sol";
+import "../../../interfaces/ICallProxy.sol";
 import "hardhat/console.sol";
 
 contract BufferManager is
@@ -29,17 +31,28 @@ contract BufferManager is
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
+    event Bridge(
+        address distributor,
+        address originToken,
+        address EthToken,
+        uint256 amount,
+        uint64 relayerFeePct,
+        uint256[] directions,
+        uint256[] percentage
+    );
+
     bool public upgradeStatus;
 
+    // address of the DepositDistributor on mainnet
+    address public distributor;
+    address public slave;
     // address of the anycall contract on polygon
     address public anycall;
     // adress of the Across bridge contract to initiate the swap
     address public spokepool;
-    uint256 public epochDuration;
     address public gnosis;
-    // address of the DepositDistributor on mainnet
-    address public distributor;
-    address public slave;
+    uint256 public epochDuration;
+    
 
     // bridge settings
     uint256 public lastExecuted;
@@ -59,8 +72,10 @@ contract BufferManager is
     mapping(address => address) public tokenToEth;
     mapping(address => uint256) public tokenToMinBridge;
 
+    // EnumerableSet of currently supported IBAlluo
     EnumerableSetUpgradeable.AddressSet private activeIbAlluos;
 
+    // Data used to prevent draining the gnosis by setting a relevant limit to be used
     struct Epoch {
         uint256 startTime;
         uint256 refilledPerEpoch;
@@ -106,6 +121,7 @@ contract BufferManager is
         _grantRole(DEFAULT_ADMIN_ROLE, _gnosis);
         _grantRole(UPGRADER_ROLE, _gnosis);
         _grantRole(GELATO, _gelato);
+        _grantRole(GELATO, _gnosis);
         _grantRole(SWAPPER, _gelato);
         _grantRole(SWAPPER, _gnosis);
     }
@@ -157,6 +173,7 @@ contract BufferManager is
      * either Gelato or Multisig, in order to prevent malicious actions
      * @dev Bridges assets using Across Bridge and info about the amounts using Multichain AnyCallV6
      * @param amount Amount of the funds to be transferred
+     * @param originToken Address of the token to be bridged
      */
     function swap(
         uint256 amount,
@@ -182,7 +199,7 @@ contract BufferManager is
             uint256[] memory direction,
             uint256[] memory percentage
         ) = IVoteExecutorSlave(slave).getEntries();
-        CallProxy(anycall).anyCall(
+        ICallProxy(anycall).anyCall(
             // address of the collector contract on mainnet
             distributor,
             abi.encode(direction, percentage, tokenEth, amount),
@@ -190,6 +207,16 @@ contract BufferManager is
             1,
             // 0 flag to pay fee on destination chain
             0
+        );
+
+        emit Bridge(
+            distributor,
+            originToken,
+            tokenEth,
+            amount,
+            relayerFeePct,
+            direction,
+            percentage
         );
     }
 
@@ -218,7 +245,7 @@ contract BufferManager is
     /**
      * @dev Function checks if IBAlluos respective adapter has queued withdrawals
      * @param _ibAlluo Address of the IBAlluo pool
-     * @return True if there is a pending withdrawal on correspoding to an IBAlluo pool adapter
+     * @return isAdapterPendingWithdrawal bool - true if there is a pending withdrawal on correspoding to an IBAlluo pool adapter
      */
     function isAdapterPendingWithdrawal(
         address _ibAlluo
@@ -234,24 +261,23 @@ contract BufferManager is
     /**
      * @notice Function checks the amount of asset that needs to be transferred for an adapter to be filled
      * @param _ibAlluo Address of an IBAlluo contract, which corresponding adapter is to be filled
+     * @return requiredRefill Amount to be refilled with 18 decimals
      */
     function adapterRequiredRefill(
         address _ibAlluo
     ) public view returns (uint256) {
         uint256 expectedAmount = handler.getExpectedAdapterAmount(_ibAlluo, 0);
         uint256 actualAmount = handler.getAdapterAmount(_ibAlluo);
-        if (actualAmount < expectedAmount) {
-            // Think of case if someone tries to break it by sending extra tokens to the buffer directly
-            uint256 difference = expectedAmount - actualAmount;
-            if ((difference * 10000) / expectedAmount > 500) {
-                return difference;
-            } else {
-                return 0;
-            }
-        } else {
+        if (actualAmount >= expectedAmount) {
             return 0;
-        }
-        return difference; 
+        } 
+        // Think of case if someone tries to break it by sending extra tokens to the buffer directly
+        uint256 difference = expectedAmount - actualAmount;
+        if ((difference * 10000) / expectedAmount <= 500) {
+            return 0;
+        } 
+    
+        return difference;
     }
 
     /**
@@ -272,18 +298,8 @@ contract BufferManager is
                 ibAlluoToEpoch[_ibAlluo].push(newEpoch);
             }
         }
-        // This should work because we are pointing at a specific memory slot.
         Epoch storage finalEpoch = relevantEpochs[relevantEpochs.length - 1];
-        console.log("RelevantEpochsLengthAfter", relevantEpochs.length);
-        console.log("FinalEpoch", finalEpoch.startTime);
-        console.log("FinalEpochRefilled", finalEpoch.refilledPerEpoch);
         return finalEpoch;
-    }
-
-    function confirmEpoch(address _ibAlluo) public returns (Epoch memory) {
-        Epoch storage test = _confirmEpoch(_ibAlluo);
-        Epoch memory memoryTest = test;
-        return memoryTest;
     }
 
     /**
@@ -310,6 +326,7 @@ contract BufferManager is
             bufferBalance = bufferBalance * 10 ** decDif;
             gnosisBalance = gnosisBalance * 10 ** decDif;
         }
+        totalAmount+= totalAmount * 5 / 100;
         if (bufferBalance < totalAmount) {
             if (totalAmount < bufferBalance + gnosisBalance) {
                 uint256 gnosisAmount = totalAmount - bufferBalance;
@@ -334,8 +351,6 @@ contract BufferManager is
                         bufferBalance / 10 ** decDif
                     );
                 }
-                // IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance);
-
                 IHandlerAdapter(adapterAddress).deposit(
                     bufferToken,
                     totalAmount,
@@ -348,14 +363,14 @@ contract BufferManager is
             } else {
                 return false;
             }
-        } 
+        } else {
         IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance / 10 ** decDif);
         IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
         if (isAdapterPendingWithdrawal(_ibAlluo)) {
             handler.satisfyAdapterWithdrawals(_ibAlluo);
         }
         return true;
-    
+        }
     }
 
     /**
@@ -367,10 +382,8 @@ contract BufferManager is
         address token,
         uint256 amount
     ) public view returns (bool) {
-        if (amount >= tokenToMinBridge[token]) {
-            if (block.timestamp >= lastExecuted + bridgeInterval) {
-                return true;
-            }
+        if (amount >= tokenToMinBridge[token] && block.timestamp >= lastExecuted + bridgeInterval) {
+            return true;   
         }
         return false;
     }
@@ -392,13 +405,8 @@ contract BufferManager is
             gnosisBalance = gnosisBalance * 10 ** decDif;
         }
         uint256 refill = adapterRequiredRefill(_iballuo);
-        if (refill > 0) {
-            if (refill < balance) {
-                return true;
-            }
-            if (refill < gnosisBalance + balance) {
-                return true;
-            }
+        if (refill > 0 && refill < gnosisBalance + balance) {
+            return true;
         }
         return false;
     }
@@ -550,30 +558,5 @@ contract BufferManager is
     }
 }
 
-interface CallProxy {
-    function anyCall(
-        address _to,
-        bytes calldata _data,
-        address _fallback,
-        uint256 _toChainID,
-        uint256 _flags
-    ) external;
-}
 
-interface ISpokePool {
-    function deposit(
-        address recipient,
-        address originToken,
-        uint256 amount,
-        uint256 destinationChainId,
-        uint64 relayerFeePct,
-        uint32 quoteTimestamp
-    ) external payable;
 
-    function speedUpDeposit(
-        address depositor,
-        uint64 newRelayerFeePct,
-        uint32 depositId,
-        bytes memory depositorSignature
-    ) external;
-}
