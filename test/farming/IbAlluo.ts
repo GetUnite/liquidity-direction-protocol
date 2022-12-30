@@ -124,6 +124,15 @@ describe("IbAlluoUSD and Handler", function () {
         exchangeAddress = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773";
 
         handler = await ethers.getContractAt("LiquidityHandler", "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1");
+        const LiquidityHandlerOld = await ethers.getContractFactory("LiquidityHandlerWithoutPriceOracles");
+        const LiquidityHandlerNew = await ethers.getContractFactory("LiquidityHandler");
+        await upgrades.forceImport(handler.address, LiquidityHandlerOld);
+        await handler.connect(admin).changeUpgradeStatus(true);
+        await handler.connect(admin).grantRole(
+            await handler.UPGRADER_ROLE(),
+            signers[0].address
+        )
+        await upgrades.upgradeProxy(handler.address, LiquidityHandlerNew);
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), multisig.address)
 

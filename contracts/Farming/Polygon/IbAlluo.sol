@@ -2,7 +2,7 @@
 pragma solidity ^0.8.11;
 
 import "./AlluoERC20Upgradable.sol";
-import "../../interfaces/ILiquidityHandler.sol";
+import {ILiquidityHandlerPolygon as ILiquidityHandler} from "../../interfaces/ILiquidityHandlerPolygon.sol";
 import "../../mock/interestHelper/Interest.sol";
 import "../../interfaces/IExchange.sol";
 import "../../interfaces/superfluid/ISuperfluidToken.sol";
@@ -330,6 +330,7 @@ contract IbAlluo is
         uint256 _amount
     ) public {
         updateRatio();
+        uint256 fiatAmount = _amount;
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
         _burn(_msgSender(), adjustedAmount);
         ILiquidityHandler handler = ILiquidityHandler(liquidityHandler);
@@ -351,9 +352,15 @@ contract IbAlluo is
                     .buildRoute(liquidToken, _targetToken)
                     .length > 0
             );
-            handler.withdraw(_recipient, liquidToken, _amount, _targetToken);
+            handler.withdraw(
+                _recipient,
+                liquidToken,
+                _amount,
+                fiatAmount,
+                _targetToken
+            );
         } else {
-            handler.withdraw(_recipient, _targetToken, _amount);
+            handler.withdraw(_recipient, _targetToken, _amount, fiatAmount);
         }
 
         emit TransferAssetValue(

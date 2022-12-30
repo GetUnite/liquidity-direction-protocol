@@ -113,7 +113,7 @@ describe("IbAlluoUSD and Handler Mainnet", function () {
     beforeEach(async function () {
 
         const IbAlluo = await ethers.getContractFactory("IbAlluoMainnet") as IbAlluoMainnet__factory;
-        const LiquidityHandler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
+        const LiquidityHandler = await ethers.getContractFactory("LiquidityHandlerWithoutPriceOracles");
         //We are using this contract to simulate Gnosis multisig wallet
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
         multisig = await Multisig.deploy(true);
