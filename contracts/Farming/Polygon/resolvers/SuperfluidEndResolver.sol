@@ -25,13 +25,36 @@ contract SuperfluidEndResolver is AccessControl {
     );
     event ClosedStreamEndDate(address indexed sender, address indexed receiver);
 
-    constructor(address[] memory _ibAlluoAddresses, address _gelato) {
+    constructor(address[] memory _ibAlluoAddresses, address _multisig) {
         for (uint i; i < _ibAlluoAddresses.length; i++) {
             _grantRole(DEFAULT_ADMIN_ROLE, _ibAlluoAddresses[i]);
         }
         ibAlluoAddresses = _ibAlluoAddresses;
-        _grantRole(GELATO, _gelato);
-        _grantRole(GELATO, msg.sender);
+
+        _grantRole(GELATO, 0x0391ceD60d22Bc2FadEf543619858b12155b7030);
+        _grantRole(DEFAULT_ADMIN_ROLE, _multisig);
+        _grantRole(GELATO, _multisig);
+    }
+
+    function migratePreExistingStreams(
+        address[] memory _tokens,
+        address[] memory _from,
+        address[] memory _to,
+        uint256[] memory _timestamps
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(
+            _tokens.length == _from.length &&
+                _from.length == _to.length &&
+                _to.length == _timestamps.length,
+            "SuperfluidEndResolver: INVALID_INPUT_LENGTH"
+        );
+        for (uint i; i < _tokens.length; i++) {
+            ibAlluoToStreamingData[_tokens[i]][_from[i]].add(_to[i]);
+            ibAlluoToActiveStreamers[_tokens[i]].add(_from[i]);
+            ibAlluoStreamDataToTimestamp[_tokens[i]][_from[i]][
+                _to[i]
+            ] = _timestamps[i];
+        }
     }
 
     function addToChecker(
@@ -112,11 +135,28 @@ contract SuperfluidEndResolver is AccessControl {
         return (false, address(0));
     }
 
+    function isStreamCloseToEndDate(
+        address _sender,
+        address _token,
+        address _receiver
+    ) public view returns (bool) {
+        uint256 timestamp = ibAlluoStreamDataToTimestamp[_token][_sender][
+            _receiver
+        ];
+        if (timestamp != 0 && block.timestamp >= timestamp) {
+            return true;
+        }
+        return false;
+    }
+
     function liquidateSender(
         address _sender,
         address _receiver,
         address _token
     ) external onlyRole(GELATO) {
+        if (!isStreamCloseToEndDate(_sender, _token, _receiver)) {
+            return;
+        }
         try IIbAlluo(_token).stopFlowWhenCritical(_sender, _receiver) {} catch {
             ibAlluoToStreamingData[_token][_sender].remove(_receiver);
             if (ibAlluoToStreamingData[_token][_sender].length() == 0) {
