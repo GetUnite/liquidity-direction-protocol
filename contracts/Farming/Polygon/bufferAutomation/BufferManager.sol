@@ -18,7 +18,6 @@ import "../../../interfaces/IHandlerAdapter.sol";
 import "../../../interfaces/IVoteExecutorSlave.sol";
 import "../../../interfaces/ISpokePool.sol";
 import "../../../interfaces/ICallProxy.sol";
-import "hardhat/console.sol";
 
 contract BufferManager is
     Initializable,
@@ -53,7 +52,6 @@ contract BufferManager is
     address public gnosis;
     uint256 public epochDuration;
     
-
     // bridge settings
     uint256 public lastExecuted;
     uint256 public bridgeInterval;
@@ -100,7 +98,6 @@ contract BufferManager is
         uint256 _brigeGenesis,
         uint256 _bridgeInterval,
         address _gnosis,
-        address _gelato,
         address _spokepool,
         address _anycall,
         address _distributor
@@ -120,9 +117,7 @@ contract BufferManager is
 
         _grantRole(DEFAULT_ADMIN_ROLE, _gnosis);
         _grantRole(UPGRADER_ROLE, _gnosis);
-        _grantRole(GELATO, _gelato);
         _grantRole(GELATO, _gnosis);
-        _grantRole(SWAPPER, _gelato);
         _grantRole(SWAPPER, _gnosis);
     }
 
@@ -134,17 +129,14 @@ contract BufferManager is
      * @return canExec Bool, if true - initiates the call by gelato
      * @return execPayload Data to be called by gelato
      */
-    function checker()
+    function checkerBridge()
         external
         view
         returns (bool canExec, bytes memory execPayload)
     {
         for (uint256 i; i < activeIbAlluos.length(); i++) {
-            address iballuo = activeIbAlluos.at(i);
-            address token = IHandlerAdapter(ibAlluoToAdapter[iballuo]).getCoreTokens();
-            uint256 amount = IERC20Upgradeable(token).balanceOf(address(this));
-            if (adapterRequiredRefill(iballuo) == 0) {
-                if (canBridge(token, amount)) {
+            (address iballuo, address token, uint256 amount) = getValues(i);
+            if (adapterRequiredRefill(iballuo) == 0 && canBridge(token, amount)) {
                     canExec = true;
                     execPayload = abi.encodeWithSelector(
                         BufferManager.swap.selector,
@@ -155,7 +147,25 @@ contract BufferManager is
 
                     break;
                 }
-            } else if (canRefill(iballuo, token)) {
+            }
+        
+        return (canExec, execPayload);
+    }
+
+    /**
+    * @dev Triggers GELATO to refill buffer
+    * @dev Checks buffer balance, balance of the gnosis and compares if he can execute the refill
+    * @return canExec bool, serves as a flag for gelato
+    * @return execPayload encoded call to refillBuffer with correct values
+    */
+    function checkerRefill()
+        external
+        view
+        returns (bool canExec, bytes memory execPayload)
+    {
+        for (uint256 i; i < activeIbAlluos.length(); i++) {
+            (address iballuo, address token,) = getValues(i);
+            if (canRefill(iballuo, token)) {
                 canExec = true;
                 execPayload = abi.encodeWithSelector(
                     BufferManager.refillBuffer.selector,
@@ -165,13 +175,15 @@ contract BufferManager is
                 break;
             }
         }
+
         return (canExec, execPayload);
     }
 
     /**
-     * @notice Function is called by gelato resolver,when checker flags it. Can only be called by
-     * either Gelato or Multisig, in order to prevent malicious actions
-     * @dev Bridges assets using Across Bridge and info about the amounts using Multichain AnyCallV6
+     * @notice Function is called by gelato when checker flags it. Can only be called by
+     * either Gelato or Multisig
+     * @dev Bridges assets using Across Bridge by UMA Protocol (Source: https://across.to/)
+     * @dev Bridges data for liquidity direction using Multichain AnyCallV6
      * @param amount Amount of the funds to be transferred
      * @param originToken Address of the token to be bridged
      */
@@ -221,7 +233,8 @@ contract BufferManager is
     }
 
     /**
-     * @dev Function serves as a leverage in case a swap gets stuck. Only called manually by multisig.
+     * @dev Function serves as a leverage to tackle a scenario in which previously set up fee was insufficient
+     * for funds to go. Only called manually by multisig.
      * @param newRelayerFeePct Relayer fee Pct to be updated
      * @param depositId ID of the deposit to be sped up, needs to be accessed from the event emitted by
      * the swap call
@@ -270,13 +283,11 @@ contract BufferManager is
         uint256 actualAmount = handler.getAdapterAmount(_ibAlluo);
         if (actualAmount >= expectedAmount) {
             return 0;
-        } 
-        // Think of case if someone tries to break it by sending extra tokens to the buffer directly
-        uint256 difference = expectedAmount - actualAmount;
+        }
+        uint256 difference = expectedAmount - actualAmount; 
         if ((difference * 10000) / expectedAmount <= 500) {
             return 0;
         } 
-    
         return difference;
     }
 
@@ -303,18 +314,23 @@ contract BufferManager is
     }
 
     /**
+     * @notice adapterRequiredRefill() and deposit() operate with 18 decimals, so balances need to be adjusted
      * @dev Refills corresponding IBAlluo adapter with prior checks and triggers executing queued withdrawals on the adapter
+     * @dev First checks if buffer has enough funds to refill adapter. If not - checks if funds on buffer and gnosis multisig
+     * together are enough to satisfy adapters. Uses all the available funds in buffer, takes rest from gnosis.
+     * @dev After successful refill calls deposit() on corresponding adapter, instructing to leave all the funds in pool. 
+     * If there are any queued withdrawals on adapter - satisfies them
      * @param _ibAlluo address of corresponding IBAlluo
      */
     function refillBuffer(
         address _ibAlluo
     ) external onlyRole(GELATO) returns (bool) {
-        address adapterAddress = ibAlluoToAdapter[_ibAlluo];
-        address bufferToken = IHandlerAdapter(adapterAddress).getCoreTokens();
         uint256 totalAmount = adapterRequiredRefill(_ibAlluo);
 
         require(totalAmount > 0, "No refill required");
 
+        address adapterAddress = ibAlluoToAdapter[_ibAlluo];
+        address bufferToken = IHandlerAdapter(adapterAddress).getCoreTokens();
         uint256 decDif = 18 - IERC20MetadataUpgradeable(bufferToken).decimals();
         uint256 bufferBalance = IERC20Upgradeable(bufferToken).balanceOf(
             address(this)
@@ -322,43 +338,15 @@ contract BufferManager is
         uint256 gnosisBalance = IERC20Upgradeable(bufferToken).balanceOf(
             gnosis
         );
-        if (decDif > 0) {
-            bufferBalance = bufferBalance * 10 ** decDif;
-            gnosisBalance = gnosisBalance * 10 ** decDif;
-        }
-        totalAmount+= totalAmount * 5 / 100;
+        
+        bufferBalance = bufferBalance * 10 ** decDif;
+        gnosisBalance = gnosisBalance * 10 ** decDif;
+        // 2 percent on top to be safe against pricefeed and lp slippage
+        totalAmount  += totalAmount * 200 / 10000;
+
         if (bufferBalance < totalAmount) {
             if (totalAmount < bufferBalance + gnosisBalance) {
-                uint256 gnosisAmount = totalAmount - bufferBalance;
-
-                Epoch storage currentEpoch = _confirmEpoch(_ibAlluo);
-
-                require(
-                    ibAlluoToMaxRefillPerEpoch[_ibAlluo] >=
-                        currentEpoch.refilledPerEpoch + gnosisAmount,
-                    "Cumulative refills exceeds limit"
-                );
-
-                currentEpoch.refilledPerEpoch += totalAmount;
-                IERC20Upgradeable(bufferToken).transferFrom(
-                    gnosis,
-                    adapterAddress,
-                    gnosisAmount / 10 ** decDif
-                );
-                if (gnosisAmount != totalAmount) {
-                    IERC20Upgradeable(bufferToken).transfer(
-                        adapterAddress,
-                        bufferBalance / 10 ** decDif
-                    );
-                }
-                IHandlerAdapter(adapterAddress).deposit(
-                    bufferToken,
-                    totalAmount,
-                    totalAmount
-                );
-                if (isAdapterPendingWithdrawal(_ibAlluo)) {
-                    handler.satisfyAdapterWithdrawals(_ibAlluo);
-                }
+                refillGnosis(totalAmount, bufferBalance, bufferToken, _ibAlluo, adapterAddress, decDif);
                 return true;
             } else {
                 return false;
@@ -372,9 +360,60 @@ contract BufferManager is
         return true;
         }
     }
+    
+    /**
+    * @notice All the amounts are 18 decimals
+    * @dev Internal function called by refillBuffer() in a scenario of using gnosis funds to execute the refill
+    * @param totalAmount Required amount to fully refill the adapter
+    * @param bufferBalance Amount of the asset on buffer
+    * @param bufferToken Address of the token used to refill
+    * @param ibAlluo Address of the ibAlluo binded to the adapter
+    * @param adapterAddress Address of the adapter to be refilled
+    * @param decDif Decimal difference, see notice in refillBuffer() for details
+    */
+    function refillGnosis(
+        uint256 totalAmount, 
+        uint256 bufferBalance, 
+        address bufferToken, 
+        address ibAlluo, 
+        address adapterAddress,
+        uint256 decDif) 
+        internal 
+        {
+        uint256 gnosisAmount = totalAmount - bufferBalance;
+
+        Epoch storage currentEpoch = _confirmEpoch(ibAlluo);
+
+        require(
+            ibAlluoToMaxRefillPerEpoch[ibAlluo] >=
+                currentEpoch.refilledPerEpoch + gnosisAmount,
+            "Cumulative refills exceeds limit"
+        );
+
+        currentEpoch.refilledPerEpoch += totalAmount;
+        IERC20Upgradeable(bufferToken).transferFrom(
+            gnosis,
+            adapterAddress,
+            gnosisAmount / 10 ** decDif
+        );
+        if (gnosisAmount != totalAmount) {
+            IERC20Upgradeable(bufferToken).transfer(
+                adapterAddress,
+                bufferBalance / 10 ** decDif
+            );
+        }
+        IHandlerAdapter(adapterAddress).deposit(
+            bufferToken,
+            totalAmount,
+            totalAmount
+        );
+        if (isAdapterPendingWithdrawal(ibAlluo)) {
+            handler.satisfyAdapterWithdrawals(ibAlluo);
+        }
+    }
 
     /**
-     * @dev Function to trigger bridging
+     * @dev View function to trigger bridging
      * @param token Token to bridge
      * @param amount Amount to bridge
      */
@@ -389,7 +428,7 @@ contract BufferManager is
     }
 
     /**
-     * @dev Function to trigger refillBuffer
+     * @dev View function to trigger refillBuffer
      * @param _iballuo Address of the IBAlluo
      * @param token Address of the correspondin primary token of the pool
      */
@@ -400,10 +439,8 @@ contract BufferManager is
         uint256 balance = IERC20Upgradeable(token).balanceOf(address(this));
         uint256 decDif = 18 - IERC20MetadataUpgradeable(token).decimals();
         uint256 gnosisBalance = IERC20Upgradeable(token).balanceOf(gnosis);
-        if (decDif > 0) {
-            balance = balance * 10 ** decDif;
-            gnosisBalance = gnosisBalance * 10 ** decDif;
-        }
+        balance = balance * 10 ** decDif;
+        gnosisBalance = gnosisBalance * 10 ** decDif;
         uint256 refill = adapterRequiredRefill(_iballuo);
         if (refill > 0 && refill < gnosisBalance + balance) {
             return true;
@@ -412,10 +449,24 @@ contract BufferManager is
     }
 
     /**
-     * @notice Initialize function faces stack too deep error, due to too many arguments
+    * @dev Internal function for readabilty of checker functions
+    * @param i Index in a loop in checkerRefill and checkerBridge
+    */
+    function getValues(uint256 i) internal view returns(address, address, uint256) {
+        address iballuo = activeIbAlluos.at(i);
+        address token = IHandlerAdapter(ibAlluoToAdapter[iballuo]).getCoreTokens();
+        uint256 amount = IERC20Upgradeable(token).balanceOf(address(this));
+
+        return(iballuo, token, amount);
+    }
+
+    /**
+     * @notice Initialize function faces stack too deep error, due to too many arguments. Used to safely set-up/upgrage
+     * iballuos and corresponding settings
      * @param _activeIbAlluos Array of IBAlluo contract supported for bridging
      * @param _ibAlluoAdapters Array of corresponding Adapters
      * @param _tokensEth Addresses of the same tokens on mainnet
+     * @param _minBridgeAmount Min amount of asset to trigget bridging for each of the iballuo
      * @param _maxRefillPerEpoch Max value of asset for an adapter to be filled in span of a predefined interval
      */
     function initializeValues(
@@ -423,14 +474,18 @@ contract BufferManager is
         address[] memory _activeIbAlluos,
         address[] memory _ibAlluoAdapters,
         address[] memory _tokensEth,
+        uint256[] memory _minBridgeAmount,
         uint256[] memory _maxRefillPerEpoch,
         uint256 _epochDuration
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         handler = ILiquidityHandler(_handler);
+
         for (uint256 i; i < _activeIbAlluos.length; i++) {
             activeIbAlluos.add(_activeIbAlluos[i]);
             ibAlluoToAdapter[_activeIbAlluos[i]] = _ibAlluoAdapters[i];
-            tokenToEth[_activeIbAlluos[i]] = _tokensEth[i];
+            address token = IHandlerAdapter(_ibAlluoAdapters[i]).getCoreTokens();
+            tokenToMinBridge[token] = _minBridgeAmount[i];
+            tokenToEth[token] = _tokensEth[i];
             ibAlluoToMaxRefillPerEpoch[_activeIbAlluos[i]] = _maxRefillPerEpoch[
                 i
             ];
@@ -470,9 +525,26 @@ contract BufferManager is
 
     /**
     * @dev Admin function to change the address of VoteExecutorSlave contract
+    * @param _slave Address of the VoteExecutorSlave contract
     */
     function setVoteExecutorSlave(address _slave) external onlyRole(DEFAULT_ADMIN_ROLE) {
         slave = _slave;
+    }
+
+    /**
+    * @dev Admin function to set anycall contract address
+    * @param _anycall Address of the anycall contract
+    */
+    function setAnycall(address _anycall) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        anycall = _anycall;
+    }
+
+    /**
+    * @dev Admin function to set Distributor contract address
+    * @param _distributor Address of the Distributor contract on ETH mainnet
+    */
+    function setDistributor(address _distributor) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        distributor = _distributor;
     }
 
     /**

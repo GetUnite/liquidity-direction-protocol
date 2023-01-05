@@ -59,5 +59,8 @@
     "prettier:solidity": "prettier --write contracts/**/*.sol",
     "alluo-ready": "solhint -f table contracts/**/*.sol && prettier --write contracts/**/*.sol && hardhat test",
     "prepare": "husky install"
+  },
+  "dependencies": {
+    "@across-protocol/sdk-v2": "^0.2.3"
   }
 }
