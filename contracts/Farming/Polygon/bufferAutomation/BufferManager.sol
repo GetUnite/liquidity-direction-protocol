@@ -12,7 +12,6 @@ import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeab
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
-import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "../../../interfaces/ILiquidityHandler.sol";
 import "../../../interfaces/IHandlerAdapter.sol";
 import "../../../interfaces/IVoteExecutorSlave.sol";
@@ -33,7 +32,7 @@ contract BufferManager is
     event Bridge(
         address distributor,
         address originToken,
-        address EthToken,
+        address ethToken,
         uint256 amount,
         uint64 relayerFeePct,
         uint256[] directions,
@@ -49,6 +48,7 @@ contract BufferManager is
     address public anycall;
     // adress of the Across bridge contract to initiate the swap
     address public spokepool;
+    // address of the gnosis multisig
     address public gnosis;
     uint256 public epochDuration;
     
@@ -88,7 +88,6 @@ contract BufferManager is
      * param _bridgeGenesis Unix timestamp declaring a starting point for counter
      * param _bridgeInterval Min time to pass between bridging (Unix timestamp)
      * param _gnosis Gnosis Multisig
-     * param _gelato Gelato executor address
      * param _spokepool Address of the SpokePool Polygon contract of Accross Protocol Bridge
      * param _anycall Address of the Multichain Anycall contract
      * param _distributor Address of the DepositDistritor contract on mainnet, which receives the bridged funds
@@ -196,8 +195,8 @@ contract BufferManager is
             "Buffer: <minAmount or <bridgeInterval"
         );
 
-        IERC20Upgradeable(originToken).approve(spokepool, amount);
         lastExecuted = block.timestamp;
+        IERC20Upgradeable(originToken).approve(spokepool, amount);
         ISpokePool(spokepool).deposit(
             distributor,
             originToken,
@@ -251,9 +250,29 @@ contract BufferManager is
             address(this),
             newRelayerFeePct,
             depositId,
+            // signMessage(newRelayerFeePct, depositId)
             depositorSignature
         );
     }
+
+    // /**
+    // * @dev Internal function called by speedup to correctly sign the message according to EIP-1271 standart
+    // * @param newRelayerFeePct New RelayerFeePct
+    // * @param depositId Id of the deposit
+    // */
+    // function signMessage(
+    //     uint64 newRelayerFeePct,
+    //     uint32 depositId
+    // ) internal view returns (bytes memory) {
+    //     bytes memory message = abi.encodePacked(
+    //         address(this),
+    //         137,
+    //         newRelayerFeePct,
+    //         depositId
+    //     );
+    //     bytes32 hash = keccak256(message);
+    //     return ecrecover(hash, sigV, sigR, sigS);
+    // }
 
     /**
      * @dev Function checks if IBAlluos respective adapter has queued withdrawals
@@ -352,7 +371,7 @@ contract BufferManager is
                 return false;
             }
         } else {
-        IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance / 10 ** decDif);
+        IERC20Upgradeable(bufferToken).transfer(adapterAddress, totalAmount / 10 ** decDif);
         IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
         if (isAdapterPendingWithdrawal(_ibAlluo)) {
             handler.satisfyAdapterWithdrawals(_ibAlluo);
