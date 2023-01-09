@@ -133,7 +133,7 @@ contract UsdCurveAdapterUpgradeable is
     /// @notice When called by liquidity handler, withdraws funds from liquidity pool
     /// @param _user Recipient address
     /// @param _token Deposit token address (eg. USDC)
-    /// @param _amount  Amount to be withdrawn in 10*18
+    /// @param _amount  Amount to be withdrawn in 10**18
     function withdraw(
         address _user,
         address _token,
@@ -150,6 +150,7 @@ contract UsdCurveAdapterUpgradeable is
         );
         IERC20(_token).safeTransfer(_user, amount);
     }
+
 
     function getAdapterAmount() external view returns (uint256) {
         // get price feed for primary token in usd
@@ -181,16 +182,26 @@ contract UsdCurveAdapterUpgradeable is
         }
     }
 
+    /**
+    * @dev Returns an address of the primary token in a pool
+    * @return primaryToken Address of the aforementioned token
+    */
     function getCoreTokens() external view returns (address primaryToken) {
         return (ICurvePoolUSD(CURVE_POOL).underlying_coins(primaryTokenIndex));
     }
 
+    /**
+    * @dev Admin function to set the primaryTokenIndex
+    */
     function changePrimaryTokenIndex(
         uint64 _newPrimaryTokenIndex
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         primaryTokenIndex = _newPrimaryTokenIndex;
     }
 
+    /**
+    * @dev Admin function to set the slippage
+    */
     function setSlippage(
         uint64 _newSlippage
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {

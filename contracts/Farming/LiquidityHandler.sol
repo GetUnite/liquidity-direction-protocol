@@ -282,6 +282,12 @@ contract LiquidityHandler is
         }
     }
 
+    /**
+     * @dev Internal function taking a path including a withdrawal in a different token
+     * @param _inputToken Address of the available token to be swapped
+     * @param _targetToken Address of the desired token
+     * @param _amount18 Amount of the token in 18 decimals
+     */
     function _withdrawThroughExchange(
         address _inputToken,
         address _targetToken,
@@ -392,9 +398,6 @@ contract LiquidityHandler is
 
         uint256 totalWithdrawalAmount = ibAlluoToWithdrawalSystems[_ibAlluo]
             .totalWithdrawalAmount;
-        // console.log("Total supply", IIbAlluo(_ibAlluo).totalAssetSupply());
-        // console.log("pct", percentage);
-        // console.log("newAmount", _newAmount);
         return
             ((_newAmount + IIbAlluo(_ibAlluo).totalAssetSupply()) *
                 percentage) /

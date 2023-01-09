@@ -791,7 +791,7 @@ describe("BufferManager tests", () => {
   })
 
   describe("Case Testing", async () => {
-    it("USDC deposit, attempted withdrawal immediately, success after another deposit", async () => {
+    it.only("USDC deposit, attempted withdrawal immediately, success after another deposit", async () => {
       await deposit(signers[5], usdc, parseUnits("1000", 6))
       await ibAlluoUsd.connect(signers[5]).withdraw(usdc.address, parseUnits("1000", 18))
       let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
