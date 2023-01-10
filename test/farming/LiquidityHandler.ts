@@ -1,10 +1,10 @@
-import { parseEther, parseUnits } from "@ethersproject/units";
+import { formatUnits, parseEther, parseUnits } from "@ethersproject/units";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { BigNumber, BigNumberish, BytesLike } from "ethers";
+import { BigNumber, BigNumberish, BytesLike, constants } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory, StIbAlluo, StIbAlluo__factory } from "../../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory, StIbAlluo, StIbAlluo__factory, ICurvePoolEUR } from "../../typechain";
 
 async function getLastWithdrawalInfo(token: IbAlluo, handler: LiquidityHandler) {
     let request = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastWithdrawalRequest
@@ -26,11 +26,9 @@ async function sendEth(users: SignerWithAddress[]) {
     let signers = await ethers.getSigners();
 
     for (let i = 0; i < users.length; i++) {
-        await signers[0].sendTransaction({
-            to: users[i].address,
-            value: parseEther("1.0")
-
-        });
+        await (await (await ethers.getContractFactory("ForceSender")).deploy({
+            value: parseEther("10.0")
+        })).forceSend(users[i].address);
     }
 }
 
@@ -79,7 +77,7 @@ describe("Handler and different adapters", function () {
     let wbtcWhale: SignerWithAddress;
     let renBtcWhale: SignerWithAddress;
 
-    before(async function () {
+    async function setup(fromBlock: number, skipBalancesCheck: boolean) {
         upgrades.silenceWarnings()
 
         //We are forking Polygon mainnet, please set Alchemy key in .env
@@ -90,7 +88,7 @@ describe("Handler and different adapters", function () {
                     enabled: true,
                     jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
                     //you can fork from last block by commenting next line
-                    blockNumber: 28955535,
+                    blockNumber: fromBlock,
                 },
             },],
         });
@@ -133,23 +131,26 @@ describe("Handler and different adapters", function () {
         curveLpBTC = await ethers.getContractAt("IERC20", "0xf8a57c1d3b9629b77b6726a042ca48990A84Fb49");
 
         console.log("We are forking Polygon mainnet\n");
-        expect(await dai.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Polygon");
-        expect(await usdc.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDC, or you are not forking Polygon");
-        expect(await usdt.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDT, or you are not forking Polygon");
-        expect(await jeur.balanceOf(jeurWhale.address)).to.be.gt(0, "Whale has no jeur, or you are not forking Polygon");
-        expect(await par.balanceOf(parWhale.address)).to.be.gt(0, "Whale has no par, or you are not forking Polygon");
-        expect(await eurt.balanceOf(eurtWhale.address)).to.be.gt(0, "Whale has no eurt, or you are not forking Polygon");
-        expect(await eurs.balanceOf(eursWhale.address)).to.be.gt(0, "Whale has no eurs, or you are not forking Polygon");
-        expect(await weth.balanceOf(wethWhale.address)).to.be.gt(0, "Whale has no weth, or you are not forking Polygon");
-        expect(await wbtc.balanceOf(wbtcWhale.address)).to.be.gt(0, "Whale has no wbtc, or you are not forking Polygon");
-        expect(await renBtc.balanceOf(renBtcWhale.address)).to.be.gt(0, "Whale has no renBtc, or you are not forking Polygon");
-
+        if (!skipBalancesCheck) {
+            expect(await dai.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no DAI, or you are not forking Polygon");
+            expect(await usdc.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDC, or you are not forking Polygon");
+            expect(await usdt.balanceOf(usdWhale.address)).to.be.gt(0, "Whale has no USDT, or you are not forking Polygon");
+            expect(await jeur.balanceOf(jeurWhale.address)).to.be.gt(0, "Whale has no jeur, or you are not forking Polygon");
+            expect(await par.balanceOf(parWhale.address)).to.be.gt(0, "Whale has no par, or you are not forking Polygon");
+            expect(await eurt.balanceOf(eurtWhale.address)).to.be.gt(0, "Whale has no eurt, or you are not forking Polygon");
+            expect(await eurs.balanceOf(eursWhale.address)).to.be.gt(0, "Whale has no eurs, or you are not forking Polygon");
+            expect(await weth.balanceOf(wethWhale.address)).to.be.gt(0, "Whale has no weth, or you are not forking Polygon");
+            expect(await wbtc.balanceOf(wbtcWhale.address)).to.be.gt(0, "Whale has no wbtc, or you are not forking Polygon");
+            expect(await renBtc.balanceOf(renBtcWhale.address)).to.be.gt(0, "Whale has no renBtc, or you are not forking Polygon");
+        }
         await sendEth([usdWhale, jeurWhale, parWhale, eurtWhale, eursWhale, wethWhale, wbtcWhale, renBtcWhale])
+    }
+
+    before(async function () {
+        await setup(28955535, false);
     });
 
-
-    beforeEach(async function () {
-
+    async function setupBeforeEach() {
         const exchangeAddress = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773";
         const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
         //We are using this contract to simulate Gnosis multisig wallet
@@ -363,6 +364,11 @@ describe("Handler and different adapters", function () {
         await ibAlluoUsd.connect(admin).setSuperToken(StIbAlluoUsd.address);
         await ibAlluoEur.connect(admin).setSuperToken(StIbAlluoEur.address);
         await ibAlluoEth.connect(admin).setSuperToken(StIbAlluoEth.address);
+    }
+
+
+    beforeEach(async function () {
+        await setupBeforeEach();
     });
 
 
@@ -899,6 +905,28 @@ describe("Handler and different adapters", function () {
                 await ibAlluoUsd.connect(signers[0]).withdraw(usdt.address, parseUnits("50", 18));
                 let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)
                 expect(withdrawalArray[0]).not.equal(withdrawalArray[1]);
+            })
+        })
+
+        describe("Pool inbalance protection", async () => {
+            it("Should revert when adapter is sending more than it should", async () => {
+                await setup(37900475, true);
+                await setupBeforeEach();
+
+                const newEurtWhale = await ethers.getImpersonatedSigner("0xb446bf7b8d6d4276d0c75ec0e3ee8dd7fe15783a");
+                await sendEth([newEurtWhale])
+                const eurPool = await ethers.getContractAt("contracts/interfaces/curve/ICurvePoolEUR.sol:ICurvePoolEUR", "0xAd326c253A84e9805559b73A08724e11E49ca651") as ICurvePoolEUR;
+
+                await eurt.connect(newEurtWhale).approve(ibAlluoEur.address, constants.MaxUint256);
+                await eurt.connect(newEurtWhale).approve(eurPool.address, constants.MaxUint256);
+
+                await ibAlluoEur.connect(newEurtWhale).deposit(eurt.address, parseUnits("100.0", 6));
+                await eurPool.connect(newEurtWhale)["exchange(int128,int128,uint256,uint256)"](
+                    3, 2, parseUnits("50000.0", 6), 0
+                );
+
+                const tx = ibAlluoEur.connect(newEurtWhale).withdraw(eurt.address, parseUnits("100.0", 6));
+                expect(tx).to.be.revertedWith("Adapter: too much sending");
             })
         })
     })
