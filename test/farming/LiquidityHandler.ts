@@ -920,13 +920,13 @@ describe("Handler and different adapters", function () {
                 await eurt.connect(newEurtWhale).approve(ibAlluoEur.address, constants.MaxUint256);
                 await eurt.connect(newEurtWhale).approve(eurPool.address, constants.MaxUint256);
 
-                await ibAlluoEur.connect(newEurtWhale).deposit(eurt.address, parseUnits("100.0", 6));
+                await ibAlluoEur.connect(newEurtWhale).deposit(eurt.address, parseUnits("10000.0", 6));
                 await eurPool.connect(newEurtWhale)["exchange(int128,int128,uint256,uint256)"](
                     3, 2, parseUnits("50000.0", 6), 0
                 );
 
-                const tx = ibAlluoEur.connect(newEurtWhale).withdraw(eurt.address, parseUnits("100.0", 6));
-                expect(tx).to.be.revertedWith("Adapter: too much sending");
+                const tx = ibAlluoEur.connect(newEurtWhale).withdraw(eurt.address, parseUnits("100.0", 18));
+                await expect(tx).to.be.revertedWith("Adapter: too much sending")
             })
         })
     })

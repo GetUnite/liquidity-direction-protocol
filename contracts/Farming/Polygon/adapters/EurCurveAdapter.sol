@@ -150,8 +150,10 @@ contract EurCurveAdapter is AccessControl {
                     int128(indexes[_token]),
                     (minAmountOut * (10000 - slippage)) / 10000
                 );
+            uint256 toUser18 = toUser *
+                10 ** (18 - IERC20Metadata(_token).decimals());
             require(
-                toUser <= (_amount * (10000 + maxSendSlippage)) / 10000,
+                toUser18 <= (_amount * (10000 + maxSendSlippage)) / 10000,
                 "Adapter: too much sending"
             );
             IERC20(_token).safeTransfer(_user, toUser);
