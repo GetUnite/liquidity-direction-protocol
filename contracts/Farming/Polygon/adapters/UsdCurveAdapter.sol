@@ -26,20 +26,23 @@ contract UsdCurveAdapter is AccessControl {
 
     uint64 public primaryTokenIndex;
     uint128 public liquidTokenIndex;
+    uint64 public maxSendSlippage;
 
     mapping(address => uint128) public indexes;
 
     constructor(
         address _multiSigWallet,
         address _liquidityHandler,
-        uint64 _slippage
+        uint64 _lowSlippage,
+        uint64 _maxSlippage
     ) {
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
         wallet = _multiSigWallet;
-        slippage = _slippage;
+        slippage = _lowSlippage;
+        maxSendSlippage = _maxSlippage;
 
         indexes[DAI] = 0;
         indexes[USDC] = 1;
@@ -153,6 +156,10 @@ contract UsdCurveAdapter is AccessControl {
                     (minAmountOut * (10000 - slippage)) / 10000,
                     true
                 );
+            require(
+                toUser <= (_amount * (10000 + maxSendSlippage)) / 10000,
+                "Adapter: too much sending"
+            );
             IERC20(_token).safeTransfer(_user, toUser);
         }
     }
@@ -197,9 +204,11 @@ contract UsdCurveAdapter is AccessControl {
     }
 
     function setSlippage(
-        uint64 _newSlippage
+        uint64 _lowSlippage,
+        uint64 _maxSlippage
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        slippage = _newSlippage;
+        slippage = _lowSlippage;
+        maxSendSlippage = _maxSlippage;
     }
 
     function setWallet(

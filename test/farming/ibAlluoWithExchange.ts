@@ -153,8 +153,8 @@ describe("IbAlluo and Exchange", function () {
         const EurAdapter = await ethers.getContractFactory("EurCurveAdapter") as EurCurveAdapter__factory;
         const EthAdapter = await ethers.getContractFactory("EthNoPoolAdapter") as EthNoPoolAdapter__factory;
 
-        eurAdapter = await EurAdapter.deploy(admin.address, handler.address, 200);
-        usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200);
+        eurAdapter = await EurAdapter.deploy(admin.address, handler.address, 200, 100);
+        usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200, 100);
         ethAdapter = await EthAdapter.deploy(admin.address, handler.address);
 
         await usdAdapter.connect(admin).adapterApproveAll()
