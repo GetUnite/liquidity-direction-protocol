@@ -12,13 +12,14 @@ import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeab
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import "../../../interfaces/ILiquidityHandler.sol";
 import "../../../interfaces/IHandlerAdapter.sol";
 import "../../../interfaces/IVoteExecutorSlave.sol";
 import "../../../interfaces/ISpokePool.sol";
 import "../../../interfaces/ICallProxy.sol";
 
-contract BufferManager is
+contract BufferManagerCurrent is
     Initializable,
     PausableUpgradeable,
     AccessControlUpgradeable,
@@ -32,7 +33,7 @@ contract BufferManager is
     event Bridge(
         address distributor,
         address originToken,
-        address ethToken,
+        address EthToken,
         uint256 amount,
         uint64 relayerFeePct,
         uint256[] directions,
@@ -48,7 +49,6 @@ contract BufferManager is
     address public anycall;
     // adress of the Across bridge contract to initiate the swap
     address public spokepool;
-    // address of the gnosis multisig
     address public gnosis;
     uint256 public epochDuration;
     
@@ -79,9 +79,6 @@ contract BufferManager is
         uint256 refilledPerEpoch;
     }
 
-    uint256 public bridgeCap;
-    uint256 public bridgeRefilled;
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
@@ -91,6 +88,7 @@ contract BufferManager is
      * param _bridgeGenesis Unix timestamp declaring a starting point for counter
      * param _bridgeInterval Min time to pass between bridging (Unix timestamp)
      * param _gnosis Gnosis Multisig
+     * param _gelato Gelato executor address
      * param _spokepool Address of the SpokePool Polygon contract of Accross Protocol Bridge
      * param _anycall Address of the Multichain Anycall contract
      * param _distributor Address of the DepositDistritor contract on mainnet, which receives the bridged funds
@@ -141,7 +139,7 @@ contract BufferManager is
             if (adapterRequiredRefill(iballuo) == 0 && canBridge(token, amount)) {
                     canExec = true;
                     execPayload = abi.encodeWithSelector(
-                        BufferManager.swap.selector,
+                        BufferManagerCurrent.swap.selector,
                         amount,
                         token,
                         iballuo
@@ -170,7 +168,7 @@ contract BufferManager is
             if (canRefill(iballuo, token)) {
                 canExec = true;
                 execPayload = abi.encodeWithSelector(
-                    BufferManager.refillBuffer.selector,
+                    BufferManagerCurrent.refillBuffer.selector,
                     iballuo
                 );
 
@@ -198,11 +196,8 @@ contract BufferManager is
             "Buffer: <minAmount or <bridgeInterval"
         );
 
-        if(block.timestamp > lastExecuted + bridgeInterval) {
-            bridgeRefilled = 0;
-        }
-        lastExecuted = block.timestamp;
         IERC20Upgradeable(originToken).approve(spokepool, amount);
+        lastExecuted = block.timestamp;
         ISpokePool(spokepool).deposit(
             distributor,
             originToken,
@@ -234,6 +229,29 @@ contract BufferManager is
             relayerFeePct,
             direction,
             percentage
+        );
+    }
+
+    /**
+     * @dev Function serves as a leverage to tackle a scenario in which previously set up fee was insufficient
+     * for funds to go. Only called manually by multisig.
+     * @param newRelayerFeePct Relayer fee Pct to be updated
+     * @param depositId ID of the deposit to be sped up, needs to be accessed from the event emitted by
+     * the swap call
+     * @param depositorSignature Signed message containing the depositor address, this contract chain ID, the updated
+     * relayer fee %, and the deposit ID. This signature is produced by signing a hash of data according to the
+     * EIP-1271 standard.
+     */
+    function speedUp(
+        uint64 newRelayerFeePct,
+        uint32 depositId,
+        bytes memory depositorSignature
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        ISpokePool(spokepool).speedUpDeposit(
+            address(this),
+            newRelayerFeePct,
+            depositId,
+            depositorSignature
         );
     }
 
@@ -336,7 +354,6 @@ contract BufferManager is
         } else {
         IERC20Upgradeable(bufferToken).transfer(adapterAddress, totalAmount / 10 ** decDif);
         IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
-        bridgeRefilled += totalAmount;
         if (isAdapterPendingWithdrawal(_ibAlluo)) {
             handler.satisfyAdapterWithdrawals(_ibAlluo);
         }
@@ -380,7 +397,6 @@ contract BufferManager is
             gnosisAmount / 10 ** decDif
         );
         if (gnosisAmount != totalAmount) {
-            bridgeRefilled += totalAmount;
             IERC20Upgradeable(bufferToken).transfer(
                 adapterAddress,
                 bufferBalance / 10 ** decDif
@@ -405,8 +421,7 @@ contract BufferManager is
         address token,
         uint256 amount
     ) public view returns (bool) {
-        uint256 amount18 = amount * 10 ** (18-IERC20MetadataUpgradeable(token).decimals());
-        if (amount >= tokenToMinBridge[token] && block.timestamp >= lastExecuted + bridgeInterval && bridgeRefilled + amount18 <= bridgeCap ) {
+        if (amount >= tokenToMinBridge[token] && block.timestamp >= lastExecuted + bridgeInterval) {
             return true;   
         }
         return false;
@@ -498,13 +513,6 @@ contract BufferManager is
     */
     function setMinBridgeAmount(address _token, uint256 _minAmount) external onlyRole(DEFAULT_ADMIN_ROLE) {
         tokenToMinBridge[_token] = _minAmount;
-    }
-
-    /**
-    * @dev Admin function to set bridge cap
-    */
-    function setBridgeCap(uint256 _cap) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bridgeCap = _cap;
     }
 
     /**
@@ -621,6 +629,3 @@ contract BufferManager is
         upgradeStatus = false;
     }
 }
-
-
-

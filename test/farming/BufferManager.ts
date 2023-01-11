@@ -385,7 +385,8 @@ describe("BufferManager tests", () => {
     await buffer.connect(gnosis).setMinBridgeAmount(weth.address, 1000000000)
     await buffer.connect(gnosis).setMinBridgeAmount(wbtc.address, 1000000000)
 
-    await buffer.connect(gnosis).setVoteExecutorSlave(slave.address);
+    await buffer.connect(gnosis).setVoteExecutorSlave(slave.address)
+    await buffer.connect(gnosis).setBridgeCap(parseUnits("1000000", 18))
 
     let entry = {
       directionId: 420,
@@ -528,7 +529,7 @@ describe("BufferManager tests", () => {
       expect(buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)).to.be.revertedWith("No refill required");
     })
 
-    it("Should not refill, both gnosis and buffer can't cover", async () => {
+    it.only("Should not refill, both gnosis and buffer can't cover", async () => {
       await deposit(signers[1], usdc, parseUnits("10000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("8000", 18))
       await usdc.connect(gnosis).transfer(usdWhale.address, await usdc.balanceOf(gnosis.address))
@@ -570,11 +571,12 @@ describe("BufferManager tests", () => {
 
   describe("Swapping", async () => {
     it("Should only allow Gelato to execute the swap", async () => {
-      expect(buffer.connect(gnosis).swap(800, ZERO_ADDR)).to.be.revertedWith('revertMessage')
+      await expect(buffer.swap(800, usdc.address)).to.be.reverted
     })
 
     it("Should not allow swapping below minimum amount", async () => {
-      expect(buffer.connect(gelatoExecutor).swap(800, ZERO_ADDR)).to.be.revertedWith("Swap: <minAmount!")
+      await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, 1000)
+      await expect(buffer.connect(gelatoExecutor).swap(800, usdc.address)).to.be.revertedWith("Buffer: <minAmount or <bridgeInterval")
     })
 
     it("Should execute swap", async () => {
@@ -754,20 +756,14 @@ describe("BufferManager tests", () => {
     })
   })
 
-  describe("speedUp", async () => {
-    it("Should revert(Invalid signature)", async() => {
-      await expect(buffer.connect(gnosis).speedUp(parseUnits("5", 16), 420, "Signed by PandaPo")).to.be.reverted
-    })
-  })
-
   describe("getEntries", async () => {
     it("Should output correct value", async() => {
       let[direction, prct] = await slave.connect(gnosis.address).getEntries()
       expect(direction[0]).to.eq(420)
       expect(prct[0]).to.eq(99)
     })
-  })
-
+  })  
+    
   describe("setEntries", async () => {
     it("Should set correct entries", async () => {
       let entrs = [{
@@ -791,7 +787,7 @@ describe("BufferManager tests", () => {
   })
 
   describe("Case Testing", async () => {
-    it.only("USDC deposit, attempted withdrawal immediately, success after another deposit", async () => {
+    it("USDC deposit, attempted withdrawal immediately, success after another deposit", async () => {
       await deposit(signers[5], usdc, parseUnits("1000", 6))
       await ibAlluoUsd.connect(signers[5]).withdraw(usdc.address, parseUnits("1000", 18))
       let withdrawalArray = await getLastWithdrawalInfo(ibAlluoUsd, handler)

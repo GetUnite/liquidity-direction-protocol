@@ -157,7 +157,6 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
           1000,
           604800,
           admin.address,
-          gelatoaddress,
           spokepooladdress,
           anycalladdress,
           ZERO_ADDR,

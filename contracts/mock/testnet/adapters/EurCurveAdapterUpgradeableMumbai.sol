@@ -144,10 +144,17 @@ contract EurCurveAdapterUpgradeableMumbai is
     }
 
     function getAdapterAmount() external view returns (uint256) {
-        uint256 curveLpAmount = IERC20Upgradeable(CURVE_POOL).balanceOf(
+        uint256 amount = IERC20Upgradeable(CURVE_POOL).balanceOf(
             (address(this))
-        );
-        return curveLpAmount;
+        ); 
+        if (priceFeedRouter != address(0)) {
+            (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
+                priceFeedRouter
+            ).getPrice(USDC, fiatIndex);
+            amount = (amount * price) / 10 ** (uint256(priceDecimals));
+        }    
+        
+        return amount;
     }
 
     function getCoreTokens() external view returns (address primaryToken) {
