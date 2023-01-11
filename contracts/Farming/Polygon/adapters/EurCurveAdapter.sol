@@ -23,6 +23,7 @@ contract EurCurveAdapter is AccessControl {
 
     uint64 public primaryTokenIndex;
     uint128 public liquidTokenIndex;
+    uint64 public maxSendSlippage;
 
     mapping(address => uint128) public indexes;
 
@@ -30,14 +31,16 @@ contract EurCurveAdapter is AccessControl {
     constructor(
         address _multiSigWallet,
         address _liquidityHandler,
-        uint64 _slippage
+        uint64 _lowSlippage,
+        uint64 _maxSlippage
     ) {
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
         wallet = _multiSigWallet;
-        slippage = _slippage;
+        slippage = _lowSlippage;
+        maxSendSlippage = _maxSlippage;
 
         indexes[JEUR] = 0;
         indexes[PAR] = 1;
@@ -147,6 +150,12 @@ contract EurCurveAdapter is AccessControl {
                     int128(indexes[_token]),
                     (minAmountOut * (10000 - slippage)) / 10000
                 );
+            uint256 toUser18 = toUser *
+                10 ** (18 - IERC20Metadata(_token).decimals());
+            require(
+                toUser18 <= (_amount * (10000 + maxSendSlippage)) / 10000,
+                "Adapter: too much sending"
+            );
             IERC20(_token).safeTransfer(_user, toUser);
         }
     }
@@ -191,9 +200,11 @@ contract EurCurveAdapter is AccessControl {
     }
 
     function setSlippage(
-        uint64 _newSlippage
+        uint64 _lowSlippage,
+        uint64 _maxSlippage
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        slippage = _newSlippage;
+        slippage = _lowSlippage;
+        maxSendSlippage = _maxSlippage;
     }
 
     function setWallet(

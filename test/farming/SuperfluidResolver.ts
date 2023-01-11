@@ -142,7 +142,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
 
         const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapter") as UsdCurveAdapter__factory;
 
-        usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200)
+        usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200, 100)
 
         await usdAdapter.connect(admin).adapterApproveAll()
 
