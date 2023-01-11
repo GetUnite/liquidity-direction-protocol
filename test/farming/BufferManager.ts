@@ -529,7 +529,7 @@ describe("BufferManager tests", () => {
       expect(buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)).to.be.revertedWith("No refill required");
     })
 
-    it.only("Should not refill, both gnosis and buffer can't cover", async () => {
+    it("Should not refill, both gnosis and buffer can't cover", async () => {
       await deposit(signers[1], usdc, parseUnits("10000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("8000", 18))
       await usdc.connect(gnosis).transfer(usdWhale.address, await usdc.balanceOf(gnosis.address))

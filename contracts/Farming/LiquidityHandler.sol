@@ -397,7 +397,7 @@ contract LiquidityHandler is
         uint256 percentage = adapterIdsToAdapterInfo[adapterId].percentage;
 
         uint256 totalWithdrawalAmount = ibAlluoToWithdrawalSystems[_ibAlluo]
-            .totalWithdrawalAmount;   
+            .totalWithdrawalAmount;
         return
             ((_newAmount + IIbAlluo(_ibAlluo).totalAssetSupply()) *
                 percentage) /
@@ -589,7 +589,9 @@ contract LiquidityHandler is
         IERC20Upgradeable(_address).safeTransfer(_to, _amount);
     }
 
-    function clearWithdrawals(address _iballuo) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function clearWithdrawals(
+        address _iballuo
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[
             _iballuo
         ];

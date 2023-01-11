@@ -150,7 +150,7 @@ contract EurCurveAdapterUpgradeableMumbai is
         if (priceFeedRouter != address(0)) {
             (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
                 priceFeedRouter
-            ).getPrice(USDC, fiatIndex);
+            ).getPrice(EURS, fiatIndex);
             amount = (amount * price) / 10 ** (uint256(priceDecimals));
         }    
         

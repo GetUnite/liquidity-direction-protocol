@@ -15596,8 +15596,7 @@
       }
     },
     "a3855b432c60f3b624ecf6ac0c5b2183a9e2a4e9f3545b354ee780671456b5a1": {
-      "address": "0xa295C28bEABfa9597803b9524B7A8295CEe4BE92",
-      "txHash": "0xcdb58df19e0d6f8ecd21f03281624f7d1da3ff49cf28b668b4d77ce22fb812fd",
+      "address": "0x8C1e42322295E58079A51140dB232B26B70eD6dD",
       "layout": {
         "solcVersion": "0.8.11",
         "storage": [
@@ -15687,136 +15686,136 @@
             "offset": 0,
             "slot": "301",
             "type": "t_bool",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:43"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:43"
           },
           {
             "label": "distributor",
             "offset": 1,
             "slot": "301",
             "type": "t_address",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:46"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:46"
           },
           {
             "label": "slave",
             "offset": 0,
             "slot": "302",
             "type": "t_address",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:47"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:47"
           },
           {
             "label": "anycall",
             "offset": 0,
             "slot": "303",
             "type": "t_address",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:49"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:49"
           },
           {
             "label": "spokepool",
             "offset": 0,
             "slot": "304",
             "type": "t_address",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:51"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:51"
           },
           {
             "label": "gnosis",
             "offset": 0,
             "slot": "305",
             "type": "t_address",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:52"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:52"
           },
           {
             "label": "epochDuration",
             "offset": 0,
             "slot": "306",
             "type": "t_uint256",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:53"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:53"
           },
           {
             "label": "lastExecuted",
             "offset": 0,
             "slot": "307",
             "type": "t_uint256",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:56"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:56"
           },
           {
             "label": "bridgeInterval",
             "offset": 0,
             "slot": "308",
             "type": "t_uint256",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:57"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:57"
           },
           {
             "label": "relayerFeePct",
             "offset": 0,
             "slot": "309",
             "type": "t_uint64",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:58"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:58"
           },
           {
             "label": "handler",
             "offset": 8,
             "slot": "309",
-            "type": "t_contract(ILiquidityHandler)5228",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:65"
+            "type": "t_contract(ILiquidityHandler)55493",
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:65"
           },
           {
             "label": "ibAlluoToEpoch",
             "offset": 0,
             "slot": "310",
-            "type": "t_mapping(t_address,t_array(t_struct(Epoch)3652_storage)dyn_storage)",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:67"
+            "type": "t_mapping(t_address,t_array(t_struct(Epoch)32576_storage)dyn_storage)",
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:67"
           },
           {
             "label": "ibAlluoToAdapter",
             "offset": 0,
             "slot": "311",
             "type": "t_mapping(t_address,t_address)",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:68"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:68"
           },
           {
             "label": "ibAlluoToMaxRefillPerEpoch",
             "offset": 0,
             "slot": "312",
             "type": "t_mapping(t_address,t_uint256)",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:69"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:69"
           },
           {
             "label": "tokenToEth",
             "offset": 0,
             "slot": "313",
             "type": "t_mapping(t_address,t_address)",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:70"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:70"
           },
           {
             "label": "tokenToMinBridge",
             "offset": 0,
             "slot": "314",
             "type": "t_mapping(t_address,t_uint256)",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:71"
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:71"
           },
           {
             "label": "activeIbAlluos",
             "offset": 0,
             "slot": "315",
-            "type": "t_struct(AddressSet)3165_storage",
-            "contract": "BufferManager",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:74"
+            "type": "t_struct(AddressSet)4242_storage",
+            "contract": "BufferManagerCurrent",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:74"
           }
         ],
         "types": {
@@ -15828,8 +15827,8 @@
             "label": "bytes32[]",
             "numberOfBytes": "32"
           },
-          "t_array(t_struct(Epoch)3652_storage)dyn_storage": {
-            "label": "struct BufferManager.Epoch[]",
+          "t_array(t_struct(Epoch)32576_storage)dyn_storage": {
+            "label": "struct BufferManagerCurrent.Epoch[]",
             "numberOfBytes": "32"
           },
           "t_array(t_uint256)49_storage": {
@@ -15848,7 +15847,7 @@
             "label": "bytes32",
             "numberOfBytes": "32"
           },
-          "t_contract(ILiquidityHandler)5228": {
+          "t_contract(ILiquidityHandler)55493": {
             "label": "contract ILiquidityHandler",
             "numberOfBytes": "20"
           },
@@ -15856,8 +15855,8 @@
             "label": "mapping(address => address)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_address,t_array(t_struct(Epoch)3652_storage)dyn_storage)": {
-            "label": "mapping(address => struct BufferManager.Epoch[])",
+          "t_mapping(t_address,t_array(t_struct(Epoch)32576_storage)dyn_storage)": {
+            "label": "mapping(address => struct BufferManagerCurrent.Epoch[])",
             "numberOfBytes": "32"
           },
           "t_mapping(t_address,t_bool)": {
@@ -15876,20 +15875,20 @@
             "label": "mapping(bytes32 => uint256)",
             "numberOfBytes": "32"
           },
-          "t_struct(AddressSet)3165_storage": {
+          "t_struct(AddressSet)4242_storage": {
             "label": "struct EnumerableSetUpgradeable.AddressSet",
             "members": [
               {
                 "label": "_inner",
-                "type": "t_struct(Set)2864_storage",
+                "type": "t_struct(Set)3941_storage",
                 "offset": 0,
                 "slot": "0"
               }
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(Epoch)3652_storage": {
-            "label": "struct BufferManager.Epoch",
+          "t_struct(Epoch)32576_storage": {
+            "label": "struct BufferManagerCurrent.Epoch",
             "members": [
               {
                 "label": "startTime",
@@ -15924,7 +15923,7 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(Set)2864_storage": {
+          "t_struct(Set)3941_storage": {
             "label": "struct EnumerableSetUpgradeable.Set",
             "members": [
               {
@@ -18151,8 +18150,9 @@
         }
       }
     },
-    "a3855b432c60f3b624ecf6ac0c5b2183a9e2a4e9f3545b354ee780671456b5a1": {
-      "address": "0x8C1e42322295E58079A51140dB232B26B70eD6dD",
+    "6364001f7059fae65619d03b7af21a435f82352b6ec70b78c8b383b77e659678": {
+      "address": "0xcA68e6be9cFD49C7C48c112Ed8cFFcd708d90069",
+      "txHash": "0xf24338e9ead216fe838649335283d8f8c0513a51cd59353689fa65a1977b4d9d",
       "layout": {
         "solcVersion": "0.8.11",
         "storage": [
@@ -18242,136 +18242,152 @@
             "offset": 0,
             "slot": "301",
             "type": "t_bool",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:43"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:42"
           },
           {
             "label": "distributor",
             "offset": 1,
             "slot": "301",
             "type": "t_address",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:46"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:45"
           },
           {
             "label": "slave",
             "offset": 0,
             "slot": "302",
             "type": "t_address",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:47"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:46"
           },
           {
             "label": "anycall",
             "offset": 0,
             "slot": "303",
             "type": "t_address",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:49"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:48"
           },
           {
             "label": "spokepool",
             "offset": 0,
             "slot": "304",
             "type": "t_address",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:51"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:50"
           },
           {
             "label": "gnosis",
             "offset": 0,
             "slot": "305",
             "type": "t_address",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:52"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:52"
           },
           {
             "label": "epochDuration",
             "offset": 0,
             "slot": "306",
             "type": "t_uint256",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:53"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:53"
           },
           {
             "label": "lastExecuted",
             "offset": 0,
             "slot": "307",
             "type": "t_uint256",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:56"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:56"
           },
           {
             "label": "bridgeInterval",
             "offset": 0,
             "slot": "308",
             "type": "t_uint256",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:57"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:57"
           },
           {
             "label": "relayerFeePct",
             "offset": 0,
             "slot": "309",
             "type": "t_uint64",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:58"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:58"
           },
           {
             "label": "handler",
             "offset": 8,
             "slot": "309",
-            "type": "t_contract(ILiquidityHandler)5228",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:65"
+            "type": "t_contract(ILiquidityHandler)55493",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:65"
           },
           {
             "label": "ibAlluoToEpoch",
             "offset": 0,
             "slot": "310",
-            "type": "t_mapping(t_address,t_array(t_struct(Epoch)3652_storage)dyn_storage)",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:67"
+            "type": "t_mapping(t_address,t_array(t_struct(Epoch)31122_storage)dyn_storage)",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:67"
           },
           {
             "label": "ibAlluoToAdapter",
             "offset": 0,
             "slot": "311",
             "type": "t_mapping(t_address,t_address)",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:68"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:68"
           },
           {
             "label": "ibAlluoToMaxRefillPerEpoch",
             "offset": 0,
             "slot": "312",
             "type": "t_mapping(t_address,t_uint256)",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:69"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:69"
           },
           {
             "label": "tokenToEth",
             "offset": 0,
             "slot": "313",
             "type": "t_mapping(t_address,t_address)",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:70"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:70"
           },
           {
             "label": "tokenToMinBridge",
             "offset": 0,
             "slot": "314",
             "type": "t_mapping(t_address,t_uint256)",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:71"
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:71"
           },
           {
             "label": "activeIbAlluos",
             "offset": 0,
             "slot": "315",
-            "type": "t_struct(AddressSet)3165_storage",
-            "contract": "BufferManagerCurrent",
-            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManagerCurrent.sol:74"
+            "type": "t_struct(AddressSet)4242_storage",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:74"
+          },
+          {
+            "label": "bridgeCap",
+            "offset": 0,
+            "slot": "317",
+            "type": "t_uint256",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:82"
+          },
+          {
+            "label": "bridgeRefilled",
+            "offset": 0,
+            "slot": "318",
+            "type": "t_uint256",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:83"
           }
         ],
         "types": {
@@ -18383,8 +18399,8 @@
             "label": "bytes32[]",
             "numberOfBytes": "32"
           },
-          "t_array(t_struct(Epoch)3652_storage)dyn_storage": {
-            "label": "struct BufferManagerCurrent.Epoch[]",
+          "t_array(t_struct(Epoch)31122_storage)dyn_storage": {
+            "label": "struct BufferManager.Epoch[]",
             "numberOfBytes": "32"
           },
           "t_array(t_uint256)49_storage": {
@@ -18403,7 +18419,7 @@
             "label": "bytes32",
             "numberOfBytes": "32"
           },
-          "t_contract(ILiquidityHandler)5228": {
+          "t_contract(ILiquidityHandler)55493": {
             "label": "contract ILiquidityHandler",
             "numberOfBytes": "20"
           },
@@ -18411,8 +18427,8 @@
             "label": "mapping(address => address)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_address,t_array(t_struct(Epoch)3652_storage)dyn_storage)": {
-            "label": "mapping(address => struct BufferManagerCurrent.Epoch[])",
+          "t_mapping(t_address,t_array(t_struct(Epoch)31122_storage)dyn_storage)": {
+            "label": "mapping(address => struct BufferManager.Epoch[])",
             "numberOfBytes": "32"
           },
           "t_mapping(t_address,t_bool)": {
@@ -18431,20 +18447,20 @@
             "label": "mapping(bytes32 => uint256)",
             "numberOfBytes": "32"
           },
-          "t_struct(AddressSet)3165_storage": {
+          "t_struct(AddressSet)4242_storage": {
             "label": "struct EnumerableSetUpgradeable.AddressSet",
             "members": [
               {
                 "label": "_inner",
-                "type": "t_struct(Set)2864_storage",
+                "type": "t_struct(Set)3941_storage",
                 "offset": 0,
                 "slot": "0"
               }
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(Epoch)3652_storage": {
-            "label": "struct BufferManagerCurrent.Epoch",
+          "t_struct(Epoch)31122_storage": {
+            "label": "struct BufferManager.Epoch",
             "members": [
               {
                 "label": "startTime",
@@ -18479,7 +18495,7 @@
             ],
             "numberOfBytes": "64"
           },
-          "t_struct(Set)2864_storage": {
+          "t_struct(Set)3941_storage": {
             "label": "struct EnumerableSetUpgradeable.Set",
             "members": [
               {
