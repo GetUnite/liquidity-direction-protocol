@@ -156,6 +156,7 @@ describe("IbAlluoUSD and Handler", function () {
 
         usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200)
 
+
         await usdAdapter.connect(admin).adapterApproveAll()
 
         let lastAdapterId = (await handler.getLastAdapterIndex()).add(1)
