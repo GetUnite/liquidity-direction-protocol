@@ -19,7 +19,7 @@ contract EurCurveAdapter is AccessControl {
     address public constant EURT = 0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f;
     address public constant CURVE_POOL =
         0xAd326c253A84e9805559b73A08724e11E49ca651;
-    address public wallet;
+    address public buffer;
     uint64 public slippage;
     address public priceFeedRouter;
     uint64 public primaryTokenIndex;
@@ -30,6 +30,7 @@ contract EurCurveAdapter is AccessControl {
     // 0 = jEUR-18dec, 1 = PAR-18dec , 2 = EURS-2dec, 3 = EURT-6dec
     constructor(
         address _multiSigWallet,
+        address _bufferManager,
         address _liquidityHandler,
         uint64 _slippage
     ) {
@@ -37,7 +38,7 @@ contract EurCurveAdapter is AccessControl {
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
-        wallet = _multiSigWallet;
+        buffer = _bufferManager;
         slippage = _slippage;
 
         indexes[JEUR] = 0;
@@ -59,7 +60,7 @@ contract EurCurveAdapter is AccessControl {
     /// @notice When called by liquidity handler, moves some funds to the Gnosis multisig and others into a LP to be kept as a 'buffer'
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
-    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Gnosis wallet (the "buffer" amount)
+    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Buffer Manager contract (the "buffer" amount)
     function deposit(
         address _token,
         uint256 _fullAmount,
@@ -72,7 +73,7 @@ contract EurCurveAdapter is AccessControl {
         if (_token == primaryToken) {
             if (toSend != 0) {
                 IERC20(primaryToken).safeTransfer(
-                    wallet,
+                    buffer,
                     toSend /
                         10 ** (18 - IERC20Metadata(primaryToken).decimals())
                 );
@@ -104,7 +105,7 @@ contract EurCurveAdapter is AccessControl {
                     amounts,
                     (lpAmount * (10000 + slippage)) / 10000
                 );
-                IERC20(primaryToken).safeTransfer(wallet, toSend);
+                IERC20(primaryToken).safeTransfer(buffer, toSend);
             }
         }
     }
@@ -172,10 +173,10 @@ contract EurCurveAdapter is AccessControl {
         slippage = _newSlippage;
     }
 
-    function setWallet(
-        address _newWallet
+    function setBuffer(
+        address _newBufferManager
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        wallet = _newWallet;
+        buffer = _newBufferManager;
     }
 
     function setPriceRouterInfo(

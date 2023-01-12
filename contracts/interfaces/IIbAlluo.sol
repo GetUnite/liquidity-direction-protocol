@@ -91,6 +91,10 @@ interface IIbAlluo is IERC20, IAccessControl {
 
     function superToken() external view returns (address);
 
+    function priceFeedRouter() external view returns (address);
+
+    function fiatIndex() external view returns (uint256);
+
     function symbol() external view returns (string memory symbol);
 
     function priceFeedRouter() external view returns (address);

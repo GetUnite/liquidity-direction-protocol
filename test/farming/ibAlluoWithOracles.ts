@@ -242,6 +242,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
             BtcNoPoolAdapter,
             [
                 admin.address,
+                liquidityHandler.address,
                 liquidityHandler.address
             ],
             { initializer: "initialize", kind: "uups" }
@@ -251,6 +252,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
             EthNoPoolAdapter,
             [
                 admin.address,
+                liquidityHandler.address,
                 liquidityHandler.address
             ],
             { initializer: "initialize", kind: "uups" }
@@ -261,6 +263,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
             [
                 admin.address,
                 liquidityHandler.address,
+                liquidityHandler.address,
                 200
             ],
             { initializer: "initialize", kind: "uups" }
@@ -270,6 +273,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
             UsdCurveAdapter,
             [
                 admin.address,
+                liquidityHandler.address,
                 liquidityHandler.address,
                 200
             ],

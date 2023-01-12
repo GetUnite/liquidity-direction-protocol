@@ -33,7 +33,7 @@ contract UsdCurveAdapterUpgradeable is
         0x445FE580eF8d70FF569aB36e80c647af338db351;
     address public constant CURVE_LP =
         0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171;
-    address public wallet;
+    address public buffer;
     bool public upgradeStatus;
     uint64 public slippage;
     address public priceFeedRouter;
@@ -47,6 +47,7 @@ contract UsdCurveAdapterUpgradeable is
 
     function initialize(
         address _multiSigWallet,
+        address _buffer,
         address _liquidityHandler,
         uint64 _slippage
     ) public initializer {
@@ -55,7 +56,8 @@ contract UsdCurveAdapterUpgradeable is
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
-        wallet = _multiSigWallet;
+        _grantRole(DEFAULT_ADMIN_ROLE, _buffer);
+        buffer = _buffer;
         slippage = _slippage;
 
         indexes[DAI] = 0;
@@ -75,7 +77,7 @@ contract UsdCurveAdapterUpgradeable is
     /// @notice When called by liquidity handler, moves some funds to the Gnosis multisig and others into a LP to be kept as a 'buffer'
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
-    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Gnosis wallet (the "buffer" amount)
+    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the buffer (the "buffer" amount)
     function deposit(
         address _token,
         uint256 _fullAmount,
@@ -88,7 +90,7 @@ contract UsdCurveAdapterUpgradeable is
         if (_token == primaryToken) {
             if (toSend != 0) {
                 IERC20(primaryToken).safeTransfer(
-                    wallet,
+                    buffer,
                     toSend /
                         10 ** (18 - IERC20Metadata(primaryToken).decimals())
                 );
@@ -122,7 +124,7 @@ contract UsdCurveAdapterUpgradeable is
                     (lpAmount * (10000 + slippage)) / 10000,
                     true
                 );
-                IERC20(primaryToken).safeTransfer(wallet, toSend);
+                IERC20(primaryToken).safeTransfer(buffer, toSend);
             }
         }
     }
@@ -130,7 +132,7 @@ contract UsdCurveAdapterUpgradeable is
     /// @notice When called by liquidity handler, withdraws funds from liquidity pool
     /// @param _user Recipient address
     /// @param _token Deposit token address (eg. USDC)
-    /// @param _amount  Amount to be withdrawn in 10*18
+    /// @param _amount  Amount to be withdrawn in 10**18
     function withdraw(
         address _user,
         address _token,
@@ -178,26 +180,36 @@ contract UsdCurveAdapterUpgradeable is
         }
     }
 
+    /**
+     * @dev Returns an address of the primary token in a pool
+     * @return primaryToken Address of the aforementioned token
+     */
     function getCoreTokens() external view returns (address primaryToken) {
         return (ICurvePoolUSD(CURVE_POOL).underlying_coins(primaryTokenIndex));
     }
 
+    /**
+     * @dev Admin function to set the primaryTokenIndex
+     */
     function changePrimaryTokenIndex(
         uint64 _newPrimaryTokenIndex
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         primaryTokenIndex = _newPrimaryTokenIndex;
     }
 
+    /**
+     * @dev Admin function to set the slippage
+     */
     function setSlippage(
         uint64 _newSlippage
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         slippage = _newSlippage;
     }
 
-    function setWallet(
-        address _newWallet
+    function setBuffer(
+        address _newBuffer
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        wallet = _newWallet;
+        buffer = _newBuffer;
     }
 
     function setPriceRouterInfo(

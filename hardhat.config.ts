@@ -66,13 +66,13 @@ const config: HardhatUserConfig = {
     //     mnemonic: process.env.MNEMONIC,
     //   },
     // },
-    rinkeby: {
-      url: process.env.RINKEBY_URL,
-      gasPrice: 25000000000,
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-    },
+    // rinkeby: {
+    // url: process.env.RINKEBY_URL,
+    // gasPrice: 25000000000,
+    // accounts: {
+    //   mnemonic: process.env.MNEMONIC,
+    // },
+    // },
     goerli: {
       url: process.env.GOERLI_URL,
       gasPrice: "auto",

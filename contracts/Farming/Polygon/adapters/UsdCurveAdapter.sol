@@ -24,7 +24,7 @@ contract UsdCurveAdapter is AccessControl {
         0x445FE580eF8d70FF569aB36e80c647af338db351;
     address public constant CURVE_LP =
         0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171;
-    address public wallet;
+    address public buffer;
     uint64 public slippage;
     address public priceFeedRouter;
     uint64 public primaryTokenIndex;
@@ -34,6 +34,7 @@ contract UsdCurveAdapter is AccessControl {
 
     constructor(
         address _multiSigWallet,
+        address _bufferManager,
         address _liquidityHandler,
         uint64 _slippage
     ) {
@@ -41,7 +42,7 @@ contract UsdCurveAdapter is AccessControl {
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
-        wallet = _multiSigWallet;
+        buffer = _bufferManager;
         slippage = _slippage;
 
         indexes[DAI] = 0;
@@ -61,7 +62,7 @@ contract UsdCurveAdapter is AccessControl {
     /// @notice When called by liquidity handler, moves some funds to the Gnosis multisig and others into a LP to be kept as a 'buffer'
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
-    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Gnosis wallet (the "buffer" amount)
+    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Buffer Manager contract (the "buffer" amount)
     function deposit(
         address _token,
         uint256 _fullAmount,
@@ -74,7 +75,7 @@ contract UsdCurveAdapter is AccessControl {
         if (_token == primaryToken) {
             if (toSend != 0) {
                 IERC20(primaryToken).safeTransfer(
-                    wallet,
+                    buffer,
                     toSend /
                         10 ** (18 - IERC20Metadata(primaryToken).decimals())
                 );
@@ -108,7 +109,7 @@ contract UsdCurveAdapter is AccessControl {
                     (lpAmount * (10000 + slippage)) / 10000,
                     true
                 );
-                IERC20(primaryToken).safeTransfer(wallet, toSend);
+                IERC20(primaryToken).safeTransfer(buffer, toSend);
             }
         }
     }
@@ -180,10 +181,10 @@ contract UsdCurveAdapter is AccessControl {
         slippage = _newSlippage;
     }
 
-    function setWallet(
-        address _newWallet
+    function setBuffer(
+        address _newBufferManager
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        wallet = _newWallet;
+        buffer = _newBufferManager;
     }
 
     function setPriceRouterInfo(

@@ -14,6 +14,8 @@ import {
   UsdCurveAdapter,
   UsdCurveAdapter__factory,
   PriceFeedRouter,
+  BufferManager__factory,
+  BufferManager
 } from "./../../typechain";
 
 async function getImpersonatedSigner(
@@ -59,6 +61,7 @@ describe("ibAlluoCurrent and Handler", function () {
   let usdWhale: SignerWithAddress;
   let exchangeAddress: string;
   let priceFeedRouter: PriceFeedRouter;
+  let buffer: BufferManager
 
   before(async function () {
     //We are forking Polygon mainnet, please set Alchemy key in .env
@@ -134,6 +137,8 @@ describe("ibAlluoCurrent and Handler", function () {
     )) as PseudoMultisigWallet__factory;
     multisig = await Multisig.deploy(true);
 
+    const Buffer = await ethers.getContractFactory("BufferManager") as BufferManager__factory;
+
     exchangeAddress = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773";
 
     handler = await ethers.getContractAt(
@@ -159,7 +164,21 @@ describe("ibAlluoCurrent and Handler", function () {
       "UsdCurveAdapter"
     )) as UsdCurveAdapter__factory;
 
-    usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200);
+    buffer = await upgrades.deployProxy(Buffer,
+      [ 604800,
+        1000,
+        604800,
+        admin.address,
+        admin.address,
+        admin.address,
+        admin.address,
+        ], {
+          initializer: 'initialize', unsafeAllow: ["delegatecall"],
+          kind: 'uups'
+      }
+    ) as BufferManager;
+
+    usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200);
 
     await usdAdapter.connect(admin).adapterApproveAll();
 

@@ -4,12 +4,15 @@ async function main() {
 
   const Handler = await ethers.getContractFactory("LiquidityHandler");
 
-  const gnosis = "0x2580f9954529853Ca5aC5543cE39E9B5B1145135";
+  const gnosis = "0x7A34b2f0DA5ea35b5117CaC735e99Ba0e2aCEECD";
+  const exchangeAddress = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773";
 
   let handler = await upgrades.deployProxy(Handler,
-        [gnosis],
-        {initializer: 'initialize', kind:'uups'}
-  );
+    [gnosis, exchangeAddress], {
+    initializer: 'initialize', unsafeAllow: ["delegatecall"],
+    kind: 'uups'
+  }
+  )
 
   console.log("Handler upgradable deployed to:", handler.address);
 }

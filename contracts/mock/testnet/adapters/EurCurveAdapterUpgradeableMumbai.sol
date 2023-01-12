@@ -9,10 +9,10 @@ import {IERC20Upgradeable as IERC20, IERC20MetadataUpgradeable as IERC20Metadata
 import {SafeERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
-import "../../../interfaces/curve/ICurvePoolEUR.sol";
+import "../curve/FakeCurveEur.sol";
 import "../../../interfaces/IPriceFeedRouter.sol";
 
-contract EurCurveAdapterUpgradeable is
+contract EurCurveAdapterUpgradeableMumbai is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable
@@ -22,12 +22,10 @@ contract EurCurveAdapterUpgradeable is
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    address public constant JEUR = 0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c;
-    address public constant PAR = 0xE2Aa7db6dA1dAE97C5f5C6914d285fBfCC32A128;
-    address public constant EURS = 0xE111178A87A3BFf0c8d18DECBa5798827539Ae99;
-    address public constant EURT = 0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f;
-    address public constant CURVE_POOL =
-        0xAd326c253A84e9805559b73A08724e11E49ca651;
+    address public constant JEUR = 0x4bf7737515EE8862306Ddc221cE34cA9d5C91200;
+    address public constant EURS = 0x3Aa4345De8B32e5c9c14FC7146597EAf262Fd70E;
+    address public constant EURT = 0x34A13C2D581efe6239b92F9a65c8BAa65dfdeBE9;
+    address public CURVE_POOL = 0xB8057748b9A5faCD3F09fBF96Afc50cbb200746a;
     address public buffer;
     bool public upgradeStatus;
     uint64 public slippage;
@@ -40,7 +38,7 @@ contract EurCurveAdapterUpgradeable is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    // 0 = jEUR-18dec, 1 = PAR-18dec , 2 = EURS-2dec, 3 = EURT-6dec
+    // 0 = jEUR-18dec, 1 = EURS-2dec, 2 = EURT-6dec
     function initialize(
         address _multiSigWallet,
         address _buffer,
@@ -60,16 +58,14 @@ contract EurCurveAdapterUpgradeable is
         slippage = _slippage;
 
         indexes[JEUR] = 0;
-        indexes[PAR] = 1;
-        indexes[EURS] = 2;
-        indexes[EURT] = 3;
+        indexes[EURS] = 1;
+        indexes[EURT] = 2;
 
-        primaryTokenIndex = 3;
+        primaryTokenIndex = 2;
     }
 
     function adapterApproveAll() external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20(JEUR).safeApprove(CURVE_POOL, type(uint256).max);
-        IERC20(PAR).safeApprove(CURVE_POOL, type(uint256).max);
         IERC20(EURS).safeApprove(CURVE_POOL, type(uint256).max);
         IERC20(EURT).safeApprove(CURVE_POOL, type(uint256).max);
         IERC20(CURVE_POOL).safeApprove(CURVE_POOL, type(uint256).max);
@@ -85,45 +81,36 @@ contract EurCurveAdapterUpgradeable is
         uint256 _leaveInPool
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
-        address primaryToken = ICurvePoolEUR(CURVE_POOL).coins(
-            primaryTokenIndex
-        );
-        if (_token == primaryToken) {
+        if (_token == JEUR) {
+            FakeCurveEur(CURVE_POOL).add_liquidity(JEUR, _fullAmount);
             if (toSend != 0) {
-                IERC20(primaryToken).safeTransfer(
-                    buffer,
-                    toSend /
-                        10 ** (18 - IERC20Metadata(primaryToken).decimals())
+                uint amountBack = FakeCurveEur(CURVE_POOL).remove_liquidity(
+                    EURT,
+                    toSend / 10 ** 12
                 );
+                IERC20Upgradeable(EURT).safeTransfer(buffer, amountBack);
+            }
+        } else if (_token == EURT) {
+            if (toSend != 0) {
+                IERC20Upgradeable(EURT).safeTransfer(buffer, toSend / 10 ** 12);
             }
             if (_leaveInPool != 0) {
-                uint256[4] memory amounts;
-                amounts[primaryTokenIndex] =
-                    _leaveInPool /
-                    10 ** (18 - IERC20Metadata(primaryToken).decimals());
-                ICurvePoolEUR(CURVE_POOL).add_liquidity(amounts, 0);
-            }
-        } else {
-            uint256[4] memory amounts;
-            amounts[indexes[_token]] =
-                _fullAmount /
-                10 ** (18 - IERC20Metadata(_token).decimals());
-
-            uint256 lpAmount = ICurvePoolEUR(CURVE_POOL).add_liquidity(
-                amounts,
-                0
-            );
-            delete amounts;
-            if (toSend != 0) {
-                toSend =
-                    toSend /
-                    10 ** (18 - IERC20Metadata(primaryToken).decimals());
-                amounts[primaryTokenIndex] = toSend;
-                ICurvePoolEUR(CURVE_POOL).remove_liquidity_imbalance(
-                    amounts,
-                    (lpAmount * (10000 + slippage)) / 10000
+                FakeCurveEur(CURVE_POOL).add_liquidity(
+                    EURT,
+                    _leaveInPool / 10 ** 12
                 );
-                IERC20(primaryToken).safeTransfer(buffer, toSend);
+            }
+        } else if (_token == EURS) {
+            FakeCurveEur(CURVE_POOL).add_liquidity(
+                EURS,
+                _fullAmount / 10 ** 16
+            );
+            if (toSend != 0) {
+                uint amountBack = FakeCurveEur(CURVE_POOL).remove_liquidity(
+                    EURT,
+                    toSend / 10 ** 12
+                );
+                IERC20Upgradeable(EURT).safeTransfer(buffer, amountBack);
             }
         }
     }
@@ -138,45 +125,43 @@ contract EurCurveAdapterUpgradeable is
         address _token,
         uint256 _amount
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        uint256[4] memory amounts;
-        uint256 amount = _amount /
-            10 ** (18 - IERC20Metadata(_token).decimals());
-        amounts[indexes[_token]] = amount;
-        ICurvePoolEUR(CURVE_POOL).remove_liquidity_imbalance(
-            amounts,
-            (_amount * (10000 + slippage)) / 10000
-        );
-        IERC20(_token).safeTransfer(_user, amount);
-    }
-
-    function getAdapterAmount() external view returns (uint256) {
-        uint256 curveLpAmount = IERC20(CURVE_POOL).balanceOf((address(this)));
-        if (curveLpAmount != 0) {
-            address primaryToken = ICurvePoolEUR(CURVE_POOL).coins(
-                primaryTokenIndex
+        if (_token == JEUR) {
+            uint amountBack = FakeCurveEur(CURVE_POOL).remove_liquidity(
+                JEUR,
+                _amount
             );
-            uint256 amount = (
-                ICurvePoolEUR(CURVE_POOL).calc_withdraw_one_coin(
-                    curveLpAmount,
-                    int128(uint128(primaryTokenIndex))
-                )
-            ) * 10 ** (18 - IERC20Metadata(primaryToken).decimals());
-
-            if (priceFeedRouter != address(0)) {
-                (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
-                    priceFeedRouter
-                ).getPrice(primaryToken, fiatIndex);
-                amount = (amount * price) / 10 ** (uint256(priceDecimals));
-            }
-
-            return amount;
-        } else {
-            return 0;
+            IERC20Upgradeable(JEUR).safeTransfer(_user, amountBack);
+        } else if (_token == EURT) {
+            uint amountBack = FakeCurveEur(CURVE_POOL).remove_liquidity(
+                EURT,
+                _amount / 10 ** 12
+            );
+            IERC20Upgradeable(EURT).safeTransfer(_user, amountBack);
+        } else if (_token == EURS) {
+            uint amountBack = FakeCurveEur(CURVE_POOL).remove_liquidity(
+                EURS,
+                _amount / 10 ** 16
+            );
+            IERC20Upgradeable(EURS).safeTransfer(_user, amountBack);
         }
     }
 
+    function getAdapterAmount() external view returns (uint256) {
+        uint256 amount = IERC20Upgradeable(CURVE_POOL).balanceOf(
+            (address(this))
+        );
+        if (priceFeedRouter != address(0)) {
+            (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
+                priceFeedRouter
+            ).getPrice(EURS, fiatIndex);
+            amount = (amount * price) / 10 ** (uint256(priceDecimals));
+        }
+
+        return amount;
+    }
+
     function getCoreTokens() external view returns (address primaryToken) {
-        return (ICurvePoolEUR(CURVE_POOL).coins(primaryTokenIndex));
+        return EURT;
     }
 
     function changePrimaryTokenIndex(
@@ -195,14 +180,6 @@ contract EurCurveAdapterUpgradeable is
         address _newBuffer
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         buffer = _newBuffer;
-    }
-
-    function setPriceRouterInfo(
-        address _priceFeedRouter,
-        uint256 _fiatIndex
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        priceFeedRouter = _priceFeedRouter;
-        fiatIndex = _fiatIndex;
     }
 
     /**
