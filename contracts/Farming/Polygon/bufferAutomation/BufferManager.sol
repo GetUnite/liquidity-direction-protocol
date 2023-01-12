@@ -374,13 +374,13 @@ contract BufferManager is
         );
 
         currentEpoch.refilledPerEpoch += totalAmount;
+        bridgeRefilled += totalAmount;
         IERC20Upgradeable(bufferToken).transferFrom(
             gnosis,
             adapterAddress,
             gnosisAmount / 10 ** decDif
         );
         if (gnosisAmount != totalAmount) {
-            bridgeRefilled += totalAmount;
             IERC20Upgradeable(bufferToken).transfer(
                 adapterAddress,
                 bufferBalance / 10 ** decDif
