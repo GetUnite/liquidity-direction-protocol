@@ -39,7 +39,6 @@ contract UsdCurveAdapterUpgradeable is
     address public priceFeedRouter;
     uint64 public primaryTokenIndex;
     uint256 public fiatIndex;
-    
 
     mapping(address => uint128) public indexes;
 
@@ -151,7 +150,6 @@ contract UsdCurveAdapterUpgradeable is
         IERC20(_token).safeTransfer(_user, amount);
     }
 
-
     function getAdapterAmount() external view returns (uint256) {
         // get price feed for primary token in usd
         // return the usd value to amount
@@ -183,16 +181,16 @@ contract UsdCurveAdapterUpgradeable is
     }
 
     /**
-    * @dev Returns an address of the primary token in a pool
-    * @return primaryToken Address of the aforementioned token
-    */
+     * @dev Returns an address of the primary token in a pool
+     * @return primaryToken Address of the aforementioned token
+     */
     function getCoreTokens() external view returns (address primaryToken) {
         return (ICurvePoolUSD(CURVE_POOL).underlying_coins(primaryTokenIndex));
     }
 
     /**
-    * @dev Admin function to set the primaryTokenIndex
-    */
+     * @dev Admin function to set the primaryTokenIndex
+     */
     function changePrimaryTokenIndex(
         uint64 _newPrimaryTokenIndex
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -200,8 +198,8 @@ contract UsdCurveAdapterUpgradeable is
     }
 
     /**
-    * @dev Admin function to set the slippage
-    */
+     * @dev Admin function to set the slippage
+     */
     function setSlippage(
         uint64 _newSlippage
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {

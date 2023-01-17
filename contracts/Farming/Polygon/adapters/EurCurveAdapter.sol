@@ -65,14 +65,22 @@ contract EurCurveAdapter is AccessControl {
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
     /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Buffer Manager contract (the "buffer" amount)
-    function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function deposit(
+        address _token,
+        uint256 _fullAmount,
+        uint256 _leaveInPool
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         address primaryToken = ICurvePoolEUR(CURVE_POOL).coins(
             primaryTokenIndex
         );
         if (_token == primaryToken) {
             if (toSend != 0) {
-                IERC20(primaryToken).safeTransfer(buffer, toSend / 10**(18 - IERC20Metadata(primaryToken).decimals()));
+                IERC20(primaryToken).safeTransfer(
+                    buffer,
+                    toSend /
+                        10 ** (18 - IERC20Metadata(primaryToken).decimals())
+                );
             }
             if (_leaveInPool != 0) {
                 uint256[4] memory amounts;
@@ -98,8 +106,9 @@ contract EurCurveAdapter is AccessControl {
                     10 ** (18 - IERC20Metadata(primaryToken).decimals());
                 amounts[primaryTokenIndex] = toSend;
                 ICurvePoolEUR(CURVE_POOL).remove_liquidity_imbalance(
-                            amounts, 
-                            lpAmount * (10000+slippage)/10000);
+                    amounts,
+                    (lpAmount * (10000 + slippage)) / 10000
+                );
                 IERC20(primaryToken).safeTransfer(buffer, toSend);
             }
         }
@@ -197,7 +206,9 @@ contract EurCurveAdapter is AccessControl {
         maxSendSlippage = _maxSlippage;
     }
 
-    function setBuffer(address _newBufferManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setBuffer(
+        address _newBufferManager
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         buffer = _newBufferManager;
     }
 

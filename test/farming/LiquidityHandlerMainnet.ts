@@ -136,7 +136,7 @@ describe("Mainnet Handler and different adapters", function () {
         const exchangeAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec";
         const IbAlluo = await ethers.getContractFactory("IbAlluoMainnet") as IbAlluoMainnet__factory;
 
-        const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
+        const Handler = await ethers.getContractFactory("LiquidityHandlerWithoutPriceOracles");
 
         handler = await upgrades.deployProxy(Handler,
             [admin.address, exchangeAddress], {

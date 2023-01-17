@@ -13,7 +13,11 @@ contract EthNoPoolAdapter is AccessControl {
     address public constant WETH = 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619;
     address public buffer;
 
-    constructor (address _multiSigWallet, address _bufferManager, address _liquidityHandler) {
+    constructor(
+        address _multiSigWallet,
+        address _bufferManager,
+        address _liquidityHandler
+    ) {
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         require(_bufferManager.isContract(), "Adapter: Not contract");
@@ -28,7 +32,7 @@ contract EthNoPoolAdapter is AccessControl {
         uint256 _leaveInPool
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
-        if(toSend != 0){
+        if (toSend != 0) {
             IERC20(WETH).safeTransfer(buffer, toSend);
         }
     }
@@ -53,7 +57,9 @@ contract EthNoPoolAdapter is AccessControl {
         return (WETH, WETH);
     }
 
-    function setBuffer(address _newBufferManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setBuffer(
+        address _newBufferManager
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         buffer = _newBufferManager;
     }
 

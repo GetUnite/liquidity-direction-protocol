@@ -16,21 +16,21 @@ pragma solidity ^0.8.11;
 // import "../../interfaces/ILiquidityHandler.sol";
 
 // /**
-// * @title Collector 
-// * @notice Parking contract deployed on mainnet storing assets deployed from other chains. 
+// * @title Collector
+// * @notice Parking contract deployed on mainnet storing assets deployed from other chains.
 // *
 // */
 
-// contract DepositDistributor  is 
+// contract DepositDistributor  is
 //     Initializable,
 //     PausableUpgradeable,
 //     AccessControlUpgradeable,
-//     UUPSUpgradeable 
-//     { 
+//     UUPSUpgradeable
+//     {
 //     using AddressUpgradeable for address;
 //     using SafeERC20Upgradeable for IERC20Upgradeable;
 //     using EnumerableMapUpgradeable for EnumerableMapUpgradeable.AddressToUintMap;
-    
+
 //     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 //     bool public upgradeStatus;
 //     address private gnosis;
@@ -47,7 +47,7 @@ pragma solidity ^0.8.11;
 //     struct Entry {
 //         // Percentage of the total contract balance
 //         // that goes to the exact strategy
-//         // with 2 desimals, so 6753 == 67.53% 
+//         // with 2 desimals, so 6753 == 67.53%
 //         uint256 weight;
 //         // strategy that distributes money to a specific pool
 //         address strategyAddress;
@@ -62,12 +62,12 @@ pragma solidity ^0.8.11;
 //     Entry[] public entries;
 
 //     /// @custom:oz-upgrades-unsafe-allow constructor
-//     constructor() initializer {}    
+//     constructor() initializer {}
 
 //     function initialize(
 //         address _multiSigWallet,
-//         address _handlerAddress, 
-//         address _executorAddress, 
+//         address _handlerAddress,
+//         address _executorAddress,
 //         address[] memory token) public initializer
 //         {
 //         __Pausable_init();
@@ -81,13 +81,13 @@ pragma solidity ^0.8.11;
 
 //         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
 //         _grantRole(UPGRADER_ROLE, _multiSigWallet);
-    
+
 //     }
 
 //     // function calculateAll() public {
 
 //     // }
-    
+
 //     function anyExecute(bytes memory _data) external returns (bool success, bytes memory result){
 //         (Entry memory _msg) = abi.decode(_data, (FundsInfo));
 //         success=true;
@@ -106,7 +106,6 @@ pragma solidity ^0.8.11;
 //     onlyRole(DEFAULT_ADMIN_ROLE) {
 //         upgradeStatus = _status;
 //     }
-
 
 //     function _authorizeUpgrade(address newImplementation)
 //     internal

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-import "./AlluoERC20Upgradable.sol";
+import "./../../Farming/Polygon/AlluoERC20Upgradable.sol";
 import {ILiquidityHandlerPolygon as ILiquidityHandler} from "../../interfaces/ILiquidityHandlerPolygon.sol";
 import "../../mock/interestHelper/Interest.sol";
 import "../../interfaces/IExchange.sol";
@@ -23,9 +23,9 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
-import {CFAv1Library} from "./superfluid/libs/CFAv1Library.sol";
+import {CFAv1Library} from "./../../Farming/Polygon/superfluid/libs/CFAv1Library.sol";
 
-contract IbAlluo is
+contract IbAlluoTestnetAfter is
     Initializable,
     PausableUpgradeable,
     AlluoERC20Upgradable,
@@ -67,8 +67,10 @@ contract IbAlluo is
     // flag for upgrades availability
     bool public upgradeStatus;
 
-    // list of tokens from which deposit available
-    EnumerableSetUpgradeable.AddressSet private supportedTokens;
+    //----------------!!!!!!!!!!!!!!!!!!!!!!!!!------------------//
+    /// @custom:oz-renamed-from supportedTokens
+    EnumerableSetUpgradeable.AddressSet private DO_NOT_REMOVE_ME;
+    //----------------!!!!!!!!!!!!!!!!!!!!!!!!!------------------//
 
     // trusted forwarder address, see EIP-2771
     address public trustedForwarder;
@@ -84,6 +86,9 @@ contract IbAlluo is
     address public superfluidEndResolver;
     bytes32 public constant GELATO = keccak256("GELATO");
 
+    // list of tokens from which deposit available
+    /// @custom:oz-renamed-from supportedTokens2
+    EnumerableSetUpgradeable.AddressSet private supportedTokens;
     mapping(address => address) public autoInvestMarketToSuperToken;
 
     address public priceFeedRouter;
@@ -839,16 +844,6 @@ contract IbAlluo is
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         priceFeedRouter = _priceFeedRouter;
         fiatIndex = _fiatIndex;
-    }
-
-    function grantRole(
-        bytes32 role,
-        address account
-    ) public override onlyRole(getRoleAdmin(role)) {
-        if (role == DEFAULT_ADMIN_ROLE) {
-            require(account.isContract());
-        }
-        _grantRole(role, account);
     }
 
     function _transfer(

@@ -4,7 +4,7 @@ pragma solidity ^0.8.11;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
-contract GnosisMock is AccessControl{
+contract GnosisMock is AccessControl {
     using Address for address;
 
     constructor() {
@@ -19,8 +19,5 @@ contract GnosisMock is AccessControl{
         to.functionCallWithValue(data, value);
     }
 
-    receive() external payable {
-
-    }
+    receive() external payable {}
 }
-
