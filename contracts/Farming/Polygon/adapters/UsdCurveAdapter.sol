@@ -28,17 +28,27 @@ contract UsdCurveAdapter is AccessControl {
     uint64 public slippage;
     address public priceFeedRouter;
     uint64 public primaryTokenIndex;
-    uint256 public fiatIndex;
+    uint128 public liquidTokenIndex;
+    uint64 public maxSendSlippage;
 
     mapping(address => uint128) public indexes;
 
-    constructor (address _multiSigWallet, address _bufferManager, address _liquidityHandler, uint64 _slippage) {
+    constructor (
+        address _multiSigWallet, 
+        address _bufferManager, 
+        address _liquidityHandler, 
+        uint64 _lowSlippage,
+        uint64 _maxSlippage
+    ) {
+
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
         buffer = _bufferManager;
-        slippage = _slippage;
+        slippage = _lowSlippage;
+        maxSendSlippage = _maxSlippage;
+
 
         indexes[DAI] = 0;
         indexes[USDC] = 1;
@@ -110,42 +120,58 @@ contract UsdCurveAdapter is AccessControl {
         uint256 _amount
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256[3] memory amounts;
-        uint256 amount = _amount /
-            10 ** (18 - IERC20Metadata(_token).decimals());
-        amounts[indexes[_token]] = amount;
-        ICurvePoolUSD(CURVE_POOL).remove_liquidity_imbalance(
-            amounts,
-            (_amount * (10000 + slippage)) / 10000,
-            true
+        address liquidToken = ICurvePoolUSD(CURVE_POOL).underlying_coins(
+            liquidTokenIndex
         );
-        IERC20(_token).safeTransfer(_user, amount);
+        uint256 amount = _amount /
+            10 ** (18 - IERC20Metadata(liquidToken).decimals());
+        amounts[liquidTokenIndex] = amount;
+
+        if (_token == liquidToken) {
+            ICurvePoolUSD(CURVE_POOL).remove_liquidity_imbalance(
+                amounts,
+                (_amount * (10000 + slippage)) / 10000,
+                true
+            );
+            IERC20(_token).safeTransfer(_user, amount);
+        } else {
+            // We want to be save agains arbitragers so at any withraw contract checks
+            // how much will be burned curveLp by withrawing this amount in token with most liquidity
+            // and passes this burned amount to get tokens
+            uint256 toBurn = ICurvePoolUSD(CURVE_POOL).calc_token_amount(
+                amounts,
+                false
+            );
+            uint256 minAmountOut = _amount /
+                10 ** (18 - IERC20Metadata(_token).decimals());
+            uint256 toUser = ICurvePoolUSD(CURVE_POOL)
+                .remove_liquidity_one_coin(
+                    toBurn,
+                    int128(indexes[_token]),
+                    (minAmountOut * (10000 - slippage)) / 10000,
+                    true
+                );
+            uint256 toUser18 = toUser *
+                10 ** (18 - IERC20Metadata(_token).decimals());
+            require(
+                toUser18 <= (_amount * (10000 + maxSendSlippage)) / 10000,
+                "Adapter: too much sending"
+            );
+            IERC20(_token).safeTransfer(_user, toUser);
+        }
     }
 
     function getAdapterAmount() external view returns (uint256) {
-        // get price feed for primary token in usd
-        // return the usd value to amount
-        // return in 10**18
-
         uint256 curveLpAmount = IERC20(CURVE_LP).balanceOf((address(this)));
         if (curveLpAmount != 0) {
-            address primaryToken = ICurvePoolUSD(CURVE_POOL).underlying_coins(
-                primaryTokenIndex
+            address liquidToken = ICurvePoolUSD(CURVE_POOL).underlying_coins(
+                liquidTokenIndex
             );
-            uint256 amount = (
-                ICurvePoolUSD(CURVE_POOL).calc_withdraw_one_coin(
-                    curveLpAmount,
-                    int128(uint128(primaryTokenIndex))
-                )
-            ) * 10 ** (18 - ERC20(primaryToken).decimals());
-
-            if (priceFeedRouter != address(0)) {
-                (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
-                    priceFeedRouter
-                ).getPrice(primaryToken, fiatIndex);
-                amount = (amount * price) / 10 ** (uint256(priceDecimals));
-            }
-
-            return amount;
+            uint256 amount = ICurvePoolUSD(CURVE_POOL).calc_withdraw_one_coin(
+                curveLpAmount,
+                int128(liquidTokenIndex)
+            );
+            return amount * 10 ** (18 - ERC20(liquidToken).decimals());
         } else {
             return 0;
         }
@@ -162,21 +188,15 @@ contract UsdCurveAdapter is AccessControl {
     }
 
     function setSlippage(
-        uint64 _newSlippage
+        uint64 _lowSlippage,
+        uint64 _maxSlippage
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        slippage = _newSlippage;
+        slippage = _lowSlippage;
+        maxSendSlippage = _maxSlippage;
     }
 
     function setBuffer(address _newBufferManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
         buffer = _newBufferManager;
-    }
-
-    function setPriceRouterInfo(
-        address _priceFeedRouter,
-        uint256 _fiatIndex
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        priceFeedRouter = _priceFeedRouter;
-        fiatIndex = _fiatIndex;
     }
 
     /**

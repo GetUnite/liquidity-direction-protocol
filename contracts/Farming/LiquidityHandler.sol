@@ -176,7 +176,8 @@ contract LiquidityHandler is
     function withdraw(
         address _user,
         address _token,
-        uint256 _amount
+        uint256 _amount,
+        uint256 _fiatAmount
     ) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 inAdapter = getAdapterAmount(msg.sender);
 
@@ -206,7 +207,7 @@ contract LiquidityHandler is
             ] = Withdrawal({
                 user: _user,
                 token: _token,
-                amount: _amount,
+                amount: _fiatAmount,
                 time: block.timestamp
             });
             withdrawalSystem.totalWithdrawalAmount += _amount;
@@ -227,6 +228,7 @@ contract LiquidityHandler is
         address _user,
         address _token,
         uint256 _amount,
+        uint256 _fiatAmount,
         address _outputToken
     ) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 inAdapter = getAdapterAmount(msg.sender);
@@ -267,7 +269,7 @@ contract LiquidityHandler is
             ] = Withdrawal({
                 user: _user,
                 token: _token,
-                amount: _amount,
+                amount: _fiatAmount,
                 time: block.timestamp
             });
             withdrawalSystem.totalWithdrawalAmount += _amount;

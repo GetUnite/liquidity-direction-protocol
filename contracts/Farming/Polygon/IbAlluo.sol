@@ -351,9 +351,9 @@ contract IbAlluo is
                     .buildRoute(liquidToken, _targetToken)
                     .length > 0
             );
-            handler.withdraw(_recipient, liquidToken, _amount, _targetToken);
+            handler.withdraw(_recipient, liquidToken, _amount, _amount, _targetToken);
         } else {
-            handler.withdraw(_recipient, _targetToken, _amount);
+            handler.withdraw(_recipient, _targetToken, _amount, _amount);
         }
 
         emit TransferAssetValue(

@@ -177,9 +177,10 @@ describe("IbAlluo and Exchange", function () {
         const EurAdapter = await ethers.getContractFactory("EurCurveAdapter") as EurCurveAdapter__factory;
         const EthAdapter = await ethers.getContractFactory("EthNoPoolAdapter") as EthNoPoolAdapter__factory;
 
-        eurAdapter = await EurAdapter.deploy(admin.address, buffer.address, handler.address, 200);
-        usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200);
+        eurAdapter = await EurAdapter.deploy(admin.address, buffer.address, handler.address, 200, 500);
+        usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200, 500);
         ethAdapter = await EthAdapter.deploy(admin.address, buffer.address, handler.address);
+
 
         await usdAdapter.connect(admin).adapterApproveAll()
         await handler.connect(admin).setAdapter(
@@ -315,9 +316,9 @@ describe("IbAlluo and Exchange", function () {
         it("Depositing in eurt and then withdrawing in Dai should give you eurt back (without being added to withdrawal queue) ", async function () {
             await deposit(signers[0], eurt, parseUnits("100", 6));
             expect(Number(await ibAlluoUsd.balanceOf(signers[0].address))).greaterThan(Number(0))
-            await deposit(signers[8], eurt, parseUnits("1000", 6));
-            await deposit(signers[8], eurt, parseUnits("1000", 6));
-            await deposit(signers[8], eurt, parseUnits("1000", 6));
+            await deposit(signers[0], eurt, parseUnits("1000", 6));
+            await deposit(signers[0], eurt, parseUnits("1000", 6));
+            await deposit(signers[0], eurt, parseUnits("1000", 6));
 
             // Once there are sufficient buffer
 

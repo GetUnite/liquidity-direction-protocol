@@ -168,7 +168,7 @@ describe("ibAlluoCurrent and Handler", function () {
       }
     ) as BufferManager;
 
-    usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200);
+    usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200, 100);
 
     await usdAdapter.connect(admin).adapterApproveAll();
 

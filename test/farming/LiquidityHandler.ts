@@ -196,8 +196,8 @@ describe("Handler and different adapters", function () {
         const EthAdapter = await ethers.getContractFactory("EthNoPoolAdapter") as EthNoPoolAdapter__factory;
         const BtcAdapter = await ethers.getContractFactory("BtcCurveAdapter") as BtcCurveAdapter__factory;
 
-        eurAdapter = await EurAdapter.deploy(admin.address, buffer.address, handler.address, 200);
-        usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200);
+        eurAdapter = await EurAdapter.deploy(admin.address, buffer.address, handler.address, 200, 100);
+        usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200, 100);
         ethAdapter = await EthAdapter.deploy(admin.address, buffer.address, handler.address);
         btcAdapter = await BtcAdapter.deploy(admin.address, handler.address, buffer.address, 200);
 

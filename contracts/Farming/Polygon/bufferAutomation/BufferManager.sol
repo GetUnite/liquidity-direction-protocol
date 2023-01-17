@@ -12,11 +12,14 @@ import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeab
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
+import "../../../interfaces/IPriceFeedRouter.sol";
 import "../../../interfaces/ILiquidityHandler.sol";
 import "../../../interfaces/IHandlerAdapter.sol";
 import "../../../interfaces/IVoteExecutorSlave.sol";
-import "../../../interfaces/ISpokePool.sol";
-import "../../../interfaces/ICallProxy.sol";
+import "../../../interfaces/IIbAlluo.sol";
+
+import {ISpokePool} from "../../../interfaces/ISpokePool.sol";
+import {ICallProxy} from "../../../interfaces/ICallProxy.sol";
 
 contract BufferManager is
     Initializable,
@@ -51,6 +54,8 @@ contract BufferManager is
     // address of the gnosis multisig
     address public gnosis;
     uint256 public epochDuration;
+    // min pct of the deviation from expectedAdapterRefill to trigger the refill (with 2 decimals, e.g. 5% = 500)
+    uint256 public refillThreshold; 
     
     // bridge settings
     uint256 public lastExecuted;
@@ -192,7 +197,7 @@ contract BufferManager is
     function swap(
         uint256 amount,
         address originToken
-    ) external onlyRole(SWAPPER) {
+    ) external whenNotPaused onlyRole(SWAPPER) {
         require(
             canBridge(originToken, amount),
             "Buffer: <minAmount or <bridgeInterval"
@@ -255,8 +260,11 @@ contract BufferManager is
 
     /**
      * @notice Function checks the amount of asset that needs to be transferred for an adapter to be filled
+     * @notice Liquidity Handler works differently for wbtc/weth and fiat-pegged assets, in first scenario getExpectedAdapteramount
+     * and getAdapterAmount return token value in 18 decimals, while 2nd scenario (stablecoins) return their fiat value.
+     * Function checks the adapter id and adapts the amount to the 18decimal token value format
      * @param _ibAlluo Address of an IBAlluo contract, which corresponding adapter is to be filled
-     * @return requiredRefill Amount to be refilled with 18 decimals
+     * @return requiredRefill Amount to be refilled in token with 18 decimals
      */
     function adapterRequiredRefill(
         address _ibAlluo
@@ -267,9 +275,20 @@ contract BufferManager is
             return 0;
         }
         uint256 difference = expectedAmount - actualAmount; 
-        if ((difference * 10000) / expectedAmount <= 500) {
+        if ((difference * 10000) / expectedAmount <= refillThreshold) {
             return 0;
         } 
+        uint id = ILiquidityHandler(handler).getAdapterId(_ibAlluo); // id 3 and 4 are weth and wbtc, which must not follow fiat logic
+        address priceFeedRouter = IIbAlluo(_ibAlluo).priceFeedRouter();
+        if (priceFeedRouter != address(0) && id!=3 && id!=4) {
+            address adapter = ibAlluoToAdapter[_ibAlluo];
+            address token = IHandlerAdapter(adapter).getCoreTokens();
+            (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
+                priceFeedRouter
+            ).getPrice(token, IIbAlluo(_ibAlluo).fiatIndex());
+
+            difference = (difference * price) / (10 ** priceDecimals);
+        }
         return difference;
     }
 
@@ -306,7 +325,7 @@ contract BufferManager is
      */
     function refillBuffer(
         address _ibAlluo
-    ) external onlyRole(GELATO) returns (bool) {
+    ) external whenNotPaused onlyRole(GELATO) returns (bool) {
         uint256 totalAmount = adapterRequiredRefill(_ibAlluo);
 
         require(totalAmount > 0, "No refill required");
@@ -334,9 +353,9 @@ contract BufferManager is
                 return false;
             }
         } else {
+        bridgeRefilled += totalAmount;
         IERC20Upgradeable(bufferToken).transfer(adapterAddress, totalAmount / 10 ** decDif);
         IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
-        bridgeRefilled += totalAmount;
         if (isAdapterPendingWithdrawal(_ibAlluo)) {
             handler.satisfyAdapterWithdrawals(_ibAlluo);
         }
@@ -373,7 +392,7 @@ contract BufferManager is
             "Cumulative refills exceeds limit"
         );
 
-        currentEpoch.refilledPerEpoch += totalAmount;
+        currentEpoch.refilledPerEpoch += gnosisAmount;
         bridgeRefilled += totalAmount;
         IERC20Upgradeable(bufferToken).transferFrom(
             gnosis,
@@ -502,6 +521,7 @@ contract BufferManager is
 
     /**
     * @dev Admin function to set bridge cap
+    * @param _cap Max amount that can be bridged per interval
     */
     function setBridgeCap(uint256 _cap) external onlyRole(DEFAULT_ADMIN_ROLE) {
         bridgeCap = _cap;
@@ -565,6 +585,15 @@ contract BufferManager is
     }
 
     /**
+    * @notice Prevents buffer from refilling adapters with "dust" amount
+    * @dev Admin function to set a minimum deviation from expectedAdapterAmount that would trigger a refill
+    * @param _pct Minimum percentage of deviation to trigger the refill (format: 5% = 500)
+    */
+    function setRefillThresholdPct(uint _pct) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        refillThreshold = _pct;
+    }
+
+    /**
      * @dev Admin function for setting the aforementioned interval
      * @param _epochDuration time of the epoch in seconds
      */
@@ -606,6 +635,14 @@ contract BufferManager is
             }
         }
         return removed;
+    }
+
+     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
     }
 
     function changeUpgradeStatus(
