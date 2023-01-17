@@ -181,6 +181,7 @@ describe("IbAlluo and Exchange", function () {
         usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200);
         ethAdapter = await EthAdapter.deploy(admin.address, buffer.address, handler.address);
 
+
         await usdAdapter.connect(admin).adapterApproveAll()
         await handler.connect(admin).setAdapter(
             1,
