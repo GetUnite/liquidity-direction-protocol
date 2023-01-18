@@ -54,8 +54,6 @@ contract BufferManager is
     // address of the gnosis multisig
     address public gnosis;
     uint256 public epochDuration;
-    // min pct of the deviation from expectedAdapterRefill to trigger the refill (with 2 decimals, e.g. 5% = 500)
-    uint256 public refillThreshold; 
     
     // bridge settings
     uint256 public lastExecuted;
@@ -86,6 +84,8 @@ contract BufferManager is
 
     uint256 public bridgeCap;
     uint256 public bridgeRefilled;
+    // min pct of the deviation from expectedAdapterRefill to trigger the refill (with 2 decimals, e.g. 5% = 500)
+    uint256 public refillThreshold; 
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -668,7 +668,16 @@ contract BufferManager is
         return removed;
     }
 
-     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+    // @notice if _amount == 0 withdraws all
+    function emergencyWithdrawal(address _token, uint256 _amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if(_amount != 0){
+        IERC20Upgradeable(_token).transfer(msg.sender, _amount);
+        } else {
+            IERC20Upgradeable(_token).transfer(msg.sender, IERC20Upgradeable(_token).balanceOf(address(this)));
+        }
+    }
+
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause();
     }
 
