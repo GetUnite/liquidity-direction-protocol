@@ -11,13 +11,13 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
-import "../interfaces/IIbAlluo.sol";
-import "../interfaces/IHandlerAdapter.sol";
-import "../interfaces/IExchange.sol";
-import "./../interfaces/IPriceFeedRouter.sol";
+import "../../interfaces/IIbAlluo.sol";
+import "../../interfaces/IHandlerAdapter.sol";
+import "../../interfaces/IExchange.sol";
+import "./../../interfaces/IPriceFeedRouter.sol";
 import "hardhat/console.sol";
 
-contract LiquidityHandlerCurrent is
+contract LiquidityHandlerPolygon is
     Initializable,
     PausableUpgradeable,
     AccessControlUpgradeable,
@@ -178,7 +178,7 @@ contract LiquidityHandlerCurrent is
         address _user,
         address _token,
         uint256 _amount,
-        uint256 fiatAmount
+        uint256 _fiatAmount
     ) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 inAdapter = getAdapterAmount(msg.sender);
 
@@ -208,7 +208,7 @@ contract LiquidityHandlerCurrent is
             ] = Withdrawal({
                 user: _user,
                 token: _token,
-                amount: fiatAmount,
+                amount: _fiatAmount,
                 time: block.timestamp
             });
             withdrawalSystem.totalWithdrawalAmount += _amount;
@@ -229,7 +229,7 @@ contract LiquidityHandlerCurrent is
         address _user,
         address _token,
         uint256 _amount,
-        uint256 fiatAmount,
+        uint256 _fiatAmount,
         address _outputToken
     ) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 inAdapter = getAdapterAmount(msg.sender);
@@ -270,7 +270,7 @@ contract LiquidityHandlerCurrent is
             ] = Withdrawal({
                 user: _user,
                 token: _token,
-                amount: fiatAmount,
+                amount: _fiatAmount,
                 time: block.timestamp
             });
             withdrawalSystem.totalWithdrawalAmount += _amount;
@@ -285,6 +285,12 @@ contract LiquidityHandlerCurrent is
         }
     }
 
+    /**
+     * @dev Internal function taking a path including a withdrawal in a different token
+     * @param _inputToken Address of the available token to be swapped
+     * @param _targetToken Address of the desired token
+     * @param _amount18 Amount of the token in 18 decimals
+     */
     function _withdrawThroughExchange(
         address _inputToken,
         address _targetToken,
@@ -320,10 +326,10 @@ contract LiquidityHandlerCurrent is
         uint256 fiatIndex = IIbAlluo(_ibAlluo).fiatIndex();
 
         if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
-            uint256 inAdapter = getAdapterAmount(_ibAlluo);
             uint256 adapterId = ibAlluoToAdapterId.get(_ibAlluo);
             address adapter = adapterIdsToAdapterInfo[adapterId].adapterAddress;
             while (lastSatisfiedWithdrawal != lastWithdrawalRequest) {
+                uint256 inAdapter = getAdapterAmount(_ibAlluo);
                 Withdrawal memory withdrawal = withdrawalSystem.withdrawals[
                     lastSatisfiedWithdrawal + 1
                 ];
@@ -343,8 +349,6 @@ contract LiquidityHandlerCurrent is
                         withdrawal.token,
                         amount
                     );
-
-                    inAdapter -= withdrawal.amount;
                     withdrawalSystem.totalWithdrawalAmount -= withdrawal.amount;
                     withdrawalSystem.lastSatisfiedWithdrawal++;
                     lastSatisfiedWithdrawal++;
@@ -408,7 +412,6 @@ contract LiquidityHandlerCurrent is
 
         uint256 totalWithdrawalAmount = ibAlluoToWithdrawalSystems[_ibAlluo]
             .totalWithdrawalAmount;
-
         return
             ((_newAmount + IIbAlluo(_ibAlluo).totalAssetSupply()) *
                 percentage) /
@@ -598,6 +601,15 @@ contract LiquidityHandlerCurrent is
         uint256 _amount
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IERC20Upgradeable(_address).safeTransfer(_to, _amount);
+    }
+
+    function clearWithdrawals(
+        address _iballuo
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[
+            _iballuo
+        ];
+        withdrawalSystem.totalWithdrawalAmount = 0;
     }
 
     function changeUpgradeStatus(

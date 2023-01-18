@@ -56,14 +56,22 @@ contract BtcCurveAdapter is AccessControl {
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
     /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Buffer Manager (the "buffer" amount)
-    function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function deposit(
+        address _token,
+        uint256 _fullAmount,
+        uint256 _leaveInPool
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         address primaryToken = ICurvePoolBTC(CURVE_POOL).underlying_coins(
             primaryTokenIndex
         );
         if (_token == primaryToken) {
             if (toSend != 0) {
-                IERC20(primaryToken).safeTransfer(buffer, toSend / 10**(18 - IERC20Metadata(primaryToken).decimals()));
+                IERC20(primaryToken).safeTransfer(
+                    buffer,
+                    toSend /
+                        10 ** (18 - IERC20Metadata(primaryToken).decimals())
+                );
             }
             if (_leaveInPool != 0) {
                 uint256[2] memory amounts;
@@ -90,9 +98,10 @@ contract BtcCurveAdapter is AccessControl {
                     10 ** (18 - IERC20Metadata(primaryToken).decimals());
                 amounts[primaryTokenIndex] = toSend;
                 ICurvePoolBTC(CURVE_POOL).remove_liquidity_imbalance(
-                            amounts, 
-                            lpAmount * (10000+slippage)/10000,
-                            true);
+                    amounts,
+                    (lpAmount * (10000 + slippage)) / 10000,
+                    true
+                );
                 IERC20(primaryToken).safeTransfer(buffer, toSend);
             }
         }
@@ -123,9 +132,8 @@ contract BtcCurveAdapter is AccessControl {
                 true
             );
             IERC20(_token).safeTransfer(_user, amount);
-        }
-        else{
-            // We want to be safe against arbitrageurs, so at any withrawal contract checks 
+        } else {
+            // We want to be safe against arbitrageurs, so at any withrawal contract checks
             // the amount of curveLp to be burned by withrawing this amount in token with most liquidity
             // and passes this burned amount to get tokens
             uint256 toBurn = ICurvePoolBTC(CURVE_POOL).calc_token_amount(
@@ -190,7 +198,9 @@ contract BtcCurveAdapter is AccessControl {
         slippage = _newSlippage;
     }
 
-    function setBuffer(address _newBufferManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setBuffer(
+        address _newBufferManager
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         buffer = _newBufferManager;
     }
 

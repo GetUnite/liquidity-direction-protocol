@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
 import { formatEther, formatUnits, parseEther, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
-import { BtcNoPoolAdapterUpgradeable, EthNoPoolAdapterUpgradeable, EurCurveAdapterUpgradeable, IbAlluo, ICurvePoolEUR, ICurvePoolUSD, IERC20Metadata, LiquidityHandler, PriceFeedRouterV2, UsdCurveAdapterUpgradeable } from "../../typechain";
+import { BtcNoPoolAdapterUpgradeable, EthNoPoolAdapterUpgradeable, EurCurveAdapterUpgradeable, IbAlluo, ICurvePoolEUR, ICurvePoolUSD, IERC20Metadata, LiquidityHandler, LiquidityHandlerPolygon, PriceFeedRouterV2, UsdCurveAdapterUpgradeable } from "../../typechain";
 
 let usdc: IERC20Metadata, usdt: IERC20Metadata, dai: IERC20Metadata, weth: IERC20Metadata,
     wbtc: IERC20Metadata, eurt: IERC20Metadata, jeur: IERC20Metadata, par: IERC20Metadata,
@@ -181,7 +181,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
         admin = await ethers.getImpersonatedSigner("0x2580f9954529853Ca5aC5543cE39E9B5B1145135");
 
         const IbAlluo = await ethers.getContractFactory("IbAlluo");
-        const LiquidityHandler = await ethers.getContractFactory("LiquidityHandler");
+        const LiquidityHandler = await ethers.getContractFactory("LiquidityHandlerPolygon");
         const OldIbAlluoFactory = await ethers.getContractFactory("IbAlluoWithoutPriceOracles");
         const OldLiquidityHandler = await ethers.getContractFactory("LiquidityHandlerWithoutPriceOracles");
 

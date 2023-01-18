@@ -40,7 +40,6 @@ contract UsdCurveAdapter is AccessControl {
         uint64 _lowSlippage,
         uint64 _maxSlippage
     ) {
-
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
@@ -55,6 +54,7 @@ contract UsdCurveAdapter is AccessControl {
         indexes[USDT] = 2;
 
         primaryTokenIndex = 1;
+        liquidTokenIndex = 1;
     }
 
     function adapterApproveAll() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -68,14 +68,22 @@ contract UsdCurveAdapter is AccessControl {
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
     /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Buffer Manager contract (the "buffer" amount)
-    function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function deposit(
+        address _token,
+        uint256 _fullAmount,
+        uint256 _leaveInPool
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         address primaryToken = ICurvePoolUSD(CURVE_POOL).underlying_coins(
             primaryTokenIndex
         );
         if (_token == primaryToken) {
             if (toSend != 0) {
-                IERC20(primaryToken).safeTransfer(buffer, toSend / 10**(18 - IERC20Metadata(primaryToken).decimals()));
+                IERC20(primaryToken).safeTransfer(
+                    buffer,
+                    toSend /
+                        10 ** (18 - IERC20Metadata(primaryToken).decimals())
+                );
             }
             if (_leaveInPool != 0) {
                 uint256[3] memory amounts;
@@ -102,9 +110,10 @@ contract UsdCurveAdapter is AccessControl {
                     10 ** (18 - IERC20Metadata(primaryToken).decimals());
                 amounts[primaryTokenIndex] = toSend;
                 ICurvePoolUSD(CURVE_POOL).remove_liquidity_imbalance(
-                            amounts, 
-                            lpAmount * (10000+slippage)/10000,
-                            true);
+                    amounts,
+                    (lpAmount * (10000 + slippage)) / 10000,
+                    true
+                );
                 IERC20(primaryToken).safeTransfer(buffer, toSend);
             }
         }
@@ -195,7 +204,9 @@ contract UsdCurveAdapter is AccessControl {
         maxSendSlippage = _maxSlippage;
     }
 
-    function setBuffer(address _newBufferManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setBuffer(
+        address _newBufferManager
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         buffer = _newBufferManager;
     }
 

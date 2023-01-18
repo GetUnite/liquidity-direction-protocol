@@ -3,7 +3,7 @@ pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts/access/IAccessControl.sol";
 
-interface ILiquidityHandler is IAccessControl {
+interface ILiquidityHandlerPolygon is IAccessControl {
     function adapterIdsToAdapterInfo(
         uint256
     )
@@ -117,13 +117,15 @@ interface ILiquidityHandler is IAccessControl {
     function withdraw(
         address _user,
         address _token,
-        uint256 _amount
+        uint256 _amount,
+        uint256 fiatAmount
     ) external;
 
     function withdraw(
         address _user,
         address _token,
         uint256 _amount,
+        uint256 fiatAmount,
         address _outputToken
     ) external;
 

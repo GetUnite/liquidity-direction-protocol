@@ -4,9 +4,9 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory, StIbAlluo, StIbAlluo__factory, BufferManager, BufferManager__factory } from "../../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandlerPolygon, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandlerPolygon__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory, StIbAlluo, StIbAlluo__factory, BufferManager, BufferManager__factory } from "../../typechain";
 
-async function getLastWithdrawalInfo(token: IbAlluo, handler: LiquidityHandler) {
+async function getLastWithdrawalInfo(token: IbAlluo, handler: LiquidityHandlerPolygon) {
     let request = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastWithdrawalRequest
     let satisfied = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastSatisfiedWithdrawal
     let total = (await handler.ibAlluoToWithdrawalSystems(token.address)).totalWithdrawalAmount
@@ -53,7 +53,7 @@ describe("Handler and different adapters", function () {
     let ethAdapter: EthNoPoolAdapter;
     let btcAdapter: BtcCurveAdapter;
 
-    let handler: LiquidityHandler;
+    let handler: LiquidityHandlerPolygon;
     let buffer: BufferManager;
 
     let dai: IERC20, usdc: IERC20, usdt: IERC20;
@@ -162,7 +162,7 @@ describe("Handler and different adapters", function () {
         const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
         //We are using this contract to simulate Gnosis multisig wallet
 
-        const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
+        const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandlerPolygon__factory;
         // Temp values for exchange stuff.
         handler = await upgrades.deployProxy(Handler,
             [admin.address, exchangeAddress], {
@@ -171,7 +171,7 @@ describe("Handler and different adapters", function () {
             unsafeAllow: ["delegatecall"]
 
         }
-        ) as LiquidityHandler;
+        ) as LiquidityHandlerPolygon;
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), admin.address)
 

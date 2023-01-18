@@ -5,7 +5,7 @@ import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { formatUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, IWrappedEther, IERC20Metadata, IExchange, Exchange, BufferManager, BufferManager__factory } from "../../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, IWrappedEther, IERC20Metadata, IExchange, Exchange, BufferManager, BufferManager__factory, LiquidityHandlerPolygon, LiquidityHandlerPolygon__factory } from "../../typechain";
 
 async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
     await ethers.provider.send(
@@ -41,7 +41,7 @@ describe("IbAlluo and Exchange", function () {
     let ethAdapter: EthNoPoolAdapter;
 
     let multisig: PseudoMultisigWallet;
-    let handler: LiquidityHandler;
+    let handler: LiquidityHandlerPolygon;
     let buffer: BufferManager;
 
     let dai: IERC20Metadata, usdc: IERC20Metadata, usdt: IERC20Metadata;
@@ -145,7 +145,7 @@ describe("IbAlluo and Exchange", function () {
         const Multisig = await ethers.getContractFactory("PseudoMultisigWallet") as PseudoMultisigWallet__factory;
         multisig = await Multisig.deploy(true);
 
-        const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
+        const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandlerPolygon__factory;
 
         handler = await upgrades.deployProxy(Handler,
             [admin.address, exchangeAddress],
@@ -153,7 +153,7 @@ describe("IbAlluo and Exchange", function () {
                 initializer: 'initialize', kind: 'uups',
                 unsafeAllow: ["delegatecall"]
             }
-        ) as LiquidityHandler;
+        ) as LiquidityHandlerPolygon;
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), admin.address)
 
@@ -177,8 +177,8 @@ describe("IbAlluo and Exchange", function () {
         const EurAdapter = await ethers.getContractFactory("EurCurveAdapter") as EurCurveAdapter__factory;
         const EthAdapter = await ethers.getContractFactory("EthNoPoolAdapter") as EthNoPoolAdapter__factory;
 
-        eurAdapter = await EurAdapter.deploy(admin.address, buffer.address, handler.address, 200, 500);
-        usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200, 500);
+        eurAdapter = await EurAdapter.deploy(admin.address, buffer.address, handler.address, 200, 100);
+        usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200, 100);
         ethAdapter = await EthAdapter.deploy(admin.address, buffer.address, handler.address);
 
 
@@ -316,12 +316,12 @@ describe("IbAlluo and Exchange", function () {
         it("Depositing in eurt and then withdrawing in Dai should give you eurt back (without being added to withdrawal queue) ", async function () {
             await deposit(signers[0], eurt, parseUnits("100", 6));
             expect(Number(await ibAlluoUsd.balanceOf(signers[0].address))).greaterThan(Number(0))
-            await deposit(signers[0], eurt, parseUnits("1000", 6));
-            await deposit(signers[0], eurt, parseUnits("1000", 6));
-            await deposit(signers[0], eurt, parseUnits("1000", 6));
+            await deposit(signers[8], eurt, parseUnits("1000", 6));
+            await deposit(signers[8], eurt, parseUnits("1000", 6));
+            await deposit(signers[8], eurt, parseUnits("1000", 6));
 
             // Once there are sufficient buffer
-
+            console.log(await ibAlluoUsd.priceFeedRouter(), await usdAdapter.priceFeedRouter())
             await ibAlluoUsd.connect(signers[0]).withdraw(eurt.address, parseEther("70"));
             const balAfter = await eurt.balanceOf(signers[0].address);
             // console.log(balAfter);

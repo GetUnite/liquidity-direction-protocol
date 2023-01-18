@@ -4,7 +4,7 @@ import { parseEther, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { BigNumber, BigNumberish} from "ethers";
 import {
-  BufferManager, BufferManager__factory, IERC20, IbAlluo, IbAlluo__factory, LiquidityHandler, LiquidityHandler__factory, VoteExecutorSlaveFinal, VoteExecutorSlaveFinal__factory, 
+  BufferManager, BufferManager__factory, IERC20, IbAlluo, IbAlluo__factory, LiquidityHandlerPolygon, LiquidityHandlerPolygon__factory, VoteExecutorSlaveFinal, VoteExecutorSlaveFinal__factory, 
   UsdCurveAdapterUpgradeable__factory, UsdCurveAdapterUpgradeable, EurCurveAdapterUpgradeable__factory, EurCurveAdapterUpgradeable, EthNoPoolAdapterUpgradeable__factory,
   EthNoPoolAdapterUpgradeable, BtcNoPoolAdapterUpgradeable__factory, BtcNoPoolAdapterUpgradeable
 } from "../../typechain";
@@ -35,7 +35,7 @@ async function sendEth(users: SignerWithAddress[]) {
   }
 }
 
-async function getLastWithdrawalInfo(token: IbAlluo, handler: LiquidityHandler) {
+async function getLastWithdrawalInfo(token: IbAlluo, handler: LiquidityHandlerPolygon) {
   let request = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastWithdrawalRequest
   let satisfied = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastSatisfiedWithdrawal
   let total = (await handler.ibAlluoToWithdrawalSystems(token.address)).totalWithdrawalAmount
@@ -60,7 +60,7 @@ describe("BufferManager tests", () => {
   let ibAlluoEth: IbAlluo;
   let ibAlluoBtc: IbAlluo;
 
-  let handler: LiquidityHandler;
+  let handler: LiquidityHandlerPolygon;
   let buffer: BufferManager;
   let slave: VoteExecutorSlaveFinal;
 
@@ -137,7 +137,7 @@ describe("BufferManager tests", () => {
     const EthAdapter = await ethers.getContractFactory("EthNoPoolAdapterUpgradeable") as EthNoPoolAdapterUpgradeable__factory;
     const BtcAdapter = await ethers.getContractFactory("BtcNoPoolAdapterUpgradeable") as BtcNoPoolAdapterUpgradeable__factory;
     
-    const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
+    const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandlerPolygon__factory;
     const IbAlluo = await ethers.getContractFactory("IbAlluo") as IbAlluo__factory;
     const Buffer = await ethers.getContractFactory("BufferManager") as BufferManager__factory;
     const Slave = await ethers.getContractFactory("VoteExecutorSlaveFinal") as VoteExecutorSlaveFinal__factory;
@@ -161,7 +161,7 @@ describe("BufferManager tests", () => {
       initializer: 'initialize', unsafeAllow: ["delegatecall"],
       kind: 'uups'
     }
-    ) as LiquidityHandler;
+    ) as LiquidityHandlerPolygon;
 
     slave = await upgrades.deployProxy(Slave,
       [gnosis.address, handler.address], {
@@ -394,6 +394,7 @@ describe("BufferManager tests", () => {
     }
     await slave.connect(gnosis).setEntries([entry])
     await slave.connect(gnosis).grantRole(await slave.DEFAULT_ADMIN_ROLE(), buffer.address)
+    await buffer.connect(gnosis).setRefillThresholdPct(500)
   });
 
   describe("Initial setup", async() => {
@@ -426,8 +427,11 @@ describe("BufferManager tests", () => {
       console.log("refill", execPayload)
     })
 
-    it("checkerBridge: Adapters don't need a refill, balance exceeds minBridgeAmount, returns true, and swap call", async () => {
+    it ("checkerBridge: Adapters don't need a refill, balance exceeds minBridgeAmount, returns true, and swap call", async () => {
       await deposit(signers[1], usdc, parseUnits("40000", 6))
+      await buffer.connect(gnosis).setBridgeCap(parseUnits("1000000", 18))
+      await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, 1)
+      await buffer.connect(gnosis).changeBridgeInterval(0)
 
       const [canExec, execPayload] = await buffer.checkerBridge()
       expect(canExec).to.eq(true)

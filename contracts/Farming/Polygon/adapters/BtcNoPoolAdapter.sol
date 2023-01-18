@@ -13,7 +13,11 @@ contract BtcNoPoolAdapter is AccessControl {
     address public constant WBTC = 0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6;
     address public buffer;
 
-    constructor (address _multiSigWallet, address _bufferManager, address _liquidityHandler) {
+    constructor(
+        address _multiSigWallet,
+        address _bufferManager,
+        address _liquidityHandler
+    ) {
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
@@ -27,8 +31,8 @@ contract BtcNoPoolAdapter is AccessControl {
         uint256 _leaveInPool
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
-        if(toSend != 0){
-            IERC20(WBTC).safeTransfer(buffer, toSend / 10**10);
+        if (toSend != 0) {
+            IERC20(WBTC).safeTransfer(buffer, toSend / 10 ** 10);
         }
     }
 
@@ -52,7 +56,9 @@ contract BtcNoPoolAdapter is AccessControl {
         return (WBTC, WBTC);
     }
 
-    function setBuffer(address _newBufferManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setBuffer(
+        address _newBufferManager
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         buffer = _newBufferManager;
     }
 

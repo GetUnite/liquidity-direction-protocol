@@ -17,7 +17,7 @@ contract EurCurveAdapter is AccessControl {
     address public constant PAR = 0xE2Aa7db6dA1dAE97C5f5C6914d285fBfCC32A128;
     address public constant EURS = 0xE111178A87A3BFf0c8d18DECBa5798827539Ae99;
     address public constant EURT = 0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f;
-    address public constant CURVE_POOL =
+    address public constant CURVE_POOL = 
         0xAd326c253A84e9805559b73A08724e11E49ca651;
     address public buffer;
     uint64 public slippage;
@@ -65,14 +65,22 @@ contract EurCurveAdapter is AccessControl {
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
     /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Buffer Manager contract (the "buffer" amount)
-    function deposit(address _token, uint256 _fullAmount, uint256 _leaveInPool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function deposit(
+        address _token,
+        uint256 _fullAmount,
+        uint256 _leaveInPool
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 toSend = _fullAmount - _leaveInPool;
         address primaryToken = ICurvePoolEUR(CURVE_POOL).coins(
             primaryTokenIndex
         );
         if (_token == primaryToken) {
             if (toSend != 0) {
-                IERC20(primaryToken).safeTransfer(buffer, toSend / 10**(18 - IERC20Metadata(primaryToken).decimals()));
+                IERC20(primaryToken).safeTransfer(
+                    buffer,
+                    toSend /
+                        10 ** (18 - IERC20Metadata(primaryToken).decimals())
+                );
             }
             if (_leaveInPool != 0) {
                 uint256[4] memory amounts;
@@ -98,8 +106,9 @@ contract EurCurveAdapter is AccessControl {
                     10 ** (18 - IERC20Metadata(primaryToken).decimals());
                 amounts[primaryTokenIndex] = toSend;
                 ICurvePoolEUR(CURVE_POOL).remove_liquidity_imbalance(
-                            amounts, 
-                            lpAmount * (10000+slippage)/10000);
+                    amounts,
+                    (lpAmount * (10000 + slippage)) / 10000
+                );
                 IERC20(primaryToken).safeTransfer(buffer, toSend);
             }
         }
@@ -187,7 +196,9 @@ contract EurCurveAdapter is AccessControl {
         maxSendSlippage = _maxSlippage;
     }
 
-    function setBuffer(address _newBufferManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setBuffer(
+        address _newBufferManager
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         buffer = _newBufferManager;
     }
 

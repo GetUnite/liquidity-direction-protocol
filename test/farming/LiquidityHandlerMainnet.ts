@@ -4,9 +4,9 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory, IbAlluoMainnet, UsdCurveAdapterMainnet, EurCurveAdapterMainnet, EthNoPoolAdapterMainnet, BtcNoPoolAdapterMainnet, IbAlluoMainnet__factory, UsdCurveAdapterMainnet__factory, BtcNoPoolAdapterMainnet__factory, EurCurveAdapterMainnet__factory, EthNoPoolAdapterMainnet__factory } from "../../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandlerMainnet, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandlerMainnet__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory, IbAlluoMainnet, UsdCurveAdapterMainnet, EurCurveAdapterMainnet, EthNoPoolAdapterMainnet, BtcNoPoolAdapterMainnet, IbAlluoMainnet__factory, UsdCurveAdapterMainnet__factory, BtcNoPoolAdapterMainnet__factory, EurCurveAdapterMainnet__factory, EthNoPoolAdapterMainnet__factory } from "../../typechain";
 
-async function getLastWithdrawalInfo(token: IbAlluoMainnet, handler: LiquidityHandler) {
+async function getLastWithdrawalInfo(token: IbAlluoMainnet, handler: LiquidityHandlerMainnet) {
     let request = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastWithdrawalRequest
     let satisfied = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastSatisfiedWithdrawal
     let total = (await handler.ibAlluoToWithdrawalSystems(token.address)).totalWithdrawalAmount
@@ -48,7 +48,7 @@ describe("Mainnet Handler and different adapters", function () {
     let ethAdapter: EthNoPoolAdapterMainnet;
     let btcAdapter: BtcNoPoolAdapterMainnet;
 
-    let handler: LiquidityHandler;
+    let handler: LiquidityHandlerMainnet;
 
     let dai: IERC20, usdc: IERC20, usdt: IERC20;
     let curveLpUSD: IERC20;
@@ -136,7 +136,7 @@ describe("Mainnet Handler and different adapters", function () {
         const exchangeAddress = "0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec";
         const IbAlluo = await ethers.getContractFactory("IbAlluoMainnet") as IbAlluoMainnet__factory;
 
-        const Handler = await ethers.getContractFactory("LiquidityHandler") as LiquidityHandler__factory;
+        const Handler = await ethers.getContractFactory("LiquidityHandlerWithoutPriceOracles");
 
         handler = await upgrades.deployProxy(Handler,
             [admin.address, exchangeAddress], {
@@ -145,7 +145,7 @@ describe("Mainnet Handler and different adapters", function () {
             unsafeAllow: ["delegatecall"]
 
         }
-        ) as LiquidityHandler;
+        ) as LiquidityHandlerMainnet;
 
         const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapterMainnet") as UsdCurveAdapterMainnet__factory;
         const EurAdapter = await ethers.getContractFactory("EurCurveAdapterMainnet") as EurCurveAdapterMainnet__factory;
