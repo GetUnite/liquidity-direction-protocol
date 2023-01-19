@@ -86,6 +86,10 @@ contract BufferManager is
     uint256 public bridgeRefilled;
     // min pct of the deviation from expectedAdapterRefill to trigger the refill (with 2 decimals, e.g. 5% = 500)
     uint256 public refillThreshold; 
+    // iballuo to pct to add on top of refills to prevent slippage (5% = 500)
+    mapping(address => uint256) public slippageControl;
+    mapping(address => uint256) public tokenToMaxBridge;
+    EnumerableSetUpgradeable.AddressSet private nonBridgeTokens;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -204,11 +208,8 @@ contract BufferManager is
             canBridge(originToken, amount),
             "Buffer: <minAmount or <bridgeInterval"
         );
-
-        if (block.timestamp > lastExecuted + bridgeInterval) {
-            bridgeRefilled = 0;
-        }
         lastExecuted = block.timestamp;
+        if(!nonBridgeTokens.contains(originToken)){
         IERC20Upgradeable(originToken).approve(spokepool, amount);
         ISpokePool(spokepool).deposit(
             distributor,
@@ -242,6 +243,9 @@ contract BufferManager is
             direction,
             percentage
         );
+        } else {
+            withdrawGnosis(originToken, amount);
+        }
     }
 
     /**
@@ -289,7 +293,7 @@ contract BufferManager is
                 priceFeedRouter
             ).getPrice(token, IIbAlluo(_ibAlluo).fiatIndex());
 
-            difference = (difference * price) / (10 ** priceDecimals);
+            difference = (difference * (10 ** priceDecimals)) / price;
         }
         return difference;
     }
@@ -346,7 +350,7 @@ contract BufferManager is
         bufferBalance = bufferBalance * 10 ** decDif;
         gnosisBalance = gnosisBalance * 10 ** decDif;
         // 2 percent on top to be safe against pricefeed and lp slippage
-        totalAmount += (totalAmount * 200) / 10000;
+        totalAmount += (totalAmount * slippageControl[_ibAlluo]) / 10000;
 
         if (bufferBalance < totalAmount) {
             if (totalAmount < bufferBalance + gnosisBalance) {
@@ -363,7 +367,6 @@ contract BufferManager is
                 return false;
             }
         } else {
-        bridgeRefilled += totalAmount;
         IERC20Upgradeable(bufferToken).transfer(adapterAddress, totalAmount / 10 ** decDif);
         IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
         if (isAdapterPendingWithdrawal(_ibAlluo)) {
@@ -402,7 +405,6 @@ contract BufferManager is
         );
 
         currentEpoch.refilledPerEpoch += gnosisAmount;
-        bridgeRefilled += totalAmount;
         IERC20Upgradeable(bufferToken).transferFrom(
             gnosis,
             adapterAddress,
@@ -438,7 +440,7 @@ contract BufferManager is
         if (
             amount >= tokenToMinBridge[token] &&
             block.timestamp >= lastExecuted + bridgeInterval &&
-            bridgeRefilled + amount18 <= bridgeCap
+            amount18 <= tokenToMaxBridge[token]
         ) {
             return true;
         }
@@ -544,10 +546,10 @@ contract BufferManager is
 
     /**
     * @dev Admin function to set bridge cap
-    * @param _cap Max amount that can be bridged per interval
+    * @param _cap Max amount that can be bridged 
     */
-    function setBridgeCap(uint256 _cap) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bridgeCap = _cap;
+    function setBridgeCap(address _token, uint256 _cap) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        tokenToMaxBridge[_token] = _cap;
     }
 
     /**
@@ -650,6 +652,24 @@ contract BufferManager is
     }
 
     /**
+    * @dev Adds tokens that are not supported by Across, thus follow different briging logic
+    * @param _token Token that should follow deviant logic
+    */
+    function addNonBridgeToken (address _token) external onlyRole(DEFAULT_ADMIN_ROLE){
+        nonBridgeTokens.add(_token);
+    }
+
+    /**
+    * @dev Sets a leverage value, that allows countering slippage in a scenario it is required
+    * @notice Needed to sustain refill logic for the adapters interacting with volatile pools
+    * @param _iballuo Address of the ibAlluo
+    * @param _pct Pct of surplus (e.g. 1% = 100)
+    */
+    function setSlippageControl (address _iballuo, uint _pct) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        slippageControl[_iballuo] = _pct;
+    }
+
+    /**
      * @notice Funtion is called by gnosis
      * @dev Removes IBAlluo pool from the list of active pools
      * @param ibAlluo Address of the IBAlluo pool to be removed
@@ -669,11 +689,11 @@ contract BufferManager is
     }
 
     // @notice if _amount == 0 withdraws all
-    function emergencyWithdrawal(address _token, uint256 _amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function withdrawGnosis(address _token, uint256 _amount) public onlyRole(DEFAULT_ADMIN_ROLE) {
         if(_amount != 0){
-        IERC20Upgradeable(_token).transfer(msg.sender, _amount);
+        IERC20Upgradeable(_token).transfer(gnosis, _amount);
         } else {
-            IERC20Upgradeable(_token).transfer(msg.sender, IERC20Upgradeable(_token).balanceOf(address(this)));
+            IERC20Upgradeable(_token).transfer(gnosis, IERC20Upgradeable(_token).balanceOf(address(this)));
         }
     }
 
