@@ -138,6 +138,6 @@ Events that may be emitted by withdrawing are:
 - `ibAlluo` - ibAlluo contract address
 - `user` - user who was added to the withdrawal queue
 - `token` - token that was requested to withdraw
-- `amount` - amount of tokens that would be sent, if withdrawal would be satisfied immideatley
+- `amount` - fiat amount that was requested and will be sent as soon as user withdrawal is satisfied
 - `queueIndex` - position in withdrawal queue
 - `requestTime` - timestamp when user was added
