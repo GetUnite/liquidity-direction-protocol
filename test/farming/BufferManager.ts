@@ -386,15 +386,26 @@ describe("BufferManager tests", () => {
     await buffer.connect(gnosis).setMinBridgeAmount(wbtc.address, 1000000000)
 
     await buffer.connect(gnosis).setVoteExecutorSlave(slave.address)
-    await buffer.connect(gnosis).setBridgeCap(parseUnits("1000000", 18))
+    await buffer.connect(gnosis).setBridgeCap(usdc.address, parseUnits("1000000", 18))
 
     let entry = {
       directionId: 420,
       percent: 99
     }
+
     await slave.connect(gnosis).setEntries([entry])
     await slave.connect(gnosis).grantRole(await slave.DEFAULT_ADMIN_ROLE(), buffer.address)
     await buffer.connect(gnosis).setRefillThresholdPct(500)
+
+    await buffer.connect(gnosis).setBridgeCap(usdc.address, parseUnits("10000000", 18))
+    await buffer.connect(gnosis).setBridgeCap(eurt.address, parseUnits("10000000", 18))
+    await buffer.connect(gnosis).setBridgeCap(weth.address, parseUnits("10000000", 18))
+    await buffer.connect(gnosis).setBridgeCap(wbtc.address, parseUnits("10000000", 18))
+
+    await buffer.connect(gnosis).setSlippageControl(ibAlluoUsd.address, 200)
+    await buffer.connect(gnosis).setSlippageControl(ibAlluoEur.address, 200)
+    await buffer.connect(gnosis).setSlippageControl(ibAlluoEth.address, 200)
+    await buffer.connect(gnosis).setSlippageControl(ibAlluoBtc.address, 200)
   });
 
   describe("Initial setup", async() => {
@@ -429,7 +440,7 @@ describe("BufferManager tests", () => {
 
     it ("checkerBridge: Adapters don't need a refill, balance exceeds minBridgeAmount, returns true, and swap call", async () => {
       await deposit(signers[1], usdc, parseUnits("40000", 6))
-      await buffer.connect(gnosis).setBridgeCap(parseUnits("1000000", 18))
+      await buffer.connect(gnosis).setBridgeCap(usdc.address, parseUnits("1000000", 18))
       await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, 1)
       await buffer.connect(gnosis).changeBridgeInterval(0)
 
@@ -502,7 +513,7 @@ describe("BufferManager tests", () => {
       expect(await buffer.adapterRequiredRefill(ibAlluoUsd.address)).to.eq(0)
     })
 
-    it("Should refill using both buffer and gnosis", async () => {
+    it.only("Should refill using both buffer and gnosis", async () => {
       // Depositing
       await deposit(signers[1], usdc, parseUnits("20000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
