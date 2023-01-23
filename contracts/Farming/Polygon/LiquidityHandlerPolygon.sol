@@ -211,12 +211,12 @@ contract LiquidityHandlerPolygon is
                 amount: _fiatAmount,
                 time: block.timestamp
             });
-            withdrawalSystem.totalWithdrawalAmount += _amount;
+            withdrawalSystem.totalWithdrawalAmount += _fiatAmount;
             emit AddedToQueue(
                 msg.sender,
                 _user,
                 _token,
-                _amount,
+                _fiatAmount,
                 lastWithdrawalRequest + 1,
                 block.timestamp
             );
@@ -273,7 +273,7 @@ contract LiquidityHandlerPolygon is
                 amount: _fiatAmount,
                 time: block.timestamp
             });
-            withdrawalSystem.totalWithdrawalAmount += _amount;
+            withdrawalSystem.totalWithdrawalAmount += _fiatAmount;
             emit AddedToQueue(
                 msg.sender,
                 _user,
