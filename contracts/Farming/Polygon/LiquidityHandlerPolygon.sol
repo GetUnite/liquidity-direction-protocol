@@ -195,7 +195,7 @@ contract LiquidityHandlerPolygon is
                 msg.sender,
                 _user,
                 _token,
-                _amount,
+                _fiatAmount,
                 0,
                 block.timestamp
             );
@@ -256,7 +256,7 @@ contract LiquidityHandlerPolygon is
                 msg.sender,
                 _user,
                 _token,
-                _amount,
+                _fiatAmount,
                 0,
                 block.timestamp
             );
@@ -278,7 +278,7 @@ contract LiquidityHandlerPolygon is
                 msg.sender,
                 _user,
                 _token,
-                _amount,
+                _fiatAmount,
                 lastWithdrawalRequest + 1,
                 block.timestamp
             );
@@ -610,6 +610,8 @@ contract LiquidityHandlerPolygon is
             _iballuo
         ];
         withdrawalSystem.totalWithdrawalAmount = 0;
+        withdrawalSystem.lastSatisfiedWithdrawal = withdrawalSystem
+            .lastWithdrawalRequest;
     }
 
     function changeUpgradeStatus(
