@@ -513,7 +513,7 @@ describe("BufferManager tests", () => {
       expect(await buffer.adapterRequiredRefill(ibAlluoUsd.address)).to.eq(0)
     })
 
-    it.only("Should refill using both buffer and gnosis", async () => {
+    it("Should refill using both buffer and gnosis", async () => {
       // Depositing
       await deposit(signers[1], usdc, parseUnits("20000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
