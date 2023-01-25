@@ -147,6 +147,10 @@ contract BufferManager is
     {
         for (uint256 i; i < activeIbAlluos.length(); i++) {
             (address iballuo, address token, uint256 amount) = getValues(i);
+            uint256 tokenCap = tokenToMaxBridge[token] / 10 * 10 ** (18-IERC20MetadataUpgradeable(token).decimals());
+            if (IERC20Upgradeable(token).balanceOf(address(this)) > tokenCap) {
+                amount = tokenToMaxBridge[token];
+            }
             if (
                 adapterRequiredRefill(iballuo) == 0 && canBridge(token, amount)
             ) {
@@ -154,8 +158,7 @@ contract BufferManager is
                 execPayload = abi.encodeWithSelector(
                     BufferManager.swap.selector,
                     amount,
-                    token,
-                    iballuo
+                    token
                 );
 
                 break;
@@ -209,43 +212,44 @@ contract BufferManager is
             "Buffer: <minAmount or <bridgeInterval"
         );
         lastExecuted = block.timestamp;
-        if(!nonBridgeTokens.contains(originToken)){
-        IERC20Upgradeable(originToken).approve(spokepool, amount);
-        ISpokePool(spokepool).deposit(
-            distributor,
-            originToken,
-            amount,
-            1,
-            relayerFeePct,
-            uint32(block.timestamp)
-        );
-        address tokenEth = tokenToEth[originToken];
-        (
-            uint256[] memory direction,
-            uint256[] memory percentage
-        ) = IVoteExecutorSlave(slave).getEntries();
-        ICallProxy(anycall).anyCall(
-            // address of the collector contract on mainnet
-            distributor,
-            abi.encode(direction, percentage, tokenEth, amount),
-            address(0),
-            1,
-            // 0 flag to pay fee on destination chain
-            0
-        );
+        // if(!nonBridgeTokens.contains(originToken)){
+        // IERC20Upgradeable(originToken).approve(spokepool, amount);
+        // ISpokePool(spokepool).deposit(
+        //     distributor,
+        //     originToken,
+        //     amount,
+        //     1,
+        //     relayerFeePct,
+        //     uint32(block.timestamp)
+        // );
+        // address tokenEth = tokenToEth[originToken];
+        // (
+        //     uint256[] memory direction,
+        //     uint256[] memory percentage
+        // ) = IVoteExecutorSlave(slave).getEntries();
+        // ICallProxy(anycall).anyCall(
+        //     // address of the collector contract on mainnet
+        //     distributor,
+        //     abi.encode(direction, percentage, tokenEth, amount),
+        //     address(0),
+        //     1,
+        //     // 0 flag to pay fee on destination chain
+        //     0
+        // );
 
-        emit Bridge(
-            distributor,
-            originToken,
-            tokenEth,
-            amount,
-            relayerFeePct,
-            direction,
-            percentage
-        );
-        } else {
-            withdrawGnosis(originToken, amount);
-        }
+        // emit Bridge(
+        //     distributor,
+        //     originToken,
+        //     tokenEth,
+        //     amount,
+        //     relayerFeePct,
+        //     direction,
+        //     percentage
+        // );
+        // } else {
+        //     withdrawGnosis(originToken, amount);
+        // }
+        withdrawGnosis(originToken, amount);
     }
 
     /**
@@ -438,7 +442,7 @@ contract BufferManager is
         uint256 amount18 = amount *
             10 ** (18 - IERC20MetadataUpgradeable(token).decimals());
         if (
-            amount >= tokenToMinBridge[token] &&
+            amount18 >= tokenToMinBridge[token] &&
             block.timestamp >= lastExecuted + bridgeInterval &&
             amount18 <= tokenToMaxBridge[token]
         ) {
