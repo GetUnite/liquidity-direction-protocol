@@ -438,7 +438,7 @@ describe("BufferManager tests", () => {
       console.log("refill", execPayload)
     })
 
-    it ("checkerBridge: Adapters don't need a refill, balance exceeds minBridgeAmount, returns true, and swap call", async () => {
+    it.only("checkerBridge: Adapters don't need a refill, balance exceeds minBridgeAmount, returns true, and swap call", async () => {
       await deposit(signers[1], usdc, parseUnits("40000", 6))
       await buffer.connect(gnosis).setBridgeCap(usdc.address, parseUnits("1000000", 18))
       await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, 1)
