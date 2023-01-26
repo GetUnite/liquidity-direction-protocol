@@ -21913,6 +21913,416 @@
           }
         }
       }
+    },
+    "7e66844b260b439d59a75f5780bd3dc07c2b2960b34318ace41a75ad42216010": {
+      "address": "0x3991BeB268DffFDeeF05161cFA764AaCFEBE67b9",
+      "txHash": "0xacbaee375fd253ae04e6c98929b9aa65580b59e213409ad99b2672b050372f3a",
+      "layout": {
+        "solcVersion": "0.8.11",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:102"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC165Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol:41"
+          },
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:61"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:247"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/ERC1967/ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol:107"
+          },
+          {
+            "label": "upgradeStatus",
+            "offset": 0,
+            "slot": "301",
+            "type": "t_bool",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:45"
+          },
+          {
+            "label": "distributor",
+            "offset": 1,
+            "slot": "301",
+            "type": "t_address",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:48"
+          },
+          {
+            "label": "slave",
+            "offset": 0,
+            "slot": "302",
+            "type": "t_address",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:49"
+          },
+          {
+            "label": "anycall",
+            "offset": 0,
+            "slot": "303",
+            "type": "t_address",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:51"
+          },
+          {
+            "label": "spokepool",
+            "offset": 0,
+            "slot": "304",
+            "type": "t_address",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:53"
+          },
+          {
+            "label": "gnosis",
+            "offset": 0,
+            "slot": "305",
+            "type": "t_address",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:55"
+          },
+          {
+            "label": "epochDuration",
+            "offset": 0,
+            "slot": "306",
+            "type": "t_uint256",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:56"
+          },
+          {
+            "label": "lastExecuted",
+            "offset": 0,
+            "slot": "307",
+            "type": "t_uint256",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:59"
+          },
+          {
+            "label": "bridgeInterval",
+            "offset": 0,
+            "slot": "308",
+            "type": "t_uint256",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:60"
+          },
+          {
+            "label": "relayerFeePct",
+            "offset": 0,
+            "slot": "309",
+            "type": "t_uint64",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:61"
+          },
+          {
+            "label": "handler",
+            "offset": 8,
+            "slot": "309",
+            "type": "t_contract(ILiquidityHandler)5831",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:68"
+          },
+          {
+            "label": "ibAlluoToEpoch",
+            "offset": 0,
+            "slot": "310",
+            "type": "t_mapping(t_address,t_array(t_struct(Epoch)3736_storage)dyn_storage)",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:70"
+          },
+          {
+            "label": "ibAlluoToAdapter",
+            "offset": 0,
+            "slot": "311",
+            "type": "t_mapping(t_address,t_address)",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:71"
+          },
+          {
+            "label": "ibAlluoToMaxRefillPerEpoch",
+            "offset": 0,
+            "slot": "312",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:72"
+          },
+          {
+            "label": "tokenToEth",
+            "offset": 0,
+            "slot": "313",
+            "type": "t_mapping(t_address,t_address)",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:73"
+          },
+          {
+            "label": "tokenToMinBridge",
+            "offset": 0,
+            "slot": "314",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:74"
+          },
+          {
+            "label": "activeIbAlluos",
+            "offset": 0,
+            "slot": "315",
+            "type": "t_struct(AddressSet)3165_storage",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:77"
+          },
+          {
+            "label": "bridgeCap",
+            "offset": 0,
+            "slot": "317",
+            "type": "t_uint256",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:85"
+          },
+          {
+            "label": "bridgeRefilled",
+            "offset": 0,
+            "slot": "318",
+            "type": "t_uint256",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:86"
+          },
+          {
+            "label": "refillThreshold",
+            "offset": 0,
+            "slot": "319",
+            "type": "t_uint256",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:88"
+          },
+          {
+            "label": "slippageControl",
+            "offset": 0,
+            "slot": "320",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:90"
+          },
+          {
+            "label": "tokenToMaxBridge",
+            "offset": 0,
+            "slot": "321",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:91"
+          },
+          {
+            "label": "nonBridgeTokens",
+            "offset": 0,
+            "slot": "322",
+            "type": "t_struct(AddressSet)3165_storage",
+            "contract": "BufferManager",
+            "src": "contracts/Farming/Polygon/bufferAutomation/BufferManager.sol:92"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(Epoch)3736_storage)dyn_storage": {
+            "label": "struct BufferManager.Epoch[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(ILiquidityHandler)5831": {
+            "label": "contract ILiquidityHandler",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_address)": {
+            "label": "mapping(address => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_array(t_struct(Epoch)3736_storage)dyn_storage)": {
+            "label": "mapping(address => struct BufferManager.Epoch[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AddressSet)3165_storage": {
+            "label": "struct EnumerableSetUpgradeable.AddressSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)2864_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Epoch)3736_storage": {
+            "label": "struct BufferManager.Epoch",
+            "members": [
+              {
+                "label": "startTime",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "refilledPerEpoch",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Set)2864_storage": {
+            "label": "struct EnumerableSetUpgradeable.Set",
+            "members": [
+              {
+                "label": "_values",
+                "type": "t_array(t_bytes32)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_indexes",
+                "type": "t_mapping(t_bytes32,t_uint256)",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        }
+      }
     }
   }
 }

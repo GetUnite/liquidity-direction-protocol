@@ -83,7 +83,6 @@ contract BufferManager is
     }
 
     uint256 public bridgeCap;
-    uint256 public bridgeRefilled;
     // min pct of the deviation from expectedAdapterRefill to trigger the refill (with 2 decimals, e.g. 5% = 500)
     uint256 public refillThreshold; 
     // iballuo to pct to add on top of refills to prevent slippage (5% = 500)
@@ -181,7 +180,7 @@ contract BufferManager is
     {
         for (uint256 i; i < activeIbAlluos.length(); i++) {
             (address iballuo, address token, ) = getValues(i);
-            if (canRefill(iballuo, token)) {
+            if (canRefill(iballuo, token) && checkEpoch(iballuo, token)) {
                 canExec = true;
                 execPayload = abi.encodeWithSelector(
                     BufferManager.refillBuffer.selector,
@@ -212,44 +211,45 @@ contract BufferManager is
             "Buffer: <minAmount or <bridgeInterval"
         );
         lastExecuted = block.timestamp;
-        // if(!nonBridgeTokens.contains(originToken)){
-        // IERC20Upgradeable(originToken).approve(spokepool, amount);
-        // ISpokePool(spokepool).deposit(
-        //     distributor,
-        //     originToken,
-        //     amount,
-        //     1,
-        //     relayerFeePct,
-        //     uint32(block.timestamp)
-        // );
-        // address tokenEth = tokenToEth[originToken];
-        // (
-        //     uint256[] memory direction,
-        //     uint256[] memory percentage
-        // ) = IVoteExecutorSlave(slave).getEntries();
-        // ICallProxy(anycall).anyCall(
-        //     // address of the collector contract on mainnet
-        //     distributor,
-        //     abi.encode(direction, percentage, tokenEth, amount),
-        //     address(0),
-        //     1,
-        //     // 0 flag to pay fee on destination chain
-        //     0
-        // );
+        if(!nonBridgeTokens.contains(originToken)){
+        IERC20Upgradeable(originToken).approve(spokepool, amount);
+        ISpokePool(spokepool).deposit(
+            distributor,
+            originToken,
+            amount,
+            1,
+            relayerFeePct,
+            uint32(block.timestamp)
+        );
+        address tokenEth = tokenToEth[originToken];
+        if(anycall != address(0)) {
+            (
+            uint256[] memory direction,
+            uint256[] memory percentage
+            ) = IVoteExecutorSlave(slave).getEntries();
+            ICallProxy(anycall).anyCall(
+            // address of the collector contract on mainnet
+            distributor,
+            abi.encode(direction, percentage, tokenEth, amount),
+            address(0),
+            1,
+            // 0 flag to pay fee on destination chain
+            0
+        );
 
-        // emit Bridge(
-        //     distributor,
-        //     originToken,
-        //     tokenEth,
-        //     amount,
-        //     relayerFeePct,
-        //     direction,
-        //     percentage
-        // );
-        // } else {
-        //     withdrawGnosis(originToken, amount);
-        // }
-        withdrawGnosis(originToken, amount);
+        emit Bridge(
+            distributor,
+            originToken,
+            tokenEth,
+            amount,
+            relayerFeePct,
+            direction,
+            percentage
+        );
+          }
+        } else {
+            withdrawGnosis(originToken, amount);
+        }
     }
 
     /**
@@ -303,6 +303,7 @@ contract BufferManager is
     }
 
     /**
+     * @notice Prevents from draining unrestricted amount of funds from gnosis
      * @dev Function returns relevant refill settings by IBAlluo address
      * @param _ibAlluo address of the IBAlluo
      * @return Epoch struct with settings
@@ -353,7 +354,7 @@ contract BufferManager is
 
         bufferBalance = bufferBalance * 10 ** decDif;
         gnosisBalance = gnosisBalance * 10 ** decDif;
-        // 2 percent on top to be safe against pricefeed and lp slippage
+        // a dynamic percent of suplus to counter fiat slippage/slippage of the pools
         totalAmount += (totalAmount * slippageControl[_ibAlluo]) / 10000;
 
         if (bufferBalance < totalAmount) {
@@ -475,6 +476,9 @@ contract BufferManager is
     /**
      * @dev Internal function for readabilty of checker functions
      * @param i Index in a loop in checkerRefill and checkerBridge
+     * @return address Iballuo address
+     * @return address Token of the respective iballuo
+     * @return amount Amount to be bridged/refill in corresponding to token decimals
      */
     function getValues(
         uint256 i
@@ -485,6 +489,32 @@ contract BufferManager is
         uint256 amount = IERC20Upgradeable(token).balanceOf(address(this));
 
         return (iballuo, token, amount);
+    }
+
+    /**
+    * @dev View function used by refillChecker to check if a refill can be executed without draining the gnosis
+    * @param _iballuo iballuo of the respective adapter
+    * @param _token token of the respective iballuo/adapter
+    * @return bool True if conditions for refill are met, false if not
+    */
+    function checkEpoch(address _iballuo, address _token) public view returns(bool) {
+        Epoch[] memory relevantEpochs = ibAlluoToEpoch[_iballuo];
+        Epoch memory lastEpoch = relevantEpochs[relevantEpochs.length - 1];
+        uint256 deadline = lastEpoch.startTime + epochDuration;
+        if (block.timestamp > deadline) {
+            lastEpoch.refilledPerEpoch = 0;
+        }
+        uint256 rrefill = adapterRequiredRefill(_iballuo);  
+        uint256 bbalance = IERC20Upgradeable(_token).balanceOf(address(this)) * 10 ** (18 - IERC20MetadataUpgradeable(_token).decimals());
+        // Checking if required refill is more than the buffer balance in order to prevent underflow, 
+        // then checking if gnosisAmount to be refilled doesn't exceed the maximum allowed gnosis refill limit  
+        if(rrefill<bbalance) {
+            return true;
+        } else if (rrefill > bbalance && ibAlluoToMaxRefillPerEpoch[_iballuo] >= rrefill + lastEpoch.refilledPerEpoch - bbalance) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -692,7 +722,13 @@ contract BufferManager is
         return removed;
     }
 
-    // @notice if _amount == 0 withdraws all
+    /**
+    * @notice if _amount == 0 withdraws all
+    * @dev Admin function to employ assets not eligible for refill/bridging logic in circulation by returning it to gnosis
+    * @param _token Address of the token to withdraw
+    * @param _amount Amount of the token to withdraw
+    */
+    
     function withdrawGnosis(address _token, uint256 _amount) public onlyRole(DEFAULT_ADMIN_ROLE) {
         if(_amount != 0){
         IERC20Upgradeable(_token).transfer(gnosis, _amount);

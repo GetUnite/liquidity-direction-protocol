@@ -380,10 +380,10 @@ describe("BufferManager tests", () => {
     await ethAdapter.connect(admin).grantRole(await ethAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
     await btcAdapter.connect(admin).grantRole(await btcAdapter.DEFAULT_ADMIN_ROLE(), handler.address)
 
-    await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, 1000000000)
-    await buffer.connect(gnosis).setMinBridgeAmount(eurt.address, 1000000000)
-    await buffer.connect(gnosis).setMinBridgeAmount(weth.address, 1000000000)
-    await buffer.connect(gnosis).setMinBridgeAmount(wbtc.address, 1000000000)
+    await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, parseUnits("1000", 18))
+    await buffer.connect(gnosis).setMinBridgeAmount(eurt.address, parseUnits("1000", 18))
+    await buffer.connect(gnosis).setMinBridgeAmount(weth.address, parseUnits("1000", 18))
+    await buffer.connect(gnosis).setMinBridgeAmount(wbtc.address, parseUnits("1000", 18))
 
     await buffer.connect(gnosis).setVoteExecutorSlave(slave.address)
     await buffer.connect(gnosis).setBridgeCap(usdc.address, parseUnits("1000000", 18))
@@ -406,6 +406,7 @@ describe("BufferManager tests", () => {
     await buffer.connect(gnosis).setSlippageControl(ibAlluoEur.address, 200)
     await buffer.connect(gnosis).setSlippageControl(ibAlluoEth.address, 200)
     await buffer.connect(gnosis).setSlippageControl(ibAlluoBtc.address, 200)
+    await buffer.connect(gnosis).grantRole(await buffer.DEFAULT_ADMIN_ROLE(), gelatoExecutor.address)
   });
 
   describe("Initial setup", async() => {
@@ -438,7 +439,7 @@ describe("BufferManager tests", () => {
       console.log("refill", execPayload)
     })
 
-    it.only("checkerBridge: Adapters don't need a refill, balance exceeds minBridgeAmount, returns true, and swap call", async () => {
+    it("checkerBridge: Adapters don't need a refill, balance exceeds minBridgeAmount, returns true, and swap call", async () => {
       await deposit(signers[1], usdc, parseUnits("40000", 6))
       await buffer.connect(gnosis).setBridgeCap(usdc.address, parseUnits("1000000", 18))
       await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, 1)
@@ -468,7 +469,8 @@ describe("BufferManager tests", () => {
       let [canExec, execPayload] = await buffer.checkerRefill()
       expect(canExec).to.eq(false)
 
-      await usdc.connect(usdWhale).transfer(gnosis.address, parseUnits("20000", 6))
+      await usdc.connect(usdWhale).transfer(gnosis.address, parseUnits("35000", 6))
+      await buffer.connect(gnosis).setMaxRefillPerEpoch(ibAlluoUsd.address, parseUnits("1000000", 18))
       let [canExec1, execPayload1] = await buffer.checkerRefill()
       expect(canExec1).to.eq(true)
     })
@@ -590,7 +592,7 @@ describe("BufferManager tests", () => {
     })
 
     it("Should not allow swapping below minimum amount", async () => {
-      await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, 1000)
+      await buffer.connect(gnosis).setMinBridgeAmount(usdc.address, parseUnits("1000", 18))
       await expect(buffer.connect(gelatoExecutor).swap(800, usdc.address)).to.be.revertedWith("Buffer: <minAmount or <bridgeInterval")
     })
 
@@ -838,16 +840,17 @@ describe("BufferManager tests", () => {
       await ibAlluoEth.connect(signers[2]).deposit(weth.address, parseUnits("2", 18))
 
       // Withdrawal request
-      await ibAlluoEth.connect(signers[2]).withdraw(weth.address, parseUnits("1", 18))
+      await ibAlluoEth.connect(signers[2]).withdraw(weth.address, parseUnits("0.7", 18))
       expect(await weth.balanceOf(signers[2].address)).to.eq(0);
 
       // Gelato checker is now true
+      await buffer.connect(gnosis).setMaxRefillPerEpoch(weth.address, parseUnits("10000000000000", 18))
       const [canExec, execPayload] = await buffer.checkerRefill()
       expect(canExec).to.eq(true)
 
       // Executing refill after gelato is flagged
       await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoEth.address)
-      expect(Number(await weth.balanceOf(signers[2].address))).to.eq(Number(parseUnits("1", 18)))
+      expect(Number(await weth.balanceOf(signers[2].address))).to.eq(Number(parseUnits("0.7", 18)))
     })
 
     it("WBTC deposit, attempted withdrawal, success after buffer is refilled", async () => {
@@ -881,6 +884,7 @@ describe("BufferManager tests", () => {
       
       // Swapping funds so that buffer only has part of the sum needed to refill, so that he uses gnosis
       await weth.connect(wethWhale).transfer(gnosis.address, parseUnits("1", 18))
+      await buffer.connect(gnosis).setMinBridgeAmount(weth.address, parseUnits("1", 17))
       await buffer.connect(gelatoExecutor).swap(parseUnits("1", 18), weth.address)
 
       // Withdrawal request
