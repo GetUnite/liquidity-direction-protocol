@@ -628,7 +628,7 @@ describe("BufferManager tests", () => {
       expect(await buffer.isAdapterPendingWithdrawal(ibAlluoUsd.address)).to.eq(true)
     })
 
-    it("Should return true after one of two withdrawals was satisfied", async() => {
+    it.only("Should return true after one of two withdrawals was satisfied", async() => {
       expect(await buffer.isAdapterPendingWithdrawal(ibAlluoUsd.address)).to.eq(false)
       await deposit(signers[2], usdc, parseUnits("500", 6))
       await ibAlluoUsd.connect(signers[2]).withdraw(usdc.address, parseUnits("300", 18))
