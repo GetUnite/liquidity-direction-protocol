@@ -145,6 +145,8 @@ contract IbAlluo is
         uint256 indexed endTimestamp
     );
 
+    event PriceInfo(uint256 price, uint8 priceDecimals);
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
@@ -255,7 +257,7 @@ contract IbAlluo is
     function deposit(
         address _token,
         uint256 _amount
-    ) external returns (uint256) {
+    ) external returns (uint256 alluoMinted) {
         // The main token is the one which isn't converted to primary tokens.
         // Small issue with deposits and withdrawals though. Need to approve.
         if (supportedTokens.contains(_token) == false) {
@@ -299,6 +301,8 @@ contract IbAlluo is
                 priceFeedRouter
             ).getPrice(_token, fiatIndex);
 
+            emit PriceInfo(price, priceDecimals);
+
             // adjust value to have equal number of decimals as the amount
             adjustedAmount =
                 (adjustedAmount * price) /
@@ -328,7 +332,7 @@ contract IbAlluo is
         address _recipient,
         address _targetToken,
         uint256 _amount
-    ) public {
+    ) public returns (uint256 targetTokenReceived, uint256 ibAlluoBurned) {
         updateRatio();
         uint256 fiatAmount = _amount;
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
@@ -339,6 +343,8 @@ contract IbAlluo is
             (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
                 priceFeedRouter
             ).getPrice(_targetToken, fiatIndex);
+
+            emit PriceInfo(price, priceDecimals);
 
             _amount = (_amount * (10 ** priceDecimals)) / price;
         }
@@ -371,6 +377,8 @@ contract IbAlluo is
             growingRatio
         );
         emit BurnedForWithdraw(_msgSender(), adjustedAmount);
+
+        return (_amount, adjustedAmount);
     }
 
     /// @notice  Withdraws accuratel
@@ -379,8 +387,11 @@ contract IbAlluo is
     /// @param _targetToken Asset token
     /// @param _amount Amount (parsed 10**18)
 
-    function withdraw(address _targetToken, uint256 _amount) external {
-        withdrawTo(_msgSender(), _targetToken, _amount);
+    function withdraw(
+        address _targetToken,
+        uint256 _amount
+    ) external returns (uint256 targetTokenReceived, uint256 ibAlluoBurned) {
+        return withdrawTo(_msgSender(), _targetToken, _amount);
     }
 
     /// @notice Wraps and creates flow
