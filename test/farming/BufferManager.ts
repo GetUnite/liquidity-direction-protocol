@@ -147,9 +147,7 @@ describe("BufferManager tests", () => {
         1000,
         604800,
         gnosis.address,
-        spokepooladdress,
-        anycalladdress,
-        ZERO_ADDR,
+        spokepooladdress
       ], {
       initializer: 'initialize', unsafeAllow: ["delegatecall"],
       kind: 'uups'

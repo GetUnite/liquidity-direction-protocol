@@ -108,21 +108,17 @@ contract BufferManager is
         uint256 _brigeGenesis,
         uint256 _bridgeInterval,
         address _gnosis,
-        address _spokepool,
-        address _anycall,
-        address _distributor
+        address _spokepool
     ) public initializer {
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
         epochDuration = _epochDuration;
-        distributor = _distributor;
         lastExecuted = _brigeGenesis;
         bridgeInterval = _bridgeInterval;
 
         spokepool = _spokepool;
-        anycall = _anycall;
         gnosis = _gnosis;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _gnosis);
@@ -624,6 +620,13 @@ contract BufferManager is
         address _distributor
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         distributor = _distributor;
+    }
+
+    /**
+    * @dev Admin function to set spokepool address
+    */
+    function setSpokePool(address _spokePool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        spokepool = _spokePool;
     }
 
     /**

@@ -171,9 +171,7 @@ describe("ibAlluoCurrent and Handler", function () {
         1000,
         604800,
         admin.address,
-        admin.address,
-        admin.address,
-        admin.address,
+        admin.address
         ], {
           initializer: 'initialize', unsafeAllow: ["delegatecall"],
           kind: 'uups'

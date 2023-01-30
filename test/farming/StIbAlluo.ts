@@ -227,9 +227,7 @@ describe("IbAlluoUSD and Handler", function () {
           1000,
           604800,
           admin.address,
-          spokepooladdress,
-          anycalladdress,
-          ZERO_ADDR,
+          spokepooladdress
         ], {
           initializer: 'initialize', unsafeAllow: ["delegatecall"],
           kind: 'uups'
