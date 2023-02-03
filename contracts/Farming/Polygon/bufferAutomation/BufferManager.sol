@@ -277,13 +277,24 @@ contract BufferManager is
     ) public view returns (uint256) {
         uint256 expectedAmount = handler.getExpectedAdapterAmount(_ibAlluo, 0);
         uint256 actualAmount = handler.getAdapterAmount(_ibAlluo);
-        if (actualAmount >= expectedAmount) {
+        (, , uint refillRequested,) = handler.ibAlluoToWithdrawalSystems(_ibAlluo);
+        uint256 difference;
+        // if (actualAmount >= expectedAmount) {
+        //     return 0;
+        // }
+        // uint256 difference = expectedAmount - actualAmount; 
+        // if ((difference * 10000) / expectedAmount <= refillThreshold) {
+        //     return 0;
+        // } 
+        if(refillRequested == 0) {
             return 0;
         }
-        uint256 difference = expectedAmount - actualAmount; 
-        if ((difference * 10000) / expectedAmount <= refillThreshold) {
+        uint amountToExpectedAdapter = refillRequested * 10000 / expectedAmount;
+        if (amountToExpectedAdapter <= refillThreshold) {
             return 0;
-        } 
+        } else {
+            difference = refillRequested + (refillRequested * refillThreshold / 10000);
+        }
         uint id = ILiquidityHandler(handler).getAdapterId(_ibAlluo); // id 3 and 4 are weth and wbtc, which must not follow fiat logic
         address priceFeedRouter = IIbAlluo(_ibAlluo).priceFeedRouter();
         if (priceFeedRouter != address(0) && id!=3 && id!=4) {
