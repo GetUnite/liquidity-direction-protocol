@@ -491,7 +491,7 @@ describe("BufferManager tests", () => {
   })
 
   describe("refillBuffer", async () => {
-    it.only("Should refill adapters", async () => {
+    it("Should refill adapters", async () => {
       await deposit(signers[1], usdc, parseUnits("20000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
       await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("5000", 6))

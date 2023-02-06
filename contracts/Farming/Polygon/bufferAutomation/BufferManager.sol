@@ -374,6 +374,7 @@ contract BufferManager is
         } else {
         IERC20Upgradeable(bufferToken).approve(_ibAlluo, totalAmount / 10 ** decDif);
         IIbAlluo(_ibAlluo).deposit(bufferToken, totalAmount / 10 ** decDif);
+        IERC20MetadataUpgradeable(_ibAlluo).transfer(gnosis, IERC20MetadataUpgradeable(_ibAlluo).balanceOf(address(this)));
         if (isAdapterPendingWithdrawal(_ibAlluo)) {
             handler.satisfyAdapterWithdrawals(_ibAlluo);
         }
@@ -423,6 +424,7 @@ contract BufferManager is
         if (isAdapterPendingWithdrawal(ibAlluo)) {
             handler.satisfyAdapterWithdrawals(ibAlluo);
         }
+        IERC20MetadataUpgradeable(ibAlluo).transfer(gnosis, IERC20MetadataUpgradeable(ibAlluo).balanceOf(address(this)));
     }
 
     /**
