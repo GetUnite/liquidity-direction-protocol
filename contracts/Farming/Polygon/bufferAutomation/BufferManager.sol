@@ -279,13 +279,6 @@ contract BufferManager is
         uint256 actualAmount = handler.getAdapterAmount(_ibAlluo);
         (, , uint refillRequested,) = handler.ibAlluoToWithdrawalSystems(_ibAlluo);
         uint256 difference;
-        // if (actualAmount >= expectedAmount) {
-        //     return 0;
-        // }
-        // uint256 difference = expectedAmount - actualAmount; 
-        // if ((difference * 10000) / expectedAmount <= refillThreshold) {
-        //     return 0;
-        // } 
         if(refillRequested == 0) {
             return 0;
         }
@@ -379,8 +372,8 @@ contract BufferManager is
                 return false;
             }
         } else {
-        IERC20Upgradeable(bufferToken).transfer(adapterAddress, totalAmount / 10 ** decDif);
-        IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
+        IERC20Upgradeable(bufferToken).approve(_ibAlluo, totalAmount / 10 ** decDif);
+        IIbAlluo(_ibAlluo).deposit(bufferToken, totalAmount / 10 ** decDif);
         if (isAdapterPendingWithdrawal(_ibAlluo)) {
             handler.satisfyAdapterWithdrawals(_ibAlluo);
         }
@@ -419,19 +412,13 @@ contract BufferManager is
         currentEpoch.refilledPerEpoch += gnosisAmount;
         IERC20Upgradeable(bufferToken).transferFrom(
             gnosis,
-            adapterAddress,
+            address(this),
             gnosisAmount / 10 ** decDif
         );
-        if (gnosisAmount != totalAmount) {
-            IERC20Upgradeable(bufferToken).transfer(
-                adapterAddress,
-                bufferBalance / 10 ** decDif
-            );
-        }
-        IHandlerAdapter(adapterAddress).deposit(
+        IERC20Upgradeable(bufferToken).approve(ibAlluo, totalAmount / 10 ** decDif);
+        IIbAlluo(ibAlluo).deposit(
             bufferToken,
-            totalAmount,
-            totalAmount
+            totalAmount / 10 ** decDif
         );
         if (isAdapterPendingWithdrawal(ibAlluo)) {
             handler.satisfyAdapterWithdrawals(ibAlluo);

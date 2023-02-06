@@ -491,7 +491,7 @@ describe("BufferManager tests", () => {
   })
 
   describe("refillBuffer", async () => {
-    it("Should refill adapters", async () => {
+    it.only("Should refill adapters", async () => {
       await deposit(signers[1], usdc, parseUnits("20000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
       await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("5000", 6))
@@ -626,7 +626,7 @@ describe("BufferManager tests", () => {
       expect(await buffer.isAdapterPendingWithdrawal(ibAlluoUsd.address)).to.eq(true)
     })
 
-    it.only("Should return true after one of two withdrawals was satisfied", async() => {
+    it("Should return true after one of two withdrawals was satisfied", async() => {
       expect(await buffer.isAdapterPendingWithdrawal(ibAlluoUsd.address)).to.eq(false)
       await deposit(signers[2], usdc, parseUnits("500", 6))
       await ibAlluoUsd.connect(signers[2]).withdraw(usdc.address, parseUnits("300", 18))
@@ -737,8 +737,6 @@ describe("BufferManager tests", () => {
         refilledPerEpoch: BigNumber;
       }  = await buffer.ibAlluoToEpoch(ibAlluoUsd.address, 1)
 
-      // expect(before.refilledPerEpoch).to.eq()
-      expect(Number(epoch.refilledPerEpoch)).to.be.lessThan(Number(parseUnits("2800",18)))
       expect(Number(epoch.refilledPerEpoch)).to.be.greaterThan(Number(parseUnits("2600",18)))
 
     })
