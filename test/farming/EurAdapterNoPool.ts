@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
 import { formatEther, formatUnits, parseEther, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
-import { BtcNoPoolAdapterUpgradeable, BufferManager, EthNoPoolAdapterUpgradeable, EurCurveAdapterUpgradeable, EurNoPoolAdapterUpgradeable, IbAlluo, ICurvePoolEUR, ICurvePoolUSD, IERC20Metadata, LiquidityHandler, LiquidityHandlerPolygon, PriceFeedRouterV2, UsdCurveAdapterUpgradeable } from "../../typechain";
+import { BufferManager, EurNoPoolAdapterUpgradeable, IbAlluo, IERC20Metadata, LiquidityHandler, PriceFeedRouterV2 } from "../../typechain";
 
 let agEur: IERC20Metadata;
 
@@ -64,7 +64,7 @@ async function checkIbAlluoDepositResult(
     console.log("Checked ibAlluo")
 }
 
-describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
+describe("Euro No Pool Upgradeable Adapter for ibAlluo with Price Oracles", async () => {
     let admin: SignerWithAddress;
 
     let ibAlluoEUR: IbAlluo;
