@@ -336,7 +336,7 @@ describe("BufferManager tests", () => {
     await handler.connect(gnosis).setAdapter(
       1,
       "USD Curve-Aave",
-      500,
+      100,
       usdAdapter.address,
       true
     )
@@ -405,6 +405,7 @@ describe("BufferManager tests", () => {
     await buffer.connect(gnosis).setSlippageControl(ibAlluoEth.address, 200)
     await buffer.connect(gnosis).setSlippageControl(ibAlluoBtc.address, 200)
     await buffer.connect(gnosis).grantRole(await buffer.DEFAULT_ADMIN_ROLE(), gelatoExecutor.address)
+    await usdc.connect(gnosis).approve(buffer.address, parseUnits("100000000", 18))
   });
 
   describe("Initial setup", async() => {
@@ -492,21 +493,27 @@ describe("BufferManager tests", () => {
 
   describe("refillBuffer", async () => {
     it("Should refill adapters", async () => {
+      await buffer.connect(gnosis).setRefillThresholdPct(5000)
+      await buffer.connect(gnosis).setSlippageControl(ibAlluoUsd.address, 500)
       await deposit(signers[1], usdc, parseUnits("20000", 6))
       await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
-      await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("5000", 6))
+      await usdc.connect(usdWhale).transfer(buffer.address, parseUnits("100000", 6))
+      // await usdc.connect(usdWhale).transfer(gnosis.address, parseUnits("25000", 6))
       expect(Number(await buffer.adapterRequiredRefill(ibAlluoUsd.address))).to.be.greaterThan(Number(parseUnits("10000", 18)))
       let result = await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
       expect(await buffer.adapterRequiredRefill(ibAlluoUsd.address)).to.eq(0);
     })
 
     it("Should refill adapter using gnosis funds", async () => {
-      await deposit(signers[1], usdc, parseUnits("20000", 6))
-      await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("20000", 18))
+      await buffer.connect(gnosis).setRefillThresholdPct(5000)
+      await buffer.connect(gnosis).setSlippageControl(ibAlluoUsd.address, 500)
+      await deposit(signers[1], usdc, parseUnits("50000", 6))
+      await ibAlluoUsd.connect(signers[1]).withdraw(usdc.address, parseUnits("50000", 18))
       await buffer.connect(gnosis).swap(await usdc.balanceOf(buffer.address), usdc.address)
       console.log("Gnosis balance before", await usdc.balanceOf(gnosis.address))
+      await usdc.connect(usdWhale).transfer(gnosis.address, parseUnits("100000", 6))
       await usdc.connect(gnosis).approve(buffer.address, await usdc.balanceOf(gnosis.address))
-      await buffer.connect(gnosis).setMaxRefillPerEpoch(ibAlluoUsd.address, parseUnits("50000", 18))
+      await buffer.connect(gnosis).setMaxRefillPerEpoch(ibAlluoUsd.address, parseUnits("500000", 18))
       await buffer.connect(gelatoExecutor).refillBuffer(ibAlluoUsd.address)
       console.log("Gnosis balance after", await usdc.balanceOf(gnosis.address))
 
