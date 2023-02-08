@@ -370,9 +370,8 @@ contract BufferManager is
                 return false;
             }
         } else {
-        IERC20Upgradeable(bufferToken).approve(_ibAlluo, totalAmount / 10 ** decDif);
-        IIbAlluo(_ibAlluo).deposit(bufferToken, totalAmount / 10 ** decDif);
-        IERC20MetadataUpgradeable(_ibAlluo).transfer(gnosis, IERC20MetadataUpgradeable(_ibAlluo).balanceOf(address(this)));
+        IERC20Upgradeable(bufferToken).transfer(adapterAddress, totalAmount / 10 ** decDif);
+        IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
         if (isAdapterPendingWithdrawal(_ibAlluo)) {
             handler.satisfyAdapterWithdrawals(_ibAlluo);
         }
@@ -417,8 +416,10 @@ contract BufferManager is
         IERC20Upgradeable(bufferToken).approve(ibAlluo, totalAmount / 10 ** decDif);
         IIbAlluo(ibAlluo).deposit(
             bufferToken,
-            totalAmount / 10 ** decDif
+            gnosisAmount / 10 ** decDif
         );
+        IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance / 10 ** decDif);
+        IHandlerAdapter(adapterAddress).deposit(bufferToken, bufferBalance, bufferBalance);
         if (isAdapterPendingWithdrawal(ibAlluo)) {
             handler.satisfyAdapterWithdrawals(ibAlluo);
         }
