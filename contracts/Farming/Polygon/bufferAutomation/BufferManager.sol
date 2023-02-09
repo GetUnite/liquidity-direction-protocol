@@ -17,7 +17,6 @@ import "../../../interfaces/ILiquidityHandler.sol";
 import "../../../interfaces/IHandlerAdapter.sol";
 import "../../../interfaces/IVoteExecutorSlave.sol";
 import "../../../interfaces/IIbAlluo.sol";
-import "hardhat/console.sol";
 
 import {ISpokePool} from "../../../interfaces/ISpokePool.sol";
 import {ICallProxy} from "../../../interfaces/ICallProxy.sol";
