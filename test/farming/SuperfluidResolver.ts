@@ -157,9 +157,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
           1000,
           604800,
           admin.address,
-          spokepooladdress,
-          anycalladdress,
-          ZERO_ADDR,
+          spokepooladdress
         ], {
           initializer: 'initialize', unsafeAllow: ["delegatecall"],
           kind: 'uups'
