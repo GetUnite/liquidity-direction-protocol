@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { Address } from "cluster";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter, ISuperTokenFactory, StIbAlluo, StIbAlluo__factory, SuperfluidResolver } from "../../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandlerPolygon, LiquidityHandler, UsdCurveAdapter, LiquidityHandlerPolygon__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter, ISuperTokenFactory, StIbAlluo, StIbAlluo__factory, SuperfluidResolver, BufferManager, BufferManager__factory } from "../../typechain";
 
 async function skipDays(d: number) {
     ethers.provider.send('evm_increaseTime', [d * 86400]);
@@ -66,6 +66,8 @@ async function setSuperfluidPermissions(signer: SignerWithAddress, ibAlluoCurren
 describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
     let signers: SignerWithAddress[];
     let admin: SignerWithAddress;
+    let gelatoExecutor: SignerWithAddress;
+    let anycall: SignerWithAddress;
 
     let ibAlluoCurrent: IbAlluo;
     let StIbAlluo: StIbAlluo;
@@ -76,6 +78,7 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
 
     let multisig: PseudoMultisigWallet;
     let handler: LiquidityHandler;
+    let buffer: BufferManager;
 
     let dai: IERC20, usdc: IERC20, usdt: IERC20;
     let curveLpUSD: IERC20;
@@ -87,7 +90,16 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
     let exchangeAddress: string;
     let superFactory: ISuperTokenFactory;
     let resolver: SuperfluidResolver;
+    
+    const spokepooladdress = "0x69B5c72837769eF1e7C164Abc6515DcFf217F920";
+    const anycalladdress = "0xC10Ef9F491C9B59f936957026020C321651ac078";
+    const gelatoaddress = "0x7A34b2f0DA5ea35b5117CaC735e99Ba0e2aCEECD";
+    const iballuoaddress = "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6";
 
+    const ZERO_ADDR = ethers.constants.AddressZero;
+
+    
+    
     before(async function () {
         upgrades.silenceWarnings()
 
@@ -138,11 +150,26 @@ describe("Superfluid resolver with StIbAlluo/IbAlluo", function () {
 
         handler = await ethers.getContractAt("LiquidityHandler", "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1");
 
+        const Buffer = await ethers.getContractFactory("BufferManager") as BufferManager__factory;
+    
+        buffer = await upgrades.deployProxy(Buffer,
+        [ 604800,
+          1000,
+          604800,
+          admin.address,
+          spokepooladdress
+        ], {
+          initializer: 'initialize', unsafeAllow: ["delegatecall"],
+          kind: 'uups'
+         }
+        ) as BufferManager;
+
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), multisig.address)
 
         const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapter") as UsdCurveAdapter__factory;
+        
+        usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200, 100)
 
-        usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200, 100)
 
         await usdAdapter.connect(admin).adapterApproveAll()
 

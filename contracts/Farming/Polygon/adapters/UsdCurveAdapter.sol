@@ -8,6 +8,9 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "../../../interfaces/curve/ICurvePoolUSD.sol";
+import "../../../interfaces/IPriceFeedRouter.sol";
+
+import "hardhat/console.sol";
 
 contract UsdCurveAdapter is AccessControl {
     using Address for address;
@@ -21,18 +24,19 @@ contract UsdCurveAdapter is AccessControl {
         0x445FE580eF8d70FF569aB36e80c647af338db351;
     address public constant CURVE_LP =
         0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171;
-    address public wallet;
+    address public buffer;
     uint64 public slippage;
-
+    address public priceFeedRouter;
     uint64 public primaryTokenIndex;
     uint128 public liquidTokenIndex;
     uint64 public maxSendSlippage;
 
     mapping(address => uint128) public indexes;
 
-    constructor(
-        address _multiSigWallet,
-        address _liquidityHandler,
+    constructor (
+        address _multiSigWallet, 
+        address _bufferManager, 
+        address _liquidityHandler, 
         uint64 _lowSlippage,
         uint64 _maxSlippage
     ) {
@@ -40,16 +44,17 @@ contract UsdCurveAdapter is AccessControl {
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
-        wallet = _multiSigWallet;
+        buffer = _bufferManager;
         slippage = _lowSlippage;
         maxSendSlippage = _maxSlippage;
+
 
         indexes[DAI] = 0;
         indexes[USDC] = 1;
         indexes[USDT] = 2;
 
-        liquidTokenIndex = 2;
         primaryTokenIndex = 1;
+        liquidTokenIndex = 1;
     }
 
     function adapterApproveAll() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -62,7 +67,7 @@ contract UsdCurveAdapter is AccessControl {
     /// @notice When called by liquidity handler, moves some funds to the Gnosis multisig and others into a LP to be kept as a 'buffer'
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
-    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Gnosis wallet (the "buffer" amount)
+    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Buffer Manager contract (the "buffer" amount)
     function deposit(
         address _token,
         uint256 _fullAmount,
@@ -75,7 +80,7 @@ contract UsdCurveAdapter is AccessControl {
         if (_token == primaryToken) {
             if (toSend != 0) {
                 IERC20(primaryToken).safeTransfer(
-                    wallet,
+                    buffer,
                     toSend /
                         10 ** (18 - IERC20Metadata(primaryToken).decimals())
                 );
@@ -109,13 +114,12 @@ contract UsdCurveAdapter is AccessControl {
                     (lpAmount * (10000 + slippage)) / 10000,
                     true
                 );
-                IERC20(primaryToken).safeTransfer(wallet, toSend);
+                IERC20(primaryToken).safeTransfer(buffer, toSend);
             }
         }
     }
 
     /// @notice When called by liquidity handler, withdraws funds from liquidity pool
-    /// @dev It checks against arbitragers attempting to exploit spreads in stablecoins.
     /// @param _user Recipient address
     /// @param _token Deposit token address (eg. USDC)
     /// @param _amount  Amount to be withdrawn in 10*18
@@ -182,21 +186,8 @@ contract UsdCurveAdapter is AccessControl {
         }
     }
 
-    function getCoreTokens()
-        external
-        view
-        returns (address liquidToken, address primaryToken)
-    {
-        return (
-            ICurvePoolUSD(CURVE_POOL).underlying_coins(liquidTokenIndex),
-            ICurvePoolUSD(CURVE_POOL).underlying_coins(primaryTokenIndex)
-        );
-    }
-
-    function changeLiquidTokenIndex(
-        uint128 _newLiquidTokenIndex
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        liquidTokenIndex = _newLiquidTokenIndex;
+    function getCoreTokens() external view returns (address primaryToken) {
+        return (ICurvePoolUSD(CURVE_POOL).underlying_coins(primaryTokenIndex));
     }
 
     function changePrimaryTokenIndex(
@@ -213,10 +204,10 @@ contract UsdCurveAdapter is AccessControl {
         maxSendSlippage = _maxSlippage;
     }
 
-    function setWallet(
-        address _newWallet
+    function setBuffer(
+        address _newBufferManager
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        wallet = _newWallet;
+        buffer = _newBufferManager;
     }
 
     /**

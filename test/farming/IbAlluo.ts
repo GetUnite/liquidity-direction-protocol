@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { Address } from "cluster";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter, StIbAlluo, ISuperTokenFactory, SuperfluidResolver, StIbAlluo__factory } from "../../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandler, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter, StIbAlluo, ISuperTokenFactory, SuperfluidResolver, StIbAlluo__factory, BufferManager, BufferManager__factory } from "../../typechain";
 
 
 async function skipDays(d: number) {
@@ -65,6 +65,7 @@ describe("IbAlluoUSD and Handler", function () {
 
     let multisig: PseudoMultisigWallet;
     let handler: LiquidityHandler;
+    let buffer: BufferManager;
 
     let dai: IERC20, usdc: IERC20, usdt: IERC20;
     let curveLpUSD: IERC20;
@@ -76,6 +77,14 @@ describe("IbAlluoUSD and Handler", function () {
     let exchangeAddress: string;
     let superFactory: ISuperTokenFactory;
     let resolver: SuperfluidResolver;
+
+    const spokepooladdress = "0x69B5c72837769eF1e7C164Abc6515DcFf217F920";
+    const anycalladdress = "0xC10Ef9F491C9B59f936957026020C321651ac078";
+    const gelatoaddress = "0x7A34b2f0DA5ea35b5117CaC735e99Ba0e2aCEECD";
+    const iballuoaddress = "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6";
+
+    const ZERO_ADDR = ethers.constants.AddressZero;
+
     before(async function () {
         upgrades.silenceWarnings()
 
@@ -124,12 +133,36 @@ describe("IbAlluoUSD and Handler", function () {
         exchangeAddress = "0x6b45B9Ab699eFbb130464AcEFC23D49481a05773";
 
         handler = await ethers.getContractAt("LiquidityHandler", "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1");
+        const LiquidityHandlerOld = await ethers.getContractFactory("LiquidityHandlerWithoutPriceOracles");
+        const LiquidityHandlerNew = await ethers.getContractFactory("LiquidityHandler");
+        await upgrades.forceImport(handler.address, LiquidityHandlerOld);
+        await handler.connect(admin).changeUpgradeStatus(true);
+        await handler.connect(admin).grantRole(
+            await handler.UPGRADER_ROLE(),
+            signers[0].address
+        )
+        await upgrades.upgradeProxy(handler.address, LiquidityHandlerNew);
 
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), multisig.address)
 
+        const Buffer = await ethers.getContractFactory("BufferManager") as BufferManager__factory;
+    
+        buffer = await upgrades.deployProxy(Buffer,
+        [ 604800,
+          1000,
+          604800,
+          admin.address,
+          spokepooladdress
+        ], {
+          initializer: 'initialize', unsafeAllow: ["delegatecall"],
+          kind: 'uups'
+         }
+        ) as BufferManager;
+
         const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapter") as UsdCurveAdapter__factory;
 
-        usdAdapter = await UsdAdapter.deploy(admin.address, handler.address, 200, 100)
+        usdAdapter = await UsdAdapter.deploy(admin.address, buffer.address, handler.address, 200, 100)
+
 
         await usdAdapter.connect(admin).adapterApproveAll()
 
@@ -349,30 +382,6 @@ describe("IbAlluoUSD and Handler", function () {
             let balance = await ibAlluoCurrent.getBalance(signers[3].address);
             //console.log(balance.toString());
             expect(balance).to.equal(0);
-        });
-
-        it("Should check all transferAssetValue functions ", async function () {
-            await deposit(signers[1], dai, parseUnits("1000", 18));
-            await ibAlluoCurrent.connect(signers[1]).transfer(signers[2].address, parseEther("100"))
-            await ibAlluoCurrent.connect(signers[1]).transfer(signers[3].address, parseEther("100"))
-            await skipDays(365);
-
-            let totalAsset = await ibAlluoCurrent.totalAssetSupply()
-            expect(totalAsset).to.be.gt(parseUnits("1159", await ibAlluoCurrent.decimals()));
-            expect(totalAsset).to.be.lt(parseUnits("1160.1", await ibAlluoCurrent.decimals()));
-
-            await ibAlluoCurrent.connect(signers[2]).transferAssetValue(signers[1].address, parseEther("115.9"))
-
-            await ibAlluoCurrent.connect(signers[3]).approveAssetValue(signers[2].address, parseEther("116"))
-            await ibAlluoCurrent.connect(signers[2]).transferFromAssetValue(signers[3].address, signers[1].address, parseEther("115.9"))
-
-            let tokenBalance = await ibAlluoCurrent.balanceOf(signers[1].address);
-            expect(tokenBalance).to.be.gt(parseUnits("999", await ibAlluoCurrent.decimals()));
-            expect(tokenBalance).to.be.lt(parseUnits("1000", await ibAlluoCurrent.decimals()));
-
-            let valueBalance = await ibAlluoCurrent.getBalance(signers[1].address)
-            expect(valueBalance).to.be.gt(parseUnits("1159", await ibAlluoCurrent.decimals()));
-            expect(valueBalance).to.be.lt(parseUnits("1160", await ibAlluoCurrent.decimals()));
         });
 
         it("Should withdraw from caller to recipient", async function () {

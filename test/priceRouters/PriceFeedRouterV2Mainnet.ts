@@ -3,9 +3,9 @@ import { expect } from "chai";
 import { BigNumberish, constants } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
-import { ChainlinkFeedStrategy, ChainlinkFeedStrategyV2, CurveLpReferenceFeedStrategyV2, CurvePoolReferenceFeedStrategy, CurvePoolReferenceFeedStrategyV2, IERC20Metadata, IFeedStrategy, PriceFeedRouter, PriceFeedRouterV2, PriceFeedRouterV2__factory } from "../typechain";
+import { ChainlinkFeedStrategy, ChainlinkFeedStrategyV2, CurveLpReferenceFeedStrategyV2, CurvePoolReferenceFeedStrategy, CurvePoolReferenceFeedStrategyV2, IERC20Metadata, IFeedStrategy, PriceFeedRouter, PriceFeedRouterV2, PriceFeedRouterV2__factory } from "../../typechain";
 
-describe("Price Feed RouterV2", function () {
+describe("Price Feed Router V2 (Mainnet)", function () {
     type FiatRoute = {
         name: string,
         id: number;
@@ -173,27 +173,7 @@ describe("Price Feed RouterV2", function () {
     describe("Empty router", async function () {
         it("Should check deploy (isTesting true)", async function () {
             expect(await router.fiatNameToFiatId("USD")).to.be.equal(0);
-            // expect(await router.owner()).to.be.equal(signers[0].address);
         })
-
-        // it("Should transferOwnership", async function () {
-        //     const newOwner = "0xfE4A8cc5b5B2366C1B58Bea3858e81843581b2F7";
-        //     expect(await router.owner()).to.not.be.equal(newOwner);
-
-        //     await router.transferOwnership(newOwner);
-
-        //     expect(await router.owner()).to.be.equal(newOwner);
-        // });
-
-        // it("Should revert transferOwnership (passing not contract)", async function () {
-        //     const newOwner = signers[0].address;
-        //     await expect(router.transferOwnership(newOwner)).to.be.revertedWith("PriceFeed: !contract");
-        // });
-
-        // it("Should revert transferOwnership (passing zero address)", async function () {
-        //     const newOwner = constants.AddressZero;
-        //     await expect(router.transferOwnership(newOwner)).to.be.revertedWith("Ownable: new owner is 0");
-        // });
 
         it("Should not set fiat strategy (attempt to use reserved id 0)", async function () {
             const fiatSymbol = "RUB";
@@ -202,28 +182,6 @@ describe("Price Feed RouterV2", function () {
 
             await expect(router.setFiatStrategy(fiatSymbol, fiatId, fiatFeed)).to.be.revertedWith("PriceFeed: id 0 reserved for USD");
         })
-
-        // it("Should revert Curve strategy (reference strategy returned zero or less)", async function () {
-        //     const curveRoute = curveRoutes[0];
-        //     const BadStrategy = await ethers.getContractFactory("BadPriceStrategy");
-        //     const badReferenceStragegy = await BadStrategy.deploy(0, 8);
-
-        //     const CurveStrategy = await ethers.getContractFactory("CurvePoolReferenceFeedStrategy");
-        //     const curveStrategy = await CurveStrategy.deploy(
-        //         badReferenceStragegy.address,
-        //         curvePoolAddress,
-        //         curveReferenceCoinIndex,
-        //         curveRoute.desiredIndex,
-        //         curveReferenceCoinDecimals,
-        //         curveRoute.oneTokenAmount
-        //     );
-
-        //     await router.setCryptoStrategy(curveStrategy.address, curveRoute.coin);
-        //     await expect(router["getPrice(address,uint256)"](curveRoute.coin, 0)).to.be.revertedWith("CurvePRFS: feed lte 0");
-
-        //     await badReferenceStragegy.changeParams(-5, 8);
-        //     await expect(router["getPrice(address,uint256)"](curveRoute.coin, 0)).to.be.revertedWith("CurvePRFS: feed lte 0");
-        // })
     })
 
     describe("Filled router", async function () {

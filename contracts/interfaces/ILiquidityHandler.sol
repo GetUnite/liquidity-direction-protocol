@@ -125,7 +125,7 @@ interface ILiquidityHandler is IAccessControl {
 
     function getAdapterCoreTokensFromIbAlluo(
         address _ibAlluo
-    ) external view returns (address, address);
+    ) external view returns (address);
 }
 
 interface ILiquidityHandlerStructs {

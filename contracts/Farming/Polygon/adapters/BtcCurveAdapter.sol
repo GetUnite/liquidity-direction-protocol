@@ -20,7 +20,7 @@ contract BtcCurveAdapter is AccessControl {
         0xC2d95EEF97Ec6C17551d45e77B590dc1F9117C67;
     address public constant CURVE_LP =
         0xf8a57c1d3b9629b77b6726a042ca48990A84Fb49;
-    address public wallet;
+    address public buffer;
     uint64 public slippage;
 
     uint64 public primaryTokenIndex;
@@ -31,14 +31,15 @@ contract BtcCurveAdapter is AccessControl {
     constructor(
         address _multiSigWallet,
         address _liquidityHandler,
+        address _buffer,
         uint64 _slippage
     ) {
         require(_multiSigWallet.isContract(), "Adapter: Not contract");
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
-        wallet = _multiSigWallet;
         slippage = _slippage;
+        buffer = _buffer;
 
         indexes[WBTC] = 0;
         indexes[RENBTC] = 1;
@@ -54,7 +55,7 @@ contract BtcCurveAdapter is AccessControl {
     /// @notice When called by liquidity handler, moves some funds to the Gnosis multisig and others into a LP to be kept as a 'buffer'
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
-    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Gnosis wallet (the "buffer" amount)
+    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Buffer Manager (the "buffer" amount)
     function deposit(
         address _token,
         uint256 _fullAmount,
@@ -67,7 +68,7 @@ contract BtcCurveAdapter is AccessControl {
         if (_token == primaryToken) {
             if (toSend != 0) {
                 IERC20(primaryToken).safeTransfer(
-                    wallet,
+                    buffer,
                     toSend /
                         10 ** (18 - IERC20Metadata(primaryToken).decimals())
                 );
@@ -101,7 +102,7 @@ contract BtcCurveAdapter is AccessControl {
                     (lpAmount * (10000 + slippage)) / 10000,
                     true
                 );
-                IERC20(primaryToken).safeTransfer(wallet, toSend);
+                IERC20(primaryToken).safeTransfer(buffer, toSend);
             }
         }
     }
@@ -132,8 +133,8 @@ contract BtcCurveAdapter is AccessControl {
             );
             IERC20(_token).safeTransfer(_user, amount);
         } else {
-            // We want to be save agains arbitragers so at any withraw contract checks
-            // how much will be burned curveLp by withrawing this amount in token with most liquidity
+            // We want to be safe against arbitrageurs, so at any withrawal contract checks
+            // the amount of curveLp to be burned by withrawing this amount in token with most liquidity
             // and passes this burned amount to get tokens
             uint256 toBurn = ICurvePoolBTC(CURVE_POOL).calc_token_amount(
                 amounts,
@@ -197,10 +198,10 @@ contract BtcCurveAdapter is AccessControl {
         slippage = _newSlippage;
     }
 
-    function setWallet(
-        address _newWallet
+    function setBuffer(
+        address _newBufferManager
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        wallet = _newWallet;
+        buffer = _newBufferManager;
     }
 
     /**

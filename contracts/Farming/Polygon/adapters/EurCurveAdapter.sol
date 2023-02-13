@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "../../../interfaces/curve/ICurvePoolEUR.sol";
+import "../../../interfaces/IPriceFeedRouter.sol";
 
 contract EurCurveAdapter is AccessControl {
     using Address for address;
@@ -16,12 +17,13 @@ contract EurCurveAdapter is AccessControl {
     address public constant PAR = 0xE2Aa7db6dA1dAE97C5f5C6914d285fBfCC32A128;
     address public constant EURS = 0xE111178A87A3BFf0c8d18DECBa5798827539Ae99;
     address public constant EURT = 0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f;
-    address public constant CURVE_POOL =
+    address public constant CURVE_POOL = 
         0xAd326c253A84e9805559b73A08724e11E49ca651;
-    address public wallet;
+    address public buffer;
     uint64 public slippage;
-
+    address public priceFeedRouter;
     uint64 public primaryTokenIndex;
+
     uint128 public liquidTokenIndex;
     uint64 public maxSendSlippage;
 
@@ -30,6 +32,7 @@ contract EurCurveAdapter is AccessControl {
     // 0 = jEUR-18dec, 1 = PAR-18dec , 2 = EURS-2dec, 3 = EURT-6dec
     constructor(
         address _multiSigWallet,
+        address _bufferManager,
         address _liquidityHandler,
         uint64 _lowSlippage,
         uint64 _maxSlippage
@@ -38,7 +41,7 @@ contract EurCurveAdapter is AccessControl {
         require(_liquidityHandler.isContract(), "Adapter: Not contract");
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(DEFAULT_ADMIN_ROLE, _liquidityHandler);
-        wallet = _multiSigWallet;
+        buffer = _bufferManager;
         slippage = _lowSlippage;
         maxSendSlippage = _maxSlippage;
 
@@ -47,7 +50,6 @@ contract EurCurveAdapter is AccessControl {
         indexes[EURS] = 2;
         indexes[EURT] = 3;
 
-        liquidTokenIndex = 2;
         primaryTokenIndex = 3;
     }
 
@@ -62,7 +64,7 @@ contract EurCurveAdapter is AccessControl {
     /// @notice When called by liquidity handler, moves some funds to the Gnosis multisig and others into a LP to be kept as a 'buffer'
     /// @param _token Deposit token address (eg. USDC)
     /// @param _fullAmount Full amount deposited in 10**18 called by liquidity handler
-    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Gnosis wallet (the "buffer" amount)
+    /// @param _leaveInPool  Amount to be left in the LP rather than be sent to the Buffer Manager contract (the "buffer" amount)
     function deposit(
         address _token,
         uint256 _fullAmount,
@@ -75,7 +77,7 @@ contract EurCurveAdapter is AccessControl {
         if (_token == primaryToken) {
             if (toSend != 0) {
                 IERC20(primaryToken).safeTransfer(
-                    wallet,
+                    buffer,
                     toSend /
                         10 ** (18 - IERC20Metadata(primaryToken).decimals())
                 );
@@ -107,7 +109,7 @@ contract EurCurveAdapter is AccessControl {
                     amounts,
                     (lpAmount * (10000 + slippage)) / 10000
                 );
-                IERC20(primaryToken).safeTransfer(wallet, toSend);
+                IERC20(primaryToken).safeTransfer(buffer, toSend);
             }
         }
     }
@@ -176,21 +178,8 @@ contract EurCurveAdapter is AccessControl {
         }
     }
 
-    function getCoreTokens()
-        external
-        view
-        returns (address liquidToken, address primaryToken)
-    {
-        return (
-            ICurvePoolEUR(CURVE_POOL).coins(liquidTokenIndex),
-            ICurvePoolEUR(CURVE_POOL).coins(primaryTokenIndex)
-        );
-    }
-
-    function changeLiquidTokenIndex(
-        uint128 _newLiquidTokenIndex
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        liquidTokenIndex = _newLiquidTokenIndex;
+    function getCoreTokens() external view returns (address primaryToken) {
+        return (ICurvePoolEUR(CURVE_POOL).coins(primaryTokenIndex));
     }
 
     function changePrimaryTokenIndex(
@@ -207,10 +196,10 @@ contract EurCurveAdapter is AccessControl {
         maxSendSlippage = _maxSlippage;
     }
 
-    function setWallet(
-        address _newWallet
+    function setBuffer(
+        address _newBufferManager
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        wallet = _newWallet;
+        buffer = _newBufferManager;
     }
 
     /**

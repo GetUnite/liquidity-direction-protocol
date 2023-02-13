@@ -72,6 +72,13 @@ contract VoteExecutorSlaveFinal is
 
     mapping(bytes32 => uint256) public hashExecutionTime;
 
+    struct Entry {
+        uint256 directionId;
+        uint256 percent;
+    }
+
+    Entry[] public entries;
+
     struct Message {
         uint256 commandIndex;
         bytes commandData;
@@ -142,7 +149,7 @@ contract VoteExecutorSlaveFinal is
                 block.timestamp >= hashExecutionTime[hashed] + 1 days,
             "Duplicate hash"
         );
-
+        delete entries;
         execute(_messages);
         executionHistory.push(_data);
         hashExecutionTime[hashed] = block.timestamp;
@@ -180,7 +187,41 @@ contract VoteExecutorSlaveFinal is
                     newInterestPerSecond,
                     ibAlluoSymbol
                 );
+            } else if (currentMessage.commandIndex == 2) {
+                (uint256 directionId, uint256 percent) = abi.decode(
+                    currentMessage.commandData,
+                    (uint256, uint256)
+                );
+                if (percent != 0) {
+                    Entry memory e = Entry(directionId, percent);
+                    entries.push(e);
+                }
             }
+        }
+    }
+
+    function getEntries()
+        external
+        view
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        returns (uint256[] memory, uint256[] memory)
+    {
+        uint256[] memory drctId = new uint256[](entries.length);
+        uint256[] memory pct = new uint256[](entries.length);
+        for (uint256 i; i < entries.length; i++) {
+            Entry memory e = entries[i];
+            drctId[i] = e.directionId;
+            pct[i] = e.percent;
+        }
+        return (drctId, pct);
+    }
+
+    function setEntries(
+        Entry[] memory _entries
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        delete entries;
+        for (uint256 i; i < _entries.length; i++) {
+            entries.push(_entries[i]);
         }
     }
 

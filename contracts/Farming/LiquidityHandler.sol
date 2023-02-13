@@ -8,12 +8,13 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableMapUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
 import "../interfaces/IIbAlluo.sol";
 import "../interfaces/IHandlerAdapter.sol";
 import "../interfaces/IExchange.sol";
+import "./../interfaces/IPriceFeedRouter.sol";
 import "hardhat/console.sol";
 
 contract LiquidityHandler is
@@ -22,7 +23,7 @@ contract LiquidityHandler is
     AccessControlUpgradeable,
     UUPSUpgradeable
 {
-    using Address for address;
+    using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using EnumerableMapUpgradeable for EnumerableMapUpgradeable.AddressToUintMap;
 
@@ -176,7 +177,8 @@ contract LiquidityHandler is
     function withdraw(
         address _user,
         address _token,
-        uint256 _amount
+        uint256 _amount,
+        uint256 _fiatAmount
     ) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 inAdapter = getAdapterAmount(msg.sender);
 
@@ -206,7 +208,7 @@ contract LiquidityHandler is
             ] = Withdrawal({
                 user: _user,
                 token: _token,
-                amount: _amount,
+                amount: _fiatAmount,
                 time: block.timestamp
             });
             withdrawalSystem.totalWithdrawalAmount += _amount;
@@ -227,6 +229,7 @@ contract LiquidityHandler is
         address _user,
         address _token,
         uint256 _amount,
+        uint256 _fiatAmount,
         address _outputToken
     ) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256 inAdapter = getAdapterAmount(msg.sender);
@@ -267,7 +270,7 @@ contract LiquidityHandler is
             ] = Withdrawal({
                 user: _user,
                 token: _token,
-                amount: _amount,
+                amount: _fiatAmount,
                 time: block.timestamp
             });
             withdrawalSystem.totalWithdrawalAmount += _amount;
@@ -294,6 +297,7 @@ contract LiquidityHandler is
             exchangeAddress,
             amountinInputTokens
         );
+
         uint256 amountinTargetTokens = IExchange(exchangeAddress).exchange(
             _inputToken,
             _targetToken,
@@ -313,6 +317,8 @@ contract LiquidityHandler is
         uint256 lastWithdrawalRequest = withdrawalSystem.lastWithdrawalRequest;
         uint256 lastSatisfiedWithdrawal = withdrawalSystem
             .lastSatisfiedWithdrawal;
+        address priceFeedRouter = IIbAlluo(_ibAlluo).priceFeedRouter();
+        uint256 fiatIndex = IIbAlluo(_ibAlluo).fiatIndex();
 
         if (lastWithdrawalRequest != lastSatisfiedWithdrawal) {
             uint256 inAdapter = getAdapterAmount(_ibAlluo);
@@ -323,10 +329,20 @@ contract LiquidityHandler is
                     lastSatisfiedWithdrawal + 1
                 ];
                 if (withdrawal.amount <= inAdapter) {
+                    uint256 amount = withdrawal.amount;
+
+                    if (priceFeedRouter != address(0)) {
+                        (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
+                            priceFeedRouter
+                        ).getPrice(withdrawal.token, fiatIndex);
+
+                        amount = (amount * (10 ** priceDecimals)) / price;
+                    }
+
                     IHandlerAdapter(adapter).withdraw(
                         withdrawal.user,
                         withdrawal.token,
-                        withdrawal.amount
+                        amount
                     );
 
                     inAdapter -= withdrawal.amount;
@@ -478,7 +494,7 @@ contract LiquidityHandler is
 
     function getAdapterCoreTokensFromIbAlluo(
         address _ibAlluo
-    ) public view returns (address, address) {
+    ) public view returns (address) {
         uint256 adapterId = ibAlluoToAdapterId.get(_ibAlluo);
         address adapterAddress = adapterIdsToAdapterInfo[adapterId]
             .adapterAddress;
@@ -592,7 +608,7 @@ contract LiquidityHandler is
     }
 
     function _authorizeUpgrade(
-        address newImplementation
+        address
     ) internal override onlyRole(UPGRADER_ROLE) {
         require(upgradeStatus, "Handler: Upgrade not allowed");
         upgradeStatus = false;
