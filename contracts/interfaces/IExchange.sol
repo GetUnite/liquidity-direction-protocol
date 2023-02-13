@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.11;
 
-interface IExchange {
+import "@openzeppelin/contracts/access/IAccessControl.sol";
+
+interface IExchange is IAccessControl {
     struct RouteEdge {
         uint32 swapProtocol; // 0 - unknown edge, 1 - UniswapV2, 2 - Curve...
         address pool; // address of pool to call

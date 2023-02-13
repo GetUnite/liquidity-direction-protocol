@@ -1,0 +1,391 @@
+
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
+import { expect } from "chai";
+import { BigNumberish, constants } from "ethers";
+import { formatUnits, parseEther, parseUnits } from "ethers/lib/utils";
+import { ethers, network, upgrades } from "hardhat";
+import { before } from "mocha"
+import { BufferManager, IbAlluo, ICurvePoolUSD, IERC20Metadata, IExchange, LiquidityHandlerPolygon, PriceFeedRouterV2, StIbAlluo, SuperfluidResolver, Usd3PoolOptimismAdapter } from "../../typechain";
+
+function getInterestPerSecondParam(apyPercent: number): string {
+    const secondsInYear = 31536000;
+    const decimalApy = 1 + (apyPercent / 100);
+    const decimalInterest = Math.pow(decimalApy, 1 / secondsInYear);
+    return Math.round(decimalInterest * (10 ** 17)).toString();
+}
+
+async function forceSend(amount: BigNumberish, to: string) {
+    const ForceSencer = await ethers.getContractFactory("ForceSender");
+    const sender = await ForceSencer.deploy({ value: amount });
+    await sender.forceSend(to);
+}
+
+async function skipDays(d: number) {
+    ethers.provider.send('evm_increaseTime', [d * 86400]);
+    ethers.provider.send('evm_mine', []);
+}
+
+describe("IbAlluo Optimism Integration Test", async () => {
+    let signers: SignerWithAddress[];
+    let priceRouter: PriceFeedRouterV2;
+    let exchange: IExchange;
+    let gnosis: SignerWithAddress;
+
+    let usdc: IERC20Metadata, usdt: IERC20Metadata, dai: IERC20Metadata, usdLpToken: ICurvePoolUSD;
+
+    before(async () => {
+        await network.provider.request({
+            method: "hardhat_reset",
+            params: [{
+                forking: {
+                    enabled: true,
+                    jsonRpcUrl: process.env.OPTIMISM_URL as string,
+                },
+            },],
+        });
+
+        exchange = await ethers.getContractAt(
+            "contracts/interfaces/IExchange.sol:IExchange",
+            "0x66Ac11c106C3670988DEFDd24BC75dE786b91095"
+        ) as IExchange;
+        priceRouter = await ethers.getContractAt("PriceFeedRouterV2", "0x7E6FD319A856A210b9957Cd6490306995830aD25");
+        gnosis = await ethers.getImpersonatedSigner("0xc7061dD515B602F86733Fa0a0dBb6d6E6B34aED4")
+
+        // Checks on recent optimism block
+
+        const deployer = "0xFc57eBe6d333980E620A923B6edb78fc7FB5cC3f";
+        const role = constants.HashZero;
+
+        expect(await exchange.hasRole(role, gnosis.address)).to.be.true;
+        expect(await priceRouter.hasRole(role, gnosis.address)).to.be.true;
+
+        if (await exchange.hasRole(role, deployer)) {
+            console.warn("\n ⚠️ Deployer has DEFAULT_ADMIN_ROLE on Exchange");
+        }
+        if (await priceRouter.hasRole(role, deployer)) {
+            console.warn("\n ⚠️ Deployer has DEFAULT_ADMIN_ROLE on PriceFeedRouterV2\n");
+        }
+
+        await network.provider.request({
+            method: "hardhat_reset",
+            params: [{
+                forking: {
+                    enabled: true,
+                    jsonRpcUrl: process.env.OPTIMISM_URL as string,
+                    blockNumber: 74118749
+                },
+            },],
+        });
+
+        upgrades.silenceWarnings()
+
+        signers = await ethers.getSigners();
+        gnosis = await ethers.getImpersonatedSigner("0xc7061dD515B602F86733Fa0a0dBb6d6E6B34aED4")
+        usdc = await ethers.getContractAt("IERC20Metadata", "0x7f5c764cbc14f9669b88837ca1490cca17c31607");
+        usdt = await ethers.getContractAt("IERC20Metadata", "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58");
+        dai = await ethers.getContractAt("IERC20Metadata", "0xda10009cbd5d07dd0cecc66161fc93d7c9000da1");
+        usdLpToken = await ethers.getContractAt(
+            "contracts/interfaces/curve/optimism/ICurvePoolUSD.sol:ICurvePoolUSD",
+            "0x1337BedC9D22ecbe766dF105c9623922A27963EC"
+        ) as ICurvePoolUSD
+
+        await forceSend(parseEther("100.0"), gnosis.address);
+
+        const usdcWhale = await ethers.getImpersonatedSigner("0x625e7708f30ca75bfd92586e17077590c60eb4cd");
+        const usdtWhale = await ethers.getImpersonatedSigner("0x0d0707963952f2fba59dd06f2b425ace40b492fe");
+        const daiWhale = await ethers.getImpersonatedSigner("0xad32aa4bff8b61b4ae07e3ba437cf81100af0cd7");
+
+        await forceSend(parseEther("100.0"), usdcWhale.address);
+        await forceSend(parseEther("100.0"), usdtWhale.address);
+        await forceSend(parseEther("100.0"), daiWhale.address);
+
+        await usdc.connect(usdcWhale).transfer(signers[0].address, await usdc.balanceOf(usdcWhale.address))
+        await usdt.connect(usdtWhale).transfer(signers[0].address, await usdt.balanceOf(usdtWhale.address))
+        await dai.connect(daiWhale).transfer(signers[0].address, await dai.balanceOf(daiWhale.address))
+    });
+
+    let handler: LiquidityHandlerPolygon;
+    let buffer: BufferManager;
+    let usdAdapter: Usd3PoolOptimismAdapter;
+    let ibAlluoUSD: IbAlluo;
+    let stIbAlluo: StIbAlluo;
+    let superfluidResolver: SuperfluidResolver;
+    beforeEach(async () => {
+        // Step 1: Deploy LiquidityHandler, but setup later
+        const handlerFactory = await ethers.getContractFactory("LiquidityHandlerPolygon");
+
+        handler = await upgrades.deployProxy(
+            handlerFactory,
+            [
+                gnosis.address,
+                exchange.address
+            ],
+            { kind: "uups" }
+        ) as LiquidityHandlerPolygon;
+
+        // Step 2: Deploy BufferManager, but setup later
+        const bufferFactory = await ethers.getContractFactory("BufferManager");
+        const blockTimestamp = (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp;
+        const spokePool = "0xa420b2d1c0841415A695b81E5B867BCD07Dff8C9";
+        buffer = await upgrades.deployProxy(
+            bufferFactory,
+            [
+                86400, // epochDuration
+                blockTimestamp, // bridgeGenesis
+                28800, // bridgeInterval
+                gnosis.address, // gnosis
+                spokePool // spokePool
+            ],
+            { kind: "uups" }
+        ) as BufferManager;
+
+        // Step 3: Deploy and set USD, ETH, BTC adapters
+        const usdAdapterFactory = await ethers.getContractFactory("Usd3PoolOptimismAdapter");
+        usdAdapter = await upgrades.deployProxy(
+            usdAdapterFactory,
+            [
+                gnosis.address,
+                buffer.address,
+                handler.address,
+                200
+            ],
+            { kind: "uups" }
+        ) as Usd3PoolOptimismAdapter;
+        await usdAdapter.connect(gnosis).adapterApproveAll();
+        await usdAdapter.connect(gnosis).setPriceRouterInfo(priceRouter.address, 0);
+        await handler.connect(gnosis).setAdapter(
+            1,
+            "USD 3pool Curve",
+            50,
+            usdAdapter.address,
+            true
+        );
+
+        // Step 4: ibAlluoUSD, ETH, BTC deploy and setup
+        const apy = 7.0;
+        const apyInteger = 700;
+        const interestPerSecond = getInterestPerSecondParam(apy);
+        const ibAlluoFactory = await ethers.getContractFactory("IbAlluo");
+        const trustedForwarder = "0xEFbA8a2A82ec1fB1273806174f5E28FBb917Cf95";
+
+        ibAlluoUSD = await upgrades.deployProxy(
+            ibAlluoFactory,
+            [
+                "Interest Bearing Alluo USD",
+                "IbAlluoUSD",
+                gnosis.address,
+                handler.address,
+                [dai.address, usdc.address, usdt.address],
+                interestPerSecond,
+                apyInteger,
+                trustedForwarder,
+                exchange.address
+            ],
+            { kind: "uups" }
+        ) as IbAlluo;
+        await handler.connect(gnosis).grantRole(constants.HashZero, ibAlluoUSD.address);
+        await handler.connect(gnosis).setIbAlluoToAdapterId(ibAlluoUSD.address, 1);
+        await ibAlluoUSD.connect(gnosis).setPriceRouterInfo(priceRouter.address, 0);
+
+        // Step 5: Setup Superfluid contracts
+        const StIbAlluoFactory = await ethers.getContractFactory("StIbAlluo");
+        const superfluidHost = "0x567c4B141ED61923967cA25Ef4906C8781069a10"
+        const cfaV1 = "0x204C6f131bb7F258b2Ea1593f5309911d8E458eD";
+
+        stIbAlluo = await upgrades.deployProxy(
+            StIbAlluoFactory,
+            [
+                ibAlluoUSD.address,
+                18,
+                "Streaming IbAlluo USD",
+                "StIbAlluoUSD",
+                superfluidHost,
+                gnosis.address,
+                [ibAlluoUSD.address]
+            ], {
+            initializer: 'alluoInitialize',
+            kind: 'uups',
+            unsafeAllow: ["delegatecall"]
+        }
+        ) as StIbAlluo;
+        await ibAlluoUSD.connect(gnosis).setSuperToken(stIbAlluo.address)
+
+        const SuperfluidResolver = await ethers.getContractFactory("SuperfluidResolver");
+        superfluidResolver = await SuperfluidResolver.deploy(
+            [ibAlluoUSD.address],
+            cfaV1,
+            gnosis.address
+        );
+        await ibAlluoUSD.connect(gnosis).setSuperfluidResolver(superfluidResolver.address);
+
+        // Step 6: Setup BufferManager
+
+
+    })
+
+    it("Clean USDC deposit+withdraw & balance check", async () => {
+        await usdc.approve(ibAlluoUSD.address, constants.MaxUint256);
+
+        const ibAlluoBalanceBefore = await ibAlluoUSD.balanceOf(signers[0].address);
+        await ibAlluoUSD.deposit(usdc.address, parseUnits("100.0", 6));
+        const ibAlluoBalanceAfter = await ibAlluoUSD.balanceOf(signers[0].address);
+        const ibAlluoReceived = ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore);
+
+        expect(ibAlluoReceived).to.be.gte(parseUnits("95.0", 18));
+        console.log("Received", formatUnits(ibAlluoReceived, 18), "ibAlluoUSD")
+
+        const balanceBefore = await usdc.balanceOf(signers[0].address);
+        await ibAlluoUSD.withdraw(usdc.address, parseUnits("0.45", 18));
+        const balanceAfter = await usdc.balanceOf(signers[0].address);
+        const received = balanceAfter.sub(balanceBefore);
+        expect(received).to.be.gt(parseUnits("0.44", 6));
+    })
+
+    it("Clean USDT deposit+withdraw & balance check", async () => {
+        await usdt.approve(ibAlluoUSD.address, constants.MaxUint256);
+
+        const ibAlluoBalanceBefore = await ibAlluoUSD.balanceOf(signers[0].address);
+        await ibAlluoUSD.deposit(usdt.address, parseUnits("100.0", 6));
+        const ibAlluoBalanceAfter = await ibAlluoUSD.balanceOf(signers[0].address);
+        const ibAlluoReceived = ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore);
+
+        expect(ibAlluoReceived).to.be.gte(parseUnits("95.0", 18));
+        console.log("Received", formatUnits(ibAlluoReceived, 18), "ibAlluoUSD")
+
+        const balanceBefore = await usdt.balanceOf(signers[0].address);
+        await ibAlluoUSD.withdraw(usdt.address, parseUnits("0.45", 18));
+        const balanceAfter = await usdt.balanceOf(signers[0].address);
+        const received = balanceAfter.sub(balanceBefore);
+        expect(received).to.be.gt(parseUnits("0.44", 6));
+    })
+
+    it("Clean DAI deposit+withdraw & balance check", async () => {
+        await dai.approve(ibAlluoUSD.address, constants.MaxUint256);
+
+        const ibAlluoBalanceBefore = await ibAlluoUSD.balanceOf(signers[0].address);
+        await ibAlluoUSD.deposit(dai.address, parseUnits("100.0", 18));
+        const ibAlluoBalanceAfter = await ibAlluoUSD.balanceOf(signers[0].address);
+        const ibAlluoReceived = ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore);
+
+        expect(ibAlluoReceived).to.be.gte(parseUnits("95.0", 18));
+        console.log("Received", formatUnits(ibAlluoReceived, 18), "ibAlluoUSD")
+
+        const balanceBefore = await dai.balanceOf(signers[0].address);
+        await ibAlluoUSD.withdraw(dai.address, parseUnits("0.45", 18));
+        const balanceAfter = await dai.balanceOf(signers[0].address);
+        const received = balanceAfter.sub(balanceBefore);
+        expect(received).to.be.gt(parseUnits("0.44", 18));
+    });
+
+    it("Check token flow", async () => {
+        await usdc.approve(ibAlluoUSD.address, constants.MaxUint256);
+        await usdt.approve(ibAlluoUSD.address, constants.MaxUint256);
+        await dai.approve(ibAlluoUSD.address, constants.MaxUint256);
+
+        await ibAlluoUSD.deposit(usdc.address, parseUnits("100.0", 6));
+        await ibAlluoUSD.deposit(usdt.address, parseUnits("100.0", 6));
+        await ibAlluoUSD.deposit(dai.address, parseUnits("100.0", 18));
+
+        const adapterAmount = await usdAdapter.getAdapterAmount();
+        const adapterLpBalance = await usdLpToken.balanceOf(usdAdapter.address);
+        const bufferUsdcBalance = await usdc.balanceOf(buffer.address);
+        const lpToUsdc = await usdLpToken.calc_withdraw_one_coin(adapterLpBalance, 1);
+        const usdcPrice = await priceRouter["getPrice(address,string)"](usdc.address, "USD");
+
+        expect(adapterAmount).to.be.gt(parseUnits("1.485", 18));
+        expect(adapterLpBalance).to.be.gt(parseUnits("1.46", 18));
+        expect(bufferUsdcBalance).to.be.gt(parseUnits("298.5", 6));
+        expect(lpToUsdc).to.be.gt(parseUnits("1.485", 6));
+
+        console.log("Adapter amount:", formatUnits(adapterAmount, 18), "USD");
+        console.log("Adapter LP amount:", formatUnits(adapterLpBalance, 18), "LP");
+        console.log("Buffer amount:", formatUnits(bufferUsdcBalance, 6), "USDC");
+        console.log("LP -> USDC:", formatUnits(lpToUsdc, 6), "USDC");
+        console.log("USDC Price:", formatUnits(usdcPrice.value, usdcPrice.decimals), "USD");
+    })
+
+    it("Check withdraw (instant)", async () => {
+        await usdc.approve(ibAlluoUSD.address, constants.MaxUint256);
+        await ibAlluoUSD.deposit(
+            usdc.address,
+            parseUnits("100000.0", 6)
+        ); // available for instant withdraw ~500 USD
+
+        const daiBefore = await dai.balanceOf(signers[0].address);
+        await ibAlluoUSD.withdraw(dai.address, parseUnits("400.0", 18));
+        const daiAfter = await dai.balanceOf(signers[0].address);
+        const receivedDai = daiAfter.sub(daiBefore);
+        console.log("Received DAI:", formatUnits(receivedDai));
+
+        expect(receivedDai).to.be.gt(parseUnits("399.0", 18));
+    })
+
+    it("Check withdraw (with queue)", async () => {
+        await usdc.approve(ibAlluoUSD.address, constants.MaxUint256);
+        await dai.approve(ibAlluoUSD.address, constants.MaxUint256);
+        await ibAlluoUSD.deposit(
+            usdc.address,
+            parseUnits("100000.0", 6)
+        ); // available for instant withdraw ~500 USD
+
+        const daiBefore = await dai.balanceOf(signers[0].address);
+        await ibAlluoUSD.withdraw(usdt.address, parseUnits("600.0", 18));
+        const daiAfter = await dai.balanceOf(signers[0].address);
+        const receivedDai = daiAfter.sub(daiBefore);
+        console.log("Received DAI:", formatUnits(receivedDai));
+
+        expect(receivedDai).to.be.eq(receivedDai);
+
+        await ibAlluoUSD.deposit(
+            dai.address,
+            parseUnits("200.0", 18)
+        ); // available for instant withdraw ~700 USD, enough to satisfy 600 USD
+
+        const daiBeforeSatisfied = await usdt.balanceOf(signers[0].address);
+        await handler.satisfyAllWithdrawals();
+        const daiAfterSatisfied = await usdt.balanceOf(signers[0].address);
+        const receivedSatisfiedDai = daiAfterSatisfied.sub(daiBeforeSatisfied);
+        console.log("Received DAI after satisfyAllWithdrawals:", formatUnits(receivedSatisfiedDai, 6));
+
+        expect(receivedSatisfiedDai).to.be.gt(parseUnits("599.0", 6));
+    })
+
+    it('Should return right user balance after one year even without claim', async function () {
+        const amount = parseUnits("100.0", await ibAlluoUSD.decimals());
+
+        await dai.approve(ibAlluoUSD.address, constants.MaxUint256)
+        await ibAlluoUSD.deposit(dai.address, amount);
+
+        await skipDays(365);
+
+        //view function that returns balance with APY
+        let balance = await ibAlluoUSD.getBalance(signers[0].address);
+        expect(balance).to.be.gt(parseUnits("106.9", await ibAlluoUSD.decimals()));
+        expect(balance).to.be.lt(parseUnits("107.1", await ibAlluoUSD.decimals()));
+    });
+
+    it("Should check all transferAssetValue functions ", async function () {
+        await dai.approve(ibAlluoUSD.address, constants.MaxUint256)
+
+        await ibAlluoUSD.deposit(dai.address, parseUnits("1000", 18));
+        await ibAlluoUSD.transfer(signers[2].address, parseEther("100"))
+        await ibAlluoUSD.transfer(signers[3].address, parseEther("100"))
+        await skipDays(365);
+
+        let totalAsset = await ibAlluoUSD.totalAssetSupply()
+        expect(totalAsset).to.be.gt(parseUnits("1069", await ibAlluoUSD.decimals()));
+        expect(totalAsset).to.be.lt(parseUnits("1070.1", await ibAlluoUSD.decimals()));
+
+        await ibAlluoUSD.connect(signers[2]).transferAssetValue(signers[1].address, parseEther("106.9"))
+
+        let tokenBalance = await ibAlluoUSD.balanceOf(signers[0].address);
+        expect(tokenBalance).to.be.gt(parseUnits("799", await ibAlluoUSD.decimals()));
+        expect(tokenBalance).to.be.lt(parseUnits("800", await ibAlluoUSD.decimals()));
+
+        let valueBalance = await ibAlluoUSD.getBalance(signers[0].address)
+        expect(valueBalance).to.be.gt(parseUnits("855", await ibAlluoUSD.decimals()));
+        expect(valueBalance).to.be.lt(parseUnits("856", await ibAlluoUSD.decimals()));
+    });
+
+    // TODO: Some tests for superfluid
+})
