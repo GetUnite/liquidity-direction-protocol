@@ -15,7 +15,7 @@ import "./../../../interfaces/IWrappedEther.sol";
 
 import "hardhat/console.sol";
 
-contract BtcOptimismAdapter is
+contract EthOptimismAdapter is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable
@@ -150,9 +150,7 @@ contract BtcOptimismAdapter is
 
         uint256 curveLpAmount = IERC20(CURVE_POOL).balanceOf((address(this)));
         if (curveLpAmount != 0) {
-            address primaryToken = ICurvePoolETH(CURVE_POOL).coins(
-                primaryTokenIndex
-            );
+            address primaryToken = WETH;
             uint256 amount = (
                 ICurvePoolETH(CURVE_POOL).calc_withdraw_one_coin(
                     curveLpAmount,
