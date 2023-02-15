@@ -25,7 +25,7 @@ contract Usd3PoolOptimismAdapter is
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    // All address are Polygon addresses.
+    // All address are Optimism addresses.
     address public constant DAI = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
     address public constant USDC = 0x7F5c764cBc14f9669B88837ca1490cCa17c31607;
     address public constant USDT = 0x94b008aA00579c1307B0EF2c499aD98a8ce58e58;

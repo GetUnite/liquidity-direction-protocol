@@ -25,7 +25,7 @@ contract EthOptimismAdapter is
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    // All address are Polygon addresses.
+    // All address are Optimism addresses.
     address public constant SETH = 0x298B9B95708152ff6968aafd889c6586e9169f1D;
     address public constant WETH = 0x4200000000000000000000000000000000000006;
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;

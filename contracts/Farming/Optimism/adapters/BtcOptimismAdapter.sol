@@ -24,7 +24,7 @@ contract BtcOptimismAdapter is
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    // All address are Polygon addresses.
+    // All address are Optimism addresses.
     address public constant SBTC = 0x298B9B95708152ff6968aafd889c6586e9169f1D;
     address public constant WBTC = 0x68f180fcCe6836688e9084f035309E29Bf0A2095;
     address public constant CURVE_POOL =
