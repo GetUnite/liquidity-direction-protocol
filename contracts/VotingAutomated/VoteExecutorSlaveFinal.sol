@@ -15,6 +15,7 @@ import "../interfaces/IGnosis.sol";
 import "../interfaces/ILiquidityHandler.sol";
 import "../interfaces/IIbAlluo.sol";
 import "../interfaces/IAlluoStrategy.sol";
+import "../interfaces/IPriceFeedRouterV2.sol";
 
 interface IAnyCallExecutor {
     struct Context {
@@ -90,7 +91,16 @@ contract VoteExecutorSlaveFinal is
         string ibAlluo;
     }
 
+    address public priceFeedRouter;
+    uint64 public primaryTokenIndex;
+    uint256 public fiatIndex;
+
     event MessageReceived(bytes32 indexed messagesHash);
+
+    address public constant USDC = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
+    address public constant ibAlluo =
+        0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6;
+    Message[] public messagess;
 
     function initialize(
         address _multiSigWallet,
@@ -167,6 +177,13 @@ contract VoteExecutorSlaveFinal is
         emit MessageReceived(hashed);
     }
 
+    function testAnyExecute(int256 delta) external {
+        Message[] memory messages = new Message[](1);
+        messages[0].commandIndex = 3;
+        messages[0].commandData = abi.encode(delta);
+        execute(messages);
+    }
+
     /// @notice Executes all messages received after authentication
     /// @dev Loops through each command in the array and executes it.
     /// @param _messages Array of messages
@@ -195,6 +212,25 @@ contract VoteExecutorSlaveFinal is
                 if (percent != 0) {
                     Entry memory e = Entry(directionId, percent);
                     entries.push(e);
+                }
+            } else if (currentMessage.commandIndex == 3) {
+                int256 treasuryDelta = abi.decode(
+                    currentMessage.commandData,
+                    (int256)
+                );
+
+                (uint256 fiatPrice, uint8 fiatDecimals) = IPriceFeedRouterV2(
+                    priceFeedRouter
+                ).getPrice(USDC, fiatIndex);
+
+                if (treasuryDelta < 0) {
+                    uint256 exactAmount = (uint256(-treasuryDelta) *
+                        10 ** fiatDecimals) / fiatPrice;
+                    IIbAlluo(ibAlluo).burn(gnosis, exactAmount);
+                } else if (treasuryDelta > 0) {
+                    uint256 exactAmount = (uint256(treasuryDelta) *
+                        10 ** fiatDecimals) / fiatPrice;
+                    IIbAlluo(ibAlluo).mint(gnosis, exactAmount);
                 }
             }
         }
@@ -340,6 +376,14 @@ contract VoteExecutorSlaveFinal is
         address _newAddress
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         voteExecutorMaster = _newAddress;
+    }
+
+    function setPriceRouterInfo(
+        address _priceFeedRouter,
+        uint256 _fiatIndex
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        priceFeedRouter = _priceFeedRouter;
+        fiatIndex = _fiatIndex;
     }
 
     function grantRole(

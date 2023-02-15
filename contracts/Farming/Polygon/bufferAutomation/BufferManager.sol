@@ -42,6 +42,11 @@ contract BufferManager is
         uint256[] percentage
     );
 
+    event Refill(
+        address token,
+        uint256 amount
+    );
+
     bool public upgradeStatus;
 
     // address of the DepositDistributor on mainnet
@@ -374,6 +379,7 @@ contract BufferManager is
         if (isAdapterPendingWithdrawal(_ibAlluo)) {
             handler.satisfyAdapterWithdrawals(_ibAlluo);
         }
+        emit Refill(_ibAlluo, totalAmount / 10 ** decDif);
         return true;
         }
     }
@@ -423,6 +429,8 @@ contract BufferManager is
             handler.satisfyAdapterWithdrawals(ibAlluo);
         }
         IERC20MetadataUpgradeable(ibAlluo).transfer(gnosis, IERC20MetadataUpgradeable(ibAlluo).balanceOf(address(this)));
+        
+        emit Refill(ibAlluo, totalAmount / 10 ** decDif);
     }
 
     /**
