@@ -98,7 +98,7 @@ contract VoteExecutorSlaveFinal is
     event MessageReceived(bytes32 indexed messagesHash);
 
     address public constant USDC = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
-    address public constant ibAlluo =
+    address public constant IBALLUO =
         0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6;
     Message[] public messagess;
 
@@ -226,11 +226,11 @@ contract VoteExecutorSlaveFinal is
                 if (treasuryDelta < 0) {
                     uint256 exactAmount = (uint256(-treasuryDelta) *
                         10 ** fiatDecimals) / fiatPrice;
-                    IIbAlluo(ibAlluo).burn(gnosis, exactAmount);
+                    IIbAlluo(IBALLUO).burn(gnosis, exactAmount);
                 } else if (treasuryDelta > 0) {
                     uint256 exactAmount = (uint256(treasuryDelta) *
                         10 ** fiatDecimals) / fiatPrice;
-                    IIbAlluo(ibAlluo).mint(gnosis, exactAmount);
+                    IIbAlluo(IBALLUO).mint(gnosis, exactAmount);
                 }
             }
         }
