@@ -2,10 +2,10 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers"
 import { expect } from "chai";
 import { BigNumberish, constants } from "ethers";
-import { formatUnits, parseEther, parseUnits } from "ethers/lib/utils";
+import { parseEther, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha"
-import { BtcOptimismAdapter, BufferManager, IbAlluo, ICurvePoolBTC, ICurvePoolETH, ICurvePoolUSD, IERC20Metadata, IExchange, IWrappedEther, LiquidityHandlerPolygon, PriceFeedRouterV2, StIbAlluo, SuperfluidEndResolver, SuperfluidResolver, Usd3PoolOptimismAdapter } from "../../typechain";
+import { BtcOptimismAdapter, BufferManager, IbAlluo, IbAlluoPriceResolver__factory, ICurvePoolBTC, ICurvePoolETH, ICurvePoolUSD, IERC20Metadata, IExchange, IWrappedEther, LiquidityHandlerPolygon, PriceFeedRouterV2, StIbAlluo, SuperfluidEndResolver, SuperfluidResolver, Usd3PoolOptimismAdapter, WithdrawalRequestResolver__factory } from "../../typechain";
 import { EthOptimismAdapter } from "../../typechain/EthOptimismAdapter";
 
 function getInterestPerSecondParam(apyPercent: number): string {
@@ -32,9 +32,11 @@ describe("IbAlluo Optimism Integration Test", async () => {
     let exchange: IExchange;
     let gnosis: SignerWithAddress;
 
-    let usdc: IERC20Metadata, usdt: IERC20Metadata, dai: IERC20Metadata, 
+    let usdc: IERC20Metadata, usdt: IERC20Metadata, dai: IERC20Metadata,
         weth: IWrappedEther, wbtc: IERC20Metadata, usdLpToken: ICurvePoolUSD,
         ethLpToken: ICurvePoolETH, btcLpToken: ICurvePoolBTC;
+
+    let resolverCreationLogged: boolean = false;
 
     before(async () => {
         await network.provider.request({
@@ -122,7 +124,7 @@ describe("IbAlluo Optimism Integration Test", async () => {
         await dai.connect(daiWhale).transfer(signers[0].address, await dai.balanceOf(daiWhale.address))
         await wbtc.connect(wbtcWhale).transfer(signers[0].address, await wbtc.balanceOf(wbtcWhale.address))
         const ethToSend = (await signers[9].getBalance()).sub(parseEther("1"));
-        await weth.connect(signers[9]).deposit({value: ethToSend});
+        await weth.connect(signers[9]).deposit({ value: ethToSend });
         await weth.connect(signers[9]).transfer(signers[0].address, ethToSend);
     });
 
@@ -380,13 +382,110 @@ describe("IbAlluo Optimism Integration Test", async () => {
         await ibAlluoETH.connect(gnosis).setSuperfluidEndResolver(superfluidEndResolver.address);
         await ibAlluoBTC.connect(gnosis).setSuperfluidEndResolver(superfluidEndResolver.address);
 
-        // TODO:
-        // look roles on (st)iballuo, use as reference
-        // look at resolvers created by Remi address
+        const gelatoRole = await superfluidResolver.GELATO();
+        const polygonGelatoExecutor = "0x0391ceD60d22Bc2FadEf543619858b12155b7030";
+        const optimismGelatoExecutor = "0x6dad1cb747a95ae1fcd364af9adb5b4615f157a4";
+
+        await superfluidResolver.connect(gnosis).revokeRole(gelatoRole, polygonGelatoExecutor);
+        await superfluidEndResolver.connect(gnosis).revokeRole(gelatoRole, polygonGelatoExecutor);
+
+        await superfluidResolver.connect(gnosis).grantRole(gelatoRole, optimismGelatoExecutor);
+        await superfluidEndResolver.connect(gnosis).grantRole(gelatoRole, optimismGelatoExecutor);
+
+        await ibAlluoUSD.connect(gnosis).grantRole(constants.HashZero, stIbAlluoETH.address);
+        await ibAlluoUSD.connect(gnosis).grantRole(constants.HashZero, stIbAlluoBTC.address);
+        await ibAlluoUSD.connect(gnosis).grantRole(gelatoRole, superfluidResolver.address);
+        await ibAlluoUSD.connect(gnosis).grantRole(gelatoRole, superfluidEndResolver.address);
+
+        await ibAlluoETH.connect(gnosis).grantRole(gelatoRole, superfluidResolver.address);
+        await ibAlluoETH.connect(gnosis).grantRole(gelatoRole, superfluidEndResolver.address);
+
+        await stIbAlluoETH.connect(gnosis).grantRole(constants.HashZero, ibAlluoUSD.address);
+        await stIbAlluoBTC.connect(gnosis).grantRole(constants.HashZero, ibAlluoUSD.address);
+
+        await ibAlluoBTC.connect(gnosis).grantRole(gelatoRole, superfluidResolver.address);
+        await ibAlluoBTC.connect(gnosis).grantRole(gelatoRole, superfluidEndResolver.address);
 
         // Step 6: Setup BufferManager
 
+        // Step 7: Resolvers
+        if (!resolverCreationLogged) {
+            // Alluo - IbAlluoXXX Price resolvers
+            const priceResolverFactory = await ethers.getContractFactory(
+                "contracts/Farming/Polygon/resolvers/IbAlluoPriceResolver.sol:IbAlluoPriceResolver"
+            ) as IbAlluoPriceResolver__factory;
+            const alluoBank = "0x645d275b7890823afd3c669f8805e24ea64ffdab"
+            const priceResolver = await priceResolverFactory.deploy(
+                handler.address,
+                alluoBank
+            );
+            console.log("1. Create resolver 'Alluo - IbAlluoXXX Price resolvers'");
+            console.log("    Execute:");
+            console.log("        Target Contract:", priceResolver.address);
+            console.log("        Automated Function: emitter ( )");
+            console.log("    When to execute:");
+            console.log("        Interval: 5 hours");
+            console.log("    Additional steps:");
+            console.log("        Put ibAlluo tokens in alluoBank:", alluoBank);
+            console.log();
 
+            // Alluo - Liquidity buffer refiller
+            console.log("2. Create resolver 'Alluo - Liquidity buffer refiller'");
+            console.log("    Execute:");
+            console.log("        Target Contract:", buffer.address);
+            console.log("        Automated Function: refillBuffer ( address: _ibAlluo )");
+            console.log("    When to execute:");
+            console.log("        Resolver address:", buffer.address);
+            console.log("        Resolver function: checkerRefill ( )");
+            console.log();
+
+            // Alluo - Superfluid liquidation protection
+            console.log("3. Create resolver 'Alluo - Superfluid liquidation protection'");
+            console.log("    Execute:");
+            console.log("        Target Contract:", superfluidResolver.address);
+            console.log("        Automated Function: liquidateSender ( address: _sender, address[]: _receivers, address: _token )");
+            console.log("    When to execute:");
+            console.log("        Resolver address:", superfluidResolver.address);
+            console.log("        Resolver function: checker ( )");
+            console.log();
+
+            // Alluo - satisfyWithdrawals IbAlluoXXX
+            const optimismPokeMe = "0x340759c8346A1E6Ed92035FB8B6ec57cE1D82c2c";
+            const handlerResolverFactory = await ethers.getContractFactory(
+                "contracts/Farming/Polygon/resolvers/WithdrawalRequestResolver.sol:WithdrawalRequestResolver"
+            ) as WithdrawalRequestResolver__factory;
+            const handlerResolver = await handlerResolverFactory.deploy(optimismPokeMe, handler.address, gnosis.address);
+            console.log("4. Create resolver 'Alluo - satisfyWithdrawals IbAlluoXXX'");
+            console.log("    Execute:");
+            console.log("        Target Contract:", handler.address);
+            console.log("        Automated Function: satisfyAllWithdrawals ( )");
+            console.log("    When to execute:");
+            console.log("        Resolver address:", handlerResolver.address);
+            console.log("        Resolver function: checker ( )");
+            console.log();
+
+            // Alluo - Superfluid end resolver
+            console.log("5. Create resolver 'Alluo - Superfluid end resolver'");
+            console.log("    Execute:");
+            console.log("        Target Contract:", superfluidEndResolver.address);
+            console.log("        Automated Function: liquidateSender ( address: _sender, address: _receiver, address: _token )");
+            console.log("    When to execute:");
+            console.log("        Resolver address:", superfluidEndResolver.address);
+            console.log("        Resolver function: checker ( )");
+            console.log();
+
+            // Alluo - Liquidity buffer bridging
+            console.log("6. Create resolver 'Alluo - Liquidity buffer refiller'");
+            console.log("    Execute:");
+            console.log("        Target Contract:", buffer.address);
+            console.log("        Automated Function: swap ( uint256: amount, address: originToken )");
+            console.log("    When to execute:");
+            console.log("        Resolver address:", buffer.address);
+            console.log("        Resolver function: checkerBridge ( )");
+            console.log();
+
+            resolverCreationLogged = true;
+        }
     })
 
     it("Clean USDC deposit+withdraw & balance check", async () => {
@@ -520,10 +619,10 @@ describe("IbAlluo Optimism Integration Test", async () => {
         expect(bufferWethBalance).to.be.eq(parseUnits("99.0", 18));
         expect(lpToWeth).to.be.gt(parseUnits("0.999", 18));
 
-        console.log("Adapter amount:", formatUnits(adapterAmount, 18), "ETH");
-        console.log("Adapter LP amount:", formatUnits(adapterLpBalance, 18), "LP");
-        console.log("Buffer amount:", formatUnits(bufferWethBalance, 18), "WETH");
-        console.log("LP -> WETH:", formatUnits(lpToWeth, 18), "WETH");
+        // console.log("Adapter amount:", formatUnits(adapterAmount, 18), "ETH");
+        // console.log("Adapter LP amount:", formatUnits(adapterLpBalance, 18), "LP");
+        // console.log("Buffer amount:", formatUnits(bufferWethBalance, 18), "WETH");
+        // console.log("LP -> WETH:", formatUnits(lpToWeth, 18), "WETH");
     })
 
     it("Check token flow BTC", async () => {
@@ -541,10 +640,10 @@ describe("IbAlluo Optimism Integration Test", async () => {
         expect(bufferWbtcBalance).to.be.eq(parseUnits("99.0", 8));
         expect(lpToWeth).to.be.gt(parseUnits("0.999", 8));
 
-        console.log("Adapter amount:", formatUnits(adapterAmount, 18), "BTC");
-        console.log("Adapter LP amount:", formatUnits(adapterLpBalance, 18), "LP");
-        console.log("Buffer amount:", formatUnits(bufferWbtcBalance, 8), "WBTC");
-        console.log("LP -> WBTC:", formatUnits(lpToWeth, 8), "WBTC");
+        // console.log("Adapter amount:", formatUnits(adapterAmount, 18), "BTC");
+        // console.log("Adapter LP amount:", formatUnits(adapterLpBalance, 18), "LP");
+        // console.log("Buffer amount:", formatUnits(bufferWbtcBalance, 8), "WBTC");
+        // console.log("LP -> WBTC:", formatUnits(lpToWeth, 8), "WBTC");
     })
 
     it("Check withdraw (instant)", async () => {
@@ -630,5 +729,432 @@ describe("IbAlluo Optimism Integration Test", async () => {
         expect(valueBalance).to.be.lt(parseUnits("856", await ibAlluoUSD.decimals()));
     });
 
+    function nameToContract(name: string): string | undefined {
+        let contractFrom: string | undefined = undefined;
+        if (name == "ibAlluoUSD Polygon") contractFrom = ibAlluoUSD.address;
+        if (name == "StibAlluoUSD Polygon") contractFrom = stIbAlluoUSD.address;
+        if (name == "ibAlluoETH Polygon") contractFrom = ibAlluoETH.address;
+        if (name == "StibAlluoETH Polygon") contractFrom = stIbAlluoETH.address;
+        if (name == "ibAlluoBTC Polygon") contractFrom = ibAlluoBTC.address;
+        if (name == "StibAlluoBTC Polygon") contractFrom = stIbAlluoBTC.address;
+        if (name == "Superfluid Resolver") contractFrom = superfluidResolver.address;
+        if (name == "Superfluid End Resolver") contractFrom = superfluidEndResolver.address;
+        if (name == "Vote Executor Slave") contractFrom = undefined;
+        if (name == "msg.sender from Gelato") contractFrom = "0x6dad1cb747a95ae1fcd364af9adb5b4615f157a4";
+        if (name == "Polygon Gnosis") contractFrom = gnosis.address;
+
+        return contractFrom;
+    }
+
+    it("Check missing roles", async () => {
+        for (let i = 0; i < rolesInfo.length; i++) {
+            const element = rolesInfo[i];
+            const from = nameToContract(element.contractName);
+            const to = nameToContract(element.roleOwnerName);
+            const role = element.role;
+
+            if (element.contractName.includes("ibAlluoEUR") || element.roleOwnerName.includes("ibAlluoEUR")) {
+                continue;
+            }
+            if (from == undefined || to == undefined) {
+                console.log("    To be set up: from", element.contractName, "to", element.roleOwnerName, "role", element.roleDecoded);
+                continue;
+            }
+
+            const contract = await ethers.getContractAt("@openzeppelin/contracts/access/AccessControl.sol:AccessControl", from);
+
+            expect(await contract.hasRole(role, to)).to.be.equal(true, `Not given ${element.roleDecoded} role from ${element.contractName} to ${element.roleOwnerName}`)
+            // console.log(`Ok ${element.roleDecoded} role from ${element.contractName} to ${element.roleOwnerName}`)
+        }
+    })
+
     // TODO: Some tests for superfluid
 })
+
+// Exported all available roles on ibAlluos, stIbAlluos, Superfluid Resolvers, Vote Executor Slave
+const rolesInfo = [
+    {
+        "contract": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "contractName": "ibAlluoUSD Polygon",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "contractName": "ibAlluoUSD Polygon",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
+        "roleDecoded": "UPGRADER_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "contractName": "ibAlluoUSD Polygon",
+        "roleOwner": "0x1D147031b6B4998bE7D446DecF7028678aeb732A",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Vote Executor Slave"
+    },
+    {
+        "contract": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "contractName": "ibAlluoUSD Polygon",
+        "roleOwner": "0x2D4Dc956FBd0044a4EBA945e8bbaf98a14025C2d",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "StibAlluoETH Polygon"
+    },
+    {
+        "contract": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "contractName": "ibAlluoUSD Polygon",
+        "roleOwner": "0x3E70E15c189e1FFe8FF44d713605528dC1701b63",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "StibAlluoBTC Polygon"
+    },
+    {
+        "contract": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "contractName": "ibAlluoUSD Polygon",
+        "roleOwner": "0x49a659FF55b6eBE9F5f8F2495Cfad0B02bfFa91c",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "Superfluid Resolver"
+    },
+    {
+        "contract": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "contractName": "ibAlluoUSD Polygon",
+        "roleOwner": "0xac9024554aA823C7d0A2e73Fc3fea9639e7c6f9A",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "Superfluid End Resolver"
+    },
+    {
+        "contract": "0xE9E759B969B991F2bFae84308385405B9Ab01541",
+        "contractName": "StibAlluoUSD Polygon",
+        "roleOwner": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoUSD Polygon"
+    },
+    {
+        "contract": "0xE9E759B969B991F2bFae84308385405B9Ab01541",
+        "contractName": "StibAlluoUSD Polygon",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92",
+        "contractName": "ibAlluoEUR Polygon",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92",
+        "contractName": "ibAlluoEUR Polygon",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
+        "roleDecoded": "UPGRADER_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92",
+        "contractName": "ibAlluoEUR Polygon",
+        "roleOwner": "0x1D147031b6B4998bE7D446DecF7028678aeb732A",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Vote Executor Slave"
+    },
+    {
+        "contract": "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92",
+        "contractName": "ibAlluoEUR Polygon",
+        "roleOwner": "0x49a659FF55b6eBE9F5f8F2495Cfad0B02bfFa91c",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "Superfluid Resolver"
+    },
+    {
+        "contract": "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92",
+        "contractName": "ibAlluoEUR Polygon",
+        "roleOwner": "0xac9024554aA823C7d0A2e73Fc3fea9639e7c6f9A",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "Superfluid End Resolver"
+    },
+    {
+        "contract": "0xe199f1B01Dd3e8a1C43B62279FEb20547a2EB3eF",
+        "contractName": "StibAlluoEUR Polygon",
+        "roleOwner": "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoEUR Polygon"
+    },
+    {
+        "contract": "0xe199f1B01Dd3e8a1C43B62279FEb20547a2EB3eF",
+        "contractName": "StibAlluoEUR Polygon",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xc677B0918a96ad258A68785C2a3955428DeA7e50",
+        "contractName": "ibAlluoETH Polygon",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xc677B0918a96ad258A68785C2a3955428DeA7e50",
+        "contractName": "ibAlluoETH Polygon",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
+        "roleDecoded": "UPGRADER_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xc677B0918a96ad258A68785C2a3955428DeA7e50",
+        "contractName": "ibAlluoETH Polygon",
+        "roleOwner": "0x1D147031b6B4998bE7D446DecF7028678aeb732A",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Vote Executor Slave"
+    },
+    {
+        "contract": "0xc677B0918a96ad258A68785C2a3955428DeA7e50",
+        "contractName": "ibAlluoETH Polygon",
+        "roleOwner": "0x49a659FF55b6eBE9F5f8F2495Cfad0B02bfFa91c",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "Superfluid Resolver"
+    },
+    {
+        "contract": "0xc677B0918a96ad258A68785C2a3955428DeA7e50",
+        "contractName": "ibAlluoETH Polygon",
+        "roleOwner": "0xac9024554aA823C7d0A2e73Fc3fea9639e7c6f9A",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "Superfluid End Resolver"
+    },
+    {
+        "contract": "0x2D4Dc956FBd0044a4EBA945e8bbaf98a14025C2d",
+        "contractName": "StibAlluoETH Polygon",
+        "roleOwner": "0xc677B0918a96ad258A68785C2a3955428DeA7e50",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoETH Polygon"
+    },
+    {
+        "contract": "0x2D4Dc956FBd0044a4EBA945e8bbaf98a14025C2d",
+        "contractName": "StibAlluoETH Polygon",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x2D4Dc956FBd0044a4EBA945e8bbaf98a14025C2d",
+        "contractName": "StibAlluoETH Polygon",
+        "roleOwner": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoUSD Polygon"
+    },
+    {
+        "contract": "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2",
+        "contractName": "ibAlluoBTC Polygon",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2",
+        "contractName": "ibAlluoBTC Polygon",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
+        "roleDecoded": "UPGRADER_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2",
+        "contractName": "ibAlluoBTC Polygon",
+        "roleOwner": "0x1D147031b6B4998bE7D446DecF7028678aeb732A",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Vote Executor Slave"
+    },
+    {
+        "contract": "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2",
+        "contractName": "ibAlluoBTC Polygon",
+        "roleOwner": "0x49a659FF55b6eBE9F5f8F2495Cfad0B02bfFa91c",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "Superfluid Resolver"
+    },
+    {
+        "contract": "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2",
+        "contractName": "ibAlluoBTC Polygon",
+        "roleOwner": "0xac9024554aA823C7d0A2e73Fc3fea9639e7c6f9A",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "Superfluid End Resolver"
+    },
+    {
+        "contract": "0x3E70E15c189e1FFe8FF44d713605528dC1701b63",
+        "contractName": "StibAlluoBTC Polygon",
+        "roleOwner": "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoBTC Polygon"
+    },
+    {
+        "contract": "0x3E70E15c189e1FFe8FF44d713605528dC1701b63",
+        "contractName": "StibAlluoBTC Polygon",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x3E70E15c189e1FFe8FF44d713605528dC1701b63",
+        "contractName": "StibAlluoBTC Polygon",
+        "roleOwner": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoUSD Polygon"
+    },
+    {
+        "contract": "0x49a659FF55b6eBE9F5f8F2495Cfad0B02bfFa91c",
+        "contractName": "Superfluid Resolver",
+        "roleOwner": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoUSD Polygon"
+    },
+    {
+        "contract": "0x49a659FF55b6eBE9F5f8F2495Cfad0B02bfFa91c",
+        "contractName": "Superfluid Resolver",
+        "roleOwner": "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoEUR Polygon"
+    },
+    {
+        "contract": "0x49a659FF55b6eBE9F5f8F2495Cfad0B02bfFa91c",
+        "contractName": "Superfluid Resolver",
+        "roleOwner": "0xc677B0918a96ad258A68785C2a3955428DeA7e50",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoETH Polygon"
+    },
+    {
+        "contract": "0x49a659FF55b6eBE9F5f8F2495Cfad0B02bfFa91c",
+        "contractName": "Superfluid Resolver",
+        "roleOwner": "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoBTC Polygon"
+    },
+    {
+        "contract": "0x49a659FF55b6eBE9F5f8F2495Cfad0B02bfFa91c",
+        "contractName": "Superfluid Resolver",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x49a659FF55b6eBE9F5f8F2495Cfad0B02bfFa91c",
+        "contractName": "Superfluid Resolver",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x49a659FF55b6eBE9F5f8F2495Cfad0B02bfFa91c",
+        "contractName": "Superfluid Resolver",
+        "roleOwner": "0x0391ceD60d22Bc2FadEf543619858b12155b7030",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "msg.sender from Gelato"
+    },
+    {
+        "contract": "0xac9024554aA823C7d0A2e73Fc3fea9639e7c6f9A",
+        "contractName": "Superfluid End Resolver",
+        "roleOwner": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoUSD Polygon"
+    },
+    {
+        "contract": "0xac9024554aA823C7d0A2e73Fc3fea9639e7c6f9A",
+        "contractName": "Superfluid End Resolver",
+        "roleOwner": "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoEUR Polygon"
+    },
+    {
+        "contract": "0xac9024554aA823C7d0A2e73Fc3fea9639e7c6f9A",
+        "contractName": "Superfluid End Resolver",
+        "roleOwner": "0xc677B0918a96ad258A68785C2a3955428DeA7e50",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoETH Polygon"
+    },
+    {
+        "contract": "0xac9024554aA823C7d0A2e73Fc3fea9639e7c6f9A",
+        "contractName": "Superfluid End Resolver",
+        "roleOwner": "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoBTC Polygon"
+    },
+    {
+        "contract": "0xac9024554aA823C7d0A2e73Fc3fea9639e7c6f9A",
+        "contractName": "Superfluid End Resolver",
+        "roleOwner": "0x0391ceD60d22Bc2FadEf543619858b12155b7030",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "msg.sender from Gelato"
+    },
+    {
+        "contract": "0xac9024554aA823C7d0A2e73Fc3fea9639e7c6f9A",
+        "contractName": "Superfluid End Resolver",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xac9024554aA823C7d0A2e73Fc3fea9639e7c6f9A",
+        "contractName": "Superfluid End Resolver",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x1D147031b6B4998bE7D446DecF7028678aeb732A",
+        "contractName": "Vote Executor Slave",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x1D147031b6B4998bE7D446DecF7028678aeb732A",
+        "contractName": "Vote Executor Slave",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
+        "roleDecoded": "UPGRADER_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    }
+];
