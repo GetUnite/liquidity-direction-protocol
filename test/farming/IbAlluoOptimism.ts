@@ -5,7 +5,7 @@ import { BigNumberish, constants } from "ethers";
 import { parseEther, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha"
-import { BtcOptimismAdapter, BufferManager, IbAlluo, IbAlluoPriceResolver__factory, ICurvePoolBTC, ICurvePoolETH, ICurvePoolUSD, IERC20Metadata, IExchange, IWrappedEther, LiquidityHandlerPolygon, PriceFeedRouterV2, StIbAlluo, SuperfluidEndResolver, SuperfluidResolver, Usd3PoolOptimismAdapter, WithdrawalRequestResolver__factory } from "../../typechain";
+import { AccessControl, BtcOptimismAdapter, BufferManager, IbAlluo, IbAlluoPriceResolver__factory, ICurvePoolBTC, ICurvePoolETH, ICurvePoolUSD, IERC20, IERC20Metadata, IExchange, IWrappedEther, LiquidityHandlerPolygon, PriceFeedRouterV2, StIbAlluo, SuperfluidEndResolver, SuperfluidResolver, Usd3PoolOptimismAdapter, WithdrawalRequestResolver__factory } from "../../typechain";
 import { EthOptimismAdapter } from "../../typechain/EthOptimismAdapter";
 
 function getInterestPerSecondParam(apyPercent: number): string {
@@ -29,12 +29,12 @@ async function skipDays(d: number) {
 describe("IbAlluo Optimism Integration Test", async () => {
     let signers: SignerWithAddress[];
     let priceRouter: PriceFeedRouterV2;
-    let exchange: IExchange;
+    let exchange: IExchange & AccessControl;
     let gnosis: SignerWithAddress;
 
     let usdc: IERC20Metadata, usdt: IERC20Metadata, dai: IERC20Metadata,
-        weth: IWrappedEther, wbtc: IERC20Metadata, usdLpToken: ICurvePoolUSD,
-        ethLpToken: ICurvePoolETH, btcLpToken: ICurvePoolBTC;
+        weth: IWrappedEther, wbtc: IERC20Metadata, usdLpToken: ICurvePoolUSD & IERC20,
+        ethLpToken: ICurvePoolETH, btcLpToken: ICurvePoolBTC & IERC20;
 
     let resolverCreationLogged: boolean = false;
 
@@ -52,7 +52,7 @@ describe("IbAlluo Optimism Integration Test", async () => {
         exchange = await ethers.getContractAt(
             "contracts/interfaces/IExchange.sol:IExchange",
             "0x66Ac11c106C3670988DEFDd24BC75dE786b91095"
-        ) as IExchange;
+        ) as IExchange & AccessControl;
         priceRouter = await ethers.getContractAt("PriceFeedRouterV2", "0x7E6FD319A856A210b9957Cd6490306995830aD25");
         gnosis = await ethers.getImpersonatedSigner("0xc7061dD515B602F86733Fa0a0dBb6d6E6B34aED4")
 
@@ -97,15 +97,15 @@ describe("IbAlluo Optimism Integration Test", async () => {
         usdLpToken = await ethers.getContractAt(
             "contracts/interfaces/curve/optimism/ICurvePoolUSD.sol:ICurvePoolUSD",
             "0x1337BedC9D22ecbe766dF105c9623922A27963EC"
-        ) as ICurvePoolUSD;
+        ) as ICurvePoolUSD & IERC20;
         ethLpToken = await ethers.getContractAt(
             "contracts/interfaces/curve/optimism/ICurvePoolETH.sol:ICurvePoolETH",
             "0x7Bc5728BC2b59B45a58d9A576E2Ffc5f0505B35E"
-        ) as ICurvePoolETH
+        ) as ICurvePoolETH;
         btcLpToken = await ethers.getContractAt(
             "contracts/interfaces/curve/optimism/ICurvePoolBTC.sol:ICurvePoolBTC",
             "0x9F2fE3500B1a7E285FDc337acacE94c480e00130"
-        ) as ICurvePoolBTC
+        ) as ICurvePoolBTC & IERC20;
 
         await forceSend(parseEther("100.0"), gnosis.address);
 
@@ -763,7 +763,7 @@ describe("IbAlluo Optimism Integration Test", async () => {
 
             const contract = await ethers.getContractAt("@openzeppelin/contracts/access/AccessControl.sol:AccessControl", from);
 
-            expect(await contract.hasRole(role, to)).to.be.equal(true, `Not given ${element.roleDecoded} role from ${element.contractName} to ${element.roleOwnerName}`)
+            expect(await contract.hasRole(role, to)).to.be.equal(true, `Not given '${element.roleDecoded}' role from '${element.contractName}' to '${element.roleOwnerName}'`)
             // console.log(`Ok ${element.roleDecoded} role from ${element.contractName} to ${element.roleOwnerName}`)
         }
     })
