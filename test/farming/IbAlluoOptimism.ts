@@ -38,6 +38,9 @@ describe("IbAlluo Optimism Integration Test", async () => {
 
     let resolverCreationLogged: boolean = false;
 
+    const cfaV1 = "0x204C6f131bb7F258b2Ea1593f5309911d8E458eD";
+    const superfluidHost = "0x567c4B141ED61923967cA25Ef4906C8781069a10";
+
     before(async () => {
         await network.provider.request({
             method: "hardhat_reset",
@@ -303,8 +306,6 @@ describe("IbAlluo Optimism Integration Test", async () => {
 
         // Step 5: Setup Superfluid contracts
         const StIbAlluoFactory = await ethers.getContractFactory("StIbAlluo");
-        const superfluidHost = "0x567c4B141ED61923967cA25Ef4906C8781069a10"
-        const cfaV1 = "0x204C6f131bb7F258b2Ea1593f5309911d8E458eD";
 
         stIbAlluoUSD = await upgrades.deployProxy(
             StIbAlluoFactory,
@@ -814,8 +815,19 @@ describe("IbAlluo Optimism Integration Test", async () => {
         }
     })
 
-    // TODO: Some tests for superfluid
-})
+    it("Should create stream",async () => {
+        await dai.approve(ibAlluoUSD.address, constants.MaxUint256);
+        await ibAlluoUSD.deposit(dai.address, parseUnits("100.0", 18));
+
+        let encodeData = await ibAlluoUSD.connect(signers[0]).formatPermissions();
+        let superhost = await ethers.getContractAt("Superfluid", superfluidHost);
+        await superhost.callAgreement(
+            cfaV1,
+            encodeData,
+            "0x"
+        )
+        await ibAlluoUSD["createFlow(address,int96,uint256)"](signers[1].address, "1", parseEther("99.0"))
+    })})
 
 // Exported all available roles on ibAlluos, stIbAlluos, Adapters, Buffer Manager, 
 // Exchange, Liquidity Handler, Price Router, Superfluid Resolvers, Vote Executor Slave,
