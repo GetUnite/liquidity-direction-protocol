@@ -184,6 +184,10 @@ contract VoteExecutorSlaveFinal is
         execute(messages);
     }
 
+    function messageExecute(Message[] memory messages) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        execute(messages);
+    }
+
     /// @notice Executes all messages received after authentication
     /// @dev Loops through each command in the array and executes it.
     /// @param _messages Array of messages
@@ -222,15 +226,18 @@ contract VoteExecutorSlaveFinal is
                 (uint256 fiatPrice, uint8 fiatDecimals) = IPriceFeedRouterV2(
                     priceFeedRouter
                 ).getPrice(USDC, fiatIndex);
-
+                uint256 growingRatio = IIbAlluo(IBALLUO).growingRatio();
+                // multiplier is private in Iballuo, so I had to hit this trickshot
+                uint256 subres = IIbAlluo(IBALLUO).convertToAssetValue(1000);
+                uint256 multiplier = 1000 * growingRatio / subres;
                 if (treasuryDelta < 0) {
                     uint256 exactAmount = (uint256(-treasuryDelta) *
-                        10 ** fiatDecimals) / fiatPrice;
-                    IIbAlluo(IBALLUO).burn(gnosis, exactAmount);
+                    10 ** fiatDecimals) / fiatPrice;
+                    IIbAlluo(IBALLUO).burn(gnosis, exactAmount * multiplier / growingRatio);
                 } else if (treasuryDelta > 0) {
                     uint256 exactAmount = (uint256(treasuryDelta) *
                         10 ** fiatDecimals) / fiatPrice;
-                    IIbAlluo(IBALLUO).mint(gnosis, exactAmount);
+                    IIbAlluo(IBALLUO).mint(gnosis, exactAmount * multiplier / growingRatio);
                 }
             }
         }

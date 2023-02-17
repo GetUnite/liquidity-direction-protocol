@@ -29,7 +29,7 @@ describe("Test VoteExecutor tracking iballuo sync", () => {
             enabled: true,
             jsonRpcUrl: process.env.POLYGON_FORKING_URL as string,
             //you can fork from last block by commenting next line
-            // blockNumber: 29518660,
+            blockNumber: 39338273,
             },
         },],
       });
@@ -53,6 +53,7 @@ describe("Test VoteExecutor tracking iballuo sync", () => {
       priceFeedRouterV2 = await ethers.getContractAt("PriceFeedRouterV2", "0x82220c7Be3a00ba0C6ed38572400A97445bdAEF2");
       await slave.connect(gnosis).setPriceRouterInfo(priceFeedRouterV2.address, 0)
 
+      upgrades.silenceWarnings();
     })
 
     it("Should mint the correct amount of ibAlluos after receiving info about delta", async() => {
@@ -96,10 +97,74 @@ describe("Test VoteExecutor tracking iballuo sync", () => {
         let balanceAfter = await iballuousd.balanceOf(gnosis.address)
 
         expect(Number(balanceAfter)).to.be.lt(Number(balanceBefore))
-        
+
         console.log("Balance before", balanceBefore)
         console.log("Balance after", balanceAfter)
     })
+
+it("should execute two messages with positive and negative delta", async () => {      
+        const commandIndex = 3;
+        const commandData1 = ethers.utils.defaultAbiCoder.encode(
+            ["int256"],
+            [100000]
+        );
+        const messages = [
+            {
+            commandIndex: commandIndex,
+            commandData: commandData1,
+            },
+        ];
+      
+        await iballuoC
+          .connect(gnosis)
+          .grantRole(await iballuoC.DEFAULT_ADMIN_ROLE(), slave.address);
+
+        const balanceBefore = await iballuousd.balanceOf(gnosis.address); 
+        await slave.connect(gnosis).messageExecute(messages);
+      
+        const balanceAfter = await iballuousd.balanceOf(gnosis.address);
+
+        console.log("Balance before", balanceBefore)
+        console.log("Balance after", balanceAfter)
+      });
+      
+      it("should execute two messages with positive and negative delta", async () => {
+        const deltaPositive = ethers.utils.parseUnits("10000", 18);
+        const deltaNegative = ethers.utils.parseUnits("-10000", 18);
+      
+        const commandIndex = 3;
+        const commandData1 = ethers.utils.defaultAbiCoder.encode(
+            ["int256"],
+            [deltaPositive]
+        );
+        const commandData2 = ethers.utils.defaultAbiCoder.encode(
+            ["int256"],
+            [deltaNegative]
+        );
+        const messages = [
+            {
+            commandIndex: commandIndex,
+            commandData: commandData1,
+            },
+            {
+            commandIndex: commandIndex,
+            commandData: commandData2,
+            }
+        ];
+      
+        await iballuoC
+          .connect(gnosis)
+          .grantRole(await iballuoC.DEFAULT_ADMIN_ROLE(), slave.address);
+
+        const balanceBefore = await iballuousd.balanceOf(gnosis.address); 
+        await slave.connect(gnosis).messageExecute(messages);
+      
+        const balanceAfter = await iballuousd.balanceOf(gnosis.address);
+        // There is a little difference due to priceFeed
+        console.log("Balance before", balanceBefore)
+        console.log("Balance after", balanceAfter)
+      });
+    
 })
 
     async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
