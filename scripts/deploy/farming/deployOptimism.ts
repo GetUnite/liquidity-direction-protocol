@@ -26,11 +26,11 @@ async function waitAndLogAddresses(contract: Contract, name: string, isProxy: bo
         const impl = await upgrades.erc1967.getImplementationAddress(contract.address);
         console.log(name, "proxy deployed:", contract.address);
         console.log(name, "impln deployed:", impl);
-        console.log("Gas used (proxy):", gasUsed, ", gas price", formatUnits(tx.effectiveGasPrice, 9));
+        console.log("Gas used (proxy):", gasUsed);
     }
     else {
         console.log(name, "deployed:", contract.address);
-        console.log("Gas used:", gasUsed, ", gas price", formatUnits(tx.effectiveGasPrice, 9));
+        console.log("Gas used:", gasUsed);
     }
 
     console.log();
@@ -116,7 +116,7 @@ async function main() {
             gnosis, // gnosis
             spokePool // spokePool
         ],
-        { kind: "uups" }
+        { kind: "uups", timeout: 3600000 }
     ) as BufferManager;
     await waitAndLogAddresses(buffer, "BufferManager", true);
 
@@ -129,7 +129,7 @@ async function main() {
             handler.address,
             200
         ],
-        { kind: "uups" }
+        { kind: "uups", timeout: 3600000 }
     ) as Usd3PoolOptimismAdapter;
     await waitAndLogAddresses(usdAdapter, "Usd3PoolOptimismAdapter", true);
 
@@ -141,7 +141,7 @@ async function main() {
             handler.address,
             200
         ],
-        { kind: "uups" }
+        { kind: "uups", timeout: 3600000 }
     ) as EthOptimismAdapter;
     await waitAndLogAddresses(ethAdapter, "EthOptimismAdapter", true);
 
@@ -153,7 +153,7 @@ async function main() {
             handler.address,
             200
         ],
-        { kind: "uups" }
+        { kind: "uups", timeout: 3600000 }
     ) as BtcOptimismAdapter;
     await waitAndLogAddresses(btcAdapter, "BtcOptimismAdapter", true);
 
@@ -179,7 +179,7 @@ async function main() {
             trustedForwarder,
             exchange.address
         ],
-        { kind: "uups" }
+        { kind: "uups", timeout: 3600000 }
     ) as IbAlluo;
     await waitAndLogAddresses(ibAlluoUSD, "IbAlluoUSD", true);
 
@@ -196,7 +196,7 @@ async function main() {
             trustedForwarder,
             exchange.address
         ],
-        { kind: "uups", useDeployedImplementation: true }
+        { kind: "uups", timeout: 3600000, useDeployedImplementation: true }
     ) as IbAlluo;
     await waitAndLogAddresses(ibAlluoETH, "IbAlluoETH", true);
 
@@ -213,7 +213,7 @@ async function main() {
             trustedForwarder,
             exchange.address
         ],
-        { kind: "uups", useDeployedImplementation: true }
+        { kind: "uups", timeout: 3600000, useDeployedImplementation: true }
     ) as IbAlluo;
     await waitAndLogAddresses(ibAlluoBTC, "IbAlluoBTC", true);
 
@@ -233,7 +233,7 @@ async function main() {
             [ibAlluoUSD.address]
         ], {
         initializer: 'alluoInitialize',
-        kind: 'uups',
+        kind: 'uups', timeout: 3600000,
         unsafeAllow: ["delegatecall"]
     }
     ) as StIbAlluo;
@@ -251,7 +251,7 @@ async function main() {
             [ibAlluoETH.address]
         ], {
         initializer: 'alluoInitialize',
-        kind: 'uups',
+        kind: 'uups', timeout: 3600000,
         unsafeAllow: ["delegatecall"],
         useDeployedImplementation: true
     }
@@ -270,14 +270,13 @@ async function main() {
             [ibAlluoBTC.address]
         ], {
         initializer: 'alluoInitialize',
-        kind: 'uups',
+        kind: 'uups', timeout: 3600000,
         unsafeAllow: ["delegatecall"],
         useDeployedImplementation: true
     }
     ) as StIbAlluo;
     await waitAndLogAddresses(stIbAlluoBTC, "StIbAlluoBTC", true);
 
-    console.log("Current gas price:", formatUnits(await ethers.provider.getGasPrice(), 9))
     const superfluidResolver = await SuperfluidResolverFactory.deploy(
         [ibAlluoUSD.address, ibAlluoETH.address, ibAlluoBTC.address],
         cfaV1,
@@ -361,7 +360,7 @@ async function main() {
     console.log();
 
     // Alluo - Liquidity buffer bridging
-    console.log("6. Create resolver 'Alluo - Liquidity buffer refiller'");
+    console.log("6. Create resolver 'Alluo - Liquidity buffer bridging'");
     console.log("    Execute:");
     console.log("        Target Contract:", buffer.address);
     console.log("        Automated Function: swap ( uint256: amount, address: originToken )");

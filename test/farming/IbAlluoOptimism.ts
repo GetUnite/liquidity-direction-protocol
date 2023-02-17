@@ -506,7 +506,7 @@ describe("IbAlluo Optimism Integration Test", async () => {
             console.log();
 
             // Alluo - Liquidity buffer bridging
-            console.log("6. Create resolver 'Alluo - Liquidity buffer refiller'");
+            console.log("6. Create resolver 'Alluo - Liquidity buffer bridging'");
             console.log("    Execute:");
             console.log("        Target Contract:", buffer.address);
             console.log("        Automated Function: swap ( uint256: amount, address: originToken )");
