@@ -160,4 +160,13 @@ interface IVoteExecutorMaster {
         address newImplementation,
         bytes memory data
     ) external payable;
+
+    function getAssetIdToDepositPercentages(
+        uint256 assetId
+    ) external view returns (Deposit[] memory);
+
+    struct Deposit {
+        uint256 directionId;
+        uint256 amount;
+    }
 }

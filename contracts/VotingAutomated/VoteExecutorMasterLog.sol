@@ -257,20 +257,20 @@ contract VoteExecutorMasterLog is
                         console.log("directionId", directionId);
                         if (percent > 0) {
                             assetIdToDepositPercentages[direction.assetId].push(
-                                Deposit(directionId, percent)
-                            );
+                                    Deposit(directionId, percent)
+                                );
                         }
 
                         if (percent == 0) {
                             console.log("full exit");
                             IAlluoStrategyV2(direction.strategyAddress).exitAll(
-                                direction.exitData,
-                                10000,
-                                strategyPrimaryToken,
-                                address(this),
-                                false,
-                                false
-                            );
+                                    direction.exitData,
+                                    10000,
+                                    strategyPrimaryToken,
+                                    address(this),
+                                    false,
+                                    false
+                                );
                             handler.removeFromActiveDirections(directionId);
                         } else {
                             uint newAmount = (percent *
@@ -418,63 +418,6 @@ contract VoteExecutorMasterLog is
         _executeDeposits();
     }
 
-    function executeAllMidCycleDeposits() public onlyRole(DEFAULT_ADMIN_ROLE) {
-        IStrategyHandler handler = IStrategyHandler(strategyHandler);
-        uint8 numberOfAssets = handler.numberOfAssets();
-        for (uint256 i; i < numberOfAssets; i++) {
-            _executeAssetMidCycleDeposits(i);
-        }
-    }
-
-    function executeSpecificMidCycleDeposits(
-        uint256 _assetId
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _executeAssetMidCycleDeposits(_assetId);
-    }
-
-    function _executeAssetMidCycleDeposits(uint256 _assetId) internal {
-        IStrategyHandler handler = IStrategyHandler(strategyHandler);
-
-        address strategyPrimaryToken = handler.getPrimaryTokenByAssetId(
-            _assetId,
-            1
-        );
-
-        uint256 totalBalance = IERC20MetadataUpgradeable(strategyPrimaryToken)
-            .balanceOf(address(this));
-
-        Deposit[] memory depositInfo = assetIdToDepositPercentages[_assetId];
-
-        for (uint256 j; j < depositInfo.length; j++) {
-            Deposit memory deposit = depositInfo[j];
-            IStrategyHandler.LiquidityDirection memory direction = handler
-                .getLiquidityDirectionById(deposit.directionId);
-            uint256 tokenAmount = (deposit.amount * totalBalance) / 10000;
-
-            if (direction.entryToken != strategyPrimaryToken) {
-                IERC20MetadataUpgradeable(strategyPrimaryToken).safeApprove(
-                    exchangeAddress,
-                    tokenAmount
-                );
-                tokenAmount = IExchange(exchangeAddress).exchange(
-                    strategyPrimaryToken,
-                    direction.entryToken,
-                    tokenAmount,
-                    0
-                );
-            }
-
-            IERC20MetadataUpgradeable(direction.entryToken).safeTransfer(
-                direction.strategyAddress,
-                tokenAmount
-            );
-            IAlluoStrategyV2(direction.strategyAddress).invest(
-                direction.entryData,
-                tokenAmount
-            );
-        }
-    }
-
     function getSubmittedData(
         uint256 _dataId
     ) external view returns (bytes memory, uint256, bytes[] memory) {
@@ -568,6 +511,12 @@ contract VoteExecutorMasterLog is
                 IIbAlluo(ibAlluoAddressList[i]).symbol()
             ] = ibAlluoAddressList[i];
         }
+    }
+
+    function getAssetIdToDepositPercentages(
+        uint256 _assetId
+    ) public view returns (Deposit[] memory) {
+        return assetIdToDepositPercentages[_assetId];
     }
 
     function cleanDepositList(

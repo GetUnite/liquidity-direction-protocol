@@ -9,6 +9,7 @@ import "solidity-coverage";
 import 'hardhat-contract-sizer'
 import './tasks'
 import '@openzeppelin/hardhat-upgrades';
+import "hardhat-tracer";
 
 dotenv.config();
 

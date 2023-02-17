@@ -146,17 +146,17 @@ describe("IbAlluoUSD and Handler", function () {
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), multisig.address)
 
         const Buffer = await ethers.getContractFactory("BufferManager") as BufferManager__factory;
-    
+
         buffer = await upgrades.deployProxy(Buffer,
-        [ 604800,
-          1000,
-          604800,
-          admin.address,
-          spokepooladdress
-        ], {
-          initializer: 'initialize', unsafeAllow: ["delegatecall"],
-          kind: 'uups'
-         }
+            [604800,
+                1000,
+                604800,
+                admin.address,
+                spokepooladdress
+            ], {
+            initializer: 'initialize', unsafeAllow: ["delegatecall"],
+            kind: 'uups'
+        }
         ) as BufferManager;
 
         const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapter") as UsdCurveAdapter__factory;
