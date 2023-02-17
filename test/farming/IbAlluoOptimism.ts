@@ -413,6 +413,32 @@ describe("IbAlluo Optimism Integration Test", async () => {
         await buffer.connect(gnosis).grantRole(swapperRole, optimismGelatoExecutor);
         await handler.connect(gnosis).grantRole(constants.HashZero, buffer.address);
 
+        await buffer.connect(gnosis).setRelayerFeePct("3000000000000000");
+        await buffer.connect(gnosis).setDistributor("0x82e568c482df2c833dab0d38deb9fb01777a9e89");
+        await buffer.connect(gnosis).initializeValues(
+            handler.address,
+            [ibAlluoUSD.address, ibAlluoETH.address, ibAlluoBTC.address],
+            [usdAdapter.address, ethAdapter.address, btcAdapter.address],
+            ["0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6"],
+            ["1000000000000000000000", "597670000000000000", "43200000000000000"],
+            ["30000000000000000000000", "18000000000000000000", "1270000000000000000"],
+            86400
+        );
+
+        await buffer.connect(gnosis).setBridgeCap(usdc.address, "10000000000000000000000");
+        await buffer.connect(gnosis).setBridgeCap(weth.address, "18000000000000000000");
+        await buffer.connect(gnosis).setBridgeCap(wbtc.address, "1270000000000000000");
+
+        await usdc.connect(gnosis).approve(buffer.address, constants.MaxUint256);
+        await weth.connect(gnosis).approve(buffer.address, constants.MaxUint256);
+        await wbtc.connect(gnosis).approve(buffer.address, constants.MaxUint256);
+
+        await buffer.connect(gnosis).setSlippageControl(ibAlluoUSD.address, 100);
+        await buffer.connect(gnosis).setSlippageControl(ibAlluoETH.address, 100);
+        await buffer.connect(gnosis).setSlippageControl(ibAlluoBTC.address, 100);
+
+        await buffer.connect(gnosis).setRefillThresholdPct(500);
+
         // Step 7: Resolvers
         if (!resolverCreationLogged) {
             // Alluo - IbAlluoXXX Price resolvers
