@@ -257,20 +257,20 @@ contract VoteExecutorMasterLog is
                         console.log("directionId", directionId);
                         if (percent > 0) {
                             assetIdToDepositPercentages[direction.assetId].push(
-                                    Deposit(directionId, percent)
-                                );
+                                Deposit(directionId, percent)
+                            );
                         }
 
                         if (percent == 0) {
                             console.log("full exit");
                             IAlluoStrategyV2(direction.strategyAddress).exitAll(
-                                    direction.exitData,
-                                    10000,
-                                    strategyPrimaryToken,
-                                    address(this),
-                                    false,
-                                    false
-                                );
+                                direction.exitData,
+                                10000,
+                                strategyPrimaryToken,
+                                address(this),
+                                false,
+                                false
+                            );
                             handler.removeFromActiveDirections(directionId);
                         } else {
                             uint newAmount = (percent *
