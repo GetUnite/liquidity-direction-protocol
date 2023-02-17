@@ -407,6 +407,11 @@ describe("IbAlluo Optimism Integration Test", async () => {
         await ibAlluoBTC.connect(gnosis).grantRole(gelatoRole, superfluidEndResolver.address);
 
         // Step 6: Setup BufferManager
+        const swapperRole = await buffer.SWAPPER();
+
+        await buffer.connect(gnosis).grantRole(gelatoRole, optimismGelatoExecutor);
+        await buffer.connect(gnosis).grantRole(swapperRole, optimismGelatoExecutor);
+        await handler.connect(gnosis).grantRole(constants.HashZero, buffer.address);
 
         // Step 7: Resolvers
         if (!resolverCreationLogged) {
@@ -742,6 +747,13 @@ describe("IbAlluo Optimism Integration Test", async () => {
         if (name == "Vote Executor Slave") contractFrom = undefined;
         if (name == "msg.sender from Gelato") contractFrom = "0x6dad1cb747a95ae1fcd364af9adb5b4615f157a4";
         if (name == "Polygon Gnosis") contractFrom = gnosis.address;
+        if (name == "BTC Adapter") contractFrom = btcAdapter.address;
+        if (name == "ETH Adapter") contractFrom = ethAdapter.address;
+        if (name == "USD Adapter") contractFrom = usdAdapter.address;
+        if (name == "Liquidity Handler") contractFrom = handler.address;
+        if (name == "Buffer Manager") contractFrom = buffer.address;
+        if (name == "Exchange") contractFrom = exchange.address;
+        if (name == "Price Router") contractFrom = priceRouter.address;
 
         return contractFrom;
     }
@@ -753,17 +765,25 @@ describe("IbAlluo Optimism Integration Test", async () => {
             const to = nameToContract(element.roleOwnerName);
             const role = element.role;
 
-            if (element.contractName.includes("ibAlluoEUR") || element.roleOwnerName.includes("ibAlluoEUR")) {
+            if (
+                element.contractName.includes("ibAlluoEUR") || element.roleOwnerName.includes("ibAlluoEUR") ||
+                element.contractName.includes("EUR Adapter") || element.roleOwnerName.includes("EUR Adapter")
+            ) {
                 continue;
             }
             if (from == undefined || to == undefined) {
-                console.log("    To be set up: from", element.contractName, "to", element.roleOwnerName, "role", element.roleDecoded);
+                console.log("    ! To be set up: from", element.contractName, "to", element.roleOwnerName, "role", element.roleDecoded);
                 continue;
             }
 
             const contract = await ethers.getContractAt("@openzeppelin/contracts/access/AccessControl.sol:AccessControl", from);
 
             expect(await contract.hasRole(role, to)).to.be.equal(true, `Not given '${element.roleDecoded}' role from '${element.contractName}' to '${element.roleOwnerName}'`)
+
+            // if (!await contract.hasRole(role, to)) {
+            //     console.log(`    Not given '${element.roleDecoded}' role from '${element.contractName}' to '${element.roleOwnerName}'`)
+            // }
+
             // console.log(`Ok ${element.roleDecoded} role from ${element.contractName} to ${element.roleOwnerName}`)
         }
     })
@@ -771,7 +791,8 @@ describe("IbAlluo Optimism Integration Test", async () => {
     // TODO: Some tests for superfluid
 })
 
-// Exported all available roles on ibAlluos, stIbAlluos, Superfluid Resolvers, Vote Executor Slave
+// Exported all available roles on ibAlluos, stIbAlluos, Adapters, Buffer Manager, 
+// Exchange, Liquidity Handler, Price Router, Superfluid Resolvers, Vote Executor Slave,
 const rolesInfo = [
     {
         "contract": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
@@ -1156,5 +1177,261 @@ const rolesInfo = [
         "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
         "roleDecoded": "UPGRADER_ROLE",
         "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xb63bb8a0500a2F5c3F0c46E203f392Ca08947494",
+        "contractName": "BTC Adapter",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xb63bb8a0500a2F5c3F0c46E203f392Ca08947494",
+        "contractName": "BTC Adapter",
+        "roleOwner": "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Liquidity Handler"
+    },
+    {
+        "contract": "0xb63bb8a0500a2F5c3F0c46E203f392Ca08947494",
+        "contractName": "BTC Adapter",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
+        "roleDecoded": "UPGRADER_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0xb63bb8a0500a2F5c3F0c46E203f392Ca08947494",
+        "contractName": "BTC Adapter",
+        "roleOwner": "0x466b375cE0D1161aEb3e69f92B2B9c365f7877BE",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Buffer Manager"
+    },
+    {
+        "contract": "0x466b375cE0D1161aEb3e69f92B2B9c365f7877BE",
+        "contractName": "Buffer Manager",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x466b375cE0D1161aEb3e69f92B2B9c365f7877BE",
+        "contractName": "Buffer Manager",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
+        "roleDecoded": "UPGRADER_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x466b375cE0D1161aEb3e69f92B2B9c365f7877BE",
+        "contractName": "Buffer Manager",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x466b375cE0D1161aEb3e69f92B2B9c365f7877BE",
+        "contractName": "Buffer Manager",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0xd2761b102bda9831f4af400cc824b8cecb9cc5c1c85c51acb1479db9735fbfc6",
+        "roleDecoded": "SWAPPER",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x466b375cE0D1161aEb3e69f92B2B9c365f7877BE",
+        "contractName": "Buffer Manager",
+        "roleOwner": "0x0391ceD60d22Bc2FadEf543619858b12155b7030",
+        "role": "0x8e81cee32eed7d8f4f15cd1d324edf5fe36cbe57fae18180879d4bdc265ceb30",
+        "roleDecoded": "GELATO",
+        "roleOwnerName": "msg.sender from Gelato"
+    },
+    {
+        "contract": "0x466b375cE0D1161aEb3e69f92B2B9c365f7877BE",
+        "contractName": "Buffer Manager",
+        "roleOwner": "0x0391ceD60d22Bc2FadEf543619858b12155b7030",
+        "role": "0xd2761b102bda9831f4af400cc824b8cecb9cc5c1c85c51acb1479db9735fbfc6",
+        "roleDecoded": "SWAPPER",
+        "roleOwnerName": "msg.sender from Gelato"
+    },
+    {
+        "contract": "0x531f26C5fc03b2e394D4054Aac97924f2bd8E1D3",
+        "contractName": "ETH Adapter",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x531f26C5fc03b2e394D4054Aac97924f2bd8E1D3",
+        "contractName": "ETH Adapter",
+        "roleOwner": "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Liquidity Handler"
+    },
+    {
+        "contract": "0x531f26C5fc03b2e394D4054Aac97924f2bd8E1D3",
+        "contractName": "ETH Adapter",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
+        "roleDecoded": "UPGRADER_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x531f26C5fc03b2e394D4054Aac97924f2bd8E1D3",
+        "contractName": "ETH Adapter",
+        "roleOwner": "0x466b375cE0D1161aEb3e69f92B2B9c365f7877BE",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Buffer Manager"
+    },
+    {
+        "contract": "0x2D5a94fF5fC8c9Fb37c1F30e149e9a7E6ABC6C4C",
+        "contractName": "EUR Adapter",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x2D5a94fF5fC8c9Fb37c1F30e149e9a7E6ABC6C4C",
+        "contractName": "EUR Adapter",
+        "roleOwner": "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Liquidity Handler"
+    },
+    {
+        "contract": "0x2D5a94fF5fC8c9Fb37c1F30e149e9a7E6ABC6C4C",
+        "contractName": "EUR Adapter",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
+        "roleDecoded": "UPGRADER_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x2D5a94fF5fC8c9Fb37c1F30e149e9a7E6ABC6C4C",
+        "contractName": "EUR Adapter",
+        "roleOwner": "0x466b375cE0D1161aEb3e69f92B2B9c365f7877BE",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Buffer Manager"
+    },
+    {
+        "contract": "0x4B47188dE4D1591EA0542db7fFb9E7294db84197",
+        "contractName": "USD Adapter",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x4B47188dE4D1591EA0542db7fFb9E7294db84197",
+        "contractName": "USD Adapter",
+        "roleOwner": "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Liquidity Handler"
+    },
+    {
+        "contract": "0x4B47188dE4D1591EA0542db7fFb9E7294db84197",
+        "contractName": "USD Adapter",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
+        "roleDecoded": "UPGRADER_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x4B47188dE4D1591EA0542db7fFb9E7294db84197",
+        "contractName": "USD Adapter",
+        "roleOwner": "0x466b375cE0D1161aEb3e69f92B2B9c365f7877BE",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Buffer Manager"
+    },
+    {
+        "contract": "0xeE0674C1E7d0f64057B6eCFe845DC2519443567F",
+        "contractName": "Exchange",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1",
+        "contractName": "Liquidity Handler",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1",
+        "contractName": "Liquidity Handler",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
+        "roleDecoded": "UPGRADER_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1",
+        "contractName": "Liquidity Handler",
+        "roleOwner": "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoUSD Polygon"
+    },
+    {
+        "contract": "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1",
+        "contractName": "Liquidity Handler",
+        "roleOwner": "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoEUR Polygon"
+    },
+    {
+        "contract": "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1",
+        "contractName": "Liquidity Handler",
+        "roleOwner": "0xc677B0918a96ad258A68785C2a3955428DeA7e50",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoETH Polygon"
+    },
+    {
+        "contract": "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1",
+        "contractName": "Liquidity Handler",
+        "roleOwner": "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "ibAlluoBTC Polygon"
+    },
+    {
+        "contract": "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1",
+        "contractName": "Liquidity Handler",
+        "roleOwner": "0x466b375cE0D1161aEb3e69f92B2B9c365f7877BE",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Buffer Manager"
+    },
+    {
+        "contract": "0x82220c7Be3a00ba0C6ed38572400A97445bdAEF2",
+        "contractName": "Price Router",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "roleDecoded": "DEFAULT_ADMIN_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
+    },
+    {
+        "contract": "0x82220c7Be3a00ba0C6ed38572400A97445bdAEF2",
+        "contractName": "Price Router",
+        "roleOwner": "0x2580f9954529853Ca5aC5543cE39E9B5B1145135",
+        "role": "0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3",
+        "roleDecoded": "UPGRADER_ROLE",
+        "roleOwnerName": "Polygon Gnosis"
     }
-];
+]
