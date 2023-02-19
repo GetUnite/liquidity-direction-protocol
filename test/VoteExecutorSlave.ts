@@ -18,7 +18,7 @@ let iballuoC: IbAlluo
 
 
 
-describe("Test VoteExecutor tracking iballuo sync", () => {
+describe("Test VoteExecutor tracking IbAlluo sync", () => {
 
     beforeEach(async function() {
         //We are forking Polygon mainnet, please set Alchemy key in .env
@@ -55,52 +55,49 @@ describe("Test VoteExecutor tracking iballuo sync", () => {
 
       upgrades.silenceWarnings();
     })
-
-    it("Should mint the correct amount of ibAlluos after receiving info about delta", async() => {
+      
+      it("Should mint iballuo", async () => {
         const delta10k = ethers.utils.parseUnits("10000", 18);
         const deltaMinus = ethers.utils.parseUnits("-1000", 18);
-
+      
         let balanceBefore = await iballuousd.balanceOf(gnosis.address);
-        expect(slave.testAnyExecute(delta10k)).to.be.reverted;
-        let balanceAfter = await iballuousd.balanceOf(gnosis.address)
-
-        expect(balanceBefore).to.be.eq(balanceAfter)
-
-        console.log("Balance before", balanceBefore)
-        console.log("Balance after", balanceAfter)
-
-    })
-
-    it("Should mint iballuo", async () => {
-        const delta10k = ethers.utils.parseUnits("10000", 18);
+        iballuoC = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
+        await iballuoC.connect(gnosis).grantRole(await iballuoC.DEFAULT_ADMIN_ROLE(), slave.address);
+        const messages = [
+          {
+            commandIndex: 3,
+            commandData: ethers.utils.defaultAbiCoder.encode(["int256"], [delta10k]),
+          },
+        ];
+        await slave.connect(gnosis).messageExecute(messages);
+        let balanceAfter = await iballuousd.balanceOf(gnosis.address);
+      
+        expect(Number(balanceAfter)).to.be.gt(Number(balanceBefore));
+      
+        console.log("Balance before", balanceBefore);
+        console.log("Balance after", balanceAfter);
+      });
+      
+      it("Should burn iballuo", async () => {
         const deltaMinus = ethers.utils.parseUnits("-1000", 18);
-
+      
         let balanceBefore = await iballuousd.balanceOf(gnosis.address);
-        iballuoC = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6")
-        await iballuoC.connect(gnosis).grantRole(await iballuoC.DEFAULT_ADMIN_ROLE(), slave.address)
-        await slave.testAnyExecute(delta10k)
-        let balanceAfter = await iballuousd.balanceOf(gnosis.address)
-
-        expect(Number(balanceAfter)).to.be.gt(Number(balanceBefore))
-
-        console.log("Balance before", balanceBefore)
-        console.log("Balance after", balanceAfter)
-    })
-
-    it("Should burn iballuo", async() => {
-        const deltaMinus = ethers.utils.parseUnits("-1000", 18);
-
-        let balanceBefore = await iballuousd.balanceOf(gnosis.address);
-        iballuoC = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6")
-        await iballuoC.connect(gnosis).grantRole(await iballuoC.DEFAULT_ADMIN_ROLE(), slave.address)
-        await slave.testAnyExecute(deltaMinus)
-        let balanceAfter = await iballuousd.balanceOf(gnosis.address)
-
-        expect(Number(balanceAfter)).to.be.lt(Number(balanceBefore))
-
-        console.log("Balance before", balanceBefore)
-        console.log("Balance after", balanceAfter)
-    })
+        iballuoC = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
+        await iballuoC.connect(gnosis).grantRole(await iballuoC.DEFAULT_ADMIN_ROLE(), slave.address);
+        const messages = [
+          {
+            commandIndex: 3,
+            commandData: ethers.utils.defaultAbiCoder.encode(["int256"], [deltaMinus]),
+          },
+        ];
+        await slave.connect(gnosis).messageExecute(messages);
+        let balanceAfter = await iballuousd.balanceOf(gnosis.address);
+      
+        expect(Number(balanceAfter)).to.be.lt(Number(balanceBefore));
+      
+        console.log("Balance before", balanceBefore);
+        console.log("Balance after", balanceAfter);
+      });
 
 it("should execute two messages with positive and negative delta", async () => {      
         const commandIndex = 3;

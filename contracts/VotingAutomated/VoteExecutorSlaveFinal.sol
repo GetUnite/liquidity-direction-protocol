@@ -100,6 +100,7 @@ contract VoteExecutorSlaveFinal is
     address public constant USDC = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
     address public constant IBALLUO =
         0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6;
+    uint256 public constant MULTIPLIER = 10**18;
     Message[] public messagess;
 
     function initialize(
@@ -177,13 +178,6 @@ contract VoteExecutorSlaveFinal is
         emit MessageReceived(hashed);
     }
 
-    function testAnyExecute(int256 delta) external {
-        Message[] memory messages = new Message[](1);
-        messages[0].commandIndex = 3;
-        messages[0].commandData = abi.encode(delta);
-        execute(messages);
-    }
-
     function messageExecute(
         Message[] memory messages
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -229,22 +223,19 @@ contract VoteExecutorSlaveFinal is
                     priceFeedRouter
                 ).getPrice(USDC, fiatIndex);
                 uint256 growingRatio = IIbAlluo(IBALLUO).growingRatio();
-                // multiplier is private in Iballuo, so I had to hit this trickshot
-                uint256 subres = IIbAlluo(IBALLUO).convertToAssetValue(1000);
-                uint256 multiplier = (1000 * growingRatio) / subres;
                 if (treasuryDelta < 0) {
                     uint256 exactAmount = (uint256(-treasuryDelta) *
                         10 ** fiatDecimals) / fiatPrice;
                     IIbAlluo(IBALLUO).burn(
                         gnosis,
-                        (exactAmount * multiplier) / growingRatio
+                        (exactAmount * MULTIPLIER) / growingRatio
                     );
                 } else if (treasuryDelta > 0) {
                     uint256 exactAmount = (uint256(treasuryDelta) *
                         10 ** fiatDecimals) / fiatPrice;
                     IIbAlluo(IBALLUO).mint(
                         gnosis,
-                        (exactAmount * multiplier) / growingRatio
+                        (exactAmount * MULTIPLIER) / growingRatio
                     );
                 }
             }
