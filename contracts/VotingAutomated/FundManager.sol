@@ -33,13 +33,11 @@ contract FundManager is
     IFastGas public constant CHAINLINK_FAST_GAS =
         IFastGas(0x169E633A2D1E6c10dD91238Ba11c4A708dfEF37C);
     bool public upgradeStatus;
+    uint88 public maxGasPrice;
 
-    address public gnosis;
     address public exchangeAddress;
     address public strategyHandler;
     address public voteExecutorMaster;
-
-    uint256 public maxGasPrice;
 
     mapping(uint256 => uint256) public assetIdToMinDeposit;
 
@@ -56,13 +54,12 @@ contract FundManager is
         address _multiSigWallet,
         address _voteExecutorMaster,
         address _strategyHandler,
-        uint256 _maxGasPrice
+        uint88 _maxGasPrice
     ) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
         require(_multiSigWallet.isContract());
-        gnosis = _multiSigWallet;
         exchangeAddress = 0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec;
         voteExecutorMaster = _voteExecutorMaster;
         strategyHandler = _strategyHandler;
@@ -91,7 +88,7 @@ contract FundManager is
         IStrategyHandler handler = IStrategyHandler(strategyHandler);
         uint8 numberOfAssets = handler.numberOfAssets();
         require(isGasPriceAcceptable(), "Gas price too high");
-        require(tx.gasprice < maxGasPrice, "Gas price too high");
+        require(tx.gasprice < maxGasPrice, "Effective gas price too high");
 
         for (uint256 i; i < numberOfAssets; i++) {
             address strategyPrimaryToken = handler.getPrimaryTokenByAssetId(
@@ -102,7 +99,7 @@ contract FundManager is
             uint256 totalBalance = IERC20MetadataUpgradeable(
                 strategyPrimaryToken
             ).balanceOf(address(this));
-            if (totalBalance > assetIdToMinDeposit[i]) {
+            if (totalBalance >= assetIdToMinDeposit[i]) {
                 return (
                     true,
                     abi.encodeWithSignature(
@@ -144,24 +141,18 @@ contract FundManager is
 
         uint256 totalBalance = IERC20MetadataUpgradeable(strategyPrimaryToken)
             .balanceOf(address(this));
-        console.log("Total balance", totalBalance);
-        console.log("Min deposit", assetIdToMinDeposit[_assetId]);
+
         if (totalBalance < assetIdToMinDeposit[_assetId]) return;
 
         IVoteExecutorMaster.Deposit[] memory depositInfo = IVoteExecutorMaster(
             voteExecutorMaster
         ).getAssetIdToDepositPercentages(_assetId);
-        console.log("Deposit info length", depositInfo.length);
         for (uint256 j; j < depositInfo.length; j++) {
             IVoteExecutorMaster.Deposit memory deposit = depositInfo[j];
             IStrategyHandler.LiquidityDirection memory direction = handler
                 .getLiquidityDirectionById(deposit.directionId);
             uint256 tokenAmount = (deposit.amount * totalBalance) / 10000;
-            console.log("Total amount", totalBalance);
-            console.log("Deposit amount", tokenAmount);
-            console.log("Deposit direction", deposit.directionId);
-            console.log("Deposit strategy", direction.strategyAddress);
-            console.log("Deposit token", direction.entryToken);
+
             if (direction.entryToken != strategyPrimaryToken) {
                 IERC20MetadataUpgradeable(strategyPrimaryToken).safeApprove(
                     exchangeAddress,
@@ -192,16 +183,6 @@ contract FundManager is
         uint256 _threshold
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         assetIdToMinDeposit[_assetId] = _threshold;
-    }
-
-    /**
-     * @notice Set the address of the multisig.
-     * @param _gnosisAddress
-     **/
-    function setGnosis(
-        address _gnosisAddress
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        gnosis = _gnosisAddress;
     }
 
     function setExchangeAddress(
