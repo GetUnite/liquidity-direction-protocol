@@ -17,7 +17,7 @@ contract EurCurveAdapter is AccessControl {
     address public constant PAR = 0xE2Aa7db6dA1dAE97C5f5C6914d285fBfCC32A128;
     address public constant EURS = 0xE111178A87A3BFf0c8d18DECBa5798827539Ae99;
     address public constant EURT = 0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f;
-    address public constant CURVE_POOL = 
+    address public constant CURVE_POOL =
         0xAd326c253A84e9805559b73A08724e11E49ca651;
     address public buffer;
     uint64 public slippage;

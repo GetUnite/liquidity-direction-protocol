@@ -33,10 +33,10 @@ contract UsdCurveAdapter is AccessControl {
 
     mapping(address => uint128) public indexes;
 
-    constructor (
-        address _multiSigWallet, 
-        address _bufferManager, 
-        address _liquidityHandler, 
+    constructor(
+        address _multiSigWallet,
+        address _bufferManager,
+        address _liquidityHandler,
         uint64 _lowSlippage,
         uint64 _maxSlippage
     ) {
@@ -47,7 +47,6 @@ contract UsdCurveAdapter is AccessControl {
         buffer = _bufferManager;
         slippage = _lowSlippage;
         maxSendSlippage = _maxSlippage;
-
 
         indexes[DAI] = 0;
         indexes[USDC] = 1;

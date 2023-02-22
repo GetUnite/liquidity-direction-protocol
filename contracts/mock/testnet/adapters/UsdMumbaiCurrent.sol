@@ -29,14 +29,14 @@ contract UsdMumbaiCurrent is
     address public constant DAI = 0x7E93BaA89c18a473e3de6fd7BD85715e1415Fc5C;
     address public constant USDC = 0xB579C5ba3Bc8EA2F5DD5622f1a5EaC6282516fB1;
     address public constant USDT = 0x9A4cBEe2f0FF57749caf66570692dAdB3462bAc9;
-    address public constant CURVE_POOL = 0x754E1c29e1C0109E7a5034Ca6F54aFbE52C3D1bA;
+    address public constant CURVE_POOL =
+        0x754E1c29e1C0109E7a5034Ca6F54aFbE52C3D1bA;
     address public buffer;
     bool public upgradeStatus;
     uint64 public slippage;
     address public priceFeedRouter;
     uint64 public primaryTokenIndex;
     uint256 public fiatIndex;
-    
 
     mapping(address => uint128) public indexes;
 
@@ -101,7 +101,10 @@ contract UsdMumbaiCurrent is
                 );
             }
         } else if (_token == USDT) {
-            FakeCurveUsd(CURVE_POOL).add_liquidity(USDT, _fullAmount / 10 ** 12);
+            FakeCurveUsd(CURVE_POOL).add_liquidity(
+                USDT,
+                _fullAmount / 10 ** 12
+            );
             if (toSend != 0) {
                 uint amountBack = FakeCurveUsd(CURVE_POOL).remove_liquidity(
                     USDC,
@@ -145,14 +148,14 @@ contract UsdMumbaiCurrent is
     function getAdapterAmount() external view returns (uint256) {
         uint256 amount = IERC20Upgradeable(CURVE_POOL).balanceOf(
             (address(this))
-        ); 
+        );
         if (priceFeedRouter != address(0)) {
             (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
                 priceFeedRouter
             ).getPrice(USDC, fiatIndex);
             amount = (amount * price) / 10 ** (uint256(priceDecimals));
-        }    
-        
+        }
+
         return amount;
     }
 

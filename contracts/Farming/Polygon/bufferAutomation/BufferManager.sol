@@ -42,10 +42,7 @@ contract BufferManager is
         uint256[] percentage
     );
 
-    event Refill(
-        address token,
-        uint256 amount
-    );
+    event Refill(address token, uint256 amount);
 
     bool public upgradeStatus;
 
@@ -59,7 +56,7 @@ contract BufferManager is
     // address of the gnosis multisig
     address public gnosis;
     uint256 public epochDuration;
-    
+
     // bridge settings
     uint256 public lastExecuted;
     uint256 public bridgeInterval;
@@ -89,7 +86,7 @@ contract BufferManager is
 
     uint256 public bridgeCap;
     // min pct of the deviation from expectedAdapterRefill to trigger the refill (with 2 decimals, e.g. 5% = 500)
-    uint256 public refillThreshold; 
+    uint256 public refillThreshold;
     // iballuo to pct to add on top of refills to prevent slippage (5% = 500)
     mapping(address => uint256) public slippageControl;
     mapping(address => uint256) public tokenToMaxBridge;
@@ -147,7 +144,8 @@ contract BufferManager is
     {
         for (uint256 i; i < activeIbAlluos.length(); i++) {
             (address iballuo, address token, uint256 amount) = getValues(i);
-            uint256 tokenCap = tokenToMaxBridge[token] / 10 * 10 ** (18-IERC20MetadataUpgradeable(token).decimals());
+            uint256 tokenCap = (tokenToMaxBridge[token] / 10) *
+                10 ** (18 - IERC20MetadataUpgradeable(token).decimals());
             if (IERC20Upgradeable(token).balanceOf(address(this)) > tokenCap) {
                 amount = tokenToMaxBridge[token];
             }
@@ -212,42 +210,42 @@ contract BufferManager is
             "Buffer: <minAmount or <bridgeInterval"
         );
         lastExecuted = block.timestamp;
-        if(!nonBridgeTokens.contains(originToken)){
-        IERC20Upgradeable(originToken).approve(spokepool, amount);
-        ISpokePool(spokepool).deposit(
-            distributor,
-            originToken,
-            amount,
-            1,
-            relayerFeePct,
-            uint32(block.timestamp)
-        );
-        address tokenEth = tokenToEth[originToken];
-        if(anycall != address(0)) {
-            (
-            uint256[] memory direction,
-            uint256[] memory percentage
-            ) = IVoteExecutorSlave(slave).getEntries();
-            ICallProxy(anycall).anyCall(
-            // address of the collector contract on mainnet
-            distributor,
-            abi.encode(direction, percentage, tokenEth, amount),
-            address(0),
-            1,
-            // 0 flag to pay fee on destination chain
-            0
-        );
+        if (!nonBridgeTokens.contains(originToken)) {
+            IERC20Upgradeable(originToken).approve(spokepool, amount);
+            ISpokePool(spokepool).deposit(
+                distributor,
+                originToken,
+                amount,
+                1,
+                relayerFeePct,
+                uint32(block.timestamp)
+            );
+            address tokenEth = tokenToEth[originToken];
+            if (anycall != address(0)) {
+                (
+                    uint256[] memory direction,
+                    uint256[] memory percentage
+                ) = IVoteExecutorSlave(slave).getEntries();
+                ICallProxy(anycall).anyCall(
+                    // address of the collector contract on mainnet
+                    distributor,
+                    abi.encode(direction, percentage, tokenEth, amount),
+                    address(0),
+                    1,
+                    // 0 flag to pay fee on destination chain
+                    0
+                );
 
-        emit Bridge(
-            distributor,
-            originToken,
-            tokenEth,
-            amount,
-            relayerFeePct,
-            direction,
-            percentage
-        );
-          }
+                emit Bridge(
+                    distributor,
+                    originToken,
+                    tokenEth,
+                    amount,
+                    relayerFeePct,
+                    direction,
+                    percentage
+                );
+            }
         } else {
             withdrawGnosis(originToken, amount);
         }
@@ -280,19 +278,21 @@ contract BufferManager is
     function adapterRequiredRefill(
         address _ibAlluo
     ) public view returns (uint256) {
-        (, , uint refillRequested,) = handler.ibAlluoToWithdrawalSystems(_ibAlluo);
+        (, , uint refillRequested, ) = handler.ibAlluoToWithdrawalSystems(
+            _ibAlluo
+        );
         uint256 expectedAmount = handler.getExpectedAdapterAmount(_ibAlluo, 0);
         uint256 actualAmount = handler.getAdapterAmount(_ibAlluo);
         if (actualAmount >= expectedAmount) {
             return 0;
         }
-        uint256 difference = expectedAmount - actualAmount; 
+        uint256 difference = expectedAmount - actualAmount;
         if ((difference * 10000) / expectedAmount <= refillThreshold) {
             return 0;
-        } 
+        }
         uint id = ILiquidityHandler(handler).getAdapterId(_ibAlluo); // id 3 and 4 are weth and wbtc, which must not follow fiat logic
         address priceFeedRouter = IIbAlluo(_ibAlluo).priceFeedRouter();
-        if (priceFeedRouter != address(0) && id!=3 && id!=4) {
+        if (priceFeedRouter != address(0) && id != 3 && id != 4) {
             address adapter = ibAlluoToAdapter[_ibAlluo];
             address token = IHandlerAdapter(adapter).getCoreTokens();
             (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
@@ -374,13 +374,20 @@ contract BufferManager is
                 return false;
             }
         } else {
-        IERC20Upgradeable(bufferToken).transfer(adapterAddress, totalAmount / 10 ** decDif);
-        IHandlerAdapter(adapterAddress).deposit(bufferToken, totalAmount, totalAmount);
-        if (isAdapterPendingWithdrawal(_ibAlluo)) {
-            handler.satisfyAdapterWithdrawals(_ibAlluo);
-        }
-        emit Refill(_ibAlluo, totalAmount / 10 ** decDif);
-        return true;
+            IERC20Upgradeable(bufferToken).transfer(
+                adapterAddress,
+                totalAmount / 10 ** decDif
+            );
+            IHandlerAdapter(adapterAddress).deposit(
+                bufferToken,
+                totalAmount,
+                totalAmount
+            );
+            if (isAdapterPendingWithdrawal(_ibAlluo)) {
+                handler.satisfyAdapterWithdrawals(_ibAlluo);
+            }
+            emit Refill(_ibAlluo, totalAmount / 10 ** decDif);
+            return true;
         }
     }
 
@@ -418,18 +425,28 @@ contract BufferManager is
             address(this),
             gnosisAmount / 10 ** decDif
         );
-        IERC20Upgradeable(bufferToken).approve(ibAlluo, totalAmount / 10 ** decDif);
-        IIbAlluo(ibAlluo).deposit(
-            bufferToken,
-            gnosisAmount / 10 ** decDif
+        IERC20Upgradeable(bufferToken).approve(
+            ibAlluo,
+            totalAmount / 10 ** decDif
         );
-        IERC20Upgradeable(bufferToken).transfer(adapterAddress, bufferBalance / 10 ** decDif);
-        IHandlerAdapter(adapterAddress).deposit(bufferToken, bufferBalance, bufferBalance);
+        IIbAlluo(ibAlluo).deposit(bufferToken, gnosisAmount / 10 ** decDif);
+        IERC20Upgradeable(bufferToken).transfer(
+            adapterAddress,
+            bufferBalance / 10 ** decDif
+        );
+        IHandlerAdapter(adapterAddress).deposit(
+            bufferToken,
+            bufferBalance,
+            bufferBalance
+        );
         if (isAdapterPendingWithdrawal(ibAlluo)) {
             handler.satisfyAdapterWithdrawals(ibAlluo);
         }
-        IERC20MetadataUpgradeable(ibAlluo).transfer(gnosis, IERC20MetadataUpgradeable(ibAlluo).balanceOf(address(this)));
-        
+        IERC20MetadataUpgradeable(ibAlluo).transfer(
+            gnosis,
+            IERC20MetadataUpgradeable(ibAlluo).balanceOf(address(this))
+        );
+
         emit Refill(ibAlluo, totalAmount / 10 ** decDif);
     }
 
@@ -494,25 +511,33 @@ contract BufferManager is
     }
 
     /**
-    * @dev View function used by refillChecker to check if a refill can be executed without draining the gnosis
-    * @param _iballuo iballuo of the respective adapter
-    * @param _token token of the respective iballuo/adapter
-    * @return bool True if conditions for refill are met, false if not
-    */
-    function checkEpoch(address _iballuo, address _token) public view returns(bool) {
+     * @dev View function used by refillChecker to check if a refill can be executed without draining the gnosis
+     * @param _iballuo iballuo of the respective adapter
+     * @param _token token of the respective iballuo/adapter
+     * @return bool True if conditions for refill are met, false if not
+     */
+    function checkEpoch(
+        address _iballuo,
+        address _token
+    ) public view returns (bool) {
         Epoch[] memory relevantEpochs = ibAlluoToEpoch[_iballuo];
         Epoch memory lastEpoch = relevantEpochs[relevantEpochs.length - 1];
         uint256 deadline = lastEpoch.startTime + epochDuration;
         if (block.timestamp > deadline) {
             lastEpoch.refilledPerEpoch = 0;
         }
-        uint256 rrefill = adapterRequiredRefill(_iballuo);  
-        uint256 bbalance = IERC20Upgradeable(_token).balanceOf(address(this)) * 10 ** (18 - IERC20MetadataUpgradeable(_token).decimals());
-        // Checking if required refill is more than the buffer balance in order to prevent underflow, 
-        // then checking if gnosisAmount to be refilled doesn't exceed the maximum allowed gnosis refill limit  
-        if(rrefill<bbalance) {
+        uint256 rrefill = adapterRequiredRefill(_iballuo);
+        uint256 bbalance = IERC20Upgradeable(_token).balanceOf(address(this)) *
+            10 ** (18 - IERC20MetadataUpgradeable(_token).decimals());
+        // Checking if required refill is more than the buffer balance in order to prevent underflow,
+        // then checking if gnosisAmount to be refilled doesn't exceed the maximum allowed gnosis refill limit
+        if (rrefill < bbalance) {
             return true;
-        } else if (rrefill > bbalance && ibAlluoToMaxRefillPerEpoch[_iballuo] >= rrefill + lastEpoch.refilledPerEpoch - bbalance) {
+        } else if (
+            rrefill > bbalance &&
+            ibAlluoToMaxRefillPerEpoch[_iballuo] >=
+            rrefill + lastEpoch.refilledPerEpoch - bbalance
+        ) {
             return true;
         } else {
             return false;
@@ -581,10 +606,13 @@ contract BufferManager is
     }
 
     /**
-    * @dev Admin function to set bridge cap
-    * @param _cap Max amount that can be bridged 
-    */
-    function setBridgeCap(address _token, uint256 _cap) external onlyRole(DEFAULT_ADMIN_ROLE) {
+     * @dev Admin function to set bridge cap
+     * @param _cap Max amount that can be bridged
+     */
+    function setBridgeCap(
+        address _token,
+        uint256 _cap
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         tokenToMaxBridge[_token] = _cap;
     }
 
@@ -629,9 +657,11 @@ contract BufferManager is
     }
 
     /**
-    * @dev Admin function to set spokepool address
-    */
-    function setSpokePool(address _spokePool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+     * @dev Admin function to set spokepool address
+     */
+    function setSpokePool(
+        address _spokePool
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         spokepool = _spokePool;
     }
 
@@ -661,11 +691,13 @@ contract BufferManager is
     }
 
     /**
-    * @notice Prevents buffer from refilling adapters with "dust" amount
-    * @dev Admin function to set a minimum deviation from expectedAdapterAmount that would trigger a refill
-    * @param _pct Minimum percentage of deviation to trigger the refill (format: 5% = 500)
-    */
-    function setRefillThresholdPct(uint _pct) external onlyRole(DEFAULT_ADMIN_ROLE) {
+     * @notice Prevents buffer from refilling adapters with "dust" amount
+     * @dev Admin function to set a minimum deviation from expectedAdapterAmount that would trigger a refill
+     * @param _pct Minimum percentage of deviation to trigger the refill (format: 5% = 500)
+     */
+    function setRefillThresholdPct(
+        uint _pct
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         refillThreshold = _pct;
     }
 
@@ -695,20 +727,25 @@ contract BufferManager is
     }
 
     /**
-    * @dev Adds tokens that are not supported by Across, thus follow different briging logic
-    * @param _token Token that should follow deviant logic
-    */
-    function addNonBridgeToken (address _token) external onlyRole(DEFAULT_ADMIN_ROLE){
+     * @dev Adds tokens that are not supported by Across, thus follow different briging logic
+     * @param _token Token that should follow deviant logic
+     */
+    function addNonBridgeToken(
+        address _token
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         nonBridgeTokens.add(_token);
     }
 
     /**
-    * @dev Sets a leverage value, that allows countering slippage in a scenario it is required
-    * @notice Needed to sustain refill logic for the adapters interacting with volatile pools
-    * @param _iballuo Address of the ibAlluo
-    * @param _pct Pct of surplus (e.g. 1% = 100)
-    */
-    function setSlippageControl (address _iballuo, uint _pct) external onlyRole(DEFAULT_ADMIN_ROLE) {
+     * @dev Sets a leverage value, that allows countering slippage in a scenario it is required
+     * @notice Needed to sustain refill logic for the adapters interacting with volatile pools
+     * @param _iballuo Address of the ibAlluo
+     * @param _pct Pct of surplus (e.g. 1% = 100)
+     */
+    function setSlippageControl(
+        address _iballuo,
+        uint _pct
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         slippageControl[_iballuo] = _pct;
     }
 
@@ -732,17 +769,23 @@ contract BufferManager is
     }
 
     /**
-    * @notice if _amount == 0 withdraws all
-    * @dev Admin function to employ assets not eligible for refill/bridging logic in circulation by returning it to gnosis
-    * @param _token Address of the token to withdraw
-    * @param _amount Amount of the token to withdraw
-    */
-    
-    function withdrawGnosis(address _token, uint256 _amount) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        if(_amount != 0){
-        IERC20Upgradeable(_token).transfer(gnosis, _amount);
+     * @notice if _amount == 0 withdraws all
+     * @dev Admin function to employ assets not eligible for refill/bridging logic in circulation by returning it to gnosis
+     * @param _token Address of the token to withdraw
+     * @param _amount Amount of the token to withdraw
+     */
+
+    function withdrawGnosis(
+        address _token,
+        uint256 _amount
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_amount != 0) {
+            IERC20Upgradeable(_token).transfer(gnosis, _amount);
         } else {
-            IERC20Upgradeable(_token).transfer(gnosis, IERC20Upgradeable(_token).balanceOf(address(this)));
+            IERC20Upgradeable(_token).transfer(
+                gnosis,
+                IERC20Upgradeable(_token).balanceOf(address(this))
+            );
         }
     }
 
