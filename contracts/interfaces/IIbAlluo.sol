@@ -85,6 +85,10 @@ interface IIbAlluo is IERC20, IAccessControl {
         uint256 _amount
     ) external;
 
+    function convertToAssetValue(
+        uint256 _amountInTokenValue
+    ) external view returns (uint256);
+
     function stopFlowWhenCritical(address sender, address receiver) external;
 
     function forceWrap(address sender) external;

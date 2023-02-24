@@ -15,6 +15,7 @@ import "../interfaces/IGnosis.sol";
 import "../interfaces/ILiquidityHandler.sol";
 import "../interfaces/IIbAlluo.sol";
 import "../interfaces/IAlluoStrategy.sol";
+import "../interfaces/IPriceFeedRouterV2.sol";
 
 interface IAnyCallExecutor {
     struct Context {
@@ -47,6 +48,11 @@ contract VoteExecutorSlaveFinal is
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    address public constant USDC = 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174;
+    address public constant IBALLUO =
+        0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6;
+    uint256 public constant MULTIPLIER = 10 ** 18;
+
     bool public upgradeStatus;
     string public lastMessage;
     address public lastCaller;
@@ -72,12 +78,16 @@ contract VoteExecutorSlaveFinal is
 
     mapping(bytes32 => uint256) public hashExecutionTime;
 
+    address public priceFeedRouter;
+    uint64 public primaryTokenIndex;
+    uint256 public fiatIndex;
+    Message[] public messages;
+    Entry[] public entries;
+
     struct Entry {
         uint256 directionId;
         uint256 percent;
     }
-
-    Entry[] public entries;
 
     struct Message {
         uint256 commandIndex;
@@ -167,6 +177,12 @@ contract VoteExecutorSlaveFinal is
         emit MessageReceived(hashed);
     }
 
+    function messageExecute(
+        Message[] memory _messages
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        execute(_messages);
+    }
+
     /// @notice Executes all messages received after authentication
     /// @dev Loops through each command in the array and executes it.
     /// @param _messages Array of messages
@@ -195,6 +211,31 @@ contract VoteExecutorSlaveFinal is
                 if (percent != 0) {
                     Entry memory e = Entry(directionId, percent);
                     entries.push(e);
+                }
+            } else if (currentMessage.commandIndex == 3) {
+                int256 treasuryDelta = abi.decode(
+                    currentMessage.commandData,
+                    (int256)
+                );
+
+                (uint256 fiatPrice, uint8 fiatDecimals) = IPriceFeedRouterV2(
+                    priceFeedRouter
+                ).getPrice(USDC, fiatIndex);
+                uint256 growingRatio = IIbAlluo(IBALLUO).growingRatio();
+                if (treasuryDelta < 0) {
+                    uint256 exactAmount = (uint256(-treasuryDelta) *
+                        10 ** fiatDecimals) / fiatPrice;
+                    IIbAlluo(IBALLUO).burn(
+                        gnosis,
+                        (exactAmount * MULTIPLIER) / growingRatio
+                    );
+                } else if (treasuryDelta >= 0) {
+                    uint256 exactAmount = (uint256(treasuryDelta) *
+                        10 ** fiatDecimals) / fiatPrice;
+                    IIbAlluo(IBALLUO).mint(
+                        gnosis,
+                        (exactAmount * MULTIPLIER) / growingRatio
+                    );
                 }
             }
         }
@@ -342,6 +383,14 @@ contract VoteExecutorSlaveFinal is
         voteExecutorMaster = _newAddress;
     }
 
+    function setPriceRouterInfo(
+        address _priceFeedRouter,
+        uint256 _fiatIndex
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        priceFeedRouter = _priceFeedRouter;
+        fiatIndex = _fiatIndex;
+    }
+
     function grantRole(
         bytes32 role,
         address account
@@ -361,7 +410,7 @@ contract VoteExecutorSlaveFinal is
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyRole(UPGRADER_ROLE) {
-        require(upgradeStatus, "Handler: Upgrade not allowed");
+        require(upgradeStatus, "Executor: Upgrade not allowed");
         upgradeStatus = false;
     }
 }
