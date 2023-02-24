@@ -85,7 +85,6 @@ describe("FundManager Tests", () => {
         await cvxDistributor.connect(Gnosis).grantRole(await cvxDistributor.PROTOCOL_ROLE(), "0x82e568C482dF2C833dab0D38DeB9fb01777A9e89")
         let ZERO_ADDRESS = Signers[0].address
         FundManager = await upgrades.deployProxy(fundManagerFactory, [Gnosis.address, ZERO_ADDRESS, ZERO_ADDRESS, maxGasPrice]) as FundManager;
-        await FundManager.setGnosis(Gnosis.address);
         await FundManager.setStrategyHandler(StrategyHandler.address);
         await FundManager.setVoteExecutorMaster(VoteExecutorMaster.address);
         await FundManager.setExchangeAddress("0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec")

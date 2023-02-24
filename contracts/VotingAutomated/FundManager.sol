@@ -99,7 +99,7 @@ contract FundManager is
             uint256 totalBalance = IERC20MetadataUpgradeable(
                 strategyPrimaryToken
             ).balanceOf(address(this));
-            if (totalBalance >= assetIdToMinDeposit[i]) {
+            if (totalBalance > assetIdToMinDeposit[i]) {
                 return (
                     true,
                     abi.encodeWithSignature(
@@ -142,7 +142,7 @@ contract FundManager is
         uint256 totalBalance = IERC20MetadataUpgradeable(strategyPrimaryToken)
             .balanceOf(address(this));
 
-        if (totalBalance < assetIdToMinDeposit[_assetId]) return;
+        if (totalBalance <= assetIdToMinDeposit[_assetId]) return;
 
         IVoteExecutorMaster.Deposit[] memory depositInfo = IVoteExecutorMaster(
             voteExecutorMaster
