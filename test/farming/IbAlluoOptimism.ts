@@ -5,7 +5,7 @@ import { BigNumberish, constants } from "ethers";
 import { parseEther, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha"
-import { AccessControl, BtcOptimismAdapter, BufferManager, IbAlluo, IbAlluoPriceResolver__factory, ICurvePoolBTC, ICurvePoolETH, ICurvePoolUSD, IERC20, IERC20Metadata, IExchange, IWrappedEther, LiquidityHandlerPolygon, PriceFeedRouterV2, StIbAlluo, SuperfluidEndResolver, SuperfluidResolver, Usd3PoolOptimismAdapter, WithdrawalRequestResolver__factory } from "../../typechain";
+import { AccessControl, BtcOptimismAdapter, BufferManager, IbAlluo, IbAlluoPriceResolver__factory, ICurvePoolBTC, ICurvePoolETH, ICurvePoolUSD, IERC20, IERC20Metadata, IExchange, IWrappedEther, LiquidityHandlerPolygon, PriceFeedRouterV2, StIbAlluo, SuperfluidEndResolver, SuperfluidResolver, Usd3PoolOptimismAdapter, VoteExecutorSlaveFinal, WithdrawalRequestResolver__factory } from "../../typechain";
 import { EthOptimismAdapter } from "../../typechain/EthOptimismAdapter";
 
 function getInterestPerSecondParam(apyPercent: number): string {
@@ -29,6 +29,7 @@ async function skipDays(d: number) {
 describe("IbAlluo Optimism Integration Test", async () => {
     let signers: SignerWithAddress[];
     let priceRouter: PriceFeedRouterV2;
+    let voteExecutorSlave: VoteExecutorSlaveFinal;
     let exchange: IExchange & AccessControl;
     let gnosis: SignerWithAddress;
 
@@ -57,7 +58,8 @@ describe("IbAlluo Optimism Integration Test", async () => {
             "0x66Ac11c106C3670988DEFDd24BC75dE786b91095"
         ) as IExchange & AccessControl;
         priceRouter = await ethers.getContractAt("PriceFeedRouterV2", "0x7E6FD319A856A210b9957Cd6490306995830aD25");
-        gnosis = await ethers.getImpersonatedSigner("0xc7061dD515B602F86733Fa0a0dBb6d6E6B34aED4")
+        voteExecutorSlave = await ethers.getContractAt("VoteExecutorSlaveFinal", "0x7E6FD319A856A210b9957Cd6490306995830aD25");
+        gnosis = await ethers.getImpersonatedSigner("0xc7061dD515B602F86733Fa0a0dBb6d6E6B34aED4");
 
         // Checks on recent optimism block
 
@@ -440,6 +442,10 @@ describe("IbAlluo Optimism Integration Test", async () => {
 
         await buffer.connect(gnosis).setRefillThresholdPct(500);
 
+        await ibAlluoUSD.connect(gnosis).grantRole(constants.HashZero, voteExecutorSlave.address);
+        await ibAlluoETH.connect(gnosis).grantRole(constants.HashZero, voteExecutorSlave.address);
+        await ibAlluoBTC.connect(gnosis).grantRole(constants.HashZero, voteExecutorSlave.address);
+
         // Step 7: Resolvers
         if (!resolverCreationLogged) {
             // Alluo - IbAlluoXXX Price resolvers
@@ -771,7 +777,7 @@ describe("IbAlluo Optimism Integration Test", async () => {
         if (name == "StibAlluoBTC Polygon") contractFrom = stIbAlluoBTC.address;
         if (name == "Superfluid Resolver") contractFrom = superfluidResolver.address;
         if (name == "Superfluid End Resolver") contractFrom = superfluidEndResolver.address;
-        if (name == "Vote Executor Slave") contractFrom = undefined;
+        if (name == "Vote Executor Slave") contractFrom = voteExecutorSlave.address;
         if (name == "msg.sender from Gelato") contractFrom = "0x6dad1cb747a95ae1fcd364af9adb5b4615f157a4";
         if (name == "Polygon Gnosis") contractFrom = gnosis.address;
         if (name == "BTC Adapter") contractFrom = btcAdapter.address;
