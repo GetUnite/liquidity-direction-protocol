@@ -62,6 +62,9 @@ contract VoteExecutorMasterLog is
     // Here the amount object is used as a percentage where 10000 is 100%;
     mapping(uint256 => Deposit[]) public assetIdToDepositPercentages;
     address public cvxDistributor;
+
+    address public constant FUND_MANAGER =
+        0xBac731029f8F92D147Acc701aB1B4B099C31A3c4;
     struct Deposit {
         uint256 directionId;
         uint256 amount;
@@ -188,6 +191,21 @@ contract VoteExecutorMasterLog is
 
         IStrategyHandler handler = IStrategyHandler(strategyHandler);
 
+        for (uint256 i; i < handler.numberOfAssets(); i++) {
+            address tokenToCheck = handler.getPrimaryTokenByAssetId(i, 1);
+            if (
+                IERC20MetadataUpgradeable(tokenToCheck).balanceOf(
+                    FUND_MANAGER
+                ) > 0
+            ) {
+                IERC20Upgradeable(tokenToCheck).transferFrom(
+                    FUND_MANAGER,
+                    address(this),
+                    IERC20Upgradeable(tokenToCheck).balanceOf(FUND_MANAGER)
+                );
+            }
+        }
+
         if (exactData.signs.length >= minSigns) {
             uint256 currentChain = crossChainInfo.currentChain;
 
@@ -257,20 +275,20 @@ contract VoteExecutorMasterLog is
                         console.log("directionId", directionId);
                         if (percent > 0) {
                             assetIdToDepositPercentages[direction.assetId].push(
-                                Deposit(directionId, percent)
-                            );
+                                    Deposit(directionId, percent)
+                                );
                         }
 
                         if (percent == 0) {
                             console.log("full exit");
                             IAlluoStrategyV2(direction.strategyAddress).exitAll(
-                                direction.exitData,
-                                10000,
-                                strategyPrimaryToken,
-                                address(this),
-                                false,
-                                false
-                            );
+                                    direction.exitData,
+                                    10000,
+                                    strategyPrimaryToken,
+                                    address(this),
+                                    false,
+                                    false
+                                );
                             handler.removeFromActiveDirections(directionId);
                         } else {
                             uint newAmount = (percent *
@@ -281,7 +299,6 @@ contract VoteExecutorMasterLog is
                                 uint exitPercent = 10000 -
                                     (newAmount * 10000) /
                                     direction.latestAmount;
-                                console.log("w percent", exitPercent);
                                 IAlluoStrategyV2(direction.strategyAddress)
                                     .exitAll(
                                         direction.exitData,
@@ -294,7 +311,6 @@ contract VoteExecutorMasterLog is
                             } else if (newAmount != direction.latestAmount) {
                                 uint depositAmount = newAmount -
                                     direction.latestAmount;
-                                console.log("deposit", depositAmount);
                                 assetIdToDepositList[direction.assetId].push(
                                     Deposit(directionId, depositAmount)
                                 );
