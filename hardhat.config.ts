@@ -33,7 +33,7 @@ const config: HardhatUserConfig = {
     },
     mainnet: {
       url: process.env.MAINNET_URL,
-      gasPrice: 8000000000,
+      gasPrice: 32000000000,
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
@@ -89,7 +89,7 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     // apiKey: process.env.ETHERSCAN_API_KEY,
-    apiKey: process.env.POLYGONSCAN_API_KEY,
+    apiKey: process.env.ETHERSCAN_API_KEY,
 
   },
 
