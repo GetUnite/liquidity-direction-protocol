@@ -250,10 +250,7 @@ contract VoteExecutorSlaveFinalOptimism is
         if (address(ibAlluo) == address(0)) {
             return;
         }
-        ibAlluo.setInterest(
-            _newAnnualInterest,
-            _newInterestPerSecond
-        );
+        ibAlluo.setInterest(_newAnnualInterest, _newInterestPerSecond);
     }
 
     /// @notice Checks the array of signatures from L1 for authentication

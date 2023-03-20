@@ -88,21 +88,22 @@ contract Usd3PoolOptimismAdapter is
             if (toSend != 0) {
                 IERC20(primaryToken).safeTransfer(
                     buffer,
-                    toSend / 10**(18 - IERC20Metadata(primaryToken).decimals())
+                    toSend /
+                        10 ** (18 - IERC20Metadata(primaryToken).decimals())
                 );
             }
             if (_leaveInPool != 0) {
                 uint256[3] memory amounts;
                 amounts[primaryTokenIndex] =
                     _leaveInPool /
-                    10**(18 - IERC20Metadata(primaryToken).decimals());
+                    10 ** (18 - IERC20Metadata(primaryToken).decimals());
                 ICurvePoolUSD(CURVE_POOL).add_liquidity(amounts, 0);
             }
         } else {
             uint256[3] memory amounts;
             amounts[indexes[_token]] =
                 _fullAmount /
-                10**(18 - IERC20Metadata(_token).decimals());
+                10 ** (18 - IERC20Metadata(_token).decimals());
 
             uint256 lpAmount = ICurvePoolUSD(CURVE_POOL).add_liquidity(
                 amounts,
@@ -112,7 +113,7 @@ contract Usd3PoolOptimismAdapter is
             if (toSend != 0) {
                 toSend =
                     toSend /
-                    10**(18 - IERC20Metadata(primaryToken).decimals());
+                    10 ** (18 - IERC20Metadata(primaryToken).decimals());
                 amounts[primaryTokenIndex] = toSend;
                 ICurvePoolUSD(CURVE_POOL).remove_liquidity_imbalance(
                     amounts,
@@ -133,7 +134,8 @@ contract Usd3PoolOptimismAdapter is
         uint256 _amount
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         uint256[3] memory amounts;
-        uint256 amount = _amount / 10**(18 - IERC20Metadata(_token).decimals());
+        uint256 amount = _amount /
+            10 ** (18 - IERC20Metadata(_token).decimals());
         amounts[indexes[_token]] = amount;
         ICurvePoolUSD(CURVE_POOL).remove_liquidity_imbalance(
             amounts,
@@ -157,13 +159,13 @@ contract Usd3PoolOptimismAdapter is
                     curveLpAmount,
                     int128(uint128(primaryTokenIndex))
                 )
-            ) * 10**(18 - ERC20(primaryToken).decimals());
+            ) * 10 ** (18 - ERC20(primaryToken).decimals());
 
             if (priceFeedRouter != address(0)) {
                 (uint256 price, uint8 priceDecimals) = IPriceFeedRouter(
                     priceFeedRouter
                 ).getPrice(primaryToken, fiatIndex);
-                amount = (amount * price) / 10**(uint256(priceDecimals));
+                amount = (amount * price) / 10 ** (uint256(priceDecimals));
             }
 
             return amount;
@@ -183,34 +185,31 @@ contract Usd3PoolOptimismAdapter is
     /**
      * @dev Admin function to set the primaryTokenIndex
      */
-    function changePrimaryTokenIndex(uint64 _newPrimaryTokenIndex)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function changePrimaryTokenIndex(
+        uint64 _newPrimaryTokenIndex
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         primaryTokenIndex = _newPrimaryTokenIndex;
     }
 
     /**
      * @dev Admin function to set the slippage
      */
-    function setSlippage(uint64 _newSlippage)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function setSlippage(
+        uint64 _newSlippage
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         slippage = _newSlippage;
     }
 
-    function setBuffer(address _newBuffer)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function setBuffer(
+        address _newBuffer
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         buffer = _newBuffer;
     }
 
-    function setPriceRouterInfo(address _priceFeedRouter, uint256 _fiatIndex)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function setPriceRouterInfo(
+        address _priceFeedRouter,
+        uint256 _fiatIndex
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         priceFeedRouter = _priceFeedRouter;
         fiatIndex = _fiatIndex;
     }
@@ -228,18 +227,15 @@ contract Usd3PoolOptimismAdapter is
         IERC20(_address).safeTransfer(_to, _amount);
     }
 
-    function changeUpgradeStatus(bool _status)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function changeUpgradeStatus(
+        bool _status
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         upgradeStatus = _status;
     }
 
-    function _authorizeUpgrade(address)
-        internal
-        override
-        onlyRole(UPGRADER_ROLE)
-    {
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(UPGRADER_ROLE) {
         require(upgradeStatus, "Adapter: Upgrade not allowed");
         upgradeStatus = false;
     }
