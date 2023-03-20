@@ -88,10 +88,13 @@ const config: HardhatUserConfig = {
     currency: "USD",
   },
   etherscan: {
-    // apiKey: process.env.ETHERSCAN_API_KEY,
-    apiKey: process.env.ETHERSCAN_API_KEY,
-
+    apiKey: {
+      mainnet: process.env.ETHERSCAN_API_KEY != undefined ? process.env.ETHERSCAN_API_KEY : "",
+      polygon: process.env.POLYGONSCAN_API_KEY != undefined ? process.env.POLYGONSCAN_API_KEY : "",
+      optimism: process.env.OPTIMISTICSCAN_API_KEY != undefined ? process.env.OPTIMISTICSCAN_API_KEY : ""
+    }
   },
+
 
   mocha: {
     timeout: 3600000,
