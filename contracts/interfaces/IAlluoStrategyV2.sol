@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity ^0.8.11;
 
 interface IAlluoStrategyV2 {
     /// @notice Invest tokens transferred to this contract.
@@ -26,7 +26,7 @@ interface IAlluoStrategyV2 {
 
     function getDeployedAmountAndRewards(
         bytes calldata data
-    ) external returns (uint256);
+    ) external view returns (uint256);
 
     /// @notice Claim available rewards.
     /// @param data whatever data you want to pass to strategy from vote extry.
