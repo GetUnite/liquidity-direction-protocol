@@ -37,7 +37,7 @@ interface IAnyCall {
     ) external;
 }
 
-contract VoteExecutorSlaveFinal is
+contract VoteExecutorSlaveFinalOptimism is
     Initializable,
     PausableUpgradeable,
     AccessControlUpgradeable,
@@ -212,31 +212,6 @@ contract VoteExecutorSlaveFinal is
                     Entry memory e = Entry(directionId, percent);
                     entries.push(e);
                 }
-            } else if (currentMessage.commandIndex == 3) {
-                int256 treasuryDelta = abi.decode(
-                    currentMessage.commandData,
-                    (int256)
-                );
-
-                (uint256 fiatPrice, uint8 fiatDecimals) = IPriceFeedRouterV2(
-                    priceFeedRouter
-                ).getPrice(USDC, fiatIndex);
-                uint256 growingRatio = IIbAlluo(IBALLUO).growingRatio();
-                if (treasuryDelta < 0) {
-                    uint256 exactAmount = (uint256(-treasuryDelta) *
-                        10 ** fiatDecimals) / fiatPrice;
-                    IIbAlluo(IBALLUO).burn(
-                        gnosis,
-                        (exactAmount * MULTIPLIER) / growingRatio
-                    );
-                } else if (treasuryDelta >= 0) {
-                    uint256 exactAmount = (uint256(treasuryDelta) *
-                        10 ** fiatDecimals) / fiatPrice;
-                    IIbAlluo(IBALLUO).mint(
-                        gnosis,
-                        (exactAmount * MULTIPLIER) / growingRatio
-                    );
-                }
             }
         }
     }
@@ -271,10 +246,11 @@ contract VoteExecutorSlaveFinal is
         uint256 _newInterestPerSecond,
         string memory _ibAlluoSymbol
     ) internal {
-        ibAlluoSymbolToAddress[_ibAlluoSymbol].setInterest(
-            _newAnnualInterest,
-            _newInterestPerSecond
-        );
+        IIbAlluo ibAlluo = ibAlluoSymbolToAddress[_ibAlluoSymbol];
+        if (address(ibAlluo) == address(0)) {
+            return;
+        }
+        ibAlluo.setInterest(_newAnnualInterest, _newInterestPerSecond);
     }
 
     /// @notice Checks the array of signatures from L1 for authentication

@@ -21,6 +21,7 @@ import {IWrappedEther} from "../interfaces/IWrappedEther.sol";
 import {IIbAlluo} from "../interfaces/IIbAlluo.sol";
 import {IPriceFeedRouterV2} from "../interfaces/IPriceFeedRouterV2.sol";
 import {IStrategyHandler} from "../interfaces/IStrategyHandler.sol";
+import {ICvxDistributor} from "../interfaces/ICvxDistributor.sol";
 
 contract VoteExecutorMasterLog is
     Initializable,
@@ -58,6 +59,12 @@ contract VoteExecutorMasterLog is
 
     uint public slippage;
 
+    // Here the amount object is used as a percentage where 10000 is 100%;
+    mapping(uint256 => Deposit[]) public assetIdToDepositPercentages;
+    address public cvxDistributor;
+
+    address public constant FUND_MANAGER =
+        0xBac731029f8F92D147Acc701aB1B4B099C31A3c4;
     struct Deposit {
         uint256 directionId;
         uint256 amount;
@@ -171,7 +178,9 @@ contract VoteExecutorMasterLog is
         }
     }
 
-    function executeSpecificData(uint256 index) external {
+    function executeSpecificData(
+        uint256 index
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         SubmittedData memory exactData = submittedData[index];
         (bytes32 hashed, Message[] memory messages, ) = abi.decode(
             exactData.data,
@@ -182,11 +191,25 @@ contract VoteExecutorMasterLog is
 
         IStrategyHandler handler = IStrategyHandler(strategyHandler);
 
+        for (uint256 i; i < handler.numberOfAssets(); i++) {
+            address tokenToCheck = handler.getPrimaryTokenByAssetId(i, 1);
+            if (
+                IERC20MetadataUpgradeable(tokenToCheck).balanceOf(
+                    FUND_MANAGER
+                ) > 0
+            ) {
+                IERC20Upgradeable(tokenToCheck).transferFrom(
+                    FUND_MANAGER,
+                    address(this),
+                    IERC20Upgradeable(tokenToCheck).balanceOf(FUND_MANAGER)
+                );
+            }
+        }
+
         if (exactData.signs.length >= minSigns) {
             uint256 currentChain = crossChainInfo.currentChain;
 
             handler.calculateAll();
-
             bool needToWithdrawTreasury;
             uint amountToWithdrawTreasury;
             Message memory lastMessage = messages[messages.length - 1];
@@ -203,6 +226,12 @@ contract VoteExecutorMasterLog is
             }
 
             uint[] memory amountsDeployed = handler.getLatestDeployed();
+
+            // Clear previous asset list for liquidity direction.
+            uint256 numberOfAssets = handler.numberOfAssets();
+            for (uint256 _assetId; _assetId < numberOfAssets; _assetId++) {
+                delete assetIdToDepositPercentages[_assetId];
+            }
 
             for (uint256 j; j < messages.length; j++) {
                 uint256 commandIndex = messages[j].commandIndex;
@@ -237,12 +266,19 @@ contract VoteExecutorMasterLog is
                         messages[j].commandData,
                         (uint256, uint256)
                     );
+
                     (
                         address strategyPrimaryToken,
                         IStrategyHandler.LiquidityDirection memory direction
                     ) = handler.getDirectionFullInfoById(directionId);
                     if (direction.chainId == currentChain) {
                         console.log("directionId", directionId);
+                        if (percent > 0) {
+                            assetIdToDepositPercentages[direction.assetId].push(
+                                Deposit(directionId, percent)
+                            );
+                        }
+
                         if (percent == 0) {
                             console.log("full exit");
                             IAlluoStrategyV2(direction.strategyAddress).exitAll(
@@ -263,7 +299,6 @@ contract VoteExecutorMasterLog is
                                 uint exitPercent = 10000 -
                                     (newAmount * 10000) /
                                     direction.latestAmount;
-                                console.log("w percent", exitPercent);
                                 IAlluoStrategyV2(direction.strategyAddress)
                                     .exitAll(
                                         direction.exitData,
@@ -276,7 +311,6 @@ contract VoteExecutorMasterLog is
                             } else if (newAmount != direction.latestAmount) {
                                 uint depositAmount = newAmount -
                                     direction.latestAmount;
-                                console.log("deposit", depositAmount);
                                 assetIdToDepositList[direction.assetId].push(
                                     Deposit(directionId, depositAmount)
                                 );
@@ -297,6 +331,8 @@ contract VoteExecutorMasterLog is
                 exactData.data,
                 exactData.signs
             );
+            ICvxDistributor(cvxDistributor).updateReward(true, true);
+
             IAnyCall(crossChainInfo.anyCallAddress).anyCall(
                 crossChainInfo.nextChainExecutor,
                 finalData,
@@ -493,6 +529,12 @@ contract VoteExecutorMasterLog is
         }
     }
 
+    function getAssetIdToDepositPercentages(
+        uint256 _assetId
+    ) public view returns (Deposit[] memory) {
+        return assetIdToDepositPercentages[_assetId];
+    }
+
     function cleanDepositList(
         uint256 _assetId
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -605,6 +647,12 @@ contract VoteExecutorMasterLog is
         address _newFeed
     ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         priceFeed = _newFeed;
+    }
+
+    function setCvxDistributor(
+        address _newCvxDistributor
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        cvxDistributor = _newCvxDistributor;
     }
 
     function grantRole(

@@ -9,6 +9,7 @@ import "solidity-coverage";
 import 'hardhat-contract-sizer'
 import './tasks'
 import '@openzeppelin/hardhat-upgrades';
+import "hardhat-tracer";
 
 dotenv.config();
 
@@ -32,14 +33,7 @@ const config: HardhatUserConfig = {
     },
     mainnet: {
       url: process.env.MAINNET_URL,
-      gasPrice: 8000000000,
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-    },
-    optimism: {
-      url: process.env.OPTIMISM_URL,
-      gasPrice: "auto",
+      gasPrice: 32000000000,
       accounts: {
         mnemonic: process.env.MNEMONIC,
       },
@@ -94,11 +88,13 @@ const config: HardhatUserConfig = {
     currency: "USD",
   },
   etherscan: {
-    // apiKey: process.env.ETHERSCAN_API_KEY,
-    // apiKey: process.env.OPTIMISM_API_KEY,
-    apiKey: process.env.POLYGONSCAN_API_KEY,
-
+    apiKey: {
+      mainnet: process.env.ETHERSCAN_API_KEY != undefined ? process.env.ETHERSCAN_API_KEY : "",
+      polygon: process.env.POLYGONSCAN_API_KEY != undefined ? process.env.POLYGONSCAN_API_KEY : "",
+      optimism: process.env.OPTIMISTICSCAN_API_KEY != undefined ? process.env.OPTIMISTICSCAN_API_KEY : ""
+    }
   },
+
 
   mocha: {
     timeout: 3600000,
