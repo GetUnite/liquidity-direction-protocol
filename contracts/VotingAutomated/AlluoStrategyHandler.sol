@@ -7,19 +7,15 @@ import {AddressUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Addr
 
 import {DecimalConverter} from "../libs/DecimalConverter.sol";
 import {AlluoBridging} from "../crosschain/AlluoBridging.sol";
-import {AlluoMessaging} from "../crosschain/AlluoMessaging.sol";
 import {AlluoUpgradeableBase} from "../AlluoUpgradeableBase.sol";
 import {IAlluoStrategyV2} from "../interfaces/IAlluoStrategyV2.sol";
 import {IExchange} from "../interfaces/IExchange.sol";
+import {IAlluoVoteExecutorUtils} from "../interfaces/IAlluoVoteExecutorUtils.sol";
 
 // solhint-disable-next-line
 import "hardhat/console.sol";
 
-contract AlluoStrategyHandler is
-    AlluoUpgradeableBase,
-    AlluoBridging,
-    AlluoMessaging
-{
+contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
@@ -29,11 +25,12 @@ contract AlluoStrategyHandler is
     mapping(uint256 => LiquidityDirection) public liquidityDirection;
     mapping(uint256 => AssetInfo) private assetIdToAssetInfo;
     mapping(uint256 => DepositQueue) public assetIdToDepositQueue;
+    mapping(address => uint8) public tokenToAssetId;
     uint8 public numberOfAssets;
     uint256 public lastDirectionId;
     uint256 public slippageTolerance;
     address public exchange;
-
+    address public voteExecutorUtils;
     struct LiquidityDirection {
         address strategyAddress;
         address entryToken;
@@ -65,17 +62,17 @@ contract AlluoStrategyHandler is
 
     function initialize(
         address _multiSigWallet,
-        address _anyCall,
         address _spokePool,
         address _recipient,
         uint256 _recipientChainId,
         uint64 _relayerFeePct,
-        uint256 _slippageTolerance
+        uint256 _slippageTolerance,
+        address _exchange,
+        address _voteExecutorUtils
     ) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        _setAnyCall(_anyCall);
         _setAlluoBridging(
             _spokePool,
             _recipient,
@@ -86,8 +83,11 @@ contract AlluoStrategyHandler is
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
 
         slippageTolerance = _slippageTolerance;
+        exchange = _exchange;
+        voteExecutorUtils = _voteExecutorUtils;
     }
 
+    ///
     // Used to calculate TVL
     function markAssetToMarket(
         uint8 assetId
@@ -151,7 +151,22 @@ contract AlluoStrategyHandler is
                 primaryToken
             );
         } else if (target > current) {
-            _queueDeposit(directionId, target - current);
+            _queueDeposit(assetId, directionId, target - current);
+        }
+    }
+
+    function bridgeRemainingFunds(
+        uint8 assetId
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        AssetInfo storage assetInfo = assetIdToAssetInfo[assetId];
+        DepositQueue storage _depositQueue = assetIdToDepositQueue[assetId];
+        address primaryToken = assetInfo.chainIdToPrimaryToken[block.chainid];
+
+        uint256 amount = IERC20MetadataUpgradeable(primaryToken).balanceOf(
+            address(this)
+        );
+        if (amount > 0 && _depositQueue.totalDepositAmount == 0) {
+            _bridge(amount, primaryToken);
         }
     }
 
@@ -173,10 +188,12 @@ contract AlluoStrategyHandler is
         );
     }
 
-    function _queueDeposit(uint256 _directionId, uint256 _amount) internal {
-        DepositQueue storage _depositQueue = assetIdToDepositQueue[
-            _directionId
-        ];
+    function _queueDeposit(
+        uint8 _assetId,
+        uint256 _directionId,
+        uint256 _amount
+    ) internal {
+        DepositQueue storage _depositQueue = assetIdToDepositQueue[_assetId];
         _depositQueue.totalDepositAmount += _amount;
         _depositQueue.deposits.push(
             Deposit({amount: _amount, directionId: _directionId})
@@ -193,15 +210,15 @@ contract AlluoStrategyHandler is
             msg.sender
         );
         require(
-            isWithinSlippageTolerance(
-                totalDepositAmount,
-                fundsReady,
-                slippageTolerance
-            ),
+            IAlluoVoteExecutorUtils(voteExecutorUtils)
+                .isWithinSlippageTolerance(
+                    totalDepositAmount,
+                    fundsReady,
+                    slippageTolerance
+                ),
             "Not enough funds"
         );
         // Assume here that any disparity between the deposit amount and funds ready is due to slippage and fees
-        _depositQueue.totalDepositAmount = fundsReady;
         // need to scale deposit values here to account for slippage
         _scaleDepositQueue(_depositQueue, totalDepositAmount, fundsReady);
         for (uint256 i; i < _depositQueue.deposits.length; i++) {
@@ -260,18 +277,6 @@ contract AlluoStrategyHandler is
         ];
     }
 
-    function isWithinSlippageTolerance(
-        uint256 _amount,
-        uint256 _amountToCompare,
-        uint256 _slippageTolerance
-    ) public pure returns (bool) {
-        return
-            _amount >=
-            ((_amountToCompare * (10000 - _slippageTolerance)) / 10000) &&
-            _amount <=
-            ((_amountToCompare * (10000 + _slippageTolerance)) / 10000);
-    }
-
     // Admin functions
     //
     //
@@ -317,32 +322,6 @@ contract AlluoStrategyHandler is
         );
     }
 
-    function addLiquidityDirection(
-        string memory _codeName,
-        address _strategyAddress,
-        address _entryToken,
-        uint256 _assetId,
-        uint256 _chainId,
-        bytes memory _entryData,
-        bytes memory _exitData,
-        bytes memory _rewardsData
-    ) external {
-        require(directionNameToId[_codeName] == 0);
-
-        directionNameToId[_codeName] = lastDirectionId;
-        liquidityDirection[lastDirectionId] = LiquidityDirection(
-            _strategyAddress,
-            _entryToken,
-            _assetId,
-            _chainId,
-            _entryData,
-            _exitData,
-            _rewardsData,
-            0
-        );
-        lastDirectionId++;
-    }
-
     function setLastDirectionId(
         uint256 _newNumber
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -365,8 +344,22 @@ contract AlluoStrategyHandler is
         assetIdToAssetInfo[_assetId].ibAlluo = _ibAlluo;
         for (uint256 i; i < _chainIds.length; i++) {
             assetIdToAssetInfo[_assetId].chainIdToPrimaryToken[
-                _chainIds[i]
-            ] = _chainIdToPrimaryToken[i];
+                    _chainIds[i]
+                ] = _chainIdToPrimaryToken[i];
         }
+    }
+
+    function getAssetAmount(uint _id) external view returns (uint256) {
+        return (assetIdToAssetInfo[_id].amountDeployed);
+    }
+
+    function getDirectionFullInfoById(
+        uint256 _id
+    ) external view returns (address, LiquidityDirection memory) {
+        require(_id != 0);
+        LiquidityDirection memory direction = liquidityDirection[_id];
+        address primaryToken = assetIdToAssetInfo[direction.assetId]
+            .chainIdToPrimaryToken[direction.chainId];
+        return (primaryToken, direction);
     }
 }

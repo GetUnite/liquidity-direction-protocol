@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 // Generated from pool contract ABI (https://polygonscan.com/address/0x89d065572136814230A55DdEeDDEC9DF34EB0B76#code)
 // and interface generator (https://bia.is/tools/abi2solidity/)

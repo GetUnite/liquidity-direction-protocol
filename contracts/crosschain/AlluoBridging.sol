@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {ISpokePool} from "../interfaces/ISpokePool.sol";
 
-contract AlluoBridging {
+abstract contract AlluoBridging {
     struct AlluoBridgingInformation {
         address spokepool;
         address recipient;

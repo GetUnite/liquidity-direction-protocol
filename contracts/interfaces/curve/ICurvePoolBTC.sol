@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 // and interface generator (https://bia.is/tools/abi2solidity/)
 interface ICurvePoolBTC {

@@ -9,7 +9,7 @@
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 /*
  * @dev Provides information about the current execution context, including the
@@ -34,7 +34,7 @@ abstract contract Context {
 
 // File: @openzeppelin/contracts/math/SafeMath.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 /**
  * @dev Wrappers over Solidity's arithmetic operations with added overflow
@@ -206,7 +206,7 @@ library SafeMath {
 
 // File: @openzeppelin/contracts/utils/Address.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 /**
  * @dev Collection of functions related to the address type
@@ -388,7 +388,7 @@ library Address {
 
 // File: contracts/lib/IERC20Internal.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 abstract contract IERC20Internal {
     function _transfer(
@@ -451,7 +451,7 @@ abstract contract IERC20Internal {
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 /**
  * @dev openzeppelin Implementation of the {IERC20} interface.
@@ -837,7 +837,7 @@ contract ERC20 is Context, IERC20, IERC20Internal {
 
 // File: @openzeppelin/contracts/utils/EnumerableSet.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 /**
  * @dev Library for managing
@@ -1110,7 +1110,7 @@ library EnumerableSet {
 
 // File: @openzeppelin/contracts/access/AccessControl.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 /**
  * @dev Contract module that allows children to implement role-based access
@@ -1348,7 +1348,7 @@ abstract contract AccessControl is Context {
 
 // File: contracts/lib/AccessControlMixin.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 contract AccessControlMixin is AccessControl {
     string private _revertMsg;
@@ -1367,7 +1367,7 @@ contract AccessControlMixin is AccessControl {
 
 // File: contracts/lib/IChildToken.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 interface IChildToken {
     function deposit(address user, bytes calldata depositData) external;
@@ -1398,7 +1398,7 @@ interface IChildToken {
  * SOFTWARE.
  */
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 /**
  * @title ECRecover
@@ -1473,7 +1473,7 @@ library ECRecover {
  * SOFTWARE.
  */
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 /**
  * @title EIP712
@@ -1540,7 +1540,7 @@ library EIP712 {
 
 // File: contracts/lib/EIP712Domain.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 abstract contract EIP712Domain {
     bytes32 public DOMAIN_SEPARATOR;
@@ -1555,7 +1555,7 @@ abstract contract EIP712Domain {
 
 // File: contracts/lib/Nonces.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 abstract contract Nonces {
     mapping(address => uint256) internal _nonces;
@@ -1572,7 +1572,7 @@ abstract contract Nonces {
 
 // File: contracts/lib/NativeMetaTransaction.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 abstract contract NativeMetaTransaction is EIP712Domain, Nonces {
     // keccak256("MetaTransaction(uint256 nonce,address from,bytes functionSignature)")
@@ -1653,7 +1653,7 @@ abstract contract NativeMetaTransaction is EIP712Domain, Nonces {
 
 // File: contracts/lib/ContextMixin.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 abstract contract ContextMixin {
     function msgSender() internal view returns (address payable sender) {
@@ -1698,7 +1698,7 @@ abstract contract ContextMixin {
  * SOFTWARE.
  */
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 abstract contract Permit is IERC20Internal, EIP712Domain, Nonces {
     // = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
@@ -1768,7 +1768,7 @@ abstract contract Permit is IERC20Internal, EIP712Domain, Nonces {
  * SOFTWARE.
  */
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 /**
  * @title Gas Abstraction
@@ -2086,7 +2086,7 @@ abstract contract GasAbstraction is IERC20Internal, EIP712Domain {
 
 // File: contracts/lib/MaticGasAbstraction.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 abstract contract MaticGasAbstraction is GasAbstraction {
     // keccak256("WithdrawWithAuthorization(address owner,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)")
@@ -2125,7 +2125,7 @@ abstract contract MaticGasAbstraction is GasAbstraction {
 
 // File: contracts/UChildERC20.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 contract UChildERC20 is
     ERC20,
@@ -2430,7 +2430,7 @@ contract UChildERC20 is
 
 // File: contracts/lib/Administrable/Blacklistable.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 abstract contract Blacklistable is AccessControlMixin {
     bytes32 public constant BLACKLISTER_ROLE = keccak256("BLACKLISTER_ROLE");
@@ -2496,7 +2496,7 @@ abstract contract Blacklistable is AccessControlMixin {
 
 // File: contracts/lib/Administrable/Pausable.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 abstract contract Pausable is AccessControlMixin {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -2556,7 +2556,7 @@ abstract contract Pausable is AccessControlMixin {
 
 // File: @openzeppelin/contracts/token/ERC20/SafeERC20.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 /**
  * @title SafeERC20
@@ -2681,7 +2681,7 @@ library SafeERC20 {
 
 // File: contracts/lib/Administrable/Rescuable.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 abstract contract Rescuable is AccessControlMixin {
     using SafeERC20 for IERC20;
@@ -2722,7 +2722,7 @@ abstract contract Rescuable is AccessControlMixin {
 
 // File: contracts/UChildAdministrableERC20.sol
 
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 contract UChildAdministrableERC20 is
     UChildERC20,

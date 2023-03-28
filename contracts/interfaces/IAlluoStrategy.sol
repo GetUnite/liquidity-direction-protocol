@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 interface IAlluoStrategy {
     /// @notice Invest tokens transferred to this contract.

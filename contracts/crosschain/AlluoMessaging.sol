@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 import {IAnyCallV7, IAnyCallV7Executor} from "../interfaces/IAnyCallV7.sol";
 
-contract AlluoMessaging {
+abstract contract AlluoMessaging {
     IAnyCallV7 public anyCallV7;
     IAnyCallV7Executor public anyCallV7Executor;
 

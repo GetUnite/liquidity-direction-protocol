@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 interface IWrappedEther {
     function name() external view returns (string memory);

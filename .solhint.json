@@ -24,7 +24,8 @@
     "no-inline-assembly": "off",
     "state-visibility": "error",
     "var-name-mixedcase": "error",
-    "max-states-count": "off"
+    "max-states-count": "off",
+    "no-console": "off"
   },
   "plugins": [
     "prettier"

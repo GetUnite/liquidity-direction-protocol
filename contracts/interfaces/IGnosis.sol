@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.11;
+pragma solidity ^0.8.17;
 
 interface IGnosis {
     function addOwnerWithThreshold(address owner, uint256 _threshold) external;
