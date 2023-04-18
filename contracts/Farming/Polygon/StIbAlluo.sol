@@ -24,6 +24,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "hardhat/console.sol";
 
+import {IConstantOutflowNFT} from "../../interfaces/superfluid/IConstantOutflowNFT.sol";
+
 /**
  * @title Superfluid's super token implementation
  *
@@ -83,6 +85,17 @@ contract StIbAlluo is
     address public ibAlluo;
     bool public upgradeStatus;
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    IConstantOutflowNFT public placeholderNFT;
+
+    function constantOutflowNFT() external view returns (IConstantOutflowNFT) {
+        return placeholderNFT;
+    }
+
+    function setPlaceholderNFT(
+        address nft
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        placeholderNFT = IConstantOutflowNFT(nft);
+    }
 
     function initialize(
         IERC20 underlyingToken,
