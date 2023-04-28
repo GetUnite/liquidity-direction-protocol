@@ -5,7 +5,7 @@ import { BigNumber, BigNumberish, BytesLike, constants, Wallet } from "ethers";
 import { defaultAbiCoder } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { ChainlinkFeedStrategyV2, CurveConvexStrategy, CurveConvexStrategyTest, CurveConvexStrategyV2, CurveConvexStrategyV2Native, CurveLpReferenceFeedStrategyV2, CurvePoolReferenceFeedStrategyV2, ERC20, IbAlluo, IbAlluo__factory, IERC20, IERC20Metadata, IExchange, PriceFeedRouterV2, PriceFeedRouterV2__factory, PseudoMultisigWallet, StrategyHandler, UsdCurveAdapter, VoteExecutorMasterLog } from "../typechain";
+import { ChainlinkFeedStrategyV2, CurveConvexStrategy, CurveConvexStrategyTest, CurveConvexStrategyV2, CurveConvexStrategyV2Native, CurveLpReferenceFeedStrategyV2, CurvePoolReferenceFeedStrategyV2, ERC20, IbAlluo, IbAlluo__factory, IERC20, IERC20Metadata, IExchange, PriceFeedRouterV2, PriceFeedRouterV2__factory, PseudoMultisigWallet, StrategyHandler, UsdCurveAdapter, VoteExecutorMasterLog } from "../typechain-types";
 let signers: SignerWithAddress[]
 let artem: SignerWithAddress
 let alex: SignerWithAddress

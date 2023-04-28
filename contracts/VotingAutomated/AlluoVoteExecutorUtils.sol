@@ -9,16 +9,14 @@ import {IAlluoStrategyHandler} from "../interfaces/IAlluoStrategyHandler.sol";
 import {IAlluoVoteExecutor} from "../interfaces/IAlluoVoteExecutor.sol";
 import {IGnosis} from "../interfaces/IGnosis.sol";
 
+import "hardhat/console.sol";
+
 contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
     using ECDSAUpgradeable for bytes32;
 
     address public strategyHandler;
     address public voteExecutor;
-    struct SubmittedData {
-        bytes data;
-        uint256 time;
-        bytes[] signs;
-    }
+
     struct Message {
         uint256 commandIndex;
         bytes commandData;
@@ -26,10 +24,12 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
 
     function initialize(
         address _strategyHandler,
-        address _voteExecutor
+        address _voteExecutor,
+        address _multisig
     ) public initializer {
         strategyHandler = _strategyHandler;
         voteExecutor = _voteExecutor;
+        _grantRole(DEFAULT_ADMIN_ROLE, _multisig);
     }
 
     function submitData(
@@ -57,6 +57,7 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
         );
         (bytes32 hashed, Message[] memory _messages, uint256 timestamp) = abi
             .decode(message, (bytes32, Message[], uint256));
+
         require(
             hashed == keccak256(abi.encode(_messages, timestamp)),
             "Hash doesn't match"
@@ -149,19 +150,14 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
             ((_amountToCompare * (10000 + _slippageTolerance)) / 10000);
     }
 
-    // Executor utils
-
-    function getSubmittedData(
-        uint256 _dataId
-    ) external view returns (bytes memory, uint256, bytes[] memory) {
-        (bytes memory submittedDataExact, ) = IAlluoVoteExecutor(voteExecutor)
-            .submittedData(_dataId);
-        SubmittedData memory submittedData = abi.decode(
-            submittedDataExact,
-            (SubmittedData)
-        );
-        return (submittedData.data, submittedData.time, submittedData.signs);
+    function timestampLastUpdatedWithinPeriod(
+        uint256 _timestamp,
+        uint256 _period
+    ) public view returns (bool) {
+        return block.timestamp - _timestamp <= _period;
     }
+
+    // Executor utils
 
     function encodeApyCommand(
         string memory _ibAlluoName,
@@ -198,6 +194,13 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
     ) public pure returns (uint256, bytes memory) {
         bytes memory encodedCommand = abi.encode(_delta);
         return (3, encodedCommand);
+    }
+
+    function encodeTvlCommand(
+        uint256[][] memory executorBalances
+    ) public pure returns (uint256, bytes memory) {
+        bytes memory encodedCommand = abi.encode(executorBalances);
+        return (4, encodedCommand);
     }
 
     function encodeAllMessages(

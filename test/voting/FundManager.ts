@@ -2,7 +2,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { ethers, network, upgrades } from "hardhat";
 import { parseEther, parseUnits } from "ethers/lib/utils";
 
-import { FundManager, VoteExecutorMasterLog, StrategyHandler } from "../../typechain";
+import { FundManager, VoteExecutorMasterLog, StrategyHandler } from "../../typechain-types";
 import { expect } from "chai";
 
 async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {

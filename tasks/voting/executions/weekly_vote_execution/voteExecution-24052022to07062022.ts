@@ -1,5 +1,5 @@
 import { task } from "hardhat/config";
-import "@nomiclabs/hardhat-waffle";
+
 
 task("voteExecution-24052022to07062022", "Execute vote from Alluo DAO for liquidity direction")
     .setAction(async function (taskArgs, hre) {
@@ -44,7 +44,7 @@ task("voteExecution-24052022to07062022", "Execute vote from Alluo DAO for liquid
             entryToken: usdt,
             poolToken: crv3,
             data: entryData2
-        }, ]
+        },]
 
 
         // when we can sort out multisig via tasks this will run

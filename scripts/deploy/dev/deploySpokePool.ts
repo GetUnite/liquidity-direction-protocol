@@ -1,5 +1,5 @@
 import { ethers, upgrades } from "hardhat"
-import { SpokePoolMock } from "../../../typechain";
+import { SpokePoolMock } from "../../../typechain-types";
 
 async function main() {
 

@@ -1,7 +1,7 @@
 import { formatEther, formatUnits } from "ethers/lib/utils";
 import { ethers, upgrades } from "hardhat";
 import * as readline from 'readline';
-import { VoteExecutorV2, VoteExecutorV2__factory } from "../../typechain";
+import { VoteExecutorV2, VoteExecutorV2__factory } from "../../typechain-types";
 
 function ask(query: string): Promise<string> {
     const rl = readline.createInterface({
@@ -46,8 +46,8 @@ async function main() {
             gnosis,
             exchange,
             [usdc, dai, frax, usdt]
-        ], 
-        {initializer: 'initialize', kind: 'uups'}
+        ],
+        { initializer: 'initialize', kind: 'uups' }
     ) as VoteExecutorV2;
 
     console.log("Deployed at", executor.address);

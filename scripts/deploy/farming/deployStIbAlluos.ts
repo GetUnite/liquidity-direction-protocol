@@ -1,6 +1,6 @@
 import { BigNumber } from "ethers";
 import { ethers, upgrades } from "hardhat"
-import { StIbAlluo, StIbAlluo__factory } from "../../../typechain";
+import { StIbAlluo, StIbAlluo__factory } from "../../../typechain-types";
 
 async function main() {
 
@@ -21,35 +21,35 @@ async function main() {
     StIbAlluoUsd = await upgrades.deployProxy(StIbAlluoFactory,
         [ibAlluoUsd, 18, "Streaming IbAlluo USD", "StIbAlluoUSD", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", gnosis, [ibAlluoUsd]
         ], {
-            initializer: 'alluoInitialize',
-            kind: 'uups'
-        }
+        initializer: 'alluoInitialize',
+        kind: 'uups'
+    }
     ) as StIbAlluo;
 
     StIbAlluoEth = await upgrades.deployProxy(StIbAlluoFactory,
-        [ibAlluoEth, 18, "Streaming IbAlluo ETH", "StIbAlluoEth", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7",gnosis, [ibAlluoEth]
+        [ibAlluoEth, 18, "Streaming IbAlluo ETH", "StIbAlluoEth", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", gnosis, [ibAlluoEth]
         ], {
-            initializer: 'alluoInitialize',
-            kind: 'uups'
-        }
+        initializer: 'alluoInitialize',
+        kind: 'uups'
+    }
     ) as StIbAlluo;
 
 
     StIbAlluoEur = await upgrades.deployProxy(StIbAlluoFactory,
-        [ibAlluoEur, 18, "Streaming IbAlluo Eur", "StIbAlluoEUR", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", gnosis,[ibAlluoEur]
+        [ibAlluoEur, 18, "Streaming IbAlluo Eur", "StIbAlluoEUR", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", gnosis, [ibAlluoEur]
         ], {
-            initializer: 'alluoInitialize',
-            kind: 'uups'
-        }
+        initializer: 'alluoInitialize',
+        kind: 'uups'
+    }
     ) as StIbAlluo;
 
 
     StIbAlluoBtc = await upgrades.deployProxy(StIbAlluoFactory,
         [ibAlluoBtc, 18, "Streaming IbAlluo Btc", "StIbAlluoBTC", "0x3E14dC1b13c488a8d5D310918780c983bD5982E7", gnosis, [ibAlluoBtc]
         ], {
-            initializer: 'alluoInitialize',
-            kind: 'uups'
-        }
+        initializer: 'alluoInitialize',
+        kind: 'uups'
+    }
     ) as StIbAlluo;
 
     console.log("All deployed...")
@@ -62,8 +62,8 @@ async function main() {
 }
 
 main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+    .then(() => process.exit(0))
+    .catch((error) => {
+        console.error(error);
+        process.exit(1);
+    });

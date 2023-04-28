@@ -78,6 +78,15 @@ interface IAlluoVoteExecutorUtils {
         uint256 _newInterestPerSecond
     ) external pure returns (uint256, bytes memory);
 
+    function timestampLastUpdatedWithinPeriod(
+        uint256 _timestamp,
+        uint256 _period
+    ) external view returns (bool);
+
+    function encodeTvlCommand(
+        uint256[][] memory executorBalances
+    ) external pure returns (uint256, bytes memory);
+
     function encodeLiquidityCommand(
         string memory _codeName,
         uint256 _percent

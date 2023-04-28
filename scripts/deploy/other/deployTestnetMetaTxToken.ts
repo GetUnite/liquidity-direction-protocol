@@ -1,6 +1,6 @@
 import { defaultAbiCoder, parseUnits } from "ethers/lib/utils";
 import { ethers, upgrades } from "hardhat"
-import { UChildAdministrableERC20 } from "../../typechain";
+import { UChildAdministrableERC20 } from "../../typechain-types";
 
 async function main() {
     const signers = await ethers.getSigners();

@@ -5,7 +5,7 @@ import { BigNumberish, constants } from "ethers";
 import { parseEther, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha"
-import { AccessControl, BtcOptimismAdapter, BufferManager, IbAlluo, IbAlluoPriceResolver__factory, ICurvePoolBTC, ICurvePoolETH, ICurvePoolUSD, IERC20, IERC20Metadata, IExchange, IWrappedEther, LiquidityHandlerPolygon, PriceFeedRouterV2, StIbAlluo, SuperfluidEndResolver, SuperfluidResolver, Usd3PoolOptimismAdapter, VoteExecutorSlaveFinal, WithdrawalRequestResolver__factory } from "../../typechain";
+import { AccessControl, BtcOptimismAdapter, BufferManager, IbAlluo, IbAlluoPriceResolver__factory, ICurvePoolBTC, ICurvePoolETH, ICurvePoolUSD, IERC20, IERC20Metadata, IExchange, IWrappedEther, LiquidityHandlerPolygon, PriceFeedRouterV2, StIbAlluo, SuperfluidEndResolver, SuperfluidResolver, Usd3PoolOptimismAdapter, VoteExecutorSlaveFinal, WithdrawalRequestResolver__factory } from "../../typechain-types";
 import { EthOptimismAdapter } from "../../typechain/EthOptimismAdapter";
 
 function getInterestPerSecondParam(apyPercent: number): string {
@@ -821,7 +821,7 @@ describe("IbAlluo Optimism Integration Test", async () => {
         }
     })
 
-    it("Should create stream",async () => {
+    it("Should create stream", async () => {
         await dai.approve(ibAlluoUSD.address, constants.MaxUint256);
         await ibAlluoUSD.deposit(dai.address, parseUnits("100.0", 18));
 
@@ -833,7 +833,8 @@ describe("IbAlluo Optimism Integration Test", async () => {
             "0x"
         )
         await ibAlluoUSD["createFlow(address,int96,uint256)"](signers[1].address, "1", parseEther("99.0"))
-    })})
+    })
+})
 
 // Exported all available roles on ibAlluos, stIbAlluos, Adapters, Buffer Manager, 
 // Exchange, Liquidity Handler, Price Router, Superfluid Resolvers, Vote Executor Slave,

@@ -24,6 +24,11 @@ contract AlluoUpgradeableBase is
 
     bool public upgradeStatus;
 
+    function __AlluoUpgradeableBase_init() public initializer {
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+    }
+
     function grantRole(
         bytes32 role,
         address account

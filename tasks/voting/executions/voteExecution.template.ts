@@ -1,5 +1,5 @@
 import { task } from "hardhat/config";
-import "@nomiclabs/hardhat-waffle";
+
 
 task("entryv2", "Execute vote from Alluo DAO for liquidity direction")
     .setAction(async function (taskArgs, hre) {

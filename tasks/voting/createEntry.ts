@@ -1,6 +1,6 @@
-import {task} from "hardhat/config";
-import "@nomiclabs/hardhat-waffle";
-import {parseEther} from "@ethersproject/units"
+import { task } from "hardhat/config";
+
+import { parseEther } from "@ethersproject/units"
 
 task("entry", "burns tokens from account")
     .setAction(async function (taskArgs, hre) {
@@ -14,7 +14,7 @@ task("entry", "burns tokens from account")
         let frax = "0x853d955aCEf822Db058eb8505911ED77F175b99e"
         let usdt = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
         let crv3 = "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490"
-        
+
         const [...addr] = await hre.ethers.getSigners();
 
         const exec = await hre.ethers.getContractAt("VoteExecutor", "0x9EB0a0751cf514262AAF45F4d856f36df56017ae");
@@ -130,30 +130,30 @@ task("entry", "burns tokens from account")
         //     convexPoold:13
         // }]
 
-        let entries = [{ 
-            weight: 50, 
-            entryToken: frax, 
+        let entries = [{
+            weight: 50,
+            entryToken: frax,
             curvePool: "0x43b4FdFD4Ff969587185cDB6f0BD875c5Fc83f8c",
             poolToken: crv3,
             poolSize: 2,
             tokenIndexInCurve: 1,
-            convexPoolAddress:"0xF403C135812408BFbE8713b5A23a04b3D48AAE31",
-            convexPoold:36
+            convexPoolAddress: "0xF403C135812408BFbE8713b5A23a04b3D48AAE31",
+            convexPoold: 36
         },
-        { 
-            weight: 50, 
-            entryToken: frax, 
+        {
+            weight: 50,
+            entryToken: frax,
             curvePool: "0x43b4FdFD4Ff969587185cDB6f0BD875c5Fc83f8c",
             poolToken: crv3,
             poolSize: 2,
             tokenIndexInCurve: 1,
-            convexPoolAddress:ZERO_ADDR,
+            convexPoolAddress: ZERO_ADDR,
             //convexPoolAddress:"0xF403C135812408BFbE8713b5A23a04b3D48AAE31",
-            convexPoold:36
+            convexPoold: 36
         }]
 
         await exec.connect(addr[0]).execute(entries)
-        
+
 
         console.log('entry task Done!');
     });

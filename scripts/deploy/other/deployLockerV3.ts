@@ -1,7 +1,7 @@
 import { formatEther, formatUnits } from "ethers/lib/utils";
 import { ethers, upgrades } from "hardhat";
 import * as readline from 'readline';
-import { AlluoLockedV3, AlluoLockedV3__factory } from "../../typechain";
+import { AlluoLockedV3, AlluoLockedV3__factory } from "../../typechain-types";
 
 function ask(query: string): Promise<string> {
     const rl = readline.createInterface({
@@ -38,8 +38,8 @@ async function main() {
         [
             gnosis,
             rewardAtStart
-        ], 
-        {initializer: 'initialize', kind: 'uups'}
+        ],
+        { initializer: 'initialize', kind: 'uups' }
     ) as AlluoLockedV3;
 
     console.log("Deployed at", locker.address);

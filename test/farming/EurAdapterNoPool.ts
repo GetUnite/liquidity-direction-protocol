@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
 import { formatEther, formatUnits, parseEther, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
-import { BufferManager, EurNoPoolAdapterUpgradeable, IbAlluo, IERC20Metadata, LiquidityHandler, PriceFeedRouterV2 } from "../../typechain";
+import { BufferManager, EurNoPoolAdapterUpgradeable, IbAlluo, IERC20Metadata, LiquidityHandler, PriceFeedRouterV2 } from "../../typechain-types";
 
 let agEur: IERC20Metadata;
 
@@ -46,7 +46,7 @@ async function checkIbAlluoDepositResult(
     const multiplier = parseEther("1");
     const growingRatio = await ibAlluo.growingRatio();
     let adjustedAmount = amountIn18.mul(multiplier).div(growingRatio);
-    
+
     if (fiatId != undefined) {
         const priceInfo = await priceFeedRouterV2["getPrice(address,uint256)"](tokenIn.address, fiatId);
         console.log("Adjusted amount before:", formatEther(adjustedAmount));
@@ -145,10 +145,10 @@ describe("Euro No Pool Upgradeable Adapter for ibAlluo with Price Oracles", asyn
         await getCoin(agEur, amount, eurAdapter.address);
     });
 
-    describe("Adapters",async () => {
+    describe("Adapters", async () => {
         it("Should return EUR value of EUR adapter", async () => {
             const adapterAmount = await eurAdapter.getAdapterAmount();
-            console.log("Reported adapter amount: ",  formatEther(adapterAmount), "EUR");
+            console.log("Reported adapter amount: ", formatEther(adapterAmount), "EUR");
             const agEurPrice = await priceFeedRouterV2["getPrice(address,string)"](agEur.address, "EUR");
             console.log("agEUR price:", formatUnits(agEurPrice.value, agEurPrice.decimals));
 
@@ -182,7 +182,7 @@ describe("Euro No Pool Upgradeable Adapter for ibAlluo with Price Oracles", asyn
             console.log(`User received ${formatEther(ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore))} ibAlluoEUR when deposited ${amount} agEUR`)
             console.log(`Adapter received ${formatEther(adapterBalanceAfter.sub(adapterBalanceBefore))} agEUR when deposited ${amount} agEUR`)
 
-            await checkIbAlluoDepositResult(agEur, amountUsd, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), 2, ibAlluoEUR);    
+            await checkIbAlluoDepositResult(agEur, amountUsd, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), 2, ibAlluoEUR);
         });
 
         it("Should deposit big amount of agEUR", async () => {
@@ -204,7 +204,7 @@ describe("Euro No Pool Upgradeable Adapter for ibAlluo with Price Oracles", asyn
             console.log(`User received ${formatEther(ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore))} ibAlluoEUR when deposited ${amount} agEUR`)
             console.log(`Adapter received ${formatEther(adapterBalanceAfter.sub(adapterBalanceBefore))} agEUR when deposited ${amount} agEUR`)
 
-            await checkIbAlluoDepositResult(agEur, amountUsd, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), 2, ibAlluoEUR);    
+            await checkIbAlluoDepositResult(agEur, amountUsd, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), 2, ibAlluoEUR);
         });
 
         it("Should withdraw EURT", async () => {

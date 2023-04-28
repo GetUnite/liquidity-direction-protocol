@@ -1,14 +1,14 @@
 import { ethers, upgrades } from "hardhat"
-import { BtcNoPoolAdapterMainnet, BtcNoPoolAdapterMainnet__factory, EthNoPoolAdapterMainnet, EthNoPoolAdapterMainnet__factory, EurCurveAdapterMainnet, EurCurveAdapterMainnet__factory, UsdCurveAdapterMainnet, UsdCurveAdapterMainnet__factory } from "../../typechain";
+import { BtcNoPoolAdapterMainnet, BtcNoPoolAdapterMainnet__factory, EthNoPoolAdapterMainnet, EthNoPoolAdapterMainnet__factory, EurCurveAdapterMainnet, EurCurveAdapterMainnet__factory, UsdCurveAdapterMainnet, UsdCurveAdapterMainnet__factory } from "../../typechain-types";
 
 async function main() {
 
-    let usdAdapter = await ethers.getContractAt("UsdCurveAdapterMainnet", "");
-    let eurAdapter = await ethers.getContractAt("EurCurveAdapterMainnet", "");
+  let usdAdapter = await ethers.getContractAt("UsdCurveAdapterMainnet", "");
+  let eurAdapter = await ethers.getContractAt("EurCurveAdapterMainnet", "");
 
-    await usdAdapter.adapterApproveAll()
-    await eurAdapter.adapterApproveAll()
-    console.log("done");
+  await usdAdapter.adapterApproveAll()
+  await eurAdapter.adapterApproveAll()
+  console.log("done");
 
 }
 

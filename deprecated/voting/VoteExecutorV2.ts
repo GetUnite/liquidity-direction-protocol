@@ -2,7 +2,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { formatUnits, parseEther, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
-import { CurveConvexStrategy, CurveConvexStrategy__factory, IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, VoteExecutorV2, VoteExecutorV2__factory } from "../../typechain";
+import { CurveConvexStrategy, CurveConvexStrategy__factory, IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, VoteExecutorV2, VoteExecutorV2__factory } from "../../typechain-types";
 
 describe("VoteExecutor", function () {
     let strategy: CurveConvexStrategy;

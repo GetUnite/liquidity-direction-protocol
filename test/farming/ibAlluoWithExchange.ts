@@ -5,7 +5,7 @@ import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { formatUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, IWrappedEther, IERC20Metadata, IExchange, Exchange, BufferManager, BufferManager__factory, LiquidityHandlerPolygon, LiquidityHandlerPolygon__factory } from "../../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, UsdCurveAdapter, LiquidityHandler__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, IWrappedEther, IERC20Metadata, IExchange, Exchange, BufferManager, BufferManager__factory, LiquidityHandlerPolygon, LiquidityHandlerPolygon__factory } from "../../typechain-types";
 
 async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
     await ethers.provider.send(
@@ -158,17 +158,17 @@ describe("IbAlluo and Exchange", function () {
         await handler.connect(admin).grantRole(await handler.DEFAULT_ADMIN_ROLE(), admin.address)
 
         const Buffer = await ethers.getContractFactory("BufferManager") as BufferManager__factory;
-    
+
         buffer = await upgrades.deployProxy(Buffer,
-        [ 604800,
-          1000,
-          604800,
-          admin.address,
-          spokepooladdress
-        ], {
-          initializer: 'initialize', unsafeAllow: ["delegatecall"],
-          kind: 'uups'
-         }
+            [604800,
+                1000,
+                604800,
+                admin.address,
+                spokepooladdress
+            ], {
+            initializer: 'initialize', unsafeAllow: ["delegatecall"],
+            kind: 'uups'
+        }
         ) as BufferManager;
 
         const UsdAdapter = await ethers.getContractFactory("UsdCurveAdapter") as UsdCurveAdapter__factory;

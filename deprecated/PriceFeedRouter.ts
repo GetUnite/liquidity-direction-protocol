@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { BigNumberish, constants } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
-import { ChainlinkFeedStrategy, ChainlinkFeedStrategyV2, CurvePoolReferenceFeedStrategy, CurvePoolReferenceFeedStrategyV2, IERC20Metadata, IFeedStrategy, PriceFeedRouter, PriceFeedRouterV2, PriceFeedRouterV2__factory } from "../typechain";
+import { ChainlinkFeedStrategy, ChainlinkFeedStrategyV2, CurvePoolReferenceFeedStrategy, CurvePoolReferenceFeedStrategyV2, IERC20Metadata, IFeedStrategy, PriceFeedRouter, PriceFeedRouterV2, PriceFeedRouterV2__factory } from "../typechain-types";
 
 describe("Price Feed Router", function () {
     type FiatRoute = {

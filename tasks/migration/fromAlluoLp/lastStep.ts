@@ -1,6 +1,6 @@
-import {task} from "hardhat/config";
-import "@nomiclabs/hardhat-waffle";
-import {parseEther} from "@ethersproject/units"
+import { task } from "hardhat/config";
+
+import { parseEther } from "@ethersproject/units"
 import { BigNumber } from 'ethers';
 import { config as dotenvConfig } from 'dotenv';
 import { formatBytes32String, parseBytes32String } from "@ethersproject/strings";

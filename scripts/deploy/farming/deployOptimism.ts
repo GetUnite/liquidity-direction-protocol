@@ -1,7 +1,7 @@
 import { Contract } from "ethers";
 import { formatUnits } from "ethers/lib/utils";
 import { ethers, upgrades } from "hardhat";
-import { BtcOptimismAdapter, BufferManager, EthOptimismAdapter, IbAlluo, IbAlluoPriceResolver__factory, ICurvePoolBTC, ICurvePoolETH, ICurvePoolUSD, IExchange, IWrappedEther, LiquidityHandlerPolygon, StIbAlluo, Usd3PoolOptimismAdapter, WithdrawalRequestResolver__factory } from "../../../typechain";
+import { BtcOptimismAdapter, BufferManager, EthOptimismAdapter, IbAlluo, IbAlluoPriceResolver__factory, ICurvePoolBTC, ICurvePoolETH, ICurvePoolUSD, IExchange, IWrappedEther, LiquidityHandlerPolygon, StIbAlluo, Usd3PoolOptimismAdapter, WithdrawalRequestResolver__factory } from "../../../typechain-types";
 
 // TODO: Update these to current APY values on farms
 const apyUsd = 7.0;
@@ -46,13 +46,13 @@ async function waitAndLogAddresses(contract: Contract, name: string, isProxy: bo
 
 // Total           : 0,17887084 ETH
 async function main() {
-    const handlerFactory = await ethers.getContractFactory("LiquidityHandlerPolygon");     
-    const bufferFactory = await ethers.getContractFactory("BufferManager");                 
-    const usdAdapterFactory = await ethers.getContractFactory("Usd3PoolOptimismAdapter");   
-    const ethAdapterFactory = await ethers.getContractFactory("EthOptimismAdapter");        
-    const btcAdapterFactory = await ethers.getContractFactory("BtcOptimismAdapter");    
-    const ibAlluoFactory = await ethers.getContractFactory("IbAlluo");                      
-    const StIbAlluoFactory = await ethers.getContractFactory("StIbAlluo");             
+    const handlerFactory = await ethers.getContractFactory("LiquidityHandlerPolygon");
+    const bufferFactory = await ethers.getContractFactory("BufferManager");
+    const usdAdapterFactory = await ethers.getContractFactory("Usd3PoolOptimismAdapter");
+    const ethAdapterFactory = await ethers.getContractFactory("EthOptimismAdapter");
+    const btcAdapterFactory = await ethers.getContractFactory("BtcOptimismAdapter");
+    const ibAlluoFactory = await ethers.getContractFactory("IbAlluo");
+    const StIbAlluoFactory = await ethers.getContractFactory("StIbAlluo");
     const SuperfluidResolverFactory = await ethers.getContractFactory("SuperfluidResolver");
     const SuperfluidEndResolverFactory = await ethers.getContractFactory("SuperfluidEndResolver");
     const handlerResolverFactory = await ethers.getContractFactory(

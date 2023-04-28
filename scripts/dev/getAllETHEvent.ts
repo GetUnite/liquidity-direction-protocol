@@ -1,6 +1,6 @@
 import { BigNumber } from "ethers";
 import { ethers, upgrades } from "hardhat"
-import { IbAlluo } from "../../typechain";
+import { IbAlluo } from "../../typechain-types";
 
 async function main() {
     const ibAlluoCurrent = await ethers.getContractAt("IbAlluo", "0xc677B0918a96ad258A68785C2a3955428DeA7e50") as IbAlluo;

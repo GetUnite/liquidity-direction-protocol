@@ -2,7 +2,7 @@ import console from "console";
 import { constants } from "ethers";
 import { parseEther } from "ethers/lib/utils";
 import { ethers } from "hardhat";
-import { AccessControl, IbAlluoPriceResolver, ICurvePoolBTC, ICurvePoolETH, ICurvePoolUSD, IERC20, IExchange, IWrappedEther, WithdrawalRequestResolver } from "../../../typechain";
+import { AccessControl, IbAlluoPriceResolver, ICurvePoolBTC, ICurvePoolETH, ICurvePoolUSD, IERC20, IExchange, IWrappedEther, WithdrawalRequestResolver } from "../../../typechain-types";
 
 type Transaction = {
     "to": string,

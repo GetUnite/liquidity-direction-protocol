@@ -1,7 +1,7 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { constants } from "ethers";
 import hre, { ethers } from "hardhat";
-import { ChainlinkFeedStrategy, CurvePoolReferenceFeedStrategy, IERC20Metadata, PriceFeedRouter } from "../../../typechain";
+import { ChainlinkFeedStrategy, CurvePoolReferenceFeedStrategy, IERC20Metadata, PriceFeedRouter } from "../../../typechain-types";
 
 async function main() {
     const ChainlinkStrategy = await ethers.getContractFactory("ChainlinkFeedStrategy");

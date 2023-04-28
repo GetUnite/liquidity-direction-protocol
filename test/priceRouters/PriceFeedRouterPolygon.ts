@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { BigNumberish, constants } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { ethers, network } from "hardhat";
-import { ChainlinkFeedStrategy, CurvePoolReferenceFeedStrategy, IERC20Metadata, IFeedStrategy, PriceFeedRouter } from "../../typechain";
+import { ChainlinkFeedStrategy, CurvePoolReferenceFeedStrategy, IERC20Metadata, IFeedStrategy, PriceFeedRouter } from "../../typechain-types";
 import { CurvePoolReferenceFeedStrategyInterface } from "../../typechain/CurvePoolReferenceFeedStrategy";
 
 describe("Price Feed Router V1 (Polygon)", function () {

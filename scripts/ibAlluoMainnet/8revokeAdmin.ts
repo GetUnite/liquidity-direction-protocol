@@ -1,5 +1,5 @@
 import { ethers, upgrades } from "hardhat"
-import { BtcNoPoolAdapterMainnet, BtcNoPoolAdapterMainnet__factory, EthNoPoolAdapterMainnet, EthNoPoolAdapterMainnet__factory, EurCurveAdapterMainnet, EurCurveAdapterMainnet__factory, UsdCurveAdapterMainnet, UsdCurveAdapterMainnet__factory } from "../../typechain";
+import { BtcNoPoolAdapterMainnet, BtcNoPoolAdapterMainnet__factory, EthNoPoolAdapterMainnet, EthNoPoolAdapterMainnet__factory, EurCurveAdapterMainnet, EurCurveAdapterMainnet__factory, UsdCurveAdapterMainnet, UsdCurveAdapterMainnet__factory } from "../../typechain-types";
 
 async function main() {
 
@@ -19,7 +19,7 @@ async function main() {
   await ethAdapter.revokeRole(adminRole, "0xFc57eBe6d333980E620A923B6edb78fc7FB5cC3f")
   await btcAdapter.revokeRole(adminRole, "0xFc57eBe6d333980E620A923B6edb78fc7FB5cC3f")
   console.log("done");
-  
+
 
 }
 

@@ -13,7 +13,7 @@ abstract contract AlluoMessaging {
 
     function _sendMessage(
         address _to,
-        bytes calldata _data,
+        bytes memory _data,
         uint256 _toChainID,
         uint256 _flags
     ) internal {

@@ -4,7 +4,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish, BytesLike } from "ethers";
 import { ethers, network, upgrades } from "hardhat";
 import { before } from "mocha";
-import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandlerMainnet, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandlerMainnet__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory, IbAlluoMainnet, UsdCurveAdapterMainnet, EurCurveAdapterMainnet, EthNoPoolAdapterMainnet, BtcNoPoolAdapterMainnet, IbAlluoMainnet__factory, UsdCurveAdapterMainnet__factory, BtcNoPoolAdapterMainnet__factory, EurCurveAdapterMainnet__factory, EthNoPoolAdapterMainnet__factory } from "../../typechain";
+import { IERC20, PseudoMultisigWallet, PseudoMultisigWallet__factory, IbAlluo, IbAlluo__factory, LiquidityHandlerMainnet, LiquidityHandler, UsdCurveAdapter, BtcCurveAdapter, LiquidityHandlerMainnet__factory, UsdCurveAdapter__factory, EurCurveAdapter, EthNoPoolAdapter, EurCurveAdapter__factory, EthNoPoolAdapter__factory, BtcCurveAdapter__factory, IbAlluoMainnet, UsdCurveAdapterMainnet, EurCurveAdapterMainnet, EthNoPoolAdapterMainnet, BtcNoPoolAdapterMainnet, IbAlluoMainnet__factory, UsdCurveAdapterMainnet__factory, BtcNoPoolAdapterMainnet__factory, EurCurveAdapterMainnet__factory, EthNoPoolAdapterMainnet__factory } from "../../typechain-types";
 
 async function getLastWithdrawalInfo(token: IbAlluoMainnet, handler: LiquidityHandlerMainnet) {
     let request = (await handler.ibAlluoToWithdrawalSystems(token.address)).lastWithdrawalRequest

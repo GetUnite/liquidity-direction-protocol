@@ -1,5 +1,5 @@
-import {task} from "hardhat/config";
-import "@nomiclabs/hardhat-waffle";
+import { task } from "hardhat/config";
+
 
 task("testIbPriceResolver", "testing emitter function")
     .setAction(async function (taskArgs, hre) {

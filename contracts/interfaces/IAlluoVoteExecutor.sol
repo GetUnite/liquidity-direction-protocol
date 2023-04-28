@@ -36,6 +36,8 @@ interface IAlluoVoteExecutor {
 
     function WETH() external view returns (address);
 
+    function __AlluoUpgradeableBase_init() external;
+
     function anyCallV7() external view returns (address);
 
     function anyCallV7Executor() external view returns (address);
@@ -56,38 +58,26 @@ interface IAlluoVoteExecutor {
 
     function changeUpgradeStatus(bool _status) external;
 
-    function confirmDataIntegrity(
-        bytes memory _data
-    ) external view returns (Message[] memory, bytes32);
-
-    function cvxDistributor() external view returns (address);
-
-    function encodeAllMessages(
-        uint256[] memory _commandIndexes,
-        bytes[] memory _messages
-    )
+    function crossChainInformation()
         external
         view
         returns (
-            bytes32 messagesHash,
-            Message[] memory messages,
-            bytes memory inputData
+            address nextExecutor,
+            address previousExecutor,
+            address finalExecutor,
+            uint256 finalExecutorChainId,
+            uint256 nextExecutorChainId,
+            uint256 previousExecutorChainId,
+            uint256 numberOfExecutors,
+            uint256 currentExecutorInternalId
         );
 
-    function encodeApyCommand(
-        string memory _ibAlluoName,
-        uint256 _newAnnualInterest,
-        uint256 _newInterestPerSecond
-    ) external pure returns (uint256, bytes memory);
+    function cvxDistributor() external view returns (address);
 
-    function encodeMintCommand(
-        uint256 _newMintAmount,
-        uint256 _period
-    ) external pure returns (uint256, bytes memory);
-
-    function encodeTreasuryAllocationChangeCommand(
-        int256 _delta
-    ) external pure returns (uint256, bytes memory);
+    function desiredPercentagesByChain(
+        uint256,
+        uint256
+    ) external view returns (uint256);
 
     function exchangeAddress() external view returns (address);
 
@@ -98,10 +88,6 @@ interface IAlluoVoteExecutor {
     ) external view returns (Deposit[] memory);
 
     function getRoleAdmin(bytes32 role) external view returns (bytes32);
-
-    function getSubmittedData(
-        uint256 _dataId
-    ) external view returns (bytes memory, uint256, bytes[] memory);
 
     function gnosis() external view returns (address);
 
@@ -119,6 +105,8 @@ interface IAlluoVoteExecutor {
     ) external view returns (address);
 
     function initialize(address _multiSigWallet) external;
+
+    function isMaster() external view returns (bool);
 
     function liquidityHandler() external view returns (address);
 
@@ -153,6 +141,17 @@ interface IAlluoVoteExecutor {
 
     function timeLock() external view returns (uint256);
 
+    function triggerBridging() external;
+
+    function universalExecutorBalances(
+        uint256,
+        uint256
+    ) external view returns (uint256);
+
+    function universalTVL(uint256) external view returns (uint256);
+
+    function universalTVLUpdated() external view returns (uint256);
+
     function updateAllIbAlluoAddresses() external;
 
     function upgradeStatus() external view returns (bool);
@@ -164,6 +163,8 @@ interface IAlluoVoteExecutor {
         bytes memory data
     ) external payable;
 
+    function voteExecutorUtils() external view returns (address);
+
     struct Message {
         uint256 commandIndex;
         bytes commandData;
@@ -172,6 +173,12 @@ interface IAlluoVoteExecutor {
     struct Deposit {
         uint256 directionId;
         uint256 amount;
+    }
+
+    struct SubmittedData {
+        bytes data;
+        uint256 time;
+        bytes[] signs;
     }
 }
 

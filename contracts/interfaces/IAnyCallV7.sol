@@ -21,4 +21,9 @@ interface IAnyCallV7Executor {
         uint256 _flags,
         bytes calldata
     ) external;
+
+    function context()
+        external
+        view
+        returns (address from, uint256 fromChainID, uint256 nonce);
 }

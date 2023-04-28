@@ -2,7 +2,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
 import { formatEther, parseEther } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
-import { AlluoLockedV4, CvxDistributor, IAlluoToken, ICurveCVXETH, IERC20Metadata, TestERC20, VoteExecutor, VoteExecutorV2 } from "../../typechain";
+import { AlluoLockedV4, CvxDistributor, IAlluoToken, ICurveCVXETH, IERC20Metadata, TestERC20, VoteExecutor, VoteExecutorV2 } from "../../typechain-types";
 
 async function getImpersonatedSigner(address: string): Promise<SignerWithAddress> {
     await ethers.provider.send(

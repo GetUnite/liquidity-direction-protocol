@@ -1,6 +1,6 @@
 import { task } from "hardhat/config";
-import "@nomiclabs/hardhat-waffle";
-import { Unwinder } from "../../typechain";
+
+import { Unwinder } from "../../typechain-types";
 
 task("voteExecution-21032022to04042022", "Execute vote from Alluo DAO for liquidity direction")
     .setAction(async function (taskArgs, hre) {

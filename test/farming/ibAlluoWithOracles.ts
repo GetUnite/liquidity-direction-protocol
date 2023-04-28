@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { BigNumber, BigNumberish } from "ethers";
 import { formatEther, formatUnits, parseEther, parseUnits } from "ethers/lib/utils";
 import { ethers, network, upgrades } from "hardhat";
-import { BtcNoPoolAdapterUpgradeable, EthNoPoolAdapterUpgradeable, EurCurveAdapterUpgradeable, IbAlluo, ICurvePoolEUR, ICurvePoolUSD, IERC20Metadata, LiquidityHandler, LiquidityHandlerPolygon, PriceFeedRouterV2, UsdCurveAdapterUpgradeable } from "../../typechain";
+import { BtcNoPoolAdapterUpgradeable, EthNoPoolAdapterUpgradeable, EurCurveAdapterUpgradeable, IbAlluo, ICurvePoolEUR, ICurvePoolUSD, IERC20Metadata, LiquidityHandler, LiquidityHandlerPolygon, PriceFeedRouterV2, UsdCurveAdapterUpgradeable } from "../../typechain-types";
 
 let usdc: IERC20Metadata, usdt: IERC20Metadata, dai: IERC20Metadata, weth: IERC20Metadata,
     wbtc: IERC20Metadata, eurt: IERC20Metadata, jeur: IERC20Metadata, par: IERC20Metadata,
@@ -101,7 +101,7 @@ async function checkIbAlluoDepositResult(
     const multiplier = parseEther("1");
     const growingRatio = await ibAlluo.growingRatio();
     let adjustedAmount = amountIn18.mul(multiplier).div(growingRatio);
-    
+
     if (fiatId != undefined) {
         const priceInfo = await priceFeedRouterV2["getPrice(address,uint256)"](tokenIn.address, fiatId);
         console.log("Adjusted amount before:", formatEther(adjustedAmount));
@@ -140,26 +140,26 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
     before(async () => {
         console.log("We are forking Polygon mainnet\n");
 
-        usdc = await ethers.getContractAt("IERC20Metadata", "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174");
-        usdt = await ethers.getContractAt("IERC20Metadata", "0xc2132D05D31c914a87C6611C10748AEb04B58e8F");
-        dai = await ethers.getContractAt("IERC20Metadata", "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063");
-        weth = await ethers.getContractAt("IERC20Metadata", "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619");
-        wbtc = await ethers.getContractAt("IERC20Metadata", "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6");
-        eurt = await ethers.getContractAt("IERC20Metadata", "0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f");
-        jeur = await ethers.getContractAt("IERC20Metadata", "0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c");
-        par = await ethers.getContractAt("IERC20Metadata", "0xE2Aa7db6dA1dAE97C5f5C6914d285fBfCC32A128");
-        eurs = await ethers.getContractAt("IERC20Metadata", "0xE111178A87A3BFf0c8d18DECBa5798827539Ae99");
-        curveLpUSD = await ethers.getContractAt("IERC20Metadata", "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171");
-        curveLpEUR = await ethers.getContractAt("IERC20Metadata", "0xAd326c253A84e9805559b73A08724e11E49ca651");
+        usdc = await ethers.getContractAt("IERC20Metadata", "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174") as IERC20Metadata;
+        usdt = await ethers.getContractAt("IERC20Metadata", "0xc2132D05D31c914a87C6611C10748AEb04B58e8F") as IERC20Metadata;
+        dai = await ethers.getContractAt("IERC20Metadata", "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063") as IERC20Metadata;
+        weth = await ethers.getContractAt("IERC20Metadata", "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619") as IERC20Metadata;
+        wbtc = await ethers.getContractAt("IERC20Metadata", "0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6") as IERC20Metadata;
+        eurt = await ethers.getContractAt("IERC20Metadata", "0x7BDF330f423Ea880FF95fC41A280fD5eCFD3D09f") as IERC20Metadata;
+        jeur = await ethers.getContractAt("IERC20Metadata", "0x4e3Decbb3645551B8A19f0eA1678079FCB33fB4c") as IERC20Metadata;
+        par = await ethers.getContractAt("IERC20Metadata", "0xE2Aa7db6dA1dAE97C5f5C6914d285fBfCC32A128") as IERC20Metadata;
+        eurs = await ethers.getContractAt("IERC20Metadata", "0xE111178A87A3BFf0c8d18DECBa5798827539Ae99") as IERC20Metadata;
+        curveLpUSD = await ethers.getContractAt("IERC20Metadata", "0xE7a24EF0C5e95Ffb0f6684b813A78F2a3AD7D171") as IERC20Metadata;
+        curveLpEUR = await ethers.getContractAt("IERC20Metadata", "0xAd326c253A84e9805559b73A08724e11E49ca651") as IERC20Metadata;
 
-        usdLiquidityPool = await ethers.getContractAt("contracts/interfaces/curve/ICurvePoolUSD.sol:ICurvePoolUSD", "0x445FE580eF8d70FF569aB36e80c647af338db351");
-        eurLiquidityPool = await ethers.getContractAt("contracts/interfaces/curve/ICurvePoolUSD.sol:ICurvePoolUSD", "0xAd326c253A84e9805559b73A08724e11E49ca651");
+        usdLiquidityPool = await ethers.getContractAt("contracts/interfaces/curve/ICurvePoolUSD.sol:ICurvePoolUSD", "0x445FE580eF8d70FF569aB36e80c647af338db351") as ICurvePoolUSD;
+        eurLiquidityPool = await ethers.getContractAt("contracts/interfaces/curve/ICurvePoolUSD.sol:ICurvePoolUSD", "0xAd326c253A84e9805559b73A08724e11E49ca651") as ICurvePoolEUR;
 
-        ibAlluoUSD = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6");
-        ibAlluoEUR = await ethers.getContractAt("IbAlluo", "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92");
-        ibAlluoETH = await ethers.getContractAt("IbAlluo", "0xc677B0918a96ad258A68785C2a3955428DeA7e50");
-        ibAlluoBTC = await ethers.getContractAt("IbAlluo", "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2");
-        liquidityHandler = await ethers.getContractAt("LiquidityHandler", "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1");
+        ibAlluoUSD = await ethers.getContractAt("IbAlluo", "0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6") as IbAlluo;
+        ibAlluoEUR = await ethers.getContractAt("IbAlluo", "0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92") as IbAlluo;
+        ibAlluoETH = await ethers.getContractAt("IbAlluo", "0xc677B0918a96ad258A68785C2a3955428DeA7e50") as IbAlluo;
+        ibAlluoBTC = await ethers.getContractAt("IbAlluo", "0xf272Ff86c86529504f0d074b210e95fc4cFCDce2") as IbAlluo;
+        liquidityHandler = await ethers.getContractAt("LiquidityHandler", "0x31a3439Ac7E6Ea7e0C0E4b846F45700c6354f8c1") as LiquidityHandler;
 
         signers = await ethers.getSigners();
     })
@@ -318,7 +318,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
         );
 
         // Step 6: set PriceFeedRouterV2
-        priceFeedRouterV2 = await ethers.getContractAt("PriceFeedRouterV2", "0x82220c7Be3a00ba0C6ed38572400A97445bdAEF2");
+        priceFeedRouterV2 = await ethers.getContractAt("PriceFeedRouterV2", "0x82220c7Be3a00ba0C6ed38572400A97445bdAEF2") as PriceFeedRouterV2;
         await ibAlluoUSD.connect(admin).setPriceRouterInfo(priceFeedRouterV2.address, 0);
         await ibAlluoEUR.connect(admin).setPriceRouterInfo(priceFeedRouterV2.address, 2);
 
@@ -337,10 +337,10 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
         await oldBtcAdapter.connect(admin).removeTokenByAddress(wbtc.address, btcAdapter.address, await wbtc.balanceOf(oldBtcAdapter.address));
     });
 
-    describe("Adapters",async () => {
+    describe("Adapters", async () => {
         it("Should return USD value of USD adapter", async () => {
             const adapterAmount = await usdAdapter.getAdapterAmount();
-            console.log("Reported adapter amount: ",  formatEther(adapterAmount), "USD");
+            console.log("Reported adapter amount: ", formatEther(adapterAmount), "USD");
 
             const lpUsdBalance = await curveLpUSD.balanceOf(usdAdapter.address);
             const lpToUsdc = await usdLiquidityPool.calc_withdraw_one_coin(lpUsdBalance, await usdAdapter.indexes(usdc.address));
@@ -353,7 +353,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
 
         it("Should return EUR value of EUR adapter", async () => {
             const adapterAmount = await eurAdapter.getAdapterAmount();
-            console.log("Reported adapter amount: ",  formatEther(adapterAmount), "EUR");
+            console.log("Reported adapter amount: ", formatEther(adapterAmount), "EUR");
 
             const lpEurBalance = await curveLpEUR.balanceOf(eurAdapter.address);
             const lpToEurt = await eurLiquidityPool.calc_withdraw_one_coin(lpEurBalance, await eurAdapter.indexes(eurt.address));
@@ -369,14 +369,14 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
 
         it("Should return ETH value of WETH adapter", async () => {
             const adapterAmount = await ethAdapter.getAdapterAmount();
-            console.log("Reported adapter amount: ",  formatEther(adapterAmount), "ETH");
+            console.log("Reported adapter amount: ", formatEther(adapterAmount), "ETH");
 
             expect(adapterAmount).to.be.equal(await weth.balanceOf(ethAdapter.address));
         });
 
         it("Should return BTC value of WBTC adapter", async () => {
             const adapterAmount = await btcAdapter.getAdapterAmount();
-            console.log("Reported adapter amount: ",  formatEther(adapterAmount), "BTC");
+            console.log("Reported adapter amount: ", formatEther(adapterAmount), "BTC");
 
             expect(adapterAmount).to.be.equal((await wbtc.balanceOf(btcAdapter.address)).mul("10000000000"));
         });
@@ -507,7 +507,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
             const ibAlluoBalanceAfter = await ibAlluoEUR.balanceOf(depositor.address);
             console.log(`Received ${formatEther(ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore))} ibAlluoEUR when deposited ${amount} EURT`)
 
-            await checkIbAlluoDepositResult(eurt, amountUsd, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), 2, ibAlluoEUR);    
+            await checkIbAlluoDepositResult(eurt, amountUsd, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), 2, ibAlluoEUR);
         });
         it("Should deposit jEUR", async () => {
             const depositor = signers[0];
@@ -524,7 +524,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
             const ibAlluoBalanceAfter = await ibAlluoEUR.balanceOf(depositor.address);
             console.log(`Received ${formatEther(ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore))} ibAlluoEUR when deposited ${amount} jEUR`)
 
-            await checkIbAlluoDepositResult(jeur, amountEur, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), 2, ibAlluoEUR);    
+            await checkIbAlluoDepositResult(jeur, amountEur, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), 2, ibAlluoEUR);
         });
         it("Should deposit PAR", async () => {
             const depositor = signers[0];
@@ -541,7 +541,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
             const ibAlluoBalanceAfter = await ibAlluoEUR.balanceOf(depositor.address);
             console.log(`Received ${formatEther(ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore))} ibAlluoEUR when deposited ${amount} PAR`)
 
-            await checkIbAlluoDepositResult(par, amountEur, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), 2, ibAlluoEUR);    
+            await checkIbAlluoDepositResult(par, amountEur, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), 2, ibAlluoEUR);
         });
         it("Should deposit EURS", async () => {
             const depositor = signers[0];
@@ -558,7 +558,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
             const ibAlluoBalanceAfter = await ibAlluoEUR.balanceOf(depositor.address);
             console.log(`Received ${formatEther(ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore))} ibAlluoEUR when deposited ${amount} EURS`)
 
-            await checkIbAlluoDepositResult(eurs, amountEur, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), 2, ibAlluoEUR);    
+            await checkIbAlluoDepositResult(eurs, amountEur, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), 2, ibAlluoEUR);
         });
 
         it("Should withdraw EURT", async () => {
@@ -651,7 +651,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
             const ibAlluoBalanceAfter = await ibAlluoETH.balanceOf(depositor.address);
             console.log(`Received ${formatEther(ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore))} ibAlluoETH when deposited ${amount} WETH`);
 
-            await checkIbAlluoDepositResult(weth, amountEth, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), undefined, ibAlluoETH);    
+            await checkIbAlluoDepositResult(weth, amountEth, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), undefined, ibAlluoETH);
         });
 
         it("Should withdraw WETH", async () => {
@@ -689,7 +689,7 @@ describe("IbAlluo With Price Oracles (Integration Tests)", async () => {
             const ibAlluoBalanceAfter = await ibAlluoBTC.balanceOf(depositor.address);
             console.log(`Received ${formatEther(ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore))} ibAlluoBTC when deposited ${amount} WBTC`);
 
-            await checkIbAlluoDepositResult(wbtc, amountBtc, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), undefined, ibAlluoBTC);    
+            await checkIbAlluoDepositResult(wbtc, amountBtc, ibAlluoBalanceAfter.sub(ibAlluoBalanceBefore), undefined, ibAlluoBTC);
         });
 
         it("Should withdraw WBTC", async () => {

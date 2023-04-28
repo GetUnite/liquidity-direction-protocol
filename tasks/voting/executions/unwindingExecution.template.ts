@@ -1,6 +1,6 @@
 import { task } from "hardhat/config";
-import "@nomiclabs/hardhat-waffle";
-import { Unwinder } from "../typechain";
+
+import { Unwinder } from "../typechain-types";
 
 task("unwind", "Unwind entries from previous vote")
     .setAction(async function (taskArgs, hre) {

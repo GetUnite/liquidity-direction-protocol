@@ -18,7 +18,7 @@ import {
   BufferManager__factory,
   BufferManager,
   UsdCurveAdapterUpgradeable
-} from "./../../typechain";
+} from "./../../typechain-types";
 
 async function getImpersonatedSigner(
   address: string
