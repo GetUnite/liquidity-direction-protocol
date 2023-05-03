@@ -168,9 +168,12 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         uint256 amount = IERC20MetadataUpgradeable(primaryToken).balanceOf(
             address(this)
         );
-        if (amount > 0 && _depositQueue.totalDepositAmount == 0) {
-            _bridge(amount, primaryToken);
-        }
+        require(amount > 0, "No funds to bridge");
+        require(
+            _depositQueue.totalDepositAmount == 0,
+            "There are still funds to be deployed"
+        );
+        _bridge(amount, primaryToken);
     }
 
     function _withdrawFromDirection(
@@ -212,6 +215,10 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         uint256 fundsReady = IERC20MetadataUpgradeable(primaryToken).balanceOf(
             msg.sender
         );
+
+        console.log("totalDepositAmount", totalDepositAmount);
+        console.log("fundsReady", fundsReady);
+        console.log("slippageTolerance", slippageTolerance);
         require(
             IAlluoVoteExecutorUtils(voteExecutorUtils)
                 .isWithinSlippageTolerance(
@@ -221,6 +228,14 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
                 ),
             "Not enough funds"
         );
+
+        // Transfer the funds to this contract
+        IERC20MetadataUpgradeable(primaryToken).transferFrom(
+            msg.sender,
+            address(this),
+            fundsReady
+        );
+
         // Assume here that any disparity between the deposit amount and funds ready is due to slippage and fees
         // need to scale deposit values here to account for slippage
         _scaleDepositQueue(_depositQueue, totalDepositAmount, fundsReady);
@@ -243,9 +258,12 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         _depositQueue.totalDepositAmount = 0;
         for (uint256 i; i < _depositQueueLength; i++) {
             Deposit storage _deposit = _depositQueue.deposits[i];
+            console.log("Before", _deposit.amount);
             _deposit.amount =
                 (_deposit.amount * _fundsReady) /
                 _totalDepositAmount;
+            console.log("after", _deposit.amount);
+
             _depositQueue.totalDepositAmount += _deposit.amount;
         }
     }
@@ -258,6 +276,7 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         LiquidityDirection memory _direction = liquidityDirection[_directionId];
         if (_direction.entryToken != _inputToken) {
             // We need to think about what we will do about slippage.
+            IERC20MetadataUpgradeable(_inputToken).approve(exchange, _amount);
             _amount = IExchange(exchange).exchange(
                 _inputToken,
                 _direction.entryToken,
@@ -266,6 +285,12 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
             );
             _inputToken = _direction.entryToken;
         }
+        // Send the funds to the strategy
+        IERC20MetadataUpgradeable(_inputToken).transfer(
+            _direction.strategyAddress,
+            _amount
+        );
+
         IAlluoStrategyV2(_direction.strategyAddress).invest(
             _direction.entryData,
             _amount
@@ -275,6 +300,7 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
     function getPrimaryTokenForAsset(
         uint256 assetId
     ) public view returns (address primaryToken) {
+        console.log("block.chainId", block.chainid);
         primaryToken = assetIdToAssetInfo[assetId].chainIdToPrimaryToken[
             block.chainid
         ];
@@ -347,8 +373,8 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         assetIdToAssetInfo[_assetId].ibAlluo = _ibAlluo;
         for (uint256 i; i < _chainIds.length; i++) {
             assetIdToAssetInfo[_assetId].chainIdToPrimaryToken[
-                _chainIds[i]
-            ] = _chainIdToPrimaryToken[i];
+                    _chainIds[i]
+                ] = _chainIdToPrimaryToken[i];
         }
     }
 

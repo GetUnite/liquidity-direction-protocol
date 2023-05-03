@@ -17,6 +17,8 @@ import {AddressUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Addr
 import {SafeERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
+import "hardhat/console.sol";
+
 contract BeefyStrategy is
     Initializable,
     AccessControlUpgradeable,
@@ -99,6 +101,7 @@ contract BeefyStrategy is
         uint256 mooTokensAmount = IBeefyVaultV6(beefyVaultAddress).balanceOf(
             address(this)
         );
+        console.log(amount);
         IBeefyVaultV6(beefyVaultAddress).deposit(amount);
         mooTokensAmount =
             IBeefyVaultV6(beefyVaultAddress).balanceOf(address(this)) -
@@ -186,45 +189,45 @@ contract BeefyStrategy is
         }
     }
 
-    function getDeployedAmountAndRewards(
-        bytes calldata data
-    ) external returns (uint256) {
-        (
-            address beefyVaultAddress,
-            address beefyBoostAddress,
-            uint256 assetId
-        ) = decodeData(data);
+    // function getDeployedAmountAndRewards(
+    //     bytes calldata data
+    // ) external returns (uint256) {
+    //     (
+    //         address beefyVaultAddress,
+    //         address beefyBoostAddress,
+    //         uint256 assetId
+    //     ) = decodeData(data);
 
-        uint256 lpAmount;
-        if (beefyBoostAddress != address(0)) {
-            lpAmount = IBeefyBoost(beefyBoostAddress).balanceOf(address(this));
-            IBeefyBoost(beefyBoostAddress).getReward();
-        } else {
-            lpAmount = IBeefyVaultV6(beefyVaultAddress).balanceOf(
-                address(this)
-            );
-        }
+    //     uint256 lpAmount;
+    //     if (beefyBoostAddress != address(0)) {
+    //         lpAmount = IBeefyBoost(beefyBoostAddress).balanceOf(address(this));
+    //         IBeefyBoost(beefyBoostAddress).getReward();
+    //     } else {
+    //         lpAmount = IBeefyVaultV6(beefyVaultAddress).balanceOf(
+    //             address(this)
+    //         );
+    //     }
 
-        if (lpAmount == 0) {
-            return 0;
-        }
+    //     if (lpAmount == 0) {
+    //         return 0;
+    //     }
 
-        lpAmount =
-            (lpAmount *
-                IBeefyVaultV6(beefyVaultAddress).getPricePerFullShare()) /
-            1e18;
-        address tokenInvested = IBeefyVaultV6(beefyVaultAddress).want();
+    //     lpAmount =
+    //         (lpAmount *
+    //             IBeefyVaultV6(beefyVaultAddress).getPricePerFullShare()) /
+    //         1e18;
+    //     address tokenInvested = IBeefyVaultV6(beefyVaultAddress).want();
 
-        (uint256 fiatPrice, uint8 fiatDecimals) = IPriceFeedRouterV2(priceFeed)
-            .getPriceOfAmount(tokenInvested, lpAmount, assetId);
+    //     (uint256 fiatPrice, uint8 fiatDecimals) = IPriceFeedRouterV2(priceFeed)
+    //         .getPriceOfAmount(tokenInvested, lpAmount, assetId);
 
-        return
-            IPriceFeedRouterV2(priceFeed).decimalsConverter(
-                fiatPrice,
-                fiatDecimals,
-                18
-            );
-    }
+    //     return
+    //         IPriceFeedRouterV2(priceFeed).decimalsConverter(
+    //             fiatPrice,
+    //             fiatDecimals,
+    //             18
+    //         );
+    // }
 
     /// @notice Claim available rewards.
     /// @param data whatever data you want to pass to strategy from vote extry.
@@ -257,6 +260,46 @@ contract BeefyStrategy is
     }
 
     function getDeployedAmount(
+        bytes calldata data
+    ) external view returns (uint256) {
+        (
+            address beefyVaultAddress,
+            address beefyBoostAddress,
+            uint256 assetId
+        ) = decodeData(data);
+
+        uint256 lpAmount;
+        if (beefyBoostAddress != address(0)) {
+            lpAmount = IBeefyBoost(beefyBoostAddress).balanceOf(address(this));
+        } else {
+            lpAmount = IBeefyVaultV6(beefyVaultAddress).balanceOf(
+                address(this)
+            );
+        }
+
+        if (lpAmount == 0) {
+            return 0;
+        }
+
+        lpAmount =
+            (lpAmount *
+                IBeefyVaultV6(beefyVaultAddress).getPricePerFullShare()) /
+            1e18;
+        address tokenInvested = IBeefyVaultV6(beefyVaultAddress).want();
+
+        (uint256 fiatPrice, uint8 fiatDecimals) = IPriceFeedRouterV2(priceFeed)
+            .getPriceOfAmount(tokenInvested, lpAmount, assetId);
+
+        return
+            IPriceFeedRouterV2(priceFeed).decimalsConverter(
+                fiatPrice,
+                fiatDecimals,
+                18
+            );
+    }
+
+    // Temp function
+    function getDeployedAmountAndRewards(
         bytes calldata data
     ) external view returns (uint256) {
         (
