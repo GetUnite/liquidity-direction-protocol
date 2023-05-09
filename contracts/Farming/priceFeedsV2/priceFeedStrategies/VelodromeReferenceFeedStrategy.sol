@@ -60,7 +60,13 @@ contract VelodromeReferenceFeedStrategy is
 
         decimals = _isResultToken0
             ? IERC20Metadata(IUniswapV2Pair(_velodromePool).token1()).decimals()
-            : IERC20Metadata(IUniswapV2Pair(_velodromePool).token0()).decimals();
+            : IERC20Metadata(IUniswapV2Pair(_velodromePool).token0())
+                .decimals();
+
+        decimalsOpposite = _isResultToken0
+            ? IERC20Metadata(IUniswapV2Pair(_velodromePool).token0()).decimals()
+            : IERC20Metadata(IUniswapV2Pair(_velodromePool).token1())
+                .decimals();
     }
 
     function getPrice() external view returns (int256, uint8) {
@@ -74,24 +80,18 @@ contract VelodromeReferenceFeedStrategy is
 
         if (isResultToken0) {
             // token1 => token0
-            amountReturned = velodromePool.getAmountOut(
-                amount,
-                token1
-            );
+            amountReturned = velodromePool.getAmountOut(amount, token1);
         } else {
             // token0 => token1
-            amountReturned = velodromePool.getAmountOut(
-                amount,
-                token0
-            );
+            amountReturned = velodromePool.getAmountOut(amount, token0);
         }
 
         (int256 usdPrice, uint8 usdDecimals) = referenceFeed.getPrice();
-        
+
         require(usdPrice > 0, "VeloRFS: feed lte 0");
         return (
-            int256(amount) * usdPrice,
-            usdDecimals + decimals
+            int256(amountReturned) * usdPrice,
+            usdDecimals + decimalsOpposite
         );
     }
 
