@@ -19,7 +19,7 @@ import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable/util
 
 import "hardhat/console.sol";
 
-contract BeefyStrategy is
+contract BeefyStrategyUniversal is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable,
@@ -89,23 +89,26 @@ contract BeefyStrategy is
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (amount == 0) return;
 
-        (address beefyVaultAddress, address beefyBoostAddress, ) = decodeData(
-            data
+        (
+            address beefyVaultAddress,
+            address beefyBoostAddress,
+            ,
+            address entryToken
+        ) = decodeData(data);
+        IERC20Upgradeable(entryToken).safeIncreaseAllowance(
+            address(exchange),
+            amount
         );
-        IERC20Upgradeable entryToken = IERC20Upgradeable(
-            IBeefyVaultV6(beefyVaultAddress).want()
+        console.log("Entry token", entryToken);
+        console.log("Beefy vault", beefyVaultAddress);
+        console.log("Amount", amount);
+        uint256 mooTokensAmount = exchange.exchange(
+            entryToken,
+            beefyVaultAddress,
+            amount,
+            0
         );
-
-        entryToken.safeIncreaseAllowance(beefyVaultAddress, amount);
-
-        uint256 mooTokensAmount = IBeefyVaultV6(beefyVaultAddress).balanceOf(
-            address(this)
-        );
-        console.log(amount);
-        IBeefyVaultV6(beefyVaultAddress).deposit(amount);
-        mooTokensAmount =
-            IBeefyVaultV6(beefyVaultAddress).balanceOf(address(this)) -
-            mooTokensAmount;
+        console.log(mooTokensAmount);
 
         if (beefyBoostAddress != address(0)) {
             IERC20Upgradeable(beefyVaultAddress).safeIncreaseAllowance(
@@ -131,50 +134,31 @@ contract BeefyStrategy is
         bool _withdrawRewards,
         bool swapRewards
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        (address beefyVaultAddress, address beefyBoostAddress, ) = decodeData(
+        (address beefyVaultAddress, address beefyBoostAddress, , ) = decodeData(
             data
         );
-        IERC20Upgradeable entryToken = IERC20Upgradeable(
-            IBeefyVaultV6(beefyVaultAddress).want()
-        );
+        IERC20Upgradeable vaultToken = IERC20Upgradeable(beefyVaultAddress);
 
-        uint256 lpAmount = entryToken.balanceOf(address(this));
-        if (unwindPercent == 10000) {
-            // withdraw everything in specified beefy vault/boost
-            if (beefyBoostAddress != address(0)) {
-                uint256 stakedAmount = IBeefyBoost(beefyBoostAddress).balanceOf(
-                    address(this)
-                );
-                IBeefyBoost(beefyBoostAddress).withdraw(stakedAmount);
-                if (_withdrawRewards) {
-                    IBeefyBoost(beefyBoostAddress).getReward();
-                }
+        if (beefyBoostAddress != address(0)) {
+            uint256 unboostAmount = (IBeefyBoost(beefyBoostAddress).balanceOf(
+                address(this)
+            ) * unwindPercent) / 10000;
+            if (_withdrawRewards) {
+                IBeefyBoost(beefyBoostAddress).getReward();
             }
-            IBeefyVaultV6(beefyVaultAddress).withdrawAll();
-        } else {
-            // partial withdraw
-            uint256 stakedAmountWithdraw;
-            if (beefyBoostAddress != address(0)) {
-                stakedAmountWithdraw =
-                    (IBeefyBoost(beefyBoostAddress).balanceOf(address(this)) *
-                        unwindPercent) /
-                    10000;
-                IBeefyBoost(beefyBoostAddress).withdraw(stakedAmountWithdraw);
-                if (_withdrawRewards) {
-                    IBeefyBoost(beefyBoostAddress).getReward();
-                }
-            } else {
-                stakedAmountWithdraw =
-                    (IBeefyVaultV6(beefyVaultAddress).balanceOf(address(this)) *
-                        unwindPercent) /
-                    10000;
-            }
-            IBeefyVaultV6(beefyVaultAddress).withdraw(stakedAmountWithdraw);
+            IBeefyBoost(beefyBoostAddress).withdraw(unboostAmount);
         }
-        lpAmount = entryToken.balanceOf(address(this)) - lpAmount;
 
+        uint256 lpAmountToSwap = (vaultToken.balanceOf(address(this)) *
+            unwindPercent) / 10000;
         // execute exchanges and transfer all tokens to receiver
-        _exchangeAll(entryToken, IERC20Upgradeable(address(outputCoin)));
+        vaultToken.safeIncreaseAllowance(address(exchange), lpAmountToSwap);
+        exchange.exchange(
+            address(vaultToken),
+            address(outputCoin),
+            lpAmountToSwap,
+            0
+        );
         if (_withdrawRewards) {
             _manageRewardsAndWithdraw(
                 swapRewards,
@@ -240,7 +224,7 @@ contract BeefyStrategy is
         address receiver,
         bool swapRewards
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        (, address beefyBoostAddress, ) = decodeData(data);
+        (, address beefyBoostAddress, , ) = decodeData(data);
 
         if (beefyBoostAddress != address(0)) {
             IBeefyBoost(beefyBoostAddress).getReward();
@@ -265,7 +249,8 @@ contract BeefyStrategy is
         (
             address beefyVaultAddress,
             address beefyBoostAddress,
-            uint256 assetId
+            uint256 assetId,
+            address entryToken
         ) = decodeData(data);
 
         uint256 lpAmount;
@@ -281,14 +266,8 @@ contract BeefyStrategy is
             return 0;
         }
 
-        lpAmount =
-            (lpAmount *
-                IBeefyVaultV6(beefyVaultAddress).getPricePerFullShare()) /
-            1e18;
-        address tokenInvested = IBeefyVaultV6(beefyVaultAddress).want();
-
         (uint256 fiatPrice, uint8 fiatDecimals) = IPriceFeedRouterV2(priceFeed)
-            .getPriceOfAmount(tokenInvested, lpAmount, assetId);
+            .getPriceOfAmount(beefyVaultAddress, lpAmount, assetId);
 
         return
             IPriceFeedRouterV2(priceFeed).decimalsConverter(
@@ -305,7 +284,8 @@ contract BeefyStrategy is
         (
             address beefyVaultAddress,
             address beefyBoostAddress,
-            uint256 assetId
+            uint256 assetId,
+            address entryToken
         ) = decodeData(data);
 
         uint256 lpAmount;
@@ -321,14 +301,8 @@ contract BeefyStrategy is
             return 0;
         }
 
-        lpAmount =
-            (lpAmount *
-                IBeefyVaultV6(beefyVaultAddress).getPricePerFullShare()) /
-            1e18;
-        address tokenInvested = IBeefyVaultV6(beefyVaultAddress).want();
-
         (uint256 fiatPrice, uint8 fiatDecimals) = IPriceFeedRouterV2(priceFeed)
-            .getPriceOfAmount(tokenInvested, lpAmount, assetId);
+            .getPriceOfAmount(beefyVaultAddress, lpAmount, assetId);
 
         return
             IPriceFeedRouterV2(priceFeed).decimalsConverter(
@@ -346,21 +320,26 @@ contract BeefyStrategy is
         returns (
             address beefyVaultAddress,
             address beefyBoostAddress,
-            uint256 assetId
+            uint256 assetId,
+            address entryToken
         )
     {
-        (beefyVaultAddress, beefyBoostAddress, assetId) = abi.decode(
-            data,
-            (address, address, uint256)
-        );
+        (beefyVaultAddress, beefyBoostAddress, assetId, entryToken) = abi
+            .decode(data, (address, address, uint256, address));
     }
 
     function encodeData(
         address beefyVaultAddress,
         address beefyBoostAddress,
-        uint256 assetId
+        uint256 assetId,
+        address entryToken
     ) public pure returns (bytes memory data) {
-        data = abi.encode(beefyVaultAddress, beefyBoostAddress, assetId);
+        data = abi.encode(
+            beefyVaultAddress,
+            beefyBoostAddress,
+            assetId,
+            entryToken
+        );
     }
 
     function setAddresses(

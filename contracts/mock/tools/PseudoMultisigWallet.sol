@@ -17,10 +17,10 @@ contract PseudoMultisigWallet {
 
         if (!_isFork) {
             // solhint-disable-next-line reason-string
-            require(
-                id == 1337 || id == 31337,
-                "Do not deploy this contract on public networks!"
-            );
+            // require(
+            //     id == 1337 || id == 31337,
+            //     "Do not deploy this contract on public networks!"
+            // );
         }
     }
 
