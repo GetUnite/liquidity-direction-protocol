@@ -54,6 +54,9 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
     mapping(uint256 => Deposit[]) public assetIdToDepositPercentages;
 
     mapping(uint256 => uint256) public universalTVL;
+    mapping(uint256 => address) public executorInternalIdToAddress;
+    mapping(uint256 => uint256) public executorInternalIdToChainId;
+
     uint256 public universalTVLUpdated;
     uint256[][] public universalExecutorBalances;
     uint256[][] public desiredPercentagesByChain;
@@ -88,24 +91,39 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
         bytes[] signs;
     }
 
-    struct ExecutorTransfer {
-        uint256 fromExecutor;
-        uint256 toExecutor;
-        uint256 tokenId;
-        uint256 amount;
-    }
     event MessageReceived(bytes32 indexed hashed);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(address _multiSigWallet) public initializer {
+    // Set all parameters
+    function initialize(
+        address _multiSigWallet,
+        address _exchangeAddress,
+        address _priceFeed,
+        address _liquidityHandler,
+        address _strategyHandler,
+        address _cvxDistributor,
+        address _voteExecutorUtils,
+        address _locker,
+        uint256 _timeLock,
+        uint256 _minSigns,
+        bool _isMaster
+    ) public initializer {
         __AlluoUpgradeableBase_init();
-        require(_multiSigWallet.isContract());
         gnosis = _multiSigWallet;
-        minSigns = 1;
-        exchangeAddress = 0x29c66CF57a03d41Cfe6d9ecB6883aa0E2AbA21Ec;
-
+        minSigns = _minSigns;
+        exchangeAddress = _exchangeAddress;
+        priceFeed = _priceFeed;
+        liquidityHandler = _liquidityHandler;
+        strategyHandler = _strategyHandler;
+        cvxDistributor = _cvxDistributor;
+        voteExecutorUtils = _voteExecutorUtils;
+        locker = _locker;
+        timeLock = _timeLock;
+        isMaster = _isMaster;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(UPGRADER_ROLE, msg.sender);
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
     }
@@ -177,20 +195,18 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
         }
     }
 
-    function _anyExecuteLogic(
-        bytes calldata data
-    ) internal override returns (bool success, bytes memory result) {
-        (address from, , ) = anyCallV7Executor.context();
+    function executeSpecificData(
+        uint256 index
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        SubmittedData memory exactData = submittedData[index];
+        // _anyExecuteLogic(exactData.data);
+        _internalExecutionofData(exactData.data, exactData.signs);
+    }
 
-        require(
-            from == crossChainInformation.previousExecutor,
-            "Not from previous executor"
-        );
-
-        (bytes memory message, bytes[] memory signs) = abi.decode(
-            data,
-            (bytes, bytes[])
-        );
+    function _internalExecutionofData(
+        bytes memory message,
+        bytes[] memory signs
+    ) internal returns (bool success, bytes memory result) {
         (bytes32 hashed, Message[] memory messages, ) = abi.decode(
             message,
             (bytes32, Message[], uint256)
@@ -209,12 +225,12 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
             return (true, "");
         }
 
+        bytes memory data = abi.encode(message, signs);
         IAlluoVoteExecutorUtils(voteExecutorUtils).confirmDataIntegrity(
             data,
             gnosis,
             minSigns
         );
-
         require(hashExecutionTime[hashed] == 0, "Duplicate hash");
         require(
             IAlluoVoteExecutorUtils(voteExecutorUtils)
@@ -225,6 +241,9 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
             "Universal TVL has not been updated"
         );
         // Now that the data has been confirmed, we can execute it
+
+        // First delete the array of desiredPercentagesByChain because this will be completely updated.
+        delete desiredPercentagesByChain;
         for (uint256 i; i < messages.length; i++) {
             Message memory currentMessage = messages[i];
             console.log("Message index", currentMessage.commandIndex);
@@ -270,17 +289,26 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
                         tvlForAsset
                     );
                 }
+                _saveDesiredPercentage(directionId, percent, executorLocalId);
             }
         }
 
-        executionHistory.push(data);
+        executionHistory.push(message);
         hashExecutionTime[hashed] = block.timestamp;
-
-        // Crosschain call.
-
         success = true;
         result = "";
         emit MessageReceived(hashed);
+    }
+
+    function _anyExecuteLogic(
+        bytes calldata data
+    ) internal override returns (bool success, bytes memory result) {
+        (bytes memory message, bytes[] memory signs) = abi.decode(
+            data,
+            (bytes, bytes[])
+        );
+        console.log("gothere");
+        return _internalExecutionofData(message, signs);
     }
 
     function markAllChainPositions() external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -297,66 +325,106 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
     }
 
     function triggerBridging() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        // Trigger the bridging messages.
-        // We need the following information to bridge funds to the correct chains
-        // VoteExecutor[] storage executors, (how much of each token each executor holds)
-        // uint256[] memory tokenIds, GOTIT
-        // uint256[][] memory desiredPercentages, GOTIT can save it during execution
-        // Beauty is that we dont need to do crosschain calls for it because we now have all the information we need.
+        // This requires some check that data has been executed and tvl has been updated...
+
         IAlluoStrategyHandler handler = IAlluoStrategyHandler(strategyHandler);
         uint8 numberOfAssets = handler.numberOfAssets();
         uint256[] memory tokenIds = new uint256[](numberOfAssets);
         for (uint256 i; i < numberOfAssets; i++) {
             tokenIds[i] = i;
         }
-        // When we do the submission of data, let's save the percentages everytime the data is passed around
-        // desiredPercentage[i] = ith executor localId
-        // desiredPercentage[i][j] = jth asset percentage
-        // From directionId --> get assetId --> get token --> get token id
-        // Write a function that loops through the direction messages and saves this to every single executor.
-        // balanceTokens(universalExecutorBalances, tokenIds, desiredPercentages);
+
+        IAlluoVoteExecutorUtils.ExecutorTransfer[]
+            memory toTransfer = IAlluoVoteExecutorUtils(voteExecutorUtils)
+                .balanceTokens(
+                    universalExecutorBalances,
+                    tokenIds,
+                    desiredPercentagesByChain
+                );
+        // Consolelog for debugging
+
+        // ALso i have to scale the amount to what is actually in the executor vs expected balance
+        for (uint256 i; i < toTransfer.length; i++) {
+            IAlluoVoteExecutorUtils.ExecutorTransfer
+                memory currentTransfer = toTransfer[i];
+            uint256 currentExecutorInternalId = crossChainInformation
+                .currentExecutorInternalId;
+            if (currentTransfer.fromExecutor == currentExecutorInternalId) {
+                address recipientExecutorAddress = executorInternalIdToAddress[
+                    currentTransfer.toExecutor
+                ];
+                uint256 recipientExecutorChainId = executorInternalIdToChainId[
+                    currentTransfer.toExecutor
+                ];
+                // Bridge through handler.
+                address primaryToken = handler.getPrimaryTokenForAsset(
+                    currentTransfer.tokenId
+                );
+
+                // Get the balance of the token and transfer it to the handler
+                uint256 currentBalance = IERC20MetadataUpgradeable(primaryToken)
+                    .balanceOf(address(this));
+                if (currentBalance < currentTransfer.amount) {
+                    currentTransfer.amount = currentBalance;
+                    // This is to account for slippage when withdrawing.
+                }
+                IERC20MetadataUpgradeable(primaryToken).transfer(
+                    address(handler),
+                    currentTransfer.amount
+                );
+
+                handler.bridgeTo(
+                    currentTransfer.amount,
+                    uint8(currentTransfer.tokenId),
+                    recipientExecutorAddress,
+                    recipientExecutorChainId
+                );
+            }
+        }
     }
 
-    function _saveDesiredPercentages(
-        bytes[] memory directionMessages
+    // Local id starts from 0 --> max(number of executors)
+    // Global id is the chain.id
+    function _saveDesiredPercentage(
+        uint256 directionId,
+        uint256 percent,
+        uint256 executorLocalId
     ) internal {
         IAlluoStrategyHandler handler = IAlluoStrategyHandler(strategyHandler);
-        uint8 numberOfAssets = handler.numberOfAssets();
+        (address strategyPrimaryToken, ) = handler.getDirectionFullInfoById(
+            directionId
+        );
+        uint256 assetId = handler.tokenToAssetId(strategyPrimaryToken);
 
-        // Initialize desiredPercentage array if necessary
+        // if desiredPercentagesByChain is not initialized, initialize it.
         if (desiredPercentagesByChain.length == 0) {
             desiredPercentagesByChain = new uint256[][](
                 crossChainInformation.numberOfExecutors
             );
+
             for (
                 uint256 i = 0;
                 i < crossChainInformation.numberOfExecutors;
                 i++
             ) {
-                desiredPercentagesByChain[i] = new uint256[](numberOfAssets);
+                desiredPercentagesByChain[i] = new uint256[](
+                    handler.numberOfAssets()
+                );
             }
         }
+        desiredPercentagesByChain[executorLocalId][assetId] += percent;
 
-        // Loop through the direction messages
-        for (uint256 i = 0; i < directionMessages.length; i++) {
-            bytes memory currentMessage = directionMessages[i];
-            (
-                uint256 directionId,
-                uint256 percent,
-                uint256 executorLocalId
-            ) = abi.decode(currentMessage, (uint256, uint256, uint256));
-
-            (address strategyPrimaryToken, ) = handler.getDirectionFullInfoById(
-                directionId
-            );
-
-            uint256 assetId = handler.tokenToAssetId(strategyPrimaryToken);
-
-            // Save the percentage for the corresponding executor and asset in the desiredPercentage array
-            desiredPercentagesByChain[executorLocalId][assetId] = uint256(
-                percent
-            );
-        }
+        // Now loop through and console log
+        // for (uint256 i = 0; i < crossChainInformation.numberOfExecutors; i++) {
+        //     for (uint256 j = 0; j < handler.numberOfAssets(); j++) {
+        //         console.log(
+        //             "desiredPercentagesByChain[%s][%s]",
+        //             i,
+        //             j,
+        //             desiredPercentagesByChain[i][j]
+        //         );
+        //     }
+        // }
     }
 
     function _executeTVLCommand(uint256[][] memory executorBalances) internal {
@@ -364,11 +432,22 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
         uint8 numberOfAssets = handler.numberOfAssets();
         uint256 currentExecutorInternalId = crossChainInformation
             .currentExecutorInternalId;
-        if (
-            isMaster &&
+
+        // Check if the inner array has been initialized
+        bool isInitialized = executorBalances[executorBalances.length - 1]
+            .length != 0
+            ? true
+            : false;
+        bool checkValue;
+
+        if (isInitialized) {
+            // Check if the last value is max uint256 (this means that it has looped through twice
             executorBalances[executorBalances.length - 1][0] ==
-            type(uint256).max
-        ) {
+                type(uint256).max
+                ? checkValue = true
+                : checkValue = false;
+        }
+        if (isMaster && checkValue) {
             // If that specific value is max uint256, then we know that it has looped through twice. And since the current chain is the master, we can stop here.
             return;
         }
@@ -403,7 +482,6 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
                     .max;
             }
         }
-
         // Now just send the message off to the next executor
         (
             uint256 commandIndex,
@@ -414,7 +492,7 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
 
         uint256[] memory commandIndexes = new uint256[](1);
         bytes[] memory messages = new bytes[](1);
-        address[] memory emptyAddresses = new address[](1);
+        address[] memory emptyAddresses = new address[](0);
 
         messages[0] = messageData;
         commandIndexes[0] = commandIndex;
@@ -428,115 +506,78 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
             crossChainInformation.nextExecutor,
             finalData,
             crossChainInformation.nextExecutorChainId,
-            0
+            2
         );
     }
 
-    // Once we calculate the amount of token balances each voteExecutor has
-    // We calculate the amount of tokens each voteExecutor needs to transfer to each other
-    // This is done in the following steps:
-    // Give each executor a unique ID, as well as a unique ID for each primary token
-    // From the inputs given by snapshot, calculate for each primary token, which percentage of the total balance each executor should have
-    // For each primary token, calculate the difference between the current balance on that chain and the desired balance
-    // Ex.) Executor 1 has 1000 tokens, Executor 2 has 2000 tokens, Executor 3 has 3000 tokens
-    // Ex.) Executor 2 needs 50%, Executor 3 needs 25%, Executor 1 needs 25%
-    // Ex.) Total balance after each should be: Executor1:1500, Executor2: 3000, Executor3: 1500
-    // Ex.) Executor 2 needs 1000 tokens, Executor 3 has 1500 surplus tokens, Executor 1 needs 500 tokens
-    // Create a delta matrix where we only put the amount of tokens that need to be transferred inwards/outwards (marked  by +- delta)
-    // Then loop for each primary token,
-    // Then loop for each executor x each executor
-    // For each from and to executor, if the delta is is positive, it means it needs funds.
-    // Only if the fromExecutor needs funds and the toExecutor has a surplus, we mark the transfer.
-    // The transfer amount is the minimum of the two deltas. AKA transfer the maximum we can and need to. Then increment it.
-    // Once the fromExecutor no longer needs funds (AKA we have now fufilled its request for funds, break and move to the next executor)
-    function balanceTokens(
-        uint256[][] memory executorsBalances,
-        uint256[] memory tokenIds,
-        uint256[][] memory desiredPercentages
-    ) internal view returns (ExecutorTransfer[] memory) {
-        uint256 executorCount = executorsBalances.length;
-        uint256 tokenCount = tokenIds.length;
-        uint256[] memory totalTokenBalances = new uint256[](tokenCount);
-        for (uint256 i = 0; i < executorCount; i++) {
-            for (uint256 j = 0; j < tokenCount; j++) {
-                totalTokenBalances[j] += executorsBalances[i][tokenIds[j]];
-            }
-        }
-
-        int256[][] memory deltaMatrix = new int256[][](executorCount);
-
-        for (uint256 i = 0; i < executorCount; i++) {
-            deltaMatrix[i] = new int256[](tokenCount);
-            for (uint256 j = 0; j < tokenCount; j++) {
-                uint256 desiredAmount = (totalTokenBalances[j] *
-                    desiredPercentages[i][j]) / 100;
-                deltaMatrix[i][j] =
-                    int256(desiredAmount) -
-                    int256(executorsBalances[i][tokenIds[j]]);
-            }
-        }
-
-        uint256 maxTransfers = executorCount * tokenCount;
-        ExecutorTransfer[] memory transfers = new ExecutorTransfer[](
-            maxTransfers
-        );
-        uint256 transferCount = 0;
-
-        for (uint256 tokenId = 0; tokenId < tokenCount; tokenId++) {
-            for (
-                uint256 fromExecutor = 0;
-                fromExecutor < executorCount;
-                fromExecutor++
-            ) {
-                if (deltaMatrix[fromExecutor][tokenId] <= 0) {
-                    continue;
-                }
-
-                for (
-                    uint256 toExecutor = 0;
-                    toExecutor < executorCount;
-                    toExecutor++
-                ) {
-                    if (
-                        deltaMatrix[toExecutor][tokenId] >= 0 ||
-                        fromExecutor == toExecutor
-                    ) {
-                        continue;
-                    }
-                    // For each from and to executor, if the delta is is positive, it means it needs funds.
-                    // Only if the fromExecutor needs funds and the toExecutor has a surplus, we mark the transfer.
-                    // The transfer amount is the minimum of the two deltas. AKA transfer the maximum we can and need to. Then increment it.
-                    // Once the fromExecutor no longer needs funds (AKA we have now fufilled its request for funds, break and move to the next executor)
-                    int256 transferAmount = deltaMatrix[fromExecutor][tokenId] <
-                        -deltaMatrix[toExecutor][tokenId]
-                        ? deltaMatrix[fromExecutor][tokenId]
-                        : -deltaMatrix[toExecutor][tokenId];
-                    transfers[transferCount] = ExecutorTransfer(
-                        fromExecutor,
-                        toExecutor,
-                        tokenId,
-                        uint256(transferAmount)
-                    );
-                    transferCount++;
-                    deltaMatrix[fromExecutor][tokenId] -= transferAmount;
-                    deltaMatrix[toExecutor][tokenId] += transferAmount;
-                    if (deltaMatrix[fromExecutor][tokenId] <= 0) {
-                        break;
-                    }
-                }
-            }
-        }
-        ExecutorTransfer[] memory nonEmptyTransfers = new ExecutorTransfer[](
-            transferCount
-        );
-        for (uint256 i = 0; i < transferCount; i++) {
-            nonEmptyTransfers[i] = transfers[i];
-        }
-
-        return nonEmptyTransfers;
+    function setAnyCall(
+        address _anyCallAddress
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setAnyCall(_anyCallAddress);
     }
 
-    // Function to send funds to CVX-ETH
+    function setCrossChainInformation(
+        address _nextExecutor,
+        address _previousExecutor,
+        address _finalExecutor,
+        uint256 _finalExecutorChainId,
+        uint256 _nextExecutorChainId,
+        uint256 _previousExecutorChainId,
+        uint256 _numberOfExecutors,
+        uint256 _currentExecutorInternalId
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        crossChainInformation = CrossChainInformation(
+            _nextExecutor,
+            _previousExecutor,
+            _finalExecutor,
+            _finalExecutorChainId,
+            _nextExecutorChainId,
+            _previousExecutorChainId,
+            _numberOfExecutors,
+            _currentExecutorInternalId
+        );
+        previousCaller = _previousExecutor;
+    }
+
+    function setExecutorInternalIds(
+        uint256[] memory _executorInternalIds,
+        address[] memory _executorAddresses,
+        uint256[] memory _executorChainIds
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 executorCount = _executorInternalIds.length;
+        for (uint256 i = 0; i < executorCount; i++) {
+            uint256 executorInternalId = _executorInternalIds[i];
+            address executorAddress = _executorAddresses[i];
+            uint256 executorChainId = _executorChainIds[i];
+            executorInternalIdToAddress[executorInternalId] = executorAddress;
+            executorInternalIdToChainId[executorInternalId] = executorChainId;
+        }
+    }
+
+    function setUniversalExecutorBalances(
+        uint256[][] memory _executorBalances
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        universalExecutorBalances = _executorBalances;
+        universalTVLUpdated = block.timestamp;
+        // Update universal tvl
+        IAlluoStrategyHandler handler = IAlluoStrategyHandler(strategyHandler);
+        uint256 numberOfAssets = handler.numberOfAssets();
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            uint256 assetId = i;
+            uint256 totalBalance;
+            for (uint256 j = 0; j < universalExecutorBalances.length; j++) {
+                totalBalance += universalExecutorBalances[j][assetId];
+            }
+            universalTVL[assetId] = totalBalance;
+        }
+        universalTVLUpdated = block.timestamp;
+    }
+
+    function setMinSigns(
+        uint256 _minSigns
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        minSigns = _minSigns;
+    }
 
     /// @notice Updates all the ibAlluo addresses used when setting APY
     function updateAllIbAlluoAddresses() public {
@@ -565,6 +606,10 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
             submittedDataExact.time,
             submittedDataExact.signs
         );
+    }
+
+    function setMaster(bool _isMaster) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        isMaster = _isMaster;
     }
 
     function multicall(
