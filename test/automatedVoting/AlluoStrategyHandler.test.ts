@@ -55,7 +55,7 @@ describe("AlluoStrategyHandler Tests", function () {
             "IERC20Metadata",
             "0x7f5c764cbc14f9669b88837ca1490cca17c31607") as IERC20Metadata;
 
-        spokePool = "0xa420b2d1c0841415A695b81E5B867BCD07Dff8C9"
+        spokePool = "0x6f26Bf09B1C792e3228e5467807a900A503c0281"
         //Temp just for simulation
         _recipient = "0xa420b2d1c0841415A695b81E5B867BCD07Dff8C9"
         _recipientChainId = "1";
@@ -75,12 +75,7 @@ describe("AlluoStrategyHandler Tests", function () {
 
         await alluoVoteExecutorUtils.connect(admin).setStorageAddresses(alluoStrategyHandler.address, ethers.constants.AddressZero)
 
-        // Weird bug with across where i cant bridge weth from optimism to eth
-        // Enable weth --> chainid 1, true
-        // let enableData = "0x272751c7000000000000000000000000420000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001"
-        // let acrossAdmin = await ethers.getImpersonatedSigner("0x428ab2ba90eba0a4be7af34c9ac451ab061ac010")
-        // // Do a raw call data transaction
-        // await acrossAdmin.sendTransaction({ to: spokePool, data: enableData })
+
     });
 
     describe("All configuration and view functions", async () => {
@@ -310,24 +305,20 @@ describe("AlluoStrategyHandler Tests", function () {
         // Only possible when we have more price routers and exchange activated
         // Need more tests on checking the deposit queue amount
 
-        // This bridging test is failing for some reason. Seems like weth and eth is disabled
-        // Also change the bridge function to not revert. Instead emit an event or something
+        it.only("Bridging should work if there are no pending deposits and there are funds spare", async () => {
+            // Technically this logic is all handled in the vote executor
+            let wethBalanceOfAdminBefore = await weth.balanceOf(admin.address);
+            await alluoStrategyHandler.connect(admin).rebalanceUntilTarget(2, 1, 0, ethers.utils.parseEther("10000")) // TVL doesnt matter when doing a 0% rebalance
+            let wethBalanceOfAdminAfter = await weth.balanceOf(admin.address);
+            let balanceTransferred = wethBalanceOfAdminAfter.sub(wethBalanceOfAdminBefore);
+            // Then simulate transferring it to the strategyHandler
+            await weth.connect(admin).transfer(alluoStrategyHandler.address, balanceTransferred);
 
 
-        // it.only("Bridging should work if there are no pending deposits and there are funds spare", async () => {
-        //     // Technically this logic is all handled in the vote executor
-        //     let wethBalanceOfAdminBefore = await weth.balanceOf(admin.address);
-        //     await alluoStrategyHandler.connect(admin).rebalanceUntilTarget(2, 1, 0, ethers.utils.parseEther("10000")) // TVL doesnt matter when doing a 0% rebalance
-        //     let wethBalanceOfAdminAfter = await weth.balanceOf(admin.address);
-        //     let balanceTransferred = wethBalanceOfAdminAfter.sub(wethBalanceOfAdminBefore);
-        //     // Then simulate transferring it to the strategyHandler
-        //     await weth.connect(admin).transfer(alluoStrategyHandler.address, balanceTransferred);
+            // Now attempt to bridge
+            await alluoStrategyHandler.connect(admin).bridgeRemainingFunds(2);
 
-
-        //     // Now attempt to bridge
-        //     await alluoStrategyHandler.connect(admin).bridgeRemainingFunds(2);
-
-        // })
+        })
 
         it("Bridging when there are no funds spare, the contract should revert", async () => {
             // Technically this logic is all handled in the vote executor

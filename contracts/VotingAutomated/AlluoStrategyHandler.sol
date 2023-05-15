@@ -62,10 +62,10 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
 
     function initialize(
         address _multiSigWallet,
-        address _spokePool,
+        address payable _spokePool,
         address _recipient,
         uint256 _recipientChainId,
-        uint64 _relayerFeePct,
+        int64 _relayerFeePct,
         uint256 _slippageTolerance,
         address _exchange,
         address _voteExecutorUtils
@@ -145,7 +145,13 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         uint256 current = markDirectionToMarket(directionId);
         AssetInfo storage assetInfo = assetIdToAssetInfo[assetId];
         address primaryToken = assetInfo.chainIdToPrimaryToken[block.chainid];
+        console.log("Target", target);
+        console.log("Current", current);
+        console.log("primary token", primaryToken);
+        console.log("assetid", assetId);
+        console.log("directionId", directionId);
         if (current > target) {
+            console.log("withdrew", current - target);
             uint256 unwindPercentage = ((current - target) * 10000) / current;
             _withdrawFromDirection(
                 directionId,
@@ -154,8 +160,23 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
                 primaryToken
             );
         } else if (target > current) {
+            console.log("Queued", current - target);
+
             _queueDeposit(assetId, directionId, target - current);
         }
+    }
+
+    function bridgeTo(
+        uint256 amount,
+        uint8 assetId,
+        address to,
+        uint256 chainId
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        AssetInfo storage assetInfo = assetIdToAssetInfo[assetId];
+        address primaryToken = assetInfo.chainIdToPrimaryToken[block.chainid];
+        // Keep getting disabled route for weth -->
+        _bridgeTo(amount, primaryToken, to, chainId);
+        emit Bridged(amount, primaryToken, to, chainId);
     }
 
     function bridgeRemainingFunds(
@@ -300,7 +321,6 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
     function getPrimaryTokenForAsset(
         uint256 assetId
     ) public view returns (address primaryToken) {
-        console.log("block.chainId", block.chainid);
         primaryToken = assetIdToAssetInfo[assetId].chainIdToPrimaryToken[
             block.chainid
         ];
@@ -351,6 +371,13 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         );
     }
 
+    function setTokenToAssetId(
+        address _token,
+        uint8 _assetId
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        tokenToAssetId[_token] = _assetId;
+    }
+
     function setLastDirectionId(
         uint256 _newNumber
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -363,6 +390,20 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         numberOfAssets = _newNumber;
     }
 
+    function setAlluoBridging(
+        address payable _spokePool,
+        address _recipient,
+        uint256 _recipientChainId,
+        int64 _relayerFeePct
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setAlluoBridging(
+            _spokePool,
+            _recipient,
+            _recipientChainId,
+            _relayerFeePct
+        );
+    }
+
     function changeAssetInfo(
         uint256 _assetId,
         uint256[] calldata _chainIds,
@@ -373,8 +414,8 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         assetIdToAssetInfo[_assetId].ibAlluo = _ibAlluo;
         for (uint256 i; i < _chainIds.length; i++) {
             assetIdToAssetInfo[_assetId].chainIdToPrimaryToken[
-                    _chainIds[i]
-                ] = _chainIdToPrimaryToken[i];
+                _chainIds[i]
+            ] = _chainIdToPrimaryToken[i];
         }
     }
 
