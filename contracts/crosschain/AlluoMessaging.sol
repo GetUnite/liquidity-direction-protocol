@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 import {IAnyCallV7, IAnyCallV7Executor} from "../interfaces/IAnyCallV7.sol";
+import "hardhat/console.sol";
 
 abstract contract AlluoMessaging {
     IAnyCallV7 public anyCallV7;
     IAnyCallV7Executor public anyCallV7Executor;
+    address public previousCaller;
 
     function _setAnyCall(address _anyCallAddress) internal {
         anyCallV7 = IAnyCallV7(_anyCallAddress);
@@ -27,6 +29,11 @@ abstract contract AlluoMessaging {
             msg.sender == address(anyCallV7Executor),
             "Only AnyCallV7Executor can call this function"
         );
+
+        (address from, , ) = anyCallV7Executor.context();
+
+        require(from == previousCaller, "Not from previous executor");
+
         return _anyExecuteLogic(data);
     }
 

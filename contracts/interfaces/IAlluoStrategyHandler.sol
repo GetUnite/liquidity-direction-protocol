@@ -71,6 +71,13 @@ interface IAlluoStrategyHandler {
 
     function bridgeRemainingFunds(uint8 assetId) external;
 
+    function bridgeTo(
+        uint256 _amount,
+        uint8 _assetId,
+        address _to,
+        uint256 _recipientChainId
+    ) external;
+
     function changeAssetInfo(
         uint256 _assetId,
         uint256[] memory _chainIds,

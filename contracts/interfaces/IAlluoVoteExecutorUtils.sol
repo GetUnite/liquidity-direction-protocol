@@ -3,6 +3,12 @@
 pragma solidity ^0.8.17;
 
 interface IAlluoVoteExecutorUtils {
+    struct ExecutorTransfer {
+        uint256 fromExecutor;
+        uint256 toExecutor;
+        uint256 tokenId;
+        uint256 amount;
+    }
     event AdminChanged(address previousAdmin, address newAdmin);
     event BeaconUpgraded(address indexed beacon);
     event Initialized(uint8 version);
@@ -82,6 +88,12 @@ interface IAlluoVoteExecutorUtils {
         uint256 _timestamp,
         uint256 _period
     ) external view returns (bool);
+
+    function balanceTokens(
+        uint256[][] memory executorsBalances,
+        uint256[] memory tokenIds,
+        uint256[][] memory desiredPercentages
+    ) external view returns (ExecutorTransfer[] memory);
 
     function encodeTvlCommand(
         uint256[][] memory executorBalances
