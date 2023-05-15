@@ -46,6 +46,7 @@ const config: HardhatUserConfig = {
       //   url: process.env.MAINNET_FORKING_URL as string,
       //   blockNumber: 14785940
       // }
+      allowUnlimitedContractSize: true
     },
     mainnet: {
       url: process.env.MAINNET_URL,
@@ -83,13 +84,12 @@ const config: HardhatUserConfig = {
     //     mnemonic: process.env.MNEMONIC,
     //   },
     // },
-    // rinkeby: {
-    // url: process.env.RINKEBY_URL,
-    // gasPrice: 25000000000,
-    // accounts: {
-    //   mnemonic: process.env.MNEMONIC,
-    // },
-    // },
+    optimisticEthereum: {
+      url: process.env.OPTIMISM_URL,
+      gasPrice: "auto",
+      accounts: process.env.ALLUO_DEPLOYER_PRIVATE_KEY != undefined ? [process.env.ALLUO_DEPLOYER_PRIVATE_KEY] : { mnemonic: process.env.MNEMONIC as string }
+
+    },
     goerli: {
       url: process.env.GOERLI_URL,
       gasPrice: "auto",
@@ -103,12 +103,14 @@ const config: HardhatUserConfig = {
     enabled: process.env.REPORT_GAS == "true",
     currency: "USD",
   },
+
   etherscan: {
     apiKey: {
       mainnet: process.env.ETHERSCAN_API_KEY != undefined ? process.env.ETHERSCAN_API_KEY : "",
       polygon: process.env.POLYGONSCAN_API_KEY != undefined ? process.env.POLYGONSCAN_API_KEY : "",
-      optimism: process.env.OPTIMISTICSCAN_API_KEY != undefined ? process.env.OPTIMISTICSCAN_API_KEY : ""
+      optimisticEthereum: process.env.OPTIMISMSCAN_API_KEY != undefined ? process.env.OPTIMISMSCAN_API_KEY : ""
     }
+
   },
 
 
