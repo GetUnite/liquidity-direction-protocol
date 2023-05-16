@@ -92,6 +92,7 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
     }
 
     event MessageReceived(bytes32 indexed hashed);
+    event logged(bytes data);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -129,9 +130,9 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
     }
 
     receive() external payable {
-        if (msg.sender != address(WETH)) {
-            WETH.deposit{value: msg.value}();
-        }
+        // if (msg.sender != address(WETH)) {
+        //     WETH.deposit{value: msg.value}();
+        // }
     }
 
     /// @notice Allows anyone to submit data for execution of votes
@@ -272,11 +273,12 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
                         (uint256, uint256, uint256)
                     );
 
-                (
-                    address strategyPrimaryToken,
-                    IAlluoStrategyHandler.LiquidityDirection memory direction
-                ) = handler.getDirectionFullInfoById(directionId);
-                if (direction.chainId == block.chainid) {
+                (address strategyPrimaryToken, ) = handler
+                    .getDirectionFullInfoById(directionId);
+                if (
+                    executorLocalId ==
+                    crossChainInformation.currentExecutorInternalId
+                ) {
                     uint8 assetId = handler.tokenToAssetId(
                         strategyPrimaryToken
                     );
@@ -298,11 +300,23 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
         success = true;
         result = "";
         emit MessageReceived(hashed);
+
+        bytes memory finalData = abi.encode(message, signs);
+        _sendMessage(
+            crossChainInformation.nextExecutor,
+            finalData,
+            crossChainInformation.nextExecutorChainId,
+            2
+        );
+
+        emit logged(finalData);
+        // Now send the message to the next chain
     }
 
     function _anyExecuteLogic(
         bytes calldata data
     ) internal override returns (bool success, bytes memory result) {
+        console.log("herio");
         (bytes memory message, bytes[] memory signs) = abi.decode(
             data,
             (bytes, bytes[])
@@ -364,6 +378,14 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
                 // Get the balance of the token and transfer it to the handler
                 uint256 currentBalance = IERC20MetadataUpgradeable(primaryToken)
                     .balanceOf(address(this));
+
+                // ALso currentTrasfer.amount is in 18 decimals, but the token might not be.
+                // Scale the currentTransferAmount to the token decimals
+                currentTransfer.amount =
+                    currentTransfer.amount /
+                    10 **
+                        (18 -
+                            IERC20MetadataUpgradeable(primaryToken).decimals());
                 if (currentBalance < currentTransfer.amount) {
                     currentTransfer.amount = currentBalance;
                     // This is to account for slippage when withdrawing.
@@ -413,18 +435,6 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
             }
         }
         desiredPercentagesByChain[executorLocalId][assetId] += percent;
-
-        // Now loop through and console log
-        // for (uint256 i = 0; i < crossChainInformation.numberOfExecutors; i++) {
-        //     for (uint256 j = 0; j < handler.numberOfAssets(); j++) {
-        //         console.log(
-        //             "desiredPercentagesByChain[%s][%s]",
-        //             i,
-        //             j,
-        //             desiredPercentagesByChain[i][j]
-        //         );
-        //     }
-        // }
     }
 
     function _executeTVLCommand(uint256[][] memory executorBalances) internal {
@@ -432,7 +442,6 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
         uint8 numberOfAssets = handler.numberOfAssets();
         uint256 currentExecutorInternalId = crossChainInformation
             .currentExecutorInternalId;
-
         // Check if the inner array has been initialized
         bool isInitialized = executorBalances[executorBalances.length - 1]
             .length != 0
@@ -462,17 +471,16 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
             }
         } else {
             // Now we definitely know that it has passed through at least once. Therefore we save this information locally (global tvl + executor balances)
-            for (uint8 i; i < executorBalances.length; i++) {
+            for (uint8 i; i < executorBalances.length - 1; i++) {
                 for (uint8 j; j < numberOfAssets; j++) {
                     universalTVL[j] += executorBalances[i][j];
                 }
             }
             universalTVLUpdated = block.timestamp;
-            universalExecutorBalances = executorBalances;
-            if (
-                executorBalances[executorBalances.length - 1][0] !=
-                type(uint256).max
-            ) {
+            universalExecutorBalances = IAlluoVoteExecutorUtils(
+                voteExecutorUtils
+            ).removeLastArray(executorBalances);
+            if (!isInitialized) {
                 // This means that we have already executed the TVL command and we are just executing it again to update the global TVL
                 // Initialize the last array to be the max value so that we know that we have already executed this command
                 executorBalances[executorBalances.length - 1] = new uint256[](
@@ -482,7 +490,7 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
                     .max;
             }
         }
-        // Now just send the message off to the next executor
+
         (
             uint256 commandIndex,
             bytes memory messageData
@@ -501,7 +509,7 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
             voteExecutorUtils
         ).encodeAllMessages(commandIndexes, messages);
         bytes memory finalData = abi.encode(inputData, emptyAddresses);
-
+        emit logged(finalData);
         _sendMessage(
             crossChainInformation.nextExecutor,
             finalData,

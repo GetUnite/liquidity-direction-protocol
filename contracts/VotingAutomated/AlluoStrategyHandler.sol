@@ -140,7 +140,8 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         // make sure to know where these funds are going / will be kept.
         // lets save latest percentages
         // entries, vote executor slave.
-        _claimAllRewards(assetId);
+        // Think about how to handle rewards correctly. Should we skim beefy?
+        // _claimAllRewards(assetId);
         uint256 target = (percentage * tvlForAsset) / 10000;
         uint256 current = markDirectionToMarket(directionId);
         AssetInfo storage assetInfo = assetIdToAssetInfo[assetId];
@@ -160,8 +161,7 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
                 primaryToken
             );
         } else if (target > current) {
-            console.log("Queued", current - target);
-
+            console.log("Queued", target - current);
             _queueDeposit(assetId, directionId, target - current);
         }
     }
@@ -174,7 +174,6 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         AssetInfo storage assetInfo = assetIdToAssetInfo[assetId];
         address primaryToken = assetInfo.chainIdToPrimaryToken[block.chainid];
-        // Keep getting disabled route for weth -->
         _bridgeTo(amount, primaryToken, to, chainId);
         emit Bridged(amount, primaryToken, to, chainId);
     }
@@ -237,14 +236,27 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
             msg.sender
         );
 
+        uint256 fundsReadyIn18Decimals = fundsReady *
+            10 ** (18 - IERC20MetadataUpgradeable(primaryToken).decimals());
         console.log("totalDepositAmount", totalDepositAmount);
-        console.log("fundsReady", fundsReady);
+        console.log("fundsReady", fundsReadyIn18Decimals);
         console.log("slippageTolerance", slippageTolerance);
+
+        if (fundsReadyIn18Decimals > totalDepositAmount) {
+            // This means that there should be a surplus sitting in the executor contract
+            // Just take hte deposit amount
+            fundsReadyIn18Decimals = totalDepositAmount;
+            // also adjust fundsReady
+            fundsReady =
+                fundsReadyIn18Decimals /
+                10 ** (18 - IERC20MetadataUpgradeable(primaryToken).decimals());
+        }
+        // Look at this again
         require(
             IAlluoVoteExecutorUtils(voteExecutorUtils)
                 .isWithinSlippageTolerance(
                     totalDepositAmount,
-                    fundsReady,
+                    fundsReadyIn18Decimals,
                     slippageTolerance
                 ),
             "Not enough funds"
@@ -259,9 +271,19 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
 
         // Assume here that any disparity between the deposit amount and funds ready is due to slippage and fees
         // need to scale deposit values here to account for slippage
-        _scaleDepositQueue(_depositQueue, totalDepositAmount, fundsReady);
+        _scaleDepositQueue(
+            _depositQueue,
+            totalDepositAmount,
+            fundsReadyIn18Decimals
+        );
         for (uint256 i; i < _depositQueue.deposits.length; i++) {
             Deposit memory _deposit = _depositQueue.deposits[i];
+            // Scale deposit.amount to primaryToken decimals
+            _deposit.amount =
+                _deposit.amount /
+                10 ** (18 - IERC20MetadataUpgradeable(primaryToken).decimals());
+
+            console.log("Adjusted depositamount", _deposit.amount);
             _depositToDirection(
                 _deposit.directionId,
                 _deposit.amount,
@@ -414,8 +436,8 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         assetIdToAssetInfo[_assetId].ibAlluo = _ibAlluo;
         for (uint256 i; i < _chainIds.length; i++) {
             assetIdToAssetInfo[_assetId].chainIdToPrimaryToken[
-                _chainIds[i]
-            ] = _chainIdToPrimaryToken[i];
+                    _chainIds[i]
+                ] = _chainIdToPrimaryToken[i];
         }
     }
 

@@ -155,7 +155,23 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
         }
         return true;
     }
+    function removeLastArray(
+        uint256[][] memory executorBalances
+    ) public pure returns (uint256[][] memory) {
+        require(executorBalances.length > 0, "No arrays to remove");
 
+        // Create a new array with reduced length
+        uint256[][] memory updatedBalances = new uint256[][](
+            executorBalances.length - 1
+        );
+
+        // Copy all arrays except the last one
+        for (uint256 i = 0; i < executorBalances.length - 1; i++) {
+            updatedBalances[i] = executorBalances[i];
+        }
+
+        return updatedBalances;
+    }
     // StrategyHandler utils
 
     function getDirectionIdByName(

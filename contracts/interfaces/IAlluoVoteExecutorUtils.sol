@@ -95,6 +95,10 @@ interface IAlluoVoteExecutorUtils {
         uint256[][] memory desiredPercentages
     ) external view returns (ExecutorTransfer[] memory);
 
+    function removeLastArray(
+        uint256[][] memory executorBalances
+    ) external pure returns (uint256[][] memory);
+
     function encodeTvlCommand(
         uint256[][] memory executorBalances
     ) external pure returns (uint256, bytes memory);
