@@ -155,6 +155,7 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
         }
         return true;
     }
+
     function removeLastArray(
         uint256[][] memory executorBalances
     ) public pure returns (uint256[][] memory) {
@@ -172,6 +173,7 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
 
         return updatedBalances;
     }
+
     // StrategyHandler utils
 
     function getDirectionIdByName(

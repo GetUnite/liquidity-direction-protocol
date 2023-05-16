@@ -151,8 +151,8 @@ async function main() {
 
     // mooStargateUSDC Polygon
     let entryData4 = await beefyStrategy.encodeData("0x2F4BBA9fC4F77F16829F84181eB7C8b50F639F95", ethers.constants.AddressZero, 0, polygonUSDCAddress)
-    let exitData4 = entryData3
-    let rewardsData4 = entryData3
+    let exitData4 = entryData4
+    let rewardsData4 = entryData4
     await alluoStrategyHandler.setLiquidityDirection("BeefyMooStargateUsdcPolygon", 4, beefyStrategy.address, polygonUSDCAddress, 0, 137, entryData4, exitData4, rewardsData4);
 
 

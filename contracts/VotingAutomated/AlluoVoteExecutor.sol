@@ -247,7 +247,6 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
         delete desiredPercentagesByChain;
         for (uint256 i; i < messages.length; i++) {
             Message memory currentMessage = messages[i];
-            console.log("Message index", currentMessage.commandIndex);
             if (currentMessage.commandIndex == 0) {
                 // _executeAPYCommand(currentMessage.commandData);
             } else if (currentMessage.commandIndex == 1) {
@@ -283,7 +282,6 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
                         strategyPrimaryToken
                     );
                     uint256 tvlForAsset = universalTVL[assetId];
-                    console.log("directionId", directionId);
                     handler.rebalanceUntilTarget(
                         assetId,
                         directionId,
@@ -316,12 +314,10 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoMessaging {
     function _anyExecuteLogic(
         bytes calldata data
     ) internal override returns (bool success, bytes memory result) {
-        console.log("herio");
         (bytes memory message, bytes[] memory signs) = abi.decode(
             data,
             (bytes, bytes[])
         );
-        console.log("gothere");
         return _internalExecutionofData(message, signs);
     }
 
