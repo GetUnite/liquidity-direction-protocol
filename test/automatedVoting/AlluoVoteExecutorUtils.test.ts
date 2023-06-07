@@ -239,12 +239,13 @@ describe("Tests with forks", async () => {
     it("Should correctly encodeLiqudidityCommand", async () => {
         let codeName = "Curve/Convex Mim+3CRV";
         let percent = 10000;
-        let commandEncoded = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent);
+        let commandEncoded = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent, 1);
         expect(commandEncoded[0]).to.equal(2);
         // Decode with ethers
-        let decoded = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256"], commandEncoded[1]);
+        let decoded = ethers.utils.defaultAbiCoder.decode(["uint256", "uint256", "uint256"], commandEncoded[1]);
         expect(decoded[0]).to.equal(1);
         expect(decoded[1]).to.equal(10000);
+        expect(decoded[2]).to.equal(1);
     })
 
 
@@ -252,7 +253,7 @@ describe("Tests with forks", async () => {
     it("Should be able to encodeAllMessages", async () => {
         let codeName = "Curve/Convex Mim+3CRV";
         let percent = 10000;
-        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent);
+        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent, 1);
 
         let delta = "-300";
         let encodedCommand2 = await alluoVoteExecutorUtils.encodeTreasuryAllocationChangeCommand(delta);
@@ -270,7 +271,7 @@ describe("Tests with forks", async () => {
     it("Should be able to submitData from admin", async () => {
         let codeName = "Curve/Convex Mim+3CRV";
         let percent = 10000;
-        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent);
+        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent, 1);
 
         let delta = "-300";
         let encodedCommand2 = await alluoVoteExecutorUtils.encodeTreasuryAllocationChangeCommand(delta);
@@ -293,7 +294,7 @@ describe("Tests with forks", async () => {
         // Signer[0] is the only one in the fake gnosis. Encode data first.
         let codeName = "Curve/Convex Mim+3CRV";
         let percent = 10000;
-        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent);
+        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent, 1);
         let delta = "-300";
         let encodedCommand2 = await alluoVoteExecutorUtils.encodeTreasuryAllocationChangeCommand(delta);
         let newMintAmount = 1000;
@@ -310,7 +311,7 @@ describe("Tests with forks", async () => {
         // Signer[0] is the only one in the fake gnosis. Encode data first.
         let codeName = "Curve/Convex Mim+3CRV";
         let percent = 10000;
-        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent);
+        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent, 1);
         let delta = "-300";
         let encodedCommand2 = await alluoVoteExecutorUtils.encodeTreasuryAllocationChangeCommand(delta);
         let newMintAmount = 1000;
@@ -328,7 +329,7 @@ describe("Tests with forks", async () => {
         // Signer[0] is the only one in the fake gnosis. Encode data first.
         let codeName = "Curve/Convex Mim+3CRV";
         let percent = 10000;
-        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent);
+        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent, 1);
         let delta = "-300";
         let encodedCommand2 = await alluoVoteExecutorUtils.encodeTreasuryAllocationChangeCommand(delta);
         let newMintAmount = 1000;
@@ -343,7 +344,7 @@ describe("Tests with forks", async () => {
         // Signer[0] is the only one in the fake gnosis. Encode data first.
         let codeName = "Curve/Convex Mim+3CRV";
         let percent = 10000;
-        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent);
+        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent, 1);
         let delta = "-300";
         let encodedCommand2 = await alluoVoteExecutorUtils.encodeTreasuryAllocationChangeCommand(delta);
         let newMintAmount = 1000;
@@ -367,7 +368,7 @@ describe("Tests with forks", async () => {
         // Signer[0] is the only one in the fake gnosis. Encode data first.
         let codeName = "Curve/Convex Mim+3CRV";
         let percent = 10000;
-        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent);
+        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent, 1);
         let delta = "-300";
         let encodedCommand2 = await alluoVoteExecutorUtils.encodeTreasuryAllocationChangeCommand(delta);
         let newMintAmount = 1000;
@@ -388,7 +389,7 @@ describe("Tests with forks", async () => {
         // Signer[0] is the only one in the fake gnosis. Encode data first.
         let codeName = "Curve/Convex Mim+3CRV";
         let percent = 10000;
-        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent);
+        let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand(codeName, percent, 1);
         let delta = "-300";
         let encodedCommand2 = await alluoVoteExecutorUtils.encodeTreasuryAllocationChangeCommand(delta);
         let newMintAmount = 1000;

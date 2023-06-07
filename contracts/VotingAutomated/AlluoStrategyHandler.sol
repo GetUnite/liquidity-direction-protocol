@@ -11,6 +11,7 @@ import {AlluoUpgradeableBase} from "../AlluoUpgradeableBase.sol";
 import {IAlluoStrategyV2} from "../interfaces/IAlluoStrategyV2.sol";
 import {IExchange} from "../interfaces/IExchange.sol";
 import {IAlluoVoteExecutorUtils} from "../interfaces/IAlluoVoteExecutorUtils.sol";
+import {ISpokePoolNew} from "../interfaces/ISpokePoolNew.sol";
 
 // solhint-disable-next-line
 import "hardhat/console.sol";
@@ -20,6 +21,7 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
+    bytes4 internal constant MAGICVALUE = 0x1626ba7e;
 
     mapping(string => uint256) public directionNameToId;
     mapping(uint256 => LiquidityDirection) public liquidityDirection;
@@ -31,6 +33,7 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
     uint256 public slippageTolerance;
     address public exchange;
     address public voteExecutorUtils;
+    address public gnosis;
     struct LiquidityDirection {
         address strategyAddress;
         address entryToken;
@@ -85,6 +88,7 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         slippageTolerance = _slippageTolerance;
         exchange = _exchange;
         voteExecutorUtils = _voteExecutorUtils;
+        gnosis = _multiSigWallet;
     }
 
     ///
@@ -174,6 +178,7 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         AssetInfo storage assetInfo = assetIdToAssetInfo[assetId];
         address primaryToken = assetInfo.chainIdToPrimaryToken[block.chainid];
+        console.log("primarytoken, chainid", primaryToken, chainId);
         _bridgeTo(amount, primaryToken, to, chainId);
         emit Bridged(amount, primaryToken, to, chainId);
     }
@@ -194,6 +199,36 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
             "There are still funds to be deployed"
         );
         _bridge(amount, primaryToken);
+    }
+
+    function speedUpDeposit(
+        int64 updatedRelayerFeePct,
+        uint32 depositId,
+        address updatedRecipient,
+        bytes memory updatedMessage,
+        bytes memory depositorSignature
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        ISpokePoolNew(alluoBridgingInformation.spokepool).speedUpDeposit(
+            address(this),
+            updatedRelayerFeePct,
+            depositId,
+            updatedRecipient,
+            updatedMessage,
+            depositorSignature
+        );
+    }
+
+    function isValidSignature(
+        bytes32 messageHash,
+        bytes memory signature
+    ) public view returns (bytes4) {
+        bool result = IAlluoVoteExecutorUtils(voteExecutorUtils)
+            .isValidMutlisigSigner(signature, messageHash, gnosis);
+        if (result) {
+            return MAGICVALUE;
+        } else {
+            return 0x0;
+        }
     }
 
     function _withdrawFromDirection(
@@ -426,6 +461,12 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         );
     }
 
+    function setGnosis(address _gnosis) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        gnosis = _gnosis;
+        _grantRole(DEFAULT_ADMIN_ROLE, _gnosis);
+        _grantRole(UPGRADER_ROLE, _gnosis);
+    }
+
     function changeAssetInfo(
         uint256 _assetId,
         uint256[] calldata _chainIds,
@@ -436,8 +477,8 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         assetIdToAssetInfo[_assetId].ibAlluo = _ibAlluo;
         for (uint256 i; i < _chainIds.length; i++) {
             assetIdToAssetInfo[_assetId].chainIdToPrimaryToken[
-                _chainIds[i]
-            ] = _chainIdToPrimaryToken[i];
+                    _chainIds[i]
+                ] = _chainIdToPrimaryToken[i];
         }
     }
 

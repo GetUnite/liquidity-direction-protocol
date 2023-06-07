@@ -2,6 +2,7 @@
 pragma solidity ^0.8.17;
 import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {ISpokePoolNew} from "../interfaces/ISpokePoolNew.sol";
+import "hardhat/console.sol";
 
 abstract contract AlluoBridging {
     event Bridged(
@@ -43,6 +44,11 @@ abstract contract AlluoBridging {
         IERC20Upgradeable(originToken).approve(
             alluoBridgingInformation.spokepool,
             amount
+        );
+        console.log(
+            originToken,
+            amount,
+            alluoBridgingInformation.recipientChainId
         );
         ISpokePoolNew(alluoBridgingInformation.spokepool).deposit(
             alluoBridgingInformation.recipient,

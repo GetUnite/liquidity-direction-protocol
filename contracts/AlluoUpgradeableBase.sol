@@ -33,9 +33,6 @@ contract AlluoUpgradeableBase is
         bytes32 role,
         address account
     ) public override onlyRole(getRoleAdmin(role)) {
-        if (role == DEFAULT_ADMIN_ROLE) {
-            require(account.isContract(), "Not contract");
-        }
         _grantRole(role, account);
     }
 

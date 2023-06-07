@@ -1,8 +1,9 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import { AlluoStrategyHandler, AlluoVoteExecutorUtils, BeefyStrategy, IBeefyBoost, IBeefyVaultV6, IERC20, IERC20Metadata, IExchange, IPriceFeedRouter, IPriceFeedRouterV2, IWrappedEther, PseudoMultisigWallet } from "../../typechain-types";
+import { AlluoStrategyHandler, AlluoVoteExecutorUtils, BeefyStrategy, IBeefyBoost, IBeefyVaultV6, IERC20, IERC20Metadata, IExchange, IPriceFeedRouter, IPriceFeedRouterV2, ISpokePoolNew, IWrappedEther, PseudoMultisigWallet } from "../../typechain-types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { mine, reset } from "@nomicfoundation/hardhat-network-helpers";
+import { encode } from "querystring";
 
 describe("AlluoStrategyHandler Tests", function () {
     let alluoStrategyHandler: AlluoStrategyHandler;
@@ -35,7 +36,9 @@ describe("AlluoStrategyHandler Tests", function () {
 
         signers = await ethers.getSigners();
         admin = await ethers.getImpersonatedSigner("0xc7061dD515B602F86733Fa0a0dBb6d6E6B34aED4")
-
+        let pseudoMultiSigFactory = await ethers.getContractFactory("PseudoMultisigWallet");
+        let pseudoMultiSig = await pseudoMultiSigFactory.deploy(true)
+        admin = await ethers.getImpersonatedSigner(pseudoMultiSig.address)
         // Send some eth to the admin
         await signers[0].sendTransaction({ to: admin.address, value: ethers.utils.parseEther("1") })
         let strategyHandlerFactory = await ethers.getContractFactory("AlluoStrategyHandler");
@@ -305,7 +308,7 @@ describe("AlluoStrategyHandler Tests", function () {
         // Only possible when we have more price routers and exchange activated
         // Need more tests on checking the deposit queue amount
 
-        it.only("Bridging should work if there are no pending deposits and there are funds spare", async () => {
+        it("Bridging should work if there are no pending deposits and there are funds spare", async () => {
             // Technically this logic is all handled in the vote executor
             let wethBalanceOfAdminBefore = await weth.balanceOf(admin.address);
             await alluoStrategyHandler.connect(admin).rebalanceUntilTarget(2, 1, 0, ethers.utils.parseEther("10000")) // TVL doesnt matter when doing a 0% rebalance
@@ -351,9 +354,96 @@ describe("AlluoStrategyHandler Tests", function () {
 
         })
 
+        it("Speedup should succeed if there was a requested bridge before", async () => {
+            // Technically this logic is all handled in the vote executor
+            let wethBalanceOfAdminBefore = await weth.balanceOf(admin.address);
+            await alluoStrategyHandler.connect(admin).rebalanceUntilTarget(2, 1, 0, ethers.utils.parseEther("10000")) // TVL doesnt matter when doing a 0% rebalance
+            let wethBalanceOfAdminAfter = await weth.balanceOf(admin.address);
+            let balanceTransferred = wethBalanceOfAdminAfter.sub(wethBalanceOfAdminBefore);
+            // Then simulate transferring it to the strategyHandler
+            await weth.connect(admin).transfer(alluoStrategyHandler.address, balanceTransferred);
+            // Now attempt to bridge
+            await alluoStrategyHandler.connect(admin).bridgeRemainingFunds(2);
 
+            let spokePoolContract = await ethers.getContractAt("ISpokePoolNew", spokePool) as ISpokePoolNew
+            let depositId = await spokePoolContract.numberOfDeposits();
+            let modifiedRelayerFeePct = 1000
+            let updatedRecipient = alluoStrategyHandler.address
+            let updatedMessage = "0x1234"
+            let originChainId = await signers[0].getChainId();
 
+            const typedData = {
+                types: {
+                    UpdateDepositDetails: [
+                        { name: "depositId", type: "uint32" },
+                        { name: "originChainId", type: "uint256" },
+                        { name: "updatedRelayerFeePct", type: "int64" },
+                        { name: "updatedRecipient", type: "address" },
+                        { name: "updatedMessage", type: "bytes" },
+                    ],
+                },
+                domain: {
+                    name: "ACROSS-V2",
+                    version: "1.0.0",
+                    chainId: Number(originChainId),
+                },
+                message: {
+                    depositId,
+                    originChainId,
+                    updatedRelayerFeePct: modifiedRelayerFeePct,
+                    updatedRecipient,
+                    updatedMessage,
+                },
+            };
+            const signature = await signers[0]._signTypedData(typedData.domain, typedData.types, typedData.message);
+            await alluoStrategyHandler.connect(admin).speedUpDeposit(modifiedRelayerFeePct, depositId, updatedRecipient, updatedMessage, signature)
+
+        })
+        it("Speedup should fail if signer is not a member of gnosis safe", async () => {
+            // Technically this logic is all handled in the vote executor
+            let wethBalanceOfAdminBefore = await weth.balanceOf(admin.address);
+            await alluoStrategyHandler.connect(admin).rebalanceUntilTarget(2, 1, 0, ethers.utils.parseEther("10000")) // TVL doesnt matter when doing a 0% rebalance
+            let wethBalanceOfAdminAfter = await weth.balanceOf(admin.address);
+            let balanceTransferred = wethBalanceOfAdminAfter.sub(wethBalanceOfAdminBefore);
+            // Then simulate transferring it to the strategyHandler
+            await weth.connect(admin).transfer(alluoStrategyHandler.address, balanceTransferred);
+            // Now attempt to bridge
+            await alluoStrategyHandler.connect(admin).bridgeRemainingFunds(2);
+
+            let spokePoolContract = await ethers.getContractAt("ISpokePoolNew", spokePool) as ISpokePoolNew
+            let depositId = await spokePoolContract.numberOfDeposits();
+            let modifiedRelayerFeePct = 1000
+            let updatedRecipient = alluoStrategyHandler.address
+            let updatedMessage = "0x1234"
+            let originChainId = await signers[0].getChainId();
+
+            const typedData = {
+                types: {
+                    UpdateDepositDetails: [
+                        { name: "depositId", type: "uint32" },
+                        { name: "originChainId", type: "uint256" },
+                        { name: "updatedRelayerFeePct", type: "int64" },
+                        { name: "updatedRecipient", type: "address" },
+                        { name: "updatedMessage", type: "bytes" },
+                    ],
+                },
+                domain: {
+                    name: "ACROSS-V2",
+                    version: "1.0.0",
+                    chainId: Number(originChainId),
+                },
+                message: {
+                    depositId,
+                    originChainId,
+                    updatedRelayerFeePct: modifiedRelayerFeePct,
+                    updatedRecipient,
+                    updatedMessage,
+                },
+            };
+            // Not member of gnosis
+            const signature = await signers[1]._signTypedData(typedData.domain, typedData.types, typedData.message);
+            await expect(alluoStrategyHandler.connect(admin).speedUpDeposit(modifiedRelayerFeePct, depositId, updatedRecipient, updatedMessage, signature)).to.be.revertedWith("invalid signature")
+
+        })
     })
-
-
 })

@@ -41,12 +41,10 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
-      // forking: {
-      //   enabled: process.env.FORKING_ENABLED == "true",
-      //   url: process.env.MAINNET_FORKING_URL as string,
-      //   blockNumber: 14785940
-      // }
-      allowUnlimitedContractSize: true
+      allowUnlimitedContractSize: true,
+      accounts: {
+        mnemonic: process.env.MNEMONIC
+      }
     },
     mainnet: {
       url: process.env.MAINNET_URL,
@@ -58,9 +56,8 @@ const config: HardhatUserConfig = {
     polygon: {
       url: process.env.POLYGON_URL,
       gasPrice: "auto",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
+      accounts: { mnemonic: process.env.MNEMONIC as string }
+
     },
     // fantom: {
     //   url: process.env.FANTOM_URL,
@@ -87,7 +84,7 @@ const config: HardhatUserConfig = {
     optimisticEthereum: {
       url: process.env.OPTIMISM_URL,
       gasPrice: "auto",
-      accounts: process.env.ALLUO_DEPLOYER_PRIVATE_KEY != undefined ? [process.env.ALLUO_DEPLOYER_PRIVATE_KEY] : { mnemonic: process.env.MNEMONIC as string }
+      accounts: { mnemonic: process.env.MNEMONIC as string }
 
     },
     goerli: {

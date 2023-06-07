@@ -153,6 +153,26 @@
       "address": "0x3BD9e8831F007528275741C1d0728699aB8bcBe1",
       "txHash": "0x88fa08576602da024550f9f7f31dbffeee64c2eb04a09a7b78ad29a42c277eb3",
       "kind": "uups"
+    },
+    {
+      "address": "0xA9081414C281De5d0B8c67a1b7a631332e259850",
+      "txHash": "0xa9dc18f56e8f73fb1b053e86ab2f3c3f7b5719e98528696a155d31568c2b84a5",
+      "kind": "uups"
+    },
+    {
+      "address": "0x4eaCDBFE57Bd641266Cab20D40174dc76802F955",
+      "txHash": "0x850bea0cb2d53cd7cef52206e94bd141cf174718a08e0fabd91ac96f5ac698c7",
+      "kind": "uups"
+    },
+    {
+      "address": "0x546e8589E5eF88AA5cA19134FAb800a49D52eE66",
+      "txHash": "0xa3c7582e1885137747ce28416d9ef36a6b1ae41eb04d25afdb2a8b33f9fdef4e",
+      "kind": "uups"
+    },
+    {
+      "address": "0x62cB09739920d071809dFD9B66D2b2cB27141410",
+      "txHash": "0x8153b90a4739d70b2cffb6992670775da4c99ce6956e6298b101a7c5afc88973",
+      "kind": "uups"
     }
   ],
   "impls": {
@@ -10759,6 +10779,1229 @@
           "t_uint8": {
             "label": "uint8",
             "numberOfBytes": "1"
+          }
+        }
+      }
+    },
+    "29d75ec714958a39f0e47495b306bf15f70957ae9709e44d21f5ee0695e0ddb2": {
+      "address": "0x31333889E567717CF8C374504929A6C7C9438f2f",
+      "txHash": "0x32acd41490ed1806ff26035c3fd50af4f9d8e6ef84f66936d0d2dcb3664d9637",
+      "layout": {
+        "solcVersion": "0.8.17",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC165Upgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\introspection\\ERC165Upgradeable.sol:41"
+          },
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\AccessControlUpgradeable.sol:61"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\AccessControlUpgradeable.sol:259"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\ERC1967\\ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\UUPSUpgradeable.sol:107"
+          },
+          {
+            "label": "upgradeStatus",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_bool",
+            "contract": "AlluoUpgradeableBase",
+            "src": "contracts\\AlluoUpgradeableBase.sol:25"
+          },
+          {
+            "label": "strategyHandler",
+            "offset": 1,
+            "slot": "251",
+            "type": "t_address",
+            "contract": "AlluoVoteExecutorUtils",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutorUtils.sol:20"
+          },
+          {
+            "label": "voteExecutor",
+            "offset": 0,
+            "slot": "252",
+            "type": "t_address",
+            "contract": "AlluoVoteExecutorUtils",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutorUtils.sol:21"
+          },
+          {
+            "label": "universalTVLUpdated",
+            "offset": 0,
+            "slot": "253",
+            "type": "t_uint256",
+            "contract": "AlluoVoteExecutorUtils",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutorUtils.sol:22"
+          },
+          {
+            "label": "crossChainInformation",
+            "offset": 0,
+            "slot": "254",
+            "type": "t_struct(CrossChainInformation)58305_storage",
+            "contract": "AlluoVoteExecutorUtils",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutorUtils.sol:24"
+          },
+          {
+            "label": "ibAlluoSymbolToAddress",
+            "offset": 0,
+            "slot": "262",
+            "type": "t_mapping(t_string_memory_ptr,t_address)",
+            "contract": "AlluoVoteExecutorUtils",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutorUtils.sol:26"
+          },
+          {
+            "label": "hashExecutionTime",
+            "offset": 0,
+            "slot": "263",
+            "type": "t_mapping(t_bytes32,t_uint256)",
+            "contract": "AlluoVoteExecutorUtils",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutorUtils.sol:27"
+          },
+          {
+            "label": "assetIdToDepositPercentages",
+            "offset": 0,
+            "slot": "264",
+            "type": "t_mapping(t_uint256,t_array(t_struct(Deposit)58279_storage)dyn_storage)",
+            "contract": "AlluoVoteExecutorUtils",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutorUtils.sol:28"
+          },
+          {
+            "label": "universalTVL",
+            "offset": 0,
+            "slot": "265",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "AlluoVoteExecutorUtils",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutorUtils.sol:30"
+          },
+          {
+            "label": "executorInternalIdToAddress",
+            "offset": 0,
+            "slot": "266",
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "AlluoVoteExecutorUtils",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutorUtils.sol:31"
+          },
+          {
+            "label": "executorInternalIdToChainId",
+            "offset": 0,
+            "slot": "267",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "AlluoVoteExecutorUtils",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutorUtils.sol:32"
+          },
+          {
+            "label": "universalExecutorBalances",
+            "offset": 0,
+            "slot": "268",
+            "type": "t_array(t_array(t_uint256)dyn_storage)dyn_storage",
+            "contract": "AlluoVoteExecutorUtils",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutorUtils.sol:34"
+          },
+          {
+            "label": "desiredPercentagesByChain",
+            "offset": 0,
+            "slot": "269",
+            "type": "t_array(t_array(t_uint256)dyn_storage)dyn_storage",
+            "contract": "AlluoVoteExecutorUtils",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutorUtils.sol:35"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_array(t_uint256)dyn_storage)dyn_storage": {
+            "label": "uint256[][]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(Deposit)58279_storage)dyn_storage": {
+            "label": "struct AlluoVoteExecutorUtils.Deposit[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_array(t_uint256)dyn_storage": {
+            "label": "uint256[]",
+            "numberOfBytes": "32"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_string_memory_ptr,t_address)": {
+            "label": "mapping(string => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_array(t_struct(Deposit)58279_storage)dyn_storage)": {
+            "label": "mapping(uint256 => struct AlluoVoteExecutorUtils.Deposit[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_string_memory_ptr": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(CrossChainInformation)58305_storage": {
+            "label": "struct AlluoVoteExecutorUtils.CrossChainInformation",
+            "members": [
+              {
+                "label": "nextExecutor",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "previousExecutor",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "finalExecutor",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "finalExecutorChainId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "nextExecutorChainId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "previousExecutorChainId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "numberOfExecutors",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "currentExecutorInternalId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              }
+            ],
+            "numberOfBytes": "256"
+          },
+          "t_struct(Deposit)58279_storage": {
+            "label": "struct AlluoVoteExecutorUtils.Deposit",
+            "members": [
+              {
+                "label": "directionId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          },
+          "t_string_storage": {
+            "label": "string"
+          }
+        }
+      }
+    },
+    "b33c095337f0ccfb28507f11d389b461d3e419e60c166bb7902d11451b8ec9d2": {
+      "address": "0xAb9ddf762Be0480563694904E22E77DCa6143cc5",
+      "txHash": "0x2758a9445072eb573dfcb57846cc8955670928494f1d4d7d9cff4f159cd09df6",
+      "layout": {
+        "solcVersion": "0.8.17",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC165Upgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\introspection\\ERC165Upgradeable.sol:41"
+          },
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\AccessControlUpgradeable.sol:61"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\AccessControlUpgradeable.sol:259"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\ERC1967\\ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\UUPSUpgradeable.sol:107"
+          },
+          {
+            "label": "upgradeStatus",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_bool",
+            "contract": "AlluoUpgradeableBase",
+            "src": "contracts\\AlluoUpgradeableBase.sol:25"
+          },
+          {
+            "label": "alluoBridgingInformation",
+            "offset": 0,
+            "slot": "252",
+            "type": "t_struct(AlluoBridgingInformation)65534_storage",
+            "contract": "AlluoBridging",
+            "src": "contracts\\crosschain\\AlluoBridging.sol:20"
+          },
+          {
+            "label": "directionNameToId",
+            "offset": 0,
+            "slot": "256",
+            "type": "t_mapping(t_string_memory_ptr,t_uint256)",
+            "contract": "AlluoStrategyHandler",
+            "src": "contracts\\VotingAutomated\\AlluoStrategyHandler.sol:26"
+          },
+          {
+            "label": "liquidityDirection",
+            "offset": 0,
+            "slot": "257",
+            "type": "t_mapping(t_uint256,t_struct(LiquidityDirection)55743_storage)",
+            "contract": "AlluoStrategyHandler",
+            "src": "contracts\\VotingAutomated\\AlluoStrategyHandler.sol:27"
+          },
+          {
+            "label": "assetIdToAssetInfo",
+            "offset": 0,
+            "slot": "258",
+            "type": "t_mapping(t_uint256,t_struct(AssetInfo)55758_storage)",
+            "contract": "AlluoStrategyHandler",
+            "src": "contracts\\VotingAutomated\\AlluoStrategyHandler.sol:28"
+          },
+          {
+            "label": "assetIdToDepositQueue",
+            "offset": 0,
+            "slot": "259",
+            "type": "t_mapping(t_uint256,t_struct(DepositQueue)55765_storage)",
+            "contract": "AlluoStrategyHandler",
+            "src": "contracts\\VotingAutomated\\AlluoStrategyHandler.sol:29"
+          },
+          {
+            "label": "tokenToAssetId",
+            "offset": 0,
+            "slot": "260",
+            "type": "t_mapping(t_address,t_uint8)",
+            "contract": "AlluoStrategyHandler",
+            "src": "contracts\\VotingAutomated\\AlluoStrategyHandler.sol:30"
+          },
+          {
+            "label": "numberOfAssets",
+            "offset": 0,
+            "slot": "261",
+            "type": "t_uint8",
+            "contract": "AlluoStrategyHandler",
+            "src": "contracts\\VotingAutomated\\AlluoStrategyHandler.sol:31"
+          },
+          {
+            "label": "lastDirectionId",
+            "offset": 0,
+            "slot": "262",
+            "type": "t_uint256",
+            "contract": "AlluoStrategyHandler",
+            "src": "contracts\\VotingAutomated\\AlluoStrategyHandler.sol:32"
+          },
+          {
+            "label": "slippageTolerance",
+            "offset": 0,
+            "slot": "263",
+            "type": "t_uint256",
+            "contract": "AlluoStrategyHandler",
+            "src": "contracts\\VotingAutomated\\AlluoStrategyHandler.sol:33"
+          },
+          {
+            "label": "exchange",
+            "offset": 0,
+            "slot": "264",
+            "type": "t_address",
+            "contract": "AlluoStrategyHandler",
+            "src": "contracts\\VotingAutomated\\AlluoStrategyHandler.sol:34"
+          },
+          {
+            "label": "voteExecutorUtils",
+            "offset": 0,
+            "slot": "265",
+            "type": "t_address",
+            "contract": "AlluoStrategyHandler",
+            "src": "contracts\\VotingAutomated\\AlluoStrategyHandler.sol:35"
+          },
+          {
+            "label": "gnosis",
+            "offset": 0,
+            "slot": "266",
+            "type": "t_address",
+            "contract": "AlluoStrategyHandler",
+            "src": "contracts\\VotingAutomated\\AlluoStrategyHandler.sol:36"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_address_payable": {
+            "label": "address payable",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(Deposit)55770_storage)dyn_storage": {
+            "label": "struct AlluoStrategyHandler.Deposit[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_bytes_storage": {
+            "label": "bytes",
+            "numberOfBytes": "32"
+          },
+          "t_int64": {
+            "label": "int64",
+            "numberOfBytes": "8"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint8)": {
+            "label": "mapping(address => uint8)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_string_memory_ptr,t_uint256)": {
+            "label": "mapping(string => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(AssetInfo)55758_storage)": {
+            "label": "mapping(uint256 => struct AlluoStrategyHandler.AssetInfo)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(DepositQueue)55765_storage)": {
+            "label": "mapping(uint256 => struct AlluoStrategyHandler.DepositQueue)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(LiquidityDirection)55743_storage)": {
+            "label": "mapping(uint256 => struct AlluoStrategyHandler.LiquidityDirection)",
+            "numberOfBytes": "32"
+          },
+          "t_string_memory_ptr": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(AddressSet)5631_storage": {
+            "label": "struct EnumerableSetUpgradeable.AddressSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)5316_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(AlluoBridgingInformation)65534_storage": {
+            "label": "struct AlluoBridging.AlluoBridgingInformation",
+            "members": [
+              {
+                "label": "spokepool",
+                "type": "t_address_payable",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "recipient",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "recipientChainId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "relayerFeePct",
+                "type": "t_int64",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(AssetInfo)55758_storage": {
+            "label": "struct AlluoStrategyHandler.AssetInfo",
+            "members": [
+              {
+                "label": "chainIdToPrimaryToken",
+                "type": "t_mapping(t_uint256,t_address)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "ibAlluo",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "activeDirections",
+                "type": "t_struct(UintSet)5788_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "needToTransferFrom",
+                "type": "t_struct(AddressSet)5631_storage",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "amountDeployed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(Deposit)55770_storage": {
+            "label": "struct AlluoStrategyHandler.Deposit",
+            "members": [
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "directionId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(DepositQueue)55765_storage": {
+            "label": "struct AlluoStrategyHandler.DepositQueue",
+            "members": [
+              {
+                "label": "totalDepositAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "deposits",
+                "type": "t_array(t_struct(Deposit)55770_storage)dyn_storage",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(LiquidityDirection)55743_storage": {
+            "label": "struct AlluoStrategyHandler.LiquidityDirection",
+            "members": [
+              {
+                "label": "strategyAddress",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "entryToken",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "assetId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "chainId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "entryData",
+                "type": "t_bytes_storage",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "exitData",
+                "type": "t_bytes_storage",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "rewardsData",
+                "type": "t_bytes_storage",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "latestAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              }
+            ],
+            "numberOfBytes": "256"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Set)5316_storage": {
+            "label": "struct EnumerableSetUpgradeable.Set",
+            "members": [
+              {
+                "label": "_values",
+                "type": "t_array(t_bytes32)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_indexes",
+                "type": "t_mapping(t_bytes32,t_uint256)",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(UintSet)5788_storage": {
+            "label": "struct EnumerableSetUpgradeable.UintSet",
+            "members": [
+              {
+                "label": "_inner",
+                "type": "t_struct(Set)5316_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          },
+          "t_string_storage": {
+            "label": "string"
+          }
+        }
+      }
+    },
+    "ba06697755f02198cb329f07acef9aeb6aed1d5702e79964bbb64e38371556ea": {
+      "address": "0xeB81A093EF2AB5e50bBdf4954B0A9D870fB90bc8",
+      "txHash": "0x55cdebd177d89fa890b469eb06bdcc8865c991c34cd619d1e7cefaded3fd2def",
+      "layout": {
+        "solcVersion": "0.8.17",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC165Upgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\utils\\introspection\\ERC165Upgradeable.sol:41"
+          },
+          {
+            "label": "_roles",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)34_storage)",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\AccessControlUpgradeable.sol:61"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "AccessControlUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\access\\AccessControlUpgradeable.sol:259"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\ERC1967\\ERC1967UpgradeUpgradeable.sol:211"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\UUPSUpgradeable.sol:107"
+          },
+          {
+            "label": "upgradeStatus",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_bool",
+            "contract": "AlluoUpgradeableBase",
+            "src": "contracts\\AlluoUpgradeableBase.sol:25"
+          },
+          {
+            "label": "spokePool",
+            "offset": 1,
+            "slot": "251",
+            "type": "t_contract(ISpokePoolNew)71517",
+            "contract": "AlluoAcrossMessaging",
+            "src": "contracts\\crosschain\\AlluoAcrossMessaging.sol:18"
+          },
+          {
+            "label": "relayerFeePct",
+            "offset": 21,
+            "slot": "251",
+            "type": "t_int64",
+            "contract": "AlluoAcrossMessaging",
+            "src": "contracts\\crosschain\\AlluoAcrossMessaging.sol:19"
+          },
+          {
+            "label": "chainIdToFeeAmount",
+            "offset": 0,
+            "slot": "252",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "AlluoAcrossMessaging",
+            "src": "contracts\\crosschain\\AlluoAcrossMessaging.sol:20"
+          },
+          {
+            "label": "chainIdToBridgingFeeToken",
+            "offset": 0,
+            "slot": "253",
+            "type": "t_mapping(t_uint256,t_address)",
+            "contract": "AlluoAcrossMessaging",
+            "src": "contracts\\crosschain\\AlluoAcrossMessaging.sol:21"
+          },
+          {
+            "label": "isMaster",
+            "offset": 0,
+            "slot": "254",
+            "type": "t_bool",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:41"
+          },
+          {
+            "label": "gnosis",
+            "offset": 1,
+            "slot": "254",
+            "type": "t_address",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:43"
+          },
+          {
+            "label": "locker",
+            "offset": 0,
+            "slot": "255",
+            "type": "t_address",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:44"
+          },
+          {
+            "label": "exchangeAddress",
+            "offset": 0,
+            "slot": "256",
+            "type": "t_address",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:45"
+          },
+          {
+            "label": "priceFeed",
+            "offset": 0,
+            "slot": "257",
+            "type": "t_address",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:46"
+          },
+          {
+            "label": "liquidityHandler",
+            "offset": 0,
+            "slot": "258",
+            "type": "t_address",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:47"
+          },
+          {
+            "label": "strategyHandler",
+            "offset": 0,
+            "slot": "259",
+            "type": "t_address",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:48"
+          },
+          {
+            "label": "cvxDistributor",
+            "offset": 0,
+            "slot": "260",
+            "type": "t_address",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:49"
+          },
+          {
+            "label": "voteExecutorUtils",
+            "offset": 0,
+            "slot": "261",
+            "type": "t_address",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:50"
+          },
+          {
+            "label": "timeLock",
+            "offset": 0,
+            "slot": "262",
+            "type": "t_uint256",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:52"
+          },
+          {
+            "label": "minSigns",
+            "offset": 0,
+            "slot": "263",
+            "type": "t_uint256",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:53"
+          },
+          {
+            "label": "ibAlluoSymbolToAddress",
+            "offset": 0,
+            "slot": "264",
+            "type": "t_mapping(t_string_memory_ptr,t_address)",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:55"
+          },
+          {
+            "label": "hashExecutionTime",
+            "offset": 0,
+            "slot": "265",
+            "type": "t_mapping(t_bytes32,t_uint256)",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:56"
+          },
+          {
+            "label": "assetIdToDepositPercentages",
+            "offset": 0,
+            "slot": "266",
+            "type": "t_mapping(t_uint256,t_array(t_struct(Deposit)57113_storage)dyn_storage)",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:57"
+          },
+          {
+            "label": "submittedData",
+            "offset": 0,
+            "slot": "267",
+            "type": "t_array(t_struct(SubmittedData)57126_storage)dyn_storage",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:59"
+          },
+          {
+            "label": "executionHistory",
+            "offset": 0,
+            "slot": "268",
+            "type": "t_array(t_bytes_storage)dyn_storage",
+            "contract": "AlluoVoteExecutor",
+            "src": "contracts\\VotingAutomated\\AlluoVoteExecutor.sol:60"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes_storage)dyn_storage": {
+            "label": "bytes[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(Deposit)57113_storage)dyn_storage": {
+            "label": "struct AlluoVoteExecutor.Deposit[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_struct(SubmittedData)57126_storage)dyn_storage": {
+            "label": "struct AlluoVoteExecutor.SubmittedData[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_bytes_storage": {
+            "label": "bytes",
+            "numberOfBytes": "32"
+          },
+          "t_contract(ISpokePoolNew)71517": {
+            "label": "contract ISpokePoolNew",
+            "numberOfBytes": "20"
+          },
+          "t_int64": {
+            "label": "int64",
+            "numberOfBytes": "8"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)34_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_uint256)": {
+            "label": "mapping(bytes32 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_string_memory_ptr,t_address)": {
+            "label": "mapping(string => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_array(t_struct(Deposit)57113_storage)dyn_storage)": {
+            "label": "mapping(uint256 => struct AlluoVoteExecutor.Deposit[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_string_memory_ptr": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Deposit)57113_storage": {
+            "label": "struct AlluoVoteExecutor.Deposit",
+            "members": [
+              {
+                "label": "directionId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(RoleData)34_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(SubmittedData)57126_storage": {
+            "label": "struct AlluoVoteExecutor.SubmittedData",
+            "members": [
+              {
+                "label": "data",
+                "type": "t_bytes_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "time",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "signs",
+                "type": "t_array(t_bytes_storage)dyn_storage",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          },
+          "t_string_storage": {
+            "label": "string"
           }
         }
       }

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
+import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
+import {SafeERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 import {ECDSAUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/ECDSAUpgradeable.sol";
-
+import {DecimalConverter} from "../libs/DecimalConverter.sol";
 import {AlluoUpgradeableBase} from "../AlluoUpgradeableBase.sol";
 
 import {IAlluoStrategyHandler} from "../interfaces/IAlluoStrategyHandler.sol";
@@ -13,18 +15,284 @@ import "hardhat/console.sol";
 
 contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
     using ECDSAUpgradeable for bytes32;
+    using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
 
     address public strategyHandler;
     address public voteExecutor;
+    uint256 public universalTVLUpdated;
+
+    CrossChainInformation public crossChainInformation;
+
+    mapping(string => address) public ibAlluoSymbolToAddress;
+    mapping(bytes32 => uint256) public hashExecutionTime;
+    mapping(uint256 => Deposit[]) public assetIdToDepositPercentages;
+
+    mapping(uint256 => uint256) public universalTVL;
+    mapping(uint256 => address) public executorInternalIdToAddress;
+    mapping(uint256 => uint256) public executorInternalIdToChainId;
+
+    uint256[][] public universalExecutorBalances;
+    uint256[][] public desiredPercentagesByChain;
+
+    struct Deposit {
+        uint256 directionId;
+        uint256 amount;
+    }
+
     struct ExecutorTransfer {
         uint256 fromExecutor;
         uint256 toExecutor;
         uint256 tokenId;
         uint256 amount;
     }
+
+    struct CrossChainInformation {
+        address nextExecutor;
+        address previousExecutor;
+        address finalExecutor;
+        uint256 finalExecutorChainId;
+        uint256 nextExecutorChainId;
+        uint256 previousExecutorChainId;
+        uint256 numberOfExecutors;
+        uint256 currentExecutorInternalId;
+    }
     struct Message {
         uint256 commandIndex;
         bytes commandData;
+    }
+
+    function clearDesiredPercentagesByChain()
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        delete desiredPercentagesByChain;
+    }
+
+    function triggerBridging() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        // This requires some check that data has been executed and tvl has been updated...
+
+        IAlluoStrategyHandler handler = IAlluoStrategyHandler(strategyHandler);
+        uint8 numberOfAssets = handler.numberOfAssets();
+        uint256[] memory tokenIds = new uint256[](numberOfAssets);
+        for (uint256 i; i < numberOfAssets; i++) {
+            tokenIds[i] = i;
+        }
+
+        ExecutorTransfer[] memory toTransfer = balanceTokens(
+            universalExecutorBalances,
+            tokenIds,
+            desiredPercentagesByChain
+        );
+        // Consolelog for debugging
+
+        // ALso i have to scale the amount to what is actually in the executor vs expected balance
+        for (uint256 i; i < toTransfer.length; i++) {
+            ExecutorTransfer memory currentTransfer = toTransfer[i];
+            uint256 currentExecutorInternalId = crossChainInformation
+                .currentExecutorInternalId;
+            if (currentTransfer.fromExecutor == currentExecutorInternalId) {
+                address recipientExecutorAddress = executorInternalIdToAddress[
+                    currentTransfer.toExecutor
+                ];
+                uint256 recipientExecutorChainId = executorInternalIdToChainId[
+                    currentTransfer.toExecutor
+                ];
+                // Bridge through handler.
+                address primaryToken = handler.getPrimaryTokenForAsset(
+                    currentTransfer.tokenId
+                );
+
+                // Get the balance of the token and transfer it to the handler
+                uint256 currentBalance = IERC20MetadataUpgradeable(primaryToken)
+                    .balanceOf(voteExecutor);
+
+                // ALso currentTrasfer.amount is in 18 decimals, but the token might not be.
+                // Scale the currentTransferAmount to the token decimals
+
+                currentTransfer.amount = DecimalConverter.toDecimals(
+                    currentTransfer.amount,
+                    18,
+                    IERC20MetadataUpgradeable(primaryToken).decimals()
+                );
+                if (currentBalance < currentTransfer.amount) {
+                    currentTransfer.amount = currentBalance;
+                    // This is to account for slippage when withdrawing.
+                }
+                IERC20MetadataUpgradeable(primaryToken).transferFrom(
+                    voteExecutor,
+                    address(handler),
+                    currentTransfer.amount
+                );
+
+                handler.bridgeTo(
+                    currentTransfer.amount,
+                    uint8(currentTransfer.tokenId),
+                    recipientExecutorAddress,
+                    recipientExecutorChainId
+                );
+            }
+        }
+    }
+
+    // Local id starts from 0 --> max(number of executors)
+    // Global id is the chain.id
+    function saveDesiredPercentage(
+        uint256 directionId,
+        uint256 percent,
+        uint256 executorLocalId
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IAlluoStrategyHandler handler = IAlluoStrategyHandler(strategyHandler);
+        (address strategyPrimaryToken, ) = handler.getDirectionFullInfoById(
+            directionId
+        );
+        uint256 assetId = handler.tokenToAssetId(strategyPrimaryToken);
+
+        // if desiredPercentagesByChain is not initialized, initialize it.
+        if (desiredPercentagesByChain.length == 0) {
+            desiredPercentagesByChain = new uint256[][](
+                crossChainInformation.numberOfExecutors
+            );
+
+            for (
+                uint256 i = 0;
+                i < crossChainInformation.numberOfExecutors;
+                i++
+            ) {
+                desiredPercentagesByChain[i] = new uint256[](
+                    handler.numberOfAssets()
+                );
+            }
+        }
+        desiredPercentagesByChain[executorLocalId][assetId] += percent;
+    }
+
+    function setCrossChainInformation(
+        address _nextExecutor,
+        address _previousExecutor,
+        address _finalExecutor,
+        uint256 _finalExecutorChainId,
+        uint256 _nextExecutorChainId,
+        uint256 _previousExecutorChainId,
+        uint256 _numberOfExecutors,
+        uint256 _currentExecutorInternalId
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        crossChainInformation = CrossChainInformation(
+            _nextExecutor,
+            _previousExecutor,
+            _finalExecutor,
+            _finalExecutorChainId,
+            _nextExecutorChainId,
+            _previousExecutorChainId,
+            _numberOfExecutors,
+            _currentExecutorInternalId
+        );
+    }
+
+    function executeTVLCommand(
+        uint256[][] memory executorBalances
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) returns (bytes memory) {
+        IAlluoStrategyHandler handler = IAlluoStrategyHandler(strategyHandler);
+        uint8 numberOfAssets = handler.numberOfAssets();
+        uint256 currentExecutorInternalId = crossChainInformation
+            .currentExecutorInternalId;
+        // Check if the inner array has been initialized
+        bool isInitialized = executorBalances[executorBalances.length - 1]
+            .length != 0
+            ? true
+            : false;
+        bool checkValue;
+
+        if (isInitialized) {
+            // Check if the last value is max uint256 (this means that it has looped through twice
+            executorBalances[executorBalances.length - 1][0] ==
+                type(uint256).max
+                ? checkValue = true
+                : checkValue = false;
+        }
+        if (IAlluoVoteExecutor(voteExecutor).isMaster() && checkValue) {
+            // If that specific value is max uint256, then we know that it has looped through twice. And since the current chain is the master, we can stop here.
+            return "";
+        }
+        // Initialize the array if it doesnt already exist and fill it out:
+        if (executorBalances[currentExecutorInternalId].length == 0) {
+            executorBalances[currentExecutorInternalId] = new uint256[](
+                numberOfAssets
+            );
+            for (uint8 i; i < numberOfAssets; i++) {
+                uint256 assetValue = handler.markAssetToMarket(i);
+                executorBalances[currentExecutorInternalId][i] = assetValue;
+            }
+        } else {
+            // Now we definitely know that it has passed through at least once. Therefore we save this information locally (global tvl + executor balances)
+            for (uint8 i; i < executorBalances.length - 1; i++) {
+                for (uint8 j; j < numberOfAssets; j++) {
+                    universalTVL[j] += executorBalances[i][j];
+                }
+            }
+            universalTVLUpdated = block.timestamp;
+            universalExecutorBalances = removeLastArray(executorBalances);
+            if (!isInitialized) {
+                // This means that we have already executed the TVL command and we are just executing it again to update the global TVL
+                // Initialize the last array to be the max value so that we know that we have already executed this command
+                executorBalances[executorBalances.length - 1] = new uint256[](
+                    1
+                );
+                executorBalances[executorBalances.length - 1][0] = type(uint256)
+                    .max;
+            }
+        }
+
+        (uint256 commandIndex, bytes memory messageData) = encodeTvlCommand(
+            executorBalances
+        );
+
+        uint256[] memory commandIndexes = new uint256[](1);
+        bytes[] memory messages = new bytes[](1);
+        address[] memory emptyAddresses = new address[](0);
+
+        messages[0] = messageData;
+        commandIndexes[0] = commandIndex;
+
+        (, , bytes memory inputData) = encodeAllMessages(
+            commandIndexes,
+            messages
+        );
+        bytes memory finalData = abi.encode(inputData, emptyAddresses);
+        return finalData;
+    }
+
+    function setExecutorInternalIds(
+        uint256[] memory _executorInternalIds,
+        address[] memory _executorAddresses,
+        uint256[] memory _executorChainIds
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 executorCount = _executorInternalIds.length;
+        for (uint256 i = 0; i < executorCount; i++) {
+            uint256 executorInternalId = _executorInternalIds[i];
+            address executorAddress = _executorAddresses[i];
+            uint256 executorChainId = _executorChainIds[i];
+            executorInternalIdToAddress[executorInternalId] = executorAddress;
+            executorInternalIdToChainId[executorInternalId] = executorChainId;
+        }
+    }
+
+    function setUniversalExecutorBalances(
+        uint256[][] memory _executorBalances
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        universalExecutorBalances = _executorBalances;
+        universalTVLUpdated = block.timestamp;
+        // Update universal tvl
+        IAlluoStrategyHandler handler = IAlluoStrategyHandler(strategyHandler);
+        uint256 numberOfAssets = handler.numberOfAssets();
+        for (uint256 i = 0; i < numberOfAssets; i++) {
+            uint256 assetId = i;
+            uint256 totalBalance;
+            for (uint256 j = 0; j < universalExecutorBalances.length; j++) {
+                totalBalance += universalExecutorBalances[j][assetId];
+            }
+            universalTVL[assetId] = totalBalance;
+        }
+        universalTVLUpdated = block.timestamp;
     }
 
     function initialize(
@@ -49,6 +317,10 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         strategyHandler = _strategyHandler;
         voteExecutor = _voteExecutor;
+
+        // ALso grant roles to the new contracts
+        _grantRole(DEFAULT_ADMIN_ROLE, _strategyHandler);
+        _grantRole(DEFAULT_ADMIN_ROLE, _voteExecutor);
     }
 
     function confirmDataIntegrity(
@@ -67,7 +339,6 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
             hashed == keccak256(abi.encode(_messages, timestamp)),
             "Hash doesn't match"
         );
-        console.log("HELOOOOOOO", signs.length);
         require(
             checkSignedHashes(signs, hashed, gnosis, minSigns),
             "Hash has not been approved"
@@ -105,13 +376,29 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
                     verify(_hashed, _signs[i], owners[j]) &&
                     checkUniqueSignature(uniqueSigners, owners[j])
                 ) {
+                    console.log("here");
                     uniqueSigners[numberOfSigns] = owners[j];
                     numberOfSigns++;
                     break;
                 }
             }
         }
+        console.log("number of signs", numberOfSigns);
         return numberOfSigns >= minSigns ? true : false;
+    }
+
+    function isValidMutlisigSigner(
+        bytes memory _sign,
+        bytes32 hashed,
+        address gnosis
+    ) public view returns (bool) {
+        address[] memory owners = IGnosis(gnosis).getOwners();
+        for (uint256 j; j < owners.length; j++) {
+            if (hashed.recover(_sign) == owners[j]) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function bytesToHex(
@@ -134,7 +421,8 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
         bytes memory signature,
         address account
     ) public pure returns (bool) {
-        return data.toEthSignedMessageHash().recover(signature) == account;
+        address signer = data.toEthSignedMessageHash().recover(signature);
+        return signer == account;
     }
 
     function getSignerAddress(

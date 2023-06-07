@@ -8,7 +8,7 @@ contract SpokePoolMock {
         uint256 amount,
         uint256 originChainId,
         uint256 destinationChainId,
-        uint64 relayerFeePct,
+        int64 relayerFeePct,
         uint32 indexed depositId,
         uint32 quoteTimestamp,
         address indexed originToken,
@@ -21,8 +21,10 @@ contract SpokePoolMock {
         address originToken,
         uint256 amount,
         uint256 destinationChainId,
-        uint64 relayerFeePct,
-        uint32 quoteTimestamp
+        int64 relayerFeePct,
+        uint32 quoteTimestamp,
+        bytes memory message,
+        uint256 maxCount
     ) public payable {
         // Check that deposit route is enabled.
         // require(enabledDepositRoutes[originToken][destinationChainId], "Disabled route");
@@ -49,7 +51,7 @@ contract SpokePoolMock {
         uint256 amount,
         uint256 originChainId,
         uint256 destinationChainId,
-        uint64 relayerFeePct,
+        int64 relayerFeePct,
         uint32 depositId,
         uint32 quoteTimestamp,
         address originToken,
