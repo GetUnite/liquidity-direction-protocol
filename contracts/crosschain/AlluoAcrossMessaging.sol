@@ -63,14 +63,7 @@ abstract contract AlluoAcrossMessaging is AcrossMessageHandler {
         bool fillCompleted,
         address relayer,
         bytes calldata message
-    ) external {
-        require(msg.sender == address(spokePool), "Only spoke pool");
-        if (fillCompleted && message.length > 0) {
-            // Only execute when the fill is completed. This is because we dont want to deal with multiple executions.
-            // There is duplicate hash execution protection anyways.
-            _acrossExecuteLogic(message);
-        }
-    }
+    ) external virtual;
 
     function _acrossExecuteLogic(
         bytes calldata data

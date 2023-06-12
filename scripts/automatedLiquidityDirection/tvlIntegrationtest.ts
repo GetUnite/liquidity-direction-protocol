@@ -27,7 +27,7 @@ async function main() {
     let beefyVault: IBeefyVaultV6;
     let beefyBoost: IBeefyBoost;
     let beefyVaultLp: IERC20Metadata;
-    // await reset(process.env.OPTIMISM_URL);
+    await reset(process.env.OPTIMISM_URL);
 
     //Set admin to me
     admin = await ethers.getSigner("0xABfE4d45c6381908F09EF7c501cc36E38D34c0d4");
@@ -60,12 +60,17 @@ async function main() {
     beefyStrategy = await ethers.getContractAt("BeefyStrategyUniversal", "0x62cB09739920d071809dFD9B66D2b2cB27141410") as BeefyStrategyUniversal
     pseudoMultiSig = await ethers.getContractAt("PseudoMultisigWallet", "0xb26D2B27f75844E5ca8Bf605190a1D8796B38a25", signers[6]) as PseudoMultisigWallet
 
-    let funcData = alluoVoteExecutor.interface.encodeFunctionData("grantRole", [await alluoVoteExecutor.DEFAULT_ADMIN_ROLE(), admin.address])
 
-    // let usdcApproveMax = usdc.interface.encodeFunctionData("approve", [spokePool, ethers.constants.MaxUint256])
-    // let funcData = alluoVoteExecutor.interface.encodeFunctionData("multicall", [[usdc.address], [usdcApproveMax]])
-    await pseudoMultiSig.executeCall(alluoVoteExecutor.address, funcData);
+    let encodedMessage1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMooStargateUsdcPolygon", 0, 1);
+    let encodedMessage2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMooStargateUsdtPolygon", 2000, 1);
+    let encodedMessage3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMaiUsdcOptimism", 3000, 0);
+    let encodedMessage4 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyDolaMaiOptimism", 5000, 0);
+    let encodeAllMessages = await alluoVoteExecutorUtils.encodeAllMessages([encodedMessage1[0], encodedMessage2[0], encodedMessage3[0], encodedMessage4[0]], [encodedMessage1[1], encodedMessage2[1], encodedMessage3[1], encodedMessage4[1]]);
+    // await alluoVoteExecutor.submitData(encodeAllMessages.inputData);
 
+    // let signature = await admin.signMessage(ethers.utils.arrayify(encodeAllMessages[0]));
+    // await alluoVoteExecutor.approveSubmittedData(0, [signature])
+    await alluoVoteExecutor.connect(admin).executeSpecificData(0)
 }
 
 main()

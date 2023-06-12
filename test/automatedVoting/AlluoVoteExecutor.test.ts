@@ -94,7 +94,7 @@ describe("AlluoVoteExecutor Tests", function () {
         let voteExecutorFactory = await ethers.getContractFactory("AlluoVoteExecutor");
 
         alluoVoteExecutor = (await upgrades.deployProxy(voteExecutorFactory, [
-            pseudoMultiSig.address, _exchange.address, priceRouter.address, liquidityHandler.address, alluoStrategyHandler.address, "0xc22DB2874725B84e99EC0a644fdD042EA3F6F899", alluoVoteExecutorUtils.address, "0xdEBbFE665359B96523d364A19FceC66B0E43860D", 0, 1, true
+            pseudoMultiSig.address, _exchange.address, priceRouter.address, liquidityHandler.address, alluoStrategyHandler.address, "0xc22DB2874725B84e99EC0a644fdD042EA3F6F899", alluoVoteExecutorUtils.address, "0xdEBbFE665359B96523d364A19FceC66B0E43860D", 86400, 1, true
         ])) as AlluoVoteExecutor;
 
         await alluoVoteExecutor.connect(admin).setAcrossInformation(spokePool, 10000000)

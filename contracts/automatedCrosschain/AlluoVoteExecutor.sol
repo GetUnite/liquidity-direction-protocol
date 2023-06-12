@@ -30,6 +30,7 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
     using ECDSAUpgradeable for bytes32;
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
+    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
 
     address public constant ALLUO = 0x1E5193ccC53f25638Aa22a940af899B692e10B09;
     address public constant FUND_MANAGER =
@@ -37,6 +38,8 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
 
     IWrappedEther public constant WETH =
         IWrappedEther(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
+
     bytes4 internal constant MAGICVALUE = 0x1626ba7e;
     bool public isMaster;
 
@@ -59,7 +62,9 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
     SubmittedData[] public submittedData;
     bytes[] public executionHistory;
     bytes[] public storedCrosschainData;
-    mapping(bytes32 => bool) public executed;
+
+    EnumerableSetUpgradeable.UintSet private queuedCrosschainMessageIndexes;
+
     struct Deposit {
         uint256 directionId;
         uint256 amount;
@@ -189,6 +194,22 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         _internalExecutionofData(exactData.data, exactData.signs);
     }
 
+    function handleAcrossMessage(
+        address tokenSent,
+        uint256 amount,
+        bool fillCompleted,
+        address relayer,
+        bytes calldata message
+    ) external override {
+        require(msg.sender == address(spokePool), "Only spoke pool");
+        require(hasRole(RELAYER_ROLE, relayer), "Only approved relayers");
+        if (fillCompleted && message.length > 0) {
+            // Only execute when the fill is completed. This is because we dont want to deal with multiple executions.
+            // There is duplicate hash execution protection anyways.
+            _acrossExecuteLogic(message);
+        }
+    }
+
     function _internalExecutionofData(
         bytes memory message,
         bytes[] memory signs
@@ -294,7 +315,11 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         emit MessageReceived(hashed);
 
         bytes memory finalData = abi.encode(message, signs);
-        if (finalData.length > 0) {
+        if (
+            finalData.length > 0 &&
+            crossChainInformation.nextExecutorChainId !=
+            crossChainInformation.finalExecutorChainId
+        ) {
             // Now send the message to the next chain
             _sendMessage(
                 crossChainInformation.nextExecutor,
@@ -309,10 +334,19 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         emit logged(finalData);
     }
 
+    function executeQueuedDeposits(
+        uint256 assetId
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        IAlluoStrategyHandler handler = IAlluoStrategyHandler(strategyHandler);
+        // Dont forget to erc20 approve each token to the handler in setup.
+        handler.executeQueuedDeposits(assetId);
+    }
+
     function _acrossExecuteLogic(
         bytes calldata data
     ) internal override returns (bool success, bytes memory result) {
         storedCrosschainData.push(data);
+        queuedCrosschainMessageIndexes.add(storedCrosschainData.length - 1);
         return (true, "");
     }
 
@@ -324,8 +358,8 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         returns (bool success, bytes memory result)
     {
         bytes memory data = storedCrosschainData[index];
-        // Permanently delete executed data. This is to ensure double execution cannot exist
-        delete storedCrosschainData[index];
+        // Remove executed data from the queue
+        queuedCrosschainMessageIndexes.remove(index);
         (bytes memory message, bytes[] memory signs) = abi.decode(
             data,
             (bytes, bytes[])
@@ -409,6 +443,20 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         uint256 _assetId
     ) public view returns (Deposit[] memory) {
         return assetIdToDepositPercentages[_assetId];
+    }
+
+    function getSequentialQueuedCrosschainIndex()
+        public
+        view
+        returns (uint256)
+    {
+        return queuedCrosschainMessageIndexes.at(0);
+    }
+
+    function forceRemoveQueuedCrosschainIndex(
+        uint256 index
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        queuedCrosschainMessageIndexes.remove(index);
     }
 
     function getSubmittedData(

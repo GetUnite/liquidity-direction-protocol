@@ -10,6 +10,7 @@ import {AlluoUpgradeableBase} from "../AlluoUpgradeableBase.sol";
 import {IAlluoStrategyHandler} from "../interfaces/IAlluoStrategyHandler.sol";
 import {IAlluoVoteExecutor} from "../interfaces/IAlluoVoteExecutor.sol";
 import {IGnosis} from "../interfaces/IGnosis.sol";
+import {IIbAlluo} from "../interfaces/IIbAlluo.sol";
 
 import "hardhat/console.sol";
 
@@ -33,6 +34,8 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
 
     uint256[][] public universalExecutorBalances;
     uint256[][] public desiredPercentagesByChain;
+
+    mapping(uint256 => address) public assetIdToIbAlluoAddress;
 
     struct Deposit {
         uint256 directionId;
@@ -60,6 +63,9 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
         uint256 commandIndex;
         bytes commandData;
     }
+    // Assuming there are existing event definitions for Profit and Loss
+    event Profit(uint8 assetId, uint256 amount);
+    event Loss(uint8 assetId, uint256 amount);
 
     function clearDesiredPercentagesByChain()
         external
@@ -211,6 +217,7 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
         }
         if (IAlluoVoteExecutor(voteExecutor).isMaster() && checkValue) {
             // If that specific value is max uint256, then we know that it has looped through twice. And since the current chain is the master, we can stop here.
+            // Calculate P&L and emit as events
             return "";
         }
         // Initialize the array if it doesnt already exist and fill it out:
@@ -224,9 +231,46 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
             }
         } else {
             // Now we definitely know that it has passed through at least once. Therefore we save this information locally (global tvl + executor balances)
+            // Clear the universalTVL before updating
+            for (uint8 i = 0; i < numberOfAssets; i++) {
+                universalTVL[i] = 0;
+            }
+
             for (uint8 i; i < executorBalances.length - 1; i++) {
                 for (uint8 j; j < numberOfAssets; j++) {
                     universalTVL[j] += executorBalances[i][j];
+                }
+            }
+
+            // New logic added here
+            for (uint8 i = 0; i < numberOfAssets; i++) {
+                uint256 oldExecutorBalance = universalExecutorBalances[
+                    currentExecutorInternalId
+                ][i];
+                uint256 interest = getLatestAPY(i);
+                uint256 timePassedInSeconds = block.timestamp -
+                    universalTVLUpdated;
+                uint256 expectedExecutorBalance = (oldExecutorBalance *
+                    interest *
+                    timePassedInSeconds) /
+                    31536000 /
+                    10000;
+
+                if (
+                    executorBalances[currentExecutorInternalId][i] >
+                    expectedExecutorBalance
+                ) {
+                    emit Profit(
+                        i,
+                        executorBalances[currentExecutorInternalId][i] -
+                            expectedExecutorBalance
+                    );
+                } else {
+                    emit Loss(
+                        i,
+                        expectedExecutorBalance -
+                            executorBalances[currentExecutorInternalId][i]
+                    );
                 }
             }
             universalTVLUpdated = block.timestamp;
@@ -259,6 +303,11 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
         );
         bytes memory finalData = abi.encode(inputData, emptyAddresses);
         return finalData;
+    }
+
+    function getLatestAPY(uint256 assetId) public view returns (uint256) {
+        address ibAlluoAddress = assetIdToIbAlluoAddress[assetId];
+        return IIbAlluo(ibAlluoAddress).annualInterest();
     }
 
     function setExecutorInternalIds(
