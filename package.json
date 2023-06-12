@@ -23,7 +23,9 @@
     "@openzeppelin/hardhat-upgrades": "^1.21.0",
     "@types/chai": "^4.3.0",
     "@types/mocha": "^9.0.0",
-    "@types/node": "^12.20.41",
+    "@types/node": "^12.20.55",
+    "@types/node-fetch": "^2.6.4",
+    "@types/promise.allsettled": "^1.0.3",
     "@typescript-eslint/eslint-plugin": "^4.33.0",
     "@typescript-eslint/parser": "^4.33.0",
     "alluo-exchange": "github:GetAlluo/exchange",
@@ -42,9 +44,10 @@
     "husky": "^8.0.2",
     "prettier": "^2.8.0",
     "prettier-plugin-solidity": "^1.0.0",
+    "promise.allsettled": "^1.0.6",
     "solhint": "^3.3.7",
     "solhint-plugin-prettier": "^0.0.5",
-    "ts-node": "^10.4.0",
+    "ts-node": "^10.9.1",
     "typescript": "^4.5.4"
   },
   "scripts": {
@@ -54,6 +57,8 @@
     "prepare": "husky install"
   },
   "dependencies": {
-    "@across-protocol/sdk-v2": "^0.2.3"
+    "@across-protocol/sdk-v2": "^0.2.3",
+    "bottleneck": "^2.19.5",
+    "p-throttle": "^5.1.0"
   }
 }
