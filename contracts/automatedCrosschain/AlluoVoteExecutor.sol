@@ -201,11 +201,11 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         address relayer,
         bytes calldata message
     ) external override {
-        require(msg.sender == address(spokePool), "Only spoke pool");
-        require(hasRole(RELAYER_ROLE, relayer), "Only approved relayers");
         if (fillCompleted && message.length > 0) {
             // Only execute when the fill is completed. This is because we dont want to deal with multiple executions.
             // There is duplicate hash execution protection anyways.
+            require(msg.sender == address(spokePool), "Only spoke pool");
+            require(hasRole(RELAYER_ROLE, relayer), "Only approved relayers");
             _acrossExecuteLogic(message);
         }
     }
@@ -360,6 +360,8 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         bytes memory data = storedCrosschainData[index];
         // Remove executed data from the queue
         queuedCrosschainMessageIndexes.remove(index);
+        console.log("Removed queuedMessage");
+
         (bytes memory message, bytes[] memory signs) = abi.decode(
             data,
             (bytes, bytes[])
@@ -448,9 +450,18 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
     function getSequentialQueuedCrosschainIndex()
         public
         view
-        returns (uint256)
+        returns (bool canExec, bytes memory execPayload)
     {
-        return queuedCrosschainMessageIndexes.at(0);
+        if (queuedCrosschainMessageIndexes.length() == 0) {
+            return (false, "");
+        } else {
+            uint256 index = queuedCrosschainMessageIndexes.at(0);
+            bytes memory payload = abi.encodeWithSelector(
+                this.executeCrosschainData.selector,
+                index
+            );
+            return (true, payload);
+        }
     }
 
     function forceRemoveQueuedCrosschainIndex(
@@ -508,6 +519,12 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         gnosis = _gnosis;
         _grantRole(DEFAULT_ADMIN_ROLE, _gnosis);
         _grantRole(UPGRADER_ROLE, _gnosis);
+    }
+
+    function setTimelock(
+        uint256 _newTimeLock
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        timeLock = _newTimeLock;
     }
 
     function multicall(

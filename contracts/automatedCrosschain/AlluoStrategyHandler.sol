@@ -247,6 +247,13 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
             false,
             false
         );
+
+        // If unwind percentage is 10000, then remove from active directions
+        if (_unwindPercentage == 10000) {
+            assetIdToAssetInfo[_direction.assetId].activeDirections.remove(
+                _directionId
+            );
+        }
     }
 
     function _queueDeposit(
@@ -373,6 +380,17 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
             _direction.entryData,
             _amount
         );
+
+        // Add to active directions if not already added
+        if (
+            !assetIdToAssetInfo[_direction.assetId].activeDirections.contains(
+                _directionId
+            )
+        ) {
+            assetIdToAssetInfo[_direction.assetId].activeDirections.add(
+                _directionId
+            );
+        }
     }
 
     function getPrimaryTokenForAsset(
@@ -477,8 +495,8 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         assetIdToAssetInfo[_assetId].ibAlluo = _ibAlluo;
         for (uint256 i; i < _chainIds.length; i++) {
             assetIdToAssetInfo[_assetId].chainIdToPrimaryToken[
-                _chainIds[i]
-            ] = _chainIdToPrimaryToken[i];
+                    _chainIds[i]
+                ] = _chainIdToPrimaryToken[i];
         }
     }
 

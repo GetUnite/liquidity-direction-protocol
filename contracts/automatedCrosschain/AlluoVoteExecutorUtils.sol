@@ -243,18 +243,19 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
             }
 
             // New logic added here
+            // Maybe only add this 
             for (uint8 i = 0; i < numberOfAssets; i++) {
                 uint256 oldExecutorBalance = universalExecutorBalances[
                     currentExecutorInternalId
                 ][i];
-                uint256 interest = getLatestAPY(i);
-                uint256 timePassedInSeconds = block.timestamp -
-                    universalTVLUpdated;
-                uint256 expectedExecutorBalance = (oldExecutorBalance *
-                    interest *
-                    timePassedInSeconds) /
+                uint256 expectedAddition = (oldExecutorBalance *
+                    getLatestAPY(i) *
+                    (block.timestamp - universalTVLUpdated)) /
                     31536000 /
                     10000;
+
+                uint256 expectedExecutorBalance = oldExecutorBalance +
+                    expectedAddition;
 
                 if (
                     executorBalances[currentExecutorInternalId][i] >
@@ -308,6 +309,13 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
     function getLatestAPY(uint256 assetId) public view returns (uint256) {
         address ibAlluoAddress = assetIdToIbAlluoAddress[assetId];
         return IIbAlluo(ibAlluoAddress).annualInterest();
+    }
+
+    function setAssetIdToIbAlluoAddresses(
+        address _ibAlluoAddress,
+        uint256 _assetId
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        assetIdToIbAlluoAddress[_assetId] = _ibAlluoAddress;
     }
 
     function setExecutorInternalIds(
