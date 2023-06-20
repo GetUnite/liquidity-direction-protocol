@@ -59,8 +59,8 @@ async function main() {
 
 
     let spokePoolContract = await ethers.getContractAt("ISpokePoolNew", spokePool) as ISpokePoolNew
-    let depositId = 1009487
-    let modifiedRelayerFeePct = ethers.utils.parseUnits("1", "17");
+    let depositId = 1010824
+    let modifiedRelayerFeePct = ethers.utils.parseUnits("25", "16");
     let updatedRecipient = alluoVoteExecutor.address
     let updatedMessage = "0x"
     let originChainId = 137
@@ -90,8 +90,8 @@ async function main() {
     };
     const signature = await signers[0]._signTypedData(typedData.domain, typedData.types, typedData.message);
     console.log(signature)
-    // await alluoVoteExecutor.speedUpDeposit(modifiedRelayerFeePct, depositId, updatedRecipient, updatedMessage, signature)
-    await alluoStrategyHandler.speedUpDeposit(modifiedRelayerFeePct, depositId, updatedRecipient, updatedMessage, signature)
+    await alluoVoteExecutor.speedUpDeposit(modifiedRelayerFeePct, depositId, updatedRecipient, updatedMessage, signature)
+    // await alluoStrategyHandler.speedUpDeposit(modifiedRelayerFeePct, depositId, updatedRecipient, updatedMessage, signature)
 }
 main()
     .then(() => process.exit(0))

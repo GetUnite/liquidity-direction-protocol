@@ -57,37 +57,42 @@ async function main() {
     beefyStrategy = await ethers.getContractAt("BeefyStrategyUniversal", "0x62cB09739920d071809dFD9B66D2b2cB27141410") as BeefyStrategyUniversal
     pseudoMultiSig = await ethers.getContractAt("PseudoMultisigWallet", "0xb26D2B27f75844E5ca8Bf605190a1D8796B38a25", signers[6]) as PseudoMultisigWallet
 
-
     //  OK lets upgrade the executor on polygon first
-    let executorFactory = await ethers.getContractFactory("AlluoVoteExecutor");
-    let newImplementation = await executorFactory.deploy();
-    await newImplementation.deployed();
-    console.log("New implementation deployed to:", newImplementation.address);
-    let upgradeTo = alluoVoteExecutor.interface.encodeFunctionData("upgradeTo", [newImplementation.address])
-    let changeStatus = alluoVoteExecutor.interface.encodeFunctionData("changeUpgradeStatus", [true])
-    let tx1 = await pseudoMultiSig.executeCall(alluoVoteExecutor.address, changeStatus)
-    let tx2 = await pseudoMultiSig.executeCall(alluoVoteExecutor.address, upgradeTo)
-    console.log("Executor upgraded")
-    // // Upgrade the handler
-    // let handlerFactory = await ethers.getContractFactory("AlluoStrategyHandler");
-    // let stauts1 = await alluoStrategyHandler.changeUpgradeStatus(true)
-    // await stauts1.wait()
-    // let handler = await upgrades.upgradeProxy(alluoStrategyHandler.address, handlerFactory);
-    // console.log("Handler upgraded")
+    // let executorFactory = await ethers.getContractFactory("AlluoVoteExecutor");
+    // await upgrades.forceImport("0x546e8589E5eF88AA5cA19134FAb800a49D52eE66", executorFactory);
+    // let stauts = await alluoVoteExecutor.changeUpgradeStatus(true)
+    // await stauts.wait()
+    // let exec = await upgrades.upgradeProxy(alluoVoteExecutor.address, executorFactory);
+    // await alluoVoteExecutor.setTimelock(60 * 60 * 24)
+    // console.log("Executor upgraded")
 
-    // // // Upgrade the utils
+
+    // // // Upgrade the handler
+    let handlerFactory = await ethers.getContractFactory("AlluoStrategyHandler");
+    let stauts1 = await alluoStrategyHandler.changeUpgradeStatus(true)
+    await stauts1.wait()
+    let handler = await upgrades.upgradeProxy(alluoStrategyHandler.address, handlerFactory);
+    console.log("Handler upgraded")
+    await alluoStrategyHandler.clearDepositQueue(0);
+
+    // // Upgrade the utils
     // let utilsFactory = await ethers.getContractFactory("AlluoVoteExecutorUtils");
     // let stauts3 = await alluoVoteExecutorUtils.changeUpgradeStatus(true)
     // await stauts3.wait()
     // let utils = await upgrades.upgradeProxy(alluoVoteExecutorUtils.address, utilsFactory);
     // console.log("All complete")
+    // await alluoVoteExecutorUtils.setAssetIdToIbAlluoAddresses("0xC2DbaAEA2EfA47EBda3E572aa0e55B742E408BF6", 0)
+    // await alluoVoteExecutorUtils.setAssetIdToIbAlluoAddresses("0xc9d8556645853C465D1D5e7d2c81A0031F0B8a92", 1)
+    // await alluoVoteExecutorUtils.setAssetIdToIbAlluoAddresses("0xc677B0918a96ad258A68785C2a3955428DeA7e50", 2)
+    // await alluoVoteExecutorUtils.setAssetIdToIbAlluoAddresses("0xf272Ff86c86529504f0d074b210e95fc4cFCDce2", 3)
 
-    // // Now verify all the implementations
+
+    // // // Now verify all the implementations
     console.log("verifying now")
-    await verify(newImplementation.address)
-    console.log("verified executor")
-    // await verify(alluoStrategyHandler.address)
-    // console.log("verified handler")
+    // await verify(alluoVoteExecutor.address)
+    // console.log("verified executor")
+    await verify(alluoStrategyHandler.address)
+    console.log("verified handler")
     // await verify(alluoVoteExecutorUtils.address)
     // console.log("verified utils")
 

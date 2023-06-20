@@ -243,7 +243,7 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
             }
 
             // New logic added here
-            // Maybe only add this 
+            // Maybe only add this
             for (uint8 i = 0; i < numberOfAssets; i++) {
                 uint256 oldExecutorBalance = universalExecutorBalances[
                     currentExecutorInternalId

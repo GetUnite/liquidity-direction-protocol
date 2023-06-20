@@ -1,9 +1,10 @@
+
 import { ethers, upgrades } from "hardhat";
-import { AlluoStrategyHandler, AlluoVoteExecutor, AlluoVoteExecutorUtils, BeefyStrategy, BeefyStrategyUniversal, IBeefyBoost, IBeefyVaultV6, IERC20, IERC20Metadata, IExchange, IPriceFeedRouter, IPriceFeedRouterV2, IWrappedEther, LiquidityHandler, PseudoMultisigWallet } from "../../typechain-types";
+import { AlluoStrategyHandler, AlluoVoteExecutor, AlluoVoteExecutorUtils, BeefyStrategy, BeefyStrategyUniversal, Exchange, IBeefyBoost, IBeefyVaultV6, IERC20, IERC20Metadata, IExchange, IPriceFeedRouter, IPriceFeedRouterV2, ISpokePoolNew, IWrappedEther, LiquidityHandler, PseudoMultisigWallet } from "../../typechain-types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { LiquidityHandlerCurrent, SpokePoolMock } from "../../typechain";
 import { reset } from "@nomicfoundation/hardhat-network-helpers";
-
+import { run } from "hardhat";
 async function main() {
     let alluoVoteExecutor: AlluoVoteExecutor;
     let alluoStrategyHandler: AlluoStrategyHandler;
@@ -24,17 +25,12 @@ async function main() {
     let ldo: IERC20Metadata;
     let liquidityHandler: LiquidityHandlerCurrent;
 
-    let beefyVault: IBeefyVaultV6;
-    let beefyBoost: IBeefyBoost;
-    let beefyVaultLp: IERC20Metadata;
-    // await reset(process.env.OPTIMISM_URL);
-
-    //Set admin to me
+    // await reset(process.env.POLYGON_FORKING_URL);
     admin = await ethers.getSigner("0xABfE4d45c6381908F09EF7c501cc36E38D34c0d4");
 
     //For test
     signers = await ethers.getSigners();
-    admin = signers[0];
+    // admin = signers[0];
 
     _exchange = await ethers.getContractAt(
         "contracts/interfaces/IExchange.sol:IExchange",
@@ -61,25 +57,63 @@ async function main() {
     pseudoMultiSig = await ethers.getContractAt("PseudoMultisigWallet", "0xb26D2B27f75844E5ca8Bf605190a1D8796B38a25", signers[6]) as PseudoMultisigWallet
 
 
-    let encodedMessage1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMooStargateUsdcPolygon", 1000, 1);
-    let encodedMessage2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMooStargateUsdtPolygon", 1000, 1);
-    let encodedMessage3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMaiUsdcOptimism", 0, 0);
-    let encodedMessage4 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyDolaMaiOptimism", 8000, 0);
-    let encodeAllMessages = await alluoVoteExecutorUtils.encodeAllMessages([encodedMessage1[0], encodedMessage2[0], encodedMessage3[0], encodedMessage4[0]], [encodedMessage1[1], encodedMessage2[1], encodedMessage3[1], encodedMessage4[1]]);
-    await alluoVoteExecutor.submitData(encodeAllMessages.inputData);
 
-    let signature = await admin.signMessage(ethers.utils.arrayify(encodeAllMessages[0]));
-    console.log("signature", signature)
-    // Increment this number
-    //
-    //
-    await alluoVoteExecutor.approveSubmittedData(7, [signature])
-    // await alluoVoteExecutor.connect(admin).executeSpecificData(6)
+    let spokePoolContract = await ethers.getContractAt("ISpokePoolNew", spokePool) as ISpokePoolNew
+    let depositId = 1011969
+    let modifiedRelayerFeePct = ethers.utils.parseUnits("0.05", "18");
+    let updatedRecipient = alluoVoteExecutor.address
+    let updatedMessage = "0x"
+    let originChainId = 137
+
+    const typedData = {
+        types: {
+            UpdateDepositDetails: [
+                { name: "depositId", type: "uint32" },
+                { name: "originChainId", type: "uint256" },
+                { name: "updatedRelayerFeePct", type: "int64" },
+                { name: "updatedRecipient", type: "address" },
+                { name: "updatedMessage", type: "bytes" },
+            ],
+        },
+        domain: {
+            name: "ACROSS-V2",
+            version: "1.0.0",
+            chainId: Number(originChainId),
+        },
+        message: {
+            depositId,
+            originChainId,
+            updatedRelayerFeePct: modifiedRelayerFeePct,
+            updatedRecipient,
+            updatedMessage,
+        },
+    };
+    const signature = await signers[0]._signTypedData(typedData.domain, typedData.types, typedData.message);
+    console.log(signature)
+    await alluoStrategyHandler.speedUpDeposit(modifiedRelayerFeePct, depositId, updatedRecipient, updatedMessage, signature)
+    // await alluoStrategyHandler.speedUpDeposit(modifiedRelayerFeePct, depositId, updatedRecipient, updatedMessage, signature)
 }
-
 main()
     .then(() => process.exit(0))
     .catch((error) => {
         console.error(error);
         process.exit(1);
     });
+
+const verify = async (contractAddress: any) => {
+    console.log("Verifying contract...");
+    try {
+        await run("verify:verify", {
+            address: contractAddress,
+        });
+    } catch (e: any) {
+        if (e.message.toLowerCase().includes("already verified")) {
+            console.log("Already verified!");
+        } else {
+            console.log(e);
+        }
+    }
+};
+
+//npx hardhat run scripts/deploy/deployHandler.ts --network polygon
+//npx hardhat verify 0xb647c6fe9d2a6e7013c7e0924b71fa7926b2a0a3 --network polygon

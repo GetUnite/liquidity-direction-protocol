@@ -85,20 +85,20 @@ async function main() {
 
     // Strategy handler related
 
-    await alluoStrategyHandler.changeAssetInfo(2, [10, 137], [weth.address, weth.address], usdc.address);
-    await alluoStrategyHandler.changeAssetInfo(0, [10, 137], [usdc.address, usdc.address], usdc.address);
+    // await alluoStrategyHandler.changeAssetInfo(2, [10, 137], [weth.address, weth.address], usdc.address);
+    // await alluoStrategyHandler.changeAssetInfo(0, [10, 137], [usdc.address, usdc.address], usdc.address);
 
-    await alluoVoteExecutorUtils.setCrossChainInformation(alluoVoteExecutor.address, alluoVoteExecutor.address, alluoVoteExecutor.address, 10, 10, 10, 2, 1)
+    // await alluoVoteExecutorUtils.setCrossChainInformation(alluoVoteExecutor.address, alluoVoteExecutor.address, alluoVoteExecutor.address, 10, 10, 10, 2, 1)
 
-    let func5 = alluoVoteExecutor.interface.encodeFunctionData("setAcrossInformation", [spokePool, ethers.utils.parseUnits("4", 17)])
-    let func6 = alluoVoteExecutor.interface.encodeFunctionData("setFeeInformation", [usdc.address, 10, ethers.utils.parseUnits("5", 6)])
-    await pseudoMultiSig.executeCall(alluoVoteExecutor.address, func5)
-    await pseudoMultiSig.executeCall(alluoVoteExecutor.address, func6)
+    // let func5 = alluoVoteExecutor.interface.encodeFunctionData("setAcrossInformation", [spokePool, ethers.utils.parseUnits("4", 17)])
+    // let func6 = alluoVoteExecutor.interface.encodeFunctionData("setFeeInformation", [usdc.address, 10, ethers.utils.parseUnits("5", 6)])
+    // await pseudoMultiSig.executeCall(alluoVoteExecutor.address, func5)
+    // await pseudoMultiSig.executeCall(alluoVoteExecutor.address, func6)
 
-    await alluoVoteExecutorUtils.setStorageAddresses(alluoStrategyHandler.address, ethers.constants.AddressZero);
-    await alluoStrategyHandler.changeNumberOfAssets(4);
-    await alluoStrategyHandler.setTokenToAssetId(weth.address, 2);
-    await alluoStrategyHandler.setTokenToAssetId(usdc.address, 0);
+    // await alluoVoteExecutorUtils.setStorageAddresses(alluoStrategyHandler.address, ethers.constants.AddressZero);
+    // await alluoStrategyHandler.changeNumberOfAssets(4);
+    // await alluoStrategyHandler.setTokenToAssetId(weth.address, 2);
+    // await alluoStrategyHandler.setTokenToAssetId(usdc.address, 0);
 
 
 
@@ -107,16 +107,16 @@ async function main() {
 
     // Strategy related
 
-    let entryData1 = await beefyStrategy.encodeData("0x01D9cfB8a9D43013a1FdC925640412D8d2D900F0", ethers.constants.AddressZero, 0, usdc.address)
-    let exitData1 = entryData1
-    let rewardsData1 = entryData1
-    await alluoStrategyHandler.setLiquidityDirection("BeefyMaiUsdcOptimism", 1, beefyStrategy.address, usdc.address, 0, 10, entryData1, exitData1, rewardsData1);
+    // let entryData1 = await beefyStrategy.encodeData("0x01D9cfB8a9D43013a1FdC925640412D8d2D900F0", ethers.constants.AddressZero, 0, usdc.address)
+    // let exitData1 = entryData1
+    // let rewardsData1 = entryData1
+    // await alluoStrategyHandler.setLiquidityDirection("BeefyMaiUsdcOptimism", 1, beefyStrategy.address, usdc.address, 0, 10, entryData1, exitData1, rewardsData1);
 
-    // DOLA-MAI Optimism
-    let entryData2 = await beefyStrategy.encodeData("0xa9913D2DA71768CD13eA75B05D9E91A3120E2f08", ethers.constants.AddressZero, 0, usdc.address)
-    let exitData2 = entryData2
-    let rewardsData2 = entryData2
-    await alluoStrategyHandler.setLiquidityDirection("BeefyDolaMaiOptimism", 2, beefyStrategy.address, usdc.address, 0, 10, entryData2, exitData2, rewardsData2);
+    // // DOLA-MAI Optimism
+    // let entryData2 = await beefyStrategy.encodeData("0xa9913D2DA71768CD13eA75B05D9E91A3120E2f08", ethers.constants.AddressZero, 0, usdc.address)
+    // let exitData2 = entryData2
+    // let rewardsData2 = entryData2
+    // await alluoStrategyHandler.setLiquidityDirection("BeefyDolaMaiOptimism", 2, beefyStrategy.address, usdc.address, 0, 10, entryData2, exitData2, rewardsData2);
 
 
     // mooStargateUSDT Polygon
@@ -130,7 +130,7 @@ async function main() {
     let entryData4 = await beefyStrategy.encodeData("0x2F4BBA9fC4F77F16829F84181eB7C8b50F639F95", ethers.constants.AddressZero, 0, polygonUSDCAddress)
     let exitData4 = entryData3
     let rewardsData4 = entryData3
-    await alluoStrategyHandler.setLiquidityDirection("BeefyMooStargateUsdtPolygon", 4, beefyStrategy.address, polygonUSDCAddress, 0, 137, entryData4, exitData4, rewardsData4);
+    await alluoStrategyHandler.setLiquidityDirection("BeefyMooStargateUsdcPolygon", 4, beefyStrategy.address, polygonUSDCAddress, 0, 137, entryData4, exitData4, rewardsData4);
 }
 
 main()

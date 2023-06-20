@@ -333,6 +333,7 @@ describe("AlluoVoteExecutor Tests", function () {
             expect(usdcBalanceAfter).to.be.equal(usdcBalanceBefore);
         })
 
+
         it("Test updateAllIbAlluoAddresses()", async () => {
             let initialIbAlluoAdress = await alluoVoteExecutor.ibAlluoSymbolToAddress("IbAlluoUSD");
             expect(initialIbAlluoAdress).to.be.equal(ethers.constants.AddressZero);

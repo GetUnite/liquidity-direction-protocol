@@ -54,37 +54,46 @@ async function main() {
     beefyStrategy = await ethers.getContractAt("BeefyStrategyUniversal", "0x62cB09739920d071809dFD9B66D2b2cB27141410") as BeefyStrategyUniversal
     pseudoMultiSig = await ethers.getContractAt("PseudoMultisigWallet", "0xb26D2B27f75844E5ca8Bf605190a1D8796B38a25", signers[6]) as PseudoMultisigWallet
 
-
-    //  OK lets upgrade the executor on polygon first
+    // //  OK lets upgrade the executor on polygon first
     let executorFactory = await ethers.getContractFactory("AlluoVoteExecutor");
-    let newImplementation = await executorFactory.deploy();
-    await newImplementation.deployed();
-    console.log("New implementation deployed to:", newImplementation.address);
-    let upgradeTo = alluoVoteExecutor.interface.encodeFunctionData("upgradeTo", [newImplementation.address])
-    let changeStatus = alluoVoteExecutor.interface.encodeFunctionData("changeUpgradeStatus", [true])
-    let tx1 = await pseudoMultiSig.executeCall(alluoVoteExecutor.address, changeStatus)
-    let tx2 = await pseudoMultiSig.executeCall(alluoVoteExecutor.address, upgradeTo)
-    console.log("Executor upgraded")
-    // // Upgrade the handler
-    // let handlerFactory = await ethers.getContractFactory("AlluoStrategyHandler");
-    // let stauts1 = await alluoStrategyHandler.changeUpgradeStatus(true)
-    // await stauts1.wait()
-    // let handler = await upgrades.upgradeProxy(alluoStrategyHandler.address, handlerFactory);
-    // console.log("Handler upgraded")
 
-    // // // Upgrade the utils
+    // let stauts = await alluoVoteExecutor.changeUpgradeStatus(true)
+
+    // stauts = await alluoVoteExecutor.grantRole(await alluoVoteExecutor.UPGRADER_ROLE(), admin.address)
+    // await stauts.wait()
+    // let exec = await upgrades.upgradeProxy(alluoVoteExecutor.address, executorFactory);
+    // console.log("Executor upgraded")
+
+    // await alluoVoteExecutor.grantRole(await alluoVoteExecutor.RELAYER_ROLE(), "0x7b112292a64a36850acca5f8e80aaf21782aa30b")
+    // await alluoVoteExecutor.grantRole(await alluoVoteExecutor.DEFAULT_ADMIN_ROLE(), "0x16A50D9Eb03DFeD8de4fCa6aA69f42dd42e4d7A0")
+    // await alluoVoteExecutor.setTimelock(60 * 60 * 24)
+
+    // // // // Upgrade the handler
+    let handlerFactory = await ethers.getContractFactory("AlluoStrategyHandler");
+    let stauts1 = await alluoStrategyHandler.changeUpgradeStatus(true)
+    await stauts1.wait()
+    let handler = await upgrades.upgradeProxy(alluoStrategyHandler.address, handlerFactory);
+    console.log("Handler upgraded")
+    await alluoStrategyHandler.clearDepositQueue(0);
+
+    // // // // Upgrade the utils
     // let utilsFactory = await ethers.getContractFactory("AlluoVoteExecutorUtils");
     // let stauts3 = await alluoVoteExecutorUtils.changeUpgradeStatus(true)
     // await stauts3.wait()
     // let utils = await upgrades.upgradeProxy(alluoVoteExecutorUtils.address, utilsFactory);
-    // console.log("All complete")
+    // await alluoVoteExecutorUtils.setAssetIdToIbAlluoAddresses("0x6b55495947F3793597C0777562C37C14cb958097", 0)
+    // await alluoVoteExecutorUtils.setAssetIdToIbAlluoAddresses("0x6b55495947F3793597C0777562C37C14cb958097", 1)
+    // await alluoVoteExecutorUtils.setAssetIdToIbAlluoAddresses("0x8BF24fea0Cae18DAB02A5b23c409E8E1f04Ff0ba", 2)
+    // await alluoVoteExecutorUtils.setAssetIdToIbAlluoAddresses("0x253eB6077db17a43Fd7b4f4E6e5a2D8b2F9A244d", 3)
+
+    console.log("All complete")
 
     // // Now verify all the implementations
     console.log("verifying now")
-    await verify(newImplementation.address)
-    console.log("verified executor")
-    // await verify(alluoStrategyHandler.address)
-    // console.log("verified handler")
+    // await verify(alluoVoteExecutor.address)
+    // console.log("verified executor")
+    await verify(alluoStrategyHandler.address)
+    console.log("verified handler")
     // await verify(alluoVoteExecutorUtils.address)
     // console.log("verified utils")
 
