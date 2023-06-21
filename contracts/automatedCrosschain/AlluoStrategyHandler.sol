@@ -335,6 +335,7 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
 
         // Then remove all deposits from the queue as they are executed
         delete _depositQueue.deposits;
+        _depositQueue.totalDepositAmount = 0;
     }
 
     function _scaleDepositQueue(
@@ -402,6 +403,13 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         primaryToken = assetIdToAssetInfo[assetId].chainIdToPrimaryToken[
             block.chainid
         ];
+    }
+
+    function getAssetIdToDepositQueue(
+        uint256 assetId
+    ) public view returns (Deposit[] memory) {
+        DepositQueue memory depositQueue = assetIdToDepositQueue[assetId];
+        return depositQueue.deposits;
     }
 
     // Admin functions
