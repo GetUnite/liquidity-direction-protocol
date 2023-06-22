@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {IAlluoStrategyV2} from "./interfaces/IAlluoStrategyV2.sol";
+import {IAlluoStrategyV3} from "./interfaces/IAlluoStrategyV3.sol";
 import {IExchange} from "./interfaces/IExchange.sol";
 import {IPriceFeedRouterV2} from "./interfaces/IPriceFeedRouterV2.sol";
 import {IWrappedEther} from "./interfaces/IWrappedEther.sol";
 import {IBeefyVaultV6} from "./interfaces/IBeefyVaultV6.sol";
 import {IBeefyBoost} from "./interfaces/IBeefyBoost.sol";
 
-import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20Upgradeable.sol";
+import {IERC20MetadataUpgradeable, IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -16,6 +16,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {AddressUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 import {SafeERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import {ExchangePriceOracle} from "./../../automatedCrosschain/priceOracle/ExchangePriceOracle.sol";
 
 import "hardhat/console.sol";
 
@@ -23,7 +24,7 @@ contract BeefyStrategyUniversal is
     Initializable,
     AccessControlUpgradeable,
     UUPSUpgradeable,
-    IAlluoStrategyV2
+    IAlluoStrategyV3
 {
     using AddressUpgradeable for address;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -37,6 +38,16 @@ contract BeefyStrategyUniversal is
     IPriceFeedRouterV2 public priceFeed;
     IExchange public exchange;
     IWrappedEther public weth;
+    ExchangePriceOracle public oracle;
+    uint32 public priceDeadline;
+
+    // 10000 max - 10%
+    // 1000 - 1%
+    // 100 - 0.1%
+    // 10 - 0.01%
+    // 1 - 0.001%
+    // minOut = (out * (100000 - acceptableSlippage)) / 100000
+    uint16 public acceptableSlippage;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
@@ -65,6 +76,66 @@ contract BeefyStrategyUniversal is
 
     function getExpectedRewards() external view returns (address[] memory) {
         return expectedRewards.values();
+    }
+
+    function getExpectedEntryExchangeRequests(
+        bytes calldata data
+    ) external pure returns (ExchangeRequest[] memory) {
+        (address beefyVaultAddress, , , address entryToken) = decodeData(data);
+
+        ExchangeRequest[] memory request = new ExchangeRequest[](1);
+        request[0] = ExchangeRequest(entryToken, beefyVaultAddress);
+
+        return request;
+    }
+
+    function getExpectedExitExchangeRequests(
+        bytes calldata data,
+        address outputCoin,
+        bool swapRewards
+    ) external view returns (ExchangeRequest[] memory) {
+        (address beefyVaultAddress, , , ) = decodeData(data);
+
+        if (!swapRewards) {
+            ExchangeRequest[] memory requestSingle = new ExchangeRequest[](1);
+            requestSingle[0] = ExchangeRequest(beefyVaultAddress, outputCoin);
+
+            return requestSingle;
+        }
+
+        uint256 len = expectedRewards.length();
+        ExchangeRequest[] memory request = new ExchangeRequest[](len + 1);
+        request[0] = ExchangeRequest(beefyVaultAddress, outputCoin);
+
+        for (uint256 i = 1; i <= len; i++) {
+            address reward = expectedRewards.at(i);
+            request[i] = ExchangeRequest(reward, outputCoin);
+        }
+
+        return request;
+    }
+
+    function getExpectedRewardsExchangeRequests(
+        bytes calldata data,
+        address outputCoin,
+        bool swapRewards
+    ) external view returns (ExchangeRequest[] memory) {
+        (, address beefyBoostAddress, , ) = decodeData(data);
+
+        if (beefyBoostAddress == address(0) && !swapRewards) {
+            ExchangeRequest[] memory requestEmpty = new ExchangeRequest[](0);
+            return requestEmpty;
+        }
+
+        uint256 len = expectedRewards.length();
+        ExchangeRequest[] memory request = new ExchangeRequest[](len);
+
+        for (uint256 i = 0; i < len; i++) {
+            address reward = expectedRewards.at(i);
+            request[i] = ExchangeRequest(reward, outputCoin);
+        }
+
+        return request;
     }
 
     function changeExpectedRewardStatus(
@@ -106,7 +177,7 @@ contract BeefyStrategyUniversal is
             entryToken,
             beefyVaultAddress,
             amount,
-            0
+            getExchangeMinOutputAmount(entryToken, beefyVaultAddress, amount)
         );
         console.log(mooTokensAmount);
 
@@ -157,7 +228,11 @@ contract BeefyStrategyUniversal is
             address(vaultToken),
             address(outputCoin),
             lpAmountToSwap,
-            0
+            getExchangeMinOutputAmount(
+                address(vaultToken),
+                address(outputCoin),
+                lpAmountToSwap
+            )
         );
         if (_withdrawRewards) {
             _manageRewardsAndWithdraw(
@@ -228,13 +303,13 @@ contract BeefyStrategyUniversal is
 
         if (beefyBoostAddress != address(0)) {
             IBeefyBoost(beefyBoostAddress).getReward();
-        }
 
-        _manageRewardsAndWithdraw(
-            swapRewards,
-            IERC20Upgradeable(outputCoin),
-            receiver
-        );
+            _manageRewardsAndWithdraw(
+                swapRewards,
+                IERC20Upgradeable(outputCoin),
+                receiver
+            );
+        }
     }
 
     function withdrawRewards(
@@ -350,6 +425,16 @@ contract BeefyStrategyUniversal is
         exchange = IExchange(_exchange);
     }
 
+    function setOracle(address _oracle) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        oracle = ExchangePriceOracle(_oracle);
+    }
+
+    function setPriceDeadline(
+        uint32 _deadline
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        priceDeadline = _deadline;
+    }
+
     /// @notice Execute any action on behalf of strategy.
     /// @dev Regular call is executed. If any of extcall fails, transaction should revert.
     /// @param destinations addresses to call
@@ -422,6 +507,50 @@ contract BeefyStrategyUniversal is
         console.log("ToCoin address", address(toCoin));
         console.log("Amount", amount);
         fromCoin.safeApprove(address(exchange), amount);
-        exchange.exchange(address(fromCoin), address(toCoin), amount, 0);
+        exchange.exchange(
+            address(fromCoin),
+            address(toCoin),
+            amount,
+            getExchangeMinOutputAmount(
+                address(fromCoin),
+                address(toCoin),
+                amount
+            )
+        );
+    }
+
+    function getExchangeMinOutputAmount(
+        address fromToken,
+        address toToken,
+        uint256 amount
+    ) internal view returns (uint256) {
+        if (address(oracle) == address(0)) {
+            console.log("WARN: Exchange price oracle is not set!");
+            return 0;
+        }
+        uint256 fromTokenOne = 10 **
+            IERC20MetadataUpgradeable(fromToken).decimals();
+
+        console.log("Looking for exchange price on exchange oracle");
+        console.log("from", fromToken);
+        console.log("to", toToken);
+        console.log("amount", fromTokenOne);
+
+        (uint224 result, uint32 timestamp) = oracle.priceRequests(
+            fromToken,
+            toToken
+        );
+
+        console.log("result", result);
+        console.log("timestamp", timestamp);
+
+        require(
+            timestamp + priceDeadline <= block.timestamp,
+            "Oracle: Price too old"
+        );
+
+        uint256 minOutPricePerToken = (result * (100000 - acceptableSlippage)) /
+            100000;
+        return (amount * minOutPricePerToken) / fromTokenOne;
     }
 }

@@ -14,7 +14,7 @@ import {ILiquidityHandler} from "../interfaces/ILiquidityHandler.sol";
 import {IAlluoToken} from "../interfaces/IAlluoToken.sol";
 import {ILocker} from "../interfaces/ILocker.sol";
 import {IGnosis} from "../interfaces/IGnosis.sol";
-import {IAlluoStrategyV2} from "../interfaces/IAlluoStrategyV2.sol";
+import {IAlluoStrategyV3} from "../interfaces/IAlluoStrategyV3.sol";
 import {IExchange} from "../interfaces/IExchange.sol";
 import {IWrappedEther} from "../interfaces/IWrappedEther.sol";
 import {IIbAlluo} from "../interfaces/IIbAlluo.sol";
@@ -22,6 +22,7 @@ import {IPriceFeedRouterV2} from "../interfaces/IPriceFeedRouterV2.sol";
 import {IAlluoStrategyHandler} from "../interfaces/IAlluoStrategyHandler.sol";
 import {ICvxDistributor} from "../interfaces/ICvxDistributor.sol";
 import {IAlluoVoteExecutorUtils} from "../interfaces/IAlluoVoteExecutorUtils.sol";
+import {ExchangePriceOracle} from "./priceOracle/ExchangePriceOracle.sol";
 
 // solhint-disable-next-line
 import "hardhat/console.sol";
@@ -64,6 +65,8 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
     bytes[] public storedCrosschainData;
 
     EnumerableSetUpgradeable.UintSet private queuedCrosschainMessageIndexes;
+
+    ExchangePriceOracle public oracle;
 
     struct Deposit {
         uint256 directionId;
@@ -387,6 +390,92 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         _executeTVLCommand(voteExecutorBalances);
     }
 
+    function requestExchangePrices() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _requestExchangePrices();
+    }
+
+    function _requestExchangePrices() internal {
+        if (address(oracle) == address(0)) {
+            console.log(
+                "WARN: Exchange price oracle is not set! Skipping oracle requests"
+            );
+            return;
+        }
+
+        // if directionId 1 is set, there are 2 registered direstions [1, 2], need to increment lastDirectionId
+        // no zeroes!
+        uint256 directionsAmount = IAlluoStrategyHandler(strategyHandler)
+            .lastDirectionId() + 1;
+
+        console.log(directionsAmount);
+
+        for (uint256 i = 1; i <= directionsAmount; i++) {
+            (
+                address strategyAddress,
+                address entryToken,
+                uint256 assetId,
+                ,
+                bytes memory entryData,
+                bytes memory exitData,
+                bytes memory rewardsData,
+
+            ) = IAlluoStrategyHandler(strategyHandler).liquidityDirection(i);
+            address primaryToken = IAlluoStrategyHandler(strategyHandler)
+                .getPrimaryTokenForAsset(assetId);
+
+            // step 1 - query prices to enter strategy (exchange call in AlluoStrategyHandler._depositToDirection)
+            console.log("primaryToken", primaryToken);
+            console.log("entryToken", entryToken);
+            oracle.requestPrice(primaryToken, entryToken);
+
+            console.log(strategyAddress);
+
+            // step 2 - query prices to enter strategy (potential exchange call in IAlluoStrategyV3.invest)
+            IAlluoStrategyV3.ExchangeRequest[]
+                memory entryExchanges = IAlluoStrategyV3(strategyAddress)
+                    .getExpectedEntryExchangeRequests(entryData);
+
+            for (uint256 j = 0; j < entryExchanges.length; j++) {
+                oracle.requestPrice(
+                    entryExchanges[j].fromToken,
+                    entryExchanges[j].toToken
+                );
+            }
+
+            // step 3 - query prices to exit strategy (potential exchange call in IAlluoStrategyV3.exitAll)
+            IAlluoStrategyV3.ExchangeRequest[]
+                memory exitExchanges = IAlluoStrategyV3(strategyAddress)
+                    .getExpectedExitExchangeRequests(
+                        exitData,
+                        primaryToken,
+                        true
+                    );
+
+            for (uint256 j = 0; j < exitExchanges.length; j++) {
+                oracle.requestPrice(
+                    exitExchanges[j].fromToken,
+                    exitExchanges[j].toToken
+                );
+            }
+
+            // step 4 - query prices to exit rewards (potential exchange call in IAlluoStrategyV3.withdrawRewards)
+            IAlluoStrategyV3.ExchangeRequest[]
+                memory rewardsExchanges = IAlluoStrategyV3(strategyAddress)
+                    .getExpectedRewardsExchangeRequests(
+                        rewardsData,
+                        primaryToken,
+                        true
+                    );
+
+            for (uint256 j = 0; j < rewardsExchanges.length; j++) {
+                oracle.requestPrice(
+                    rewardsExchanges[j].fromToken,
+                    rewardsExchanges[j].toToken
+                );
+            }
+        }
+    }
+
     function _executeTVLCommand(uint256[][] memory executorBalances) internal {
         IAlluoVoteExecutorUtils utils = IAlluoVoteExecutorUtils(
             voteExecutorUtils
@@ -406,6 +495,8 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
                 finalData
             );
         }
+
+        _requestExchangePrices();
     }
 
     function setAcrossInformation(
@@ -525,6 +616,10 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         uint256 _newTimeLock
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         timeLock = _newTimeLock;
+    }
+
+    function setOracle(address _oracle) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        oracle = ExchangePriceOracle(_oracle);
     }
 
     function multicall(
