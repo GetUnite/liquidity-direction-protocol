@@ -12,7 +12,8 @@ contract ExchangePriceOracle is AccessControl {
     bytes32 public constant ORACLE_ROLE = keccak256("ORACLE_ROLE");
 
     struct PriceRequest {
-        uint224 result;
+        uint216 result;
+        uint8 decimals;
         uint32 timestamp;
     }
     mapping(address => mapping(address => PriceRequest)) public priceRequests;
@@ -36,10 +37,12 @@ contract ExchangePriceOracle is AccessControl {
     function submitPrice(
         address fromToken,
         address toToken,
-        uint224 result
+        uint216 result,
+        uint8 decimals
     ) external onlyRole(ORACLE_ROLE) {
         priceRequests[fromToken][toToken] = PriceRequest(
             result,
+            decimals,
             uint32(block.timestamp)
         );
     }

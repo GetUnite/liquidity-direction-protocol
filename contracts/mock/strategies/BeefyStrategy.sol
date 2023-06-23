@@ -546,17 +546,18 @@ contract BeefyStrategy is
             console.log("WARN: Exchange price oracle is not set!");
             return 0;
         }
-        uint256 fromTokenOne = 10 **
-            IERC20MetadataUpgradeable(fromToken).decimals();
 
         console.log("Looking for exchange price on exchange oracle");
         console.log("from", fromToken);
         console.log("to", toToken);
+        console.log("amount", amount);
 
-        (uint224 result, uint32 timestamp) = oracle.priceRequests(
+        (uint216 result, uint8 decimals, uint32 timestamp) = oracle.priceRequests(
             fromToken,
             toToken
         );
+
+        uint256 fromTokenOne = 10 ** decimals;
 
         console.log("result", result);
         console.log("timestamp", timestamp);
@@ -568,11 +569,6 @@ contract BeefyStrategy is
 
         uint256 minOutPricePerToken = (result * (100000 - acceptableSlippage)) /
             100000;
-        uint256 minOutTotal = (amount * minOutPricePerToken) / fromTokenOne;
-
-        console.log("Exchange request:", amount);
-        console.log("Min out:", minOutTotal);
-
-        return minOutTotal;
+        return (amount * minOutPricePerToken) / fromTokenOne;
     }
 }

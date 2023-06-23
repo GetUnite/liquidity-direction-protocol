@@ -414,12 +414,17 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
                 address strategyAddress,
                 address entryToken,
                 uint256 assetId,
-                ,
+                uint256 chainId,
                 bytes memory entryData,
                 bytes memory exitData,
                 bytes memory rewardsData,
 
             ) = IAlluoStrategyHandler(strategyHandler).liquidityDirection(i);
+
+            if (chainId != block.chainid) {
+                continue;
+            }
+
             address primaryToken = IAlluoStrategyHandler(strategyHandler)
                 .getPrimaryTokenForAsset(assetId);
 
