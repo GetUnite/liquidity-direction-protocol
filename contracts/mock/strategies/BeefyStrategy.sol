@@ -552,10 +552,8 @@ contract BeefyStrategy is
         console.log("to", toToken);
         console.log("amount", amount);
 
-        (uint216 result, uint8 decimals, uint32 timestamp) = oracle.priceRequests(
-            fromToken,
-            toToken
-        );
+        (uint216 result, uint8 decimals, uint32 timestamp) = oracle
+            .priceRequests(fromToken, toToken);
 
         uint256 fromTokenOne = 10 ** decimals;
 
