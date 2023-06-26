@@ -363,7 +363,6 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         bytes memory data = storedCrosschainData[index];
         // Remove executed data from the queue
         queuedCrosschainMessageIndexes.remove(index);
-        console.log("Removed queuedMessage");
 
         (bytes memory message, bytes[] memory signs) = abi.decode(
             data,
@@ -396,9 +395,6 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
 
     function _requestExchangePrices() internal {
         if (address(oracle) == address(0)) {
-            console.log(
-                "WARN: Exchange price oracle is not set! Skipping oracle requests"
-            );
             return;
         }
 
@@ -406,8 +402,6 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         // no zeroes!
         uint256 directionsAmount = IAlluoStrategyHandler(strategyHandler)
             .lastDirectionId() + 1;
-
-        console.log(directionsAmount);
 
         for (uint256 i = 1; i <= directionsAmount; i++) {
             (
@@ -429,11 +423,8 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
                 .getPrimaryTokenForAsset(assetId);
 
             // step 1 - query prices to enter strategy (exchange call in AlluoStrategyHandler._depositToDirection)
-            console.log("primaryToken", primaryToken);
-            console.log("entryToken", entryToken);
-            oracle.requestPrice(primaryToken, entryToken);
 
-            console.log(strategyAddress);
+            oracle.requestPrice(primaryToken, entryToken);
 
             // step 2 - query prices to enter strategy (potential exchange call in IAlluoStrategyV3.invest)
             IAlluoStrategyV3.ExchangeRequest[]
