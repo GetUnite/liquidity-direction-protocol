@@ -435,6 +435,12 @@ contract BeefyStrategyUniversal is
         priceDeadline = _deadline;
     }
 
+    function setAcceptableSlippage(
+        uint16 _acceptableSlippage
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        acceptableSlippage = _acceptableSlippage;
+    }
+
     /// @notice Execute any action on behalf of strategy.
     /// @dev Regular call is executed. If any of extcall fails, transaction should revert.
     /// @param destinations addresses to call
@@ -534,10 +540,8 @@ contract BeefyStrategyUniversal is
         console.log("to", toToken);
         console.log("amount", amount);
 
-        (uint216 result, uint8 decimals, uint32 timestamp) = oracle.priceRequests(
-            fromToken,
-            toToken
-        );
+        (uint216 result, uint8 decimals, uint32 timestamp) = oracle
+            .priceRequests(fromToken, toToken);
 
         uint256 fromTokenOne = 10 ** decimals;
 

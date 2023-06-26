@@ -12,6 +12,7 @@ import {IAlluoStrategyV2} from "../interfaces/IAlluoStrategyV2.sol";
 import {IExchange} from "../interfaces/IExchange.sol";
 import {IAlluoVoteExecutorUtils} from "../interfaces/IAlluoVoteExecutorUtils.sol";
 import {ISpokePoolNew} from "../interfaces/ISpokePoolNew.sol";
+import {ExchangePriceOracle} from "./priceOracle/ExchangePriceOracle.sol";
 
 // solhint-disable-next-line
 import "hardhat/console.sol";
@@ -34,6 +35,18 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
     address public exchange;
     address public voteExecutorUtils;
     address public gnosis;
+
+    ExchangePriceOracle public oracle;
+    uint32 public priceDeadline;
+
+    // 10000 max - 10%
+    // 1000 - 1%
+    // 100 - 0.1%
+    // 10 - 0.01%
+    // 1 - 0.001%
+    // minOut = (out * (100000 - acceptableSlippage)) / 100000
+    uint16 public acceptableSlippage;
+
     struct LiquidityDirection {
         address strategyAddress;
         address entryToken;
@@ -370,7 +383,11 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
                 _inputToken,
                 _direction.entryToken,
                 _amount,
-                0
+                getExchangeMinOutputAmount(
+                    _inputToken,
+                    _direction.entryToken,
+                    _amount
+                )
             );
             _inputToken = _direction.entryToken;
         }
@@ -395,6 +412,39 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
                 _directionId
             );
         }
+    }
+
+    function getExchangeMinOutputAmount(
+        address fromToken,
+        address toToken,
+        uint256 amount
+    ) internal view returns (uint256) {
+        if (address(oracle) == address(0)) {
+            console.log("WARN: Exchange price oracle is not set!");
+            return 0;
+        }
+
+        console.log("Looking for exchange price on exchange oracle");
+        console.log("from", fromToken);
+        console.log("to", toToken);
+        console.log("amount", amount);
+
+        (uint216 result, uint8 decimals, uint32 timestamp) = oracle
+            .priceRequests(fromToken, toToken);
+
+        uint256 fromTokenOne = 10 ** decimals;
+
+        console.log("result", result);
+        console.log("timestamp", timestamp);
+
+        require(
+            timestamp + priceDeadline <= block.timestamp,
+            "Oracle: Price too old"
+        );
+
+        uint256 minOutPricePerToken = (result * (100000 - acceptableSlippage)) /
+            100000;
+        return (amount * minOutPricePerToken) / fromTokenOne;
     }
 
     function getPrimaryTokenForAsset(
@@ -500,6 +550,22 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         uint256 _assetId
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         delete assetIdToDepositQueue[_assetId];
+    }
+
+    function setOracle(address _oracle) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        oracle = ExchangePriceOracle(_oracle);
+    }
+
+    function setPriceDeadline(
+        uint32 _deadline
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        priceDeadline = _deadline;
+    }
+
+    function setAcceptableSlippage(
+        uint16 _acceptableSlippage
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        acceptableSlippage = _acceptableSlippage;
     }
 
     function changeAssetInfo(
