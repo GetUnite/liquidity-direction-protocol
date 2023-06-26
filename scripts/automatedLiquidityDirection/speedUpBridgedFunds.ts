@@ -59,11 +59,11 @@ async function main() {
 
 
     let spokePoolContract = await ethers.getContractAt("ISpokePoolNew", spokePool) as ISpokePoolNew
-    let depositId = 1011969
-    let modifiedRelayerFeePct = ethers.utils.parseUnits("0.05", "18");
+    let depositId = 1007844
+    let modifiedRelayerFeePct = ethers.utils.parseUnits("0.2", "18");
     let updatedRecipient = alluoVoteExecutor.address
     let updatedMessage = "0x"
-    let originChainId = 137
+    let originChainId = 10
 
     const typedData = {
         types: {

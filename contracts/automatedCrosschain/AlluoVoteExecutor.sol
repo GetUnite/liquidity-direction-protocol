@@ -249,7 +249,7 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         require(
             utils.timestampLastUpdatedWithinPeriod(
                 universalTVLUpdated,
-                60 minutes
+                3 hours
             ),
             "Universal TVL has not been updated"
         );

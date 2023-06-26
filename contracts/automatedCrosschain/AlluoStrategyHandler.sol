@@ -34,6 +34,9 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
     address public exchange;
     address public voteExecutorUtils;
     address public gnosis;
+
+    mapping(uint256 => string) public directionIdToName;
+
     struct LiquidityDirection {
         address strategyAddress;
         address entryToken;
@@ -445,6 +448,8 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         bytes memory _rewardsData
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         directionNameToId[_codeName] = _directionId;
+        directionIdToName[_directionId] = _codeName;
+
         liquidityDirection[_directionId] = LiquidityDirection(
             _strategyAddress,
             _entryToken,
@@ -455,6 +460,13 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
             _rewardsData,
             0
         );
+    }
+
+    function setDirectionIdToName(
+        uint256 _directionId,
+        string memory _codeName
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        directionIdToName[_directionId] = _codeName;
     }
 
     function setTokenToAssetId(
@@ -512,8 +524,8 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         assetIdToAssetInfo[_assetId].ibAlluo = _ibAlluo;
         for (uint256 i; i < _chainIds.length; i++) {
             assetIdToAssetInfo[_assetId].chainIdToPrimaryToken[
-                _chainIds[i]
-            ] = _chainIdToPrimaryToken[i];
+                    _chainIds[i]
+                ] = _chainIdToPrimaryToken[i];
         }
     }
 

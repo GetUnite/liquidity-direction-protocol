@@ -63,8 +63,8 @@ async function main() {
 
     let encodedMessage1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMooStargateUsdcPolygon", 1000, 1);
     let encodedMessage2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMooStargateUsdtPolygon", 1000, 1);
-    let encodedMessage3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMaiUsdcOptimism", 0, 0);
-    let encodedMessage4 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyDolaMaiOptimism", 8000, 0);
+    let encodedMessage3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMaiUsdcOptimism", 3000, 0);
+    let encodedMessage4 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyDolaMaiOptimism", 5000, 0);
     let encodeAllMessages = await alluoVoteExecutorUtils.encodeAllMessages([encodedMessage1[0], encodedMessage2[0], encodedMessage3[0], encodedMessage4[0]], [encodedMessage1[1], encodedMessage2[1], encodedMessage3[1], encodedMessage4[1]]);
     await alluoVoteExecutor.submitData(encodeAllMessages.inputData);
 
@@ -73,8 +73,9 @@ async function main() {
     // Increment this number
     //
     //
-    await alluoVoteExecutor.approveSubmittedData(7, [signature])
-    // await alluoVoteExecutor.connect(admin).executeSpecificData(6)
+    let tx = await alluoVoteExecutor.approveSubmittedData(10, [signature])
+    await tx.wait()
+    await alluoVoteExecutor.executeSpecificData(10)
 }
 
 main()
