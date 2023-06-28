@@ -61,11 +61,13 @@ async function main() {
     pseudoMultiSig = await ethers.getContractAt("PseudoMultisigWallet", "0xb26D2B27f75844E5ca8Bf605190a1D8796B38a25", signers[6]) as PseudoMultisigWallet
 
 
-    let encodedMessage1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMooStargateUsdcPolygon", 1000, 1);
-    let encodedMessage2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMooStargateUsdtPolygon", 1000, 1);
-    let encodedMessage3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMaiUsdcOptimism", 3000, 0);
-    let encodedMessage4 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyDolaMaiOptimism", 5000, 0);
-    let encodeAllMessages = await alluoVoteExecutorUtils.encodeAllMessages([encodedMessage1[0], encodedMessage2[0], encodedMessage3[0], encodedMessage4[0]], [encodedMessage1[1], encodedMessage2[1], encodedMessage3[1], encodedMessage4[1]]);
+    let encodedMessage1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMooStargateUsdcPolygon", 5000, 1);
+    let encodedMessage2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMooStargateUsdtPolygon", 5000, 1);
+    let encodedMessage3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyMaiUsdcOptimism", 0, 0);
+    let encodedMessage4 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyDolaMaiOptimism", 0, 0);
+    let encodedMessage5 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyStETHOptimism", 7000, 0);
+    let encodedMessage6 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyFrxETHOptimism", 3000, 0);
+    let encodeAllMessages = await alluoVoteExecutorUtils.encodeAllMessages([encodedMessage1[0], encodedMessage2[0], encodedMessage3[0], encodedMessage4[0], encodedMessage5[0], encodedMessage6[0]], [encodedMessage1[1], encodedMessage2[1], encodedMessage3[1], encodedMessage4[1], encodedMessage5[1], encodedMessage6[1]]);
     await alluoVoteExecutor.submitData(encodeAllMessages.inputData);
 
     let signature = await admin.signMessage(ethers.utils.arrayify(encodeAllMessages[0]));
@@ -73,9 +75,9 @@ async function main() {
     // Increment this number
     //
     //
-    let tx = await alluoVoteExecutor.approveSubmittedData(10, [signature])
+    let tx = await alluoVoteExecutor.approveSubmittedData(12, [signature])
     await tx.wait()
-    await alluoVoteExecutor.executeSpecificData(10)
+    await alluoVoteExecutor.executeSpecificData(12)
 }
 
 main()
@@ -84,3 +86,5 @@ main()
         console.error(error);
         process.exit(1);
     });
+
+    // npx hardhat run scripts/automatedLiquidityDirection/tvlIntegrationtest.ts --network optimisticEthereum

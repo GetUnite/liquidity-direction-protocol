@@ -63,7 +63,7 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
         uint256 commandIndex;
         bytes commandData;
     }
-    // Assuming there are existing event definitions for Profit and Loss
+
     event Profit(uint8 assetId, uint256 amount);
     event Loss(uint8 assetId, uint256 amount);
 

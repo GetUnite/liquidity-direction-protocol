@@ -57,38 +57,49 @@ async function main() {
     beefyStrategy = await ethers.getContractAt("BeefyStrategyUniversal", "0x62cB09739920d071809dFD9B66D2b2cB27141410") as BeefyStrategyUniversal
     pseudoMultiSig = await ethers.getContractAt("PseudoMultisigWallet", "0xb26D2B27f75844E5ca8Bf605190a1D8796B38a25", signers[6]) as PseudoMultisigWallet
 
-    //  OK lets upgrade the executor on polygon first
-    let executorFactory = await ethers.getContractFactory("AlluoVoteExecutor");
-    let stauts = await alluoVoteExecutor.changeUpgradeStatus(true)
-    await stauts.wait()
-    let exec = await upgrades.upgradeProxy(alluoVoteExecutor.address, executorFactory);
-    // console.log("Executor upgraded")
+    // //  OK lets upgrade the executor on polygon first
+    // let executorFactory = await ethers.getContractFactory("AlluoVoteExecutor");
+    // let stauts = await alluoVoteExecutor.changeUpgradeStatus(true)
+    // await stauts.wait()
+    // let exec = await upgrades.upgradeProxy(alluoVoteExecutor.address, executorFactory);
+    // // console.log("Executor upgraded")
 
 
-    // // // Upgrade the handler
-    let handlerFactory = await ethers.getContractFactory("AlluoStrategyHandler");
-    let stauts1 = await alluoStrategyHandler.changeUpgradeStatus(true)
-    await stauts1.wait()
-    let handler = await upgrades.upgradeProxy(alluoStrategyHandler.address, handlerFactory);
-    console.log("Handler upgraded")
+    // // // // Upgrade the handler
+    // let handlerFactory = await ethers.getContractFactory("AlluoStrategyHandler");
+    // let stauts1 = await alluoStrategyHandler.changeUpgradeStatus(true)
+    // await stauts1.wait()
+    // let handler = await upgrades.upgradeProxy(alluoStrategyHandler.address, handlerFactory);
+    // console.log("Handler upgraded")
 
-    // // Upgrade the utils
-    let utilsFactory = await ethers.getContractFactory("AlluoVoteExecutorUtils");
-    let stauts3 = await alluoVoteExecutorUtils.changeUpgradeStatus(true)
-    await stauts3.wait()
-    let utils = await upgrades.upgradeProxy(alluoVoteExecutorUtils.address, utilsFactory);
-    console.log("All complete")
+    // // // Upgrade the utils
+    // let utilsFactory = await ethers.getContractFactory("AlluoVoteExecutorUtils");
+    // let stauts3 = await alluoVoteExecutorUtils.changeUpgradeStatus(true)
+    // await stauts3.wait()
+    // let utils = await upgrades.upgradeProxy(alluoVoteExecutorUtils.address, utilsFactory);
+    // console.log("All complete")
+
+
+    // let beefyStrategyFactory = await ethers.getContractFactory("BeefyStrategyUniversal");
+    // let stauts4 = await beefyStrategy.changeUpgradeStatus(true)
+    // await stauts4.wait()
+    // let beefyStrategyUpgraded = await upgrades.upgradeProxy(beefyStrategy.address, beefyStrategyFactory);
+    // console.log("Beefy upgraded")
 
 
     // Now verify all the implementations
-    console.log("verifying now")
-    await verify(alluoVoteExecutor.address)
-    console.log("verified executor")
-    await verify(alluoStrategyHandler.address)
-    console.log("verified handler")
-    await verify(alluoVoteExecutorUtils.address)
-    console.log("verified utils")
+    // console.log("verifying now")
+    // await verify(alluoVoteExecutor.address)
+    // console.log("verified executor")
+    // await verify(alluoStrategyHandler.address)
+    // console.log("verified handler")
+    // await verify(alluoVoteExecutorUtils.address)
+    // console.log("verified utils")
 
+
+    await verify("0x88c4e93c6b18908d6d45d3e14f3ceea72cbe3e7d")
+    await verify("0x513b4bd49b79e88cf7ecd475dd764abf77f72cd9")
+    await verify("0x45f99300b5539c490482420c26ccf85647ac7936")
 }
 main()
     .then(() => process.exit(0))

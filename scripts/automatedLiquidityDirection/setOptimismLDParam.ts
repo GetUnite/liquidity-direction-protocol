@@ -54,47 +54,24 @@ async function main() {
     beefyStrategy = await ethers.getContractAt("BeefyStrategyUniversal", "0x62cB09739920d071809dFD9B66D2b2cB27141410") as BeefyStrategyUniversal
     pseudoMultiSig = await ethers.getContractAt("PseudoMultisigWallet", "0xb26D2B27f75844E5ca8Bf605190a1D8796B38a25", signers[6]) as PseudoMultisigWallet
 
-    //  OK lets upgrade the executor on polygon first
-    // let executorFactory = await ethers.getContractFactory("AlluoVoteExecutor");
+    let optimismWETHAddress = "0x4200000000000000000000000000000000000006"
 
-    // let stauts = await alluoVoteExecutor.changeUpgradeStatus(true)
-    // await stauts.wait()
-    // let exec = await upgrades.upgradeProxy(alluoVoteExecutor.address, executorFactory);
-    // console.log("Executor upgraded")
-
-    // // Upgrade the handler
-    // let handlerFactory = await ethers.getContractFactory("AlluoStrategyHandler");
-    // let stauts1 = await alluoStrategyHandler.changeUpgradeStatus(true)
-    // await stauts1.wait()
-    // let handler = await upgrades.upgradeProxy(alluoStrategyHandler.address, handlerFactory);
-    // console.log("Handler upgraded")
-
-    // Upgrade the utils
-    // let utilsFactory = await ethers.getContractFactory("AlluoVoteExecutorUtils");
-    // let stauts3 = await alluoVoteExecutorUtils.changeUpgradeStatus(true)
-    // await stauts3.wait()
-    // let utils = await upgrades.upgradeProxy(alluoVoteExecutorUtils.address, utilsFactory);
+    let wethBalance = await weth.balanceOf(beefyStrategy.address)
 
 
-    // let beefyStrategyFactory = await ethers.getContractFactory("BeefyStrategyUniversal");
-    // let stauts4 = await beefyStrategy.changeUpgradeStatus(true)
-    // await stauts4.wait()
-    // let beefyStrategyUpgraded = await upgrades.upgradeProxy(beefyStrategy.address, beefyStrategyFactory);
-    // console.log("Beefy upgraded")
+    let entryData3 = await beefyStrategy.encodeData("0xcAdC68d5834898D54929E694eD19e833e0117694", ethers.constants.AddressZero, 2, optimismWETHAddress)
+    let exitData3 = entryData3
+    let rewardsData3 = entryData3
+    await alluoStrategyHandler.setLiquidityDirection("BeefyStETHOptimism", 5, beefyStrategy.address, optimismWETHAddress, 2, 10, entryData3, exitData3, rewardsData3);
+    await beefyStrategy.invest(entryData3, wethBalance.div(2))
 
+    // // mooStargateUSDC Polygon
+    let entryData4 = await beefyStrategy.encodeData("0x1b620BE62788e940b4c4ae6Df933c50981AcAB80", ethers.constants.AddressZero, 2, optimismWETHAddress)
+    let exitData4 = entryData4
+    let rewardsData4 = entryData4
+    await alluoStrategyHandler.setLiquidityDirection("BeefyFrxETHOptimism", 6, beefyStrategy.address, optimismWETHAddress, 2, 10, entryData4, exitData4, rewardsData4);
+    await beefyStrategy.invest(entryData4, wethBalance.div(2))
 
-    console.log("All complete")
-
-    // // Now verify all the implementations
-    console.log("verifying now")
-    await verify(alluoVoteExecutor.address)
-    console.log("verified executor")
-    await verify(alluoStrategyHandler.address)
-    console.log("verified handler")
-    // await verify(alluoVoteExecutorUtils.address)
-    // console.log("verified utils")
-    await verify(beefyStrategy.address)
-    console.log("verified beefy")
 
 }
 main()

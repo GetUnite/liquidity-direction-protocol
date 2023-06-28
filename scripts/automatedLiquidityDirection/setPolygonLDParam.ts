@@ -75,9 +75,26 @@ async function main() {
     // await alluoStrategyHandler.setLiquidityDirection("BeefyMooStargateUsdcPolygon", 4, beefyStrategy.address, polygonUSDCAddress, 0, 137, entryData4, exitData4, rewardsData4);
 
 
+    // mooStargateUSDT Polygon
+    let polygonUSDCAddress = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+    let optimismWETHAddress = "0x4200000000000000000000000000000000000006"
+
+
+    let entryData3 = await beefyStrategy.encodeData("0xcAdC68d5834898D54929E694eD19e833e0117694", ethers.constants.AddressZero, 2, optimismWETHAddress)
+    let exitData3 = entryData3
+    let rewardsData3 = entryData3
+    await alluoStrategyHandler.setLiquidityDirection("BeefyStETHOptimism", 5, beefyStrategy.address, optimismWETHAddress, 2, 10, entryData3, exitData3, rewardsData3);
+
+    // // mooStargateUSDC Polygon
+    let entryData4 = await beefyStrategy.encodeData("0x1b620BE62788e940b4c4ae6Df933c50981AcAB80", ethers.constants.AddressZero, 2, optimismWETHAddress)
+    let exitData4 = entryData4
+    let rewardsData4 = entryData4
+    await alluoStrategyHandler.setLiquidityDirection("BeefyFrxETHOptimism", 6, beefyStrategy.address, optimismWETHAddress, 2, 10, entryData4, exitData4, rewardsData4);
+
+
     // Set bridging fee correctly
 
-    await alluoStrategyHandler.setAlluoBridging(spokePool, alluoVoteExecutor.address, 10, ethers.utils.parseUnits("0.05", 18))
+    // await alluoStrategyHandler.setAlluoBridging(spokePool, alluoVoteExecutor.address, 10, ethers.utils.parseUnits("0.05", 18))
 }
 
 main()
