@@ -52,7 +52,7 @@
     "prettier:solidity": "prettier --write contracts/**/*.sol",
     "alluo-ready": "solhint -f table contracts/**/*.sol && prettier --write contracts/**/*.sol && hardhat test",
     "prepare": "husky install",
-    "testLd" : "hh test test/automatedVoting/AlluoStrategyHandler.test.ts test/automatedVoting/AlluoVoteExecutor.test.ts test/automatedVoting/AlluoVoteExecutorUtils.test.ts"
+    "testLd" : "hh test test/automatedVoting/AlluoStrategyHandler.test.ts test/automatedVoting/AlluoStrategyHandlerWithOracle.test.ts test/automatedVoting/AlluoVoteExecutor.test.ts test/automatedVoting/AlluoVoteExecutorUtils.test.ts"
   },
   "dependencies": {
     "@across-protocol/sdk-v2": "^0.2.3"

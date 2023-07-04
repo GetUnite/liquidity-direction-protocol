@@ -1,9 +1,10 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import { AlluoStrategyHandler, AlluoVoteExecutor, AlluoVoteExecutorUtils, BeefyStrategy, IBeefyBoost, IBeefyVaultV6, IERC20, IERC20Metadata, IExchange, IPriceFeedRouter, IPriceFeedRouterV2, ISpokePoolNew, IWrappedEther, LiquidityHandler, PseudoMultisigWallet } from "../../typechain-types";
+import { AlluoStrategyHandler, AlluoVoteExecutor, AlluoVoteExecutorUtils, BeefyStrategy, ExchangePriceOracle, ExchangePriceOracle__factory, IBeefyBoost, IBeefyVaultV6, IERC20, IERC20Metadata, IExchange, IPriceFeedRouter, IPriceFeedRouterV2, ISpokePoolNew, IWrappedEther, LiquidityHandler, PseudoMultisigWallet } from "../../typechain-types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { mine, reset } from "@nomicfoundation/hardhat-network-helpers";
+import { mine, reset, time } from "@nomicfoundation/hardhat-network-helpers";
 import { LiquidityHandlerCurrent, SpokePoolMock } from "../../typechain";
+import { PriceRequestedEvent } from "../../typechain-types/contracts/automatedCrosschain/priceOracle/ExchangePriceOracle";
 
 describe("AlluoVoteExecutor Tests", function () {
     let alluoVoteExecutor: AlluoVoteExecutor;
@@ -26,6 +27,7 @@ describe("AlluoVoteExecutor Tests", function () {
     let liquidityHandler: LiquidityHandlerCurrent;
     // let maiUSDCLp: IERC20Metadata;
     // let maiUSDCBeefy: IBeefyVaultV6;
+    let exchangePriceOracle: ExchangePriceOracle;
 
     let beefyVault: IBeefyVaultV6;
     let beefyBoost: IBeefyBoost;
@@ -109,7 +111,10 @@ describe("AlluoVoteExecutor Tests", function () {
 
         // Also the voteExecutor should approve each primary token to the utils contract
         let approve = usdc.interface.encodeFunctionData("approve", [alluoVoteExecutorUtils.address, ethers.constants.MaxUint256]);
-        await alluoVoteExecutor.connect(admin).multicall([usdc.address, weth.address], [approve, approve])
+        await alluoVoteExecutor.connect(admin).multicall([usdc.address, weth.address], [approve, approve]);
+
+        const oracleFactory = await ethers.getContractFactory("ExchangePriceOracle") as ExchangePriceOracle__factory;
+        exchangePriceOracle = await oracleFactory.deploy();
     });
     describe("Test TVL information", async () => {
         this.beforeEach(async () => {
@@ -136,11 +141,12 @@ describe("AlluoVoteExecutor Tests", function () {
             let entryData = await beefyStrategy.encodeData(beefyVault.address, beefyBoost.address, 2)
             let exitData = entryData;
             let rewardsData = entryData;
-            await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategy", 1, beefyStrategy.address, weth.address, 2, 31337, entryData, exitData, rewardsData);
+            await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategy", 1, beefyStrategy.address, beefyVaultLp.address, 2, 31337, entryData, exitData, rewardsData);
             // await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategy2", 2, beefyStrategy.address, weth.address, 2, 10, entryData, exitData, rewardsData);
             // Now lets set Liquidity direction ifnormation
-            await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategyChain69", 3, beefyStrategy.address, weth.address, 2, 69, entryData, exitData, rewardsData);
-            await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategyChain96", 4, beefyStrategy.address, weth.address, 2, 96, entryData, exitData, rewardsData);
+            await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategyChain69", 2, beefyStrategy.address, beefyVaultLp.address, 2, 69, entryData, exitData, rewardsData);
+            await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategyChain96", 3, beefyStrategy.address, beefyVaultLp.address, 2, 96, entryData, exitData, rewardsData);
+            await alluoStrategyHandler.connect(admin).setLastDirectionId(2);
 
             await alluoStrategyHandler.connect(admin).addToActiveDirections(1);
             await alluoStrategyHandler.connect(admin).changeAssetInfo(2, [31337, 69, 96], [weth.address, weth.address, weth.address], usdc.address);
@@ -250,6 +256,48 @@ describe("AlluoVoteExecutor Tests", function () {
             await alluoVoteExecutor.connect(admin).markAllChainPositions();
         });
 
+        it("Test markAllChainPositions (with price oracle)", async () => {
+            // Setup price oracle for this test case
+            await alluoVoteExecutor.setOracle(exchangePriceOracle.address);
+            await exchangePriceOracle.grantRole(
+                await exchangePriceOracle.PRICE_REQUESTER_ROLE(),
+                alluoVoteExecutor.address
+            )
+
+            // Send some usdc to the voteExecutor so it can bridge
+            await _exchange.connect(signers[1]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("10"), 0, { value: ethers.utils.parseEther("10") })
+            await usdc.connect(signers[1]).transfer(alluoVoteExecutor.address, ethers.utils.parseUnits("100", 6));
+
+
+            // Let signer1 get some usdc through the exchange
+            await _exchange.connect(signers[1]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("10"), 0, { value: ethers.utils.parseEther("10") })
+            // We first need some existing position in direction 1.
+            // Deposit some usdc through the strategyFirst
+            let signerBalanceUsdc = await usdc.balanceOf(signers[1].address);
+            await usdc.connect(signers[1]).approve(_exchange.address, signerBalanceUsdc);
+            // Swap to "MAI-USDC beefy"
+            await _exchange.connect(signers[1]).exchange(usdc.address, beefyVaultLp.address, signerBalanceUsdc, 0);
+            let beefyVaultLpBalance = await beefyVaultLp.balanceOf(signers[1].address);
+            console.log(beefyVaultLpBalance)
+            await beefyVaultLp.connect(signers[1]).transfer(beefyStrategy.address, beefyVaultLpBalance)
+            let directionData = await alluoStrategyHandler.liquidityDirection(1);
+            // Deposit through the strategy
+            await beefyStrategy.connect(admin).invest(directionData.entryData, beefyVaultLpBalance)
+            const tx = await alluoVoteExecutor.connect(admin).markAllChainPositions();
+
+            // Check that Price Oracle receives correct set of requests
+
+            // primaryToken -> entryToken
+            await expect(tx).to.emit(exchangePriceOracle, "PriceRequested")
+                .withArgs("0x4200000000000000000000000000000000000006", "0xEfDE221f306152971D8e9f181bFe998447975810");
+            // entryToken -> primaryToken
+            await expect(tx).to.emit(exchangePriceOracle, "PriceRequested")
+                .withArgs("0xEfDE221f306152971D8e9f181bFe998447975810", "0x4200000000000000000000000000000000000006");
+            // rewards
+            await expect(tx).to.emit(exchangePriceOracle, "PriceRequested")
+                .withArgs("0xFdb794692724153d1488CcdBE0C56c252596735F", "0x4200000000000000000000000000000000000006");
+        });
+
         it("Test that the bridging triggering works as expected", async () => {
 
             // Send some usdc to the voteExecutor so it can bridge
@@ -314,6 +362,226 @@ describe("AlluoVoteExecutor Tests", function () {
         })
 
 
+        it("Test that the bridging triggering works as expected (with price oracles)", async () => {
+            await beefyStrategy.connect(admin).setOracle(exchangePriceOracle.address);
+            await beefyStrategy.connect(admin).setPriceDeadline(60);
+            await beefyStrategy.connect(admin).setAcceptableSlippage(3000); // 3%
+
+            //             __Exchange__
+            // from 0xefde221f306152971d8e9f181bfe998447975810
+            // to 0x4200000000000000000000000000000000000006
+            // amount 97.104650302229072876
+            // result output: 99.861924694063452840
+            // per token: 1.028394874840000000
+
+            await exchangePriceOracle.submitPrice(
+                "0xefde221f306152971d8e9f181bfe998447975810",
+                "0x4200000000000000000000000000000000000006",
+                ethers.BigNumber.from("1028394874840000000"),
+                18
+            );
+
+            // Send some usdc to the voteExecutor so it can bridge
+            await _exchange.connect(signers[2]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("10"), 0, { value: ethers.utils.parseEther("10") })
+            await usdc.connect(signers[2]).transfer(alluoVoteExecutor.address, ethers.utils.parseUnits("100", 6));
+
+            // First set the parameters correctly 
+            // 3 executors, ids 0 , 1 ,2 
+            // Executor addresses 0 = me, 1 = signers[9], 2= signers[10]
+            // Executor balances : Lets put 100 eth inside the main one, and 50 eth in the other two.
+            // Then in the data, we will set it so that there is expected to be 50eth  transfer each to the other two
+            await alluoVoteExecutorUtils.connect(admin).setExecutorInternalIds([0, 1, 2], [alluoVoteExecutor.address, signers[9].address, signers[10].address], [0, 1, 137]);
+            await alluoVoteExecutorUtils.connect(admin).setUniversalExecutorBalances([[0, 0, ethers.utils.parseEther("100"), 0], [0, 0, ethers.utils.parseEther("50"), 0], [0, 0, ethers.utils.parseEther("50"), 0]]);
+            await alluoVoteExecutorUtils.connect(admin).setCrossChainInformation(signers[0].address, signers[1].address, signers[2].address, 99, 1 /*Important param here, next chainid*/, 10, 3, 0)
+
+            // await alluoVoteExecutor.connect(admin).setCrossChainInformation(signers[0].address, signers[1].address, signers[2].address, 99, 1 /*Important param here, next chainid*/, 10, 3, 0)
+            // Lets fake that TVL call happened correctly
+
+
+            // Now let's encode the data and submit it as usual
+            let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategy", 0, 0)
+            let encodedCommand2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategyChain69", 5000, 1)
+            let encodedCommand3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategyChain96", 5000, 2)
+
+            let allEncoded = await alluoVoteExecutorUtils.encodeAllMessages([encodedCommand1[0], encodedCommand2[0], encodedCommand3[0]], [encodedCommand1[1], encodedCommand2[1], encodedCommand3[1]]);
+            await alluoVoteExecutor.connect(admin).submitData(allEncoded.inputData);
+            await alluoVoteExecutor.connect(admin).setMinSigns(0);
+
+
+            // Fake a 100 eth deposit into this current chain
+            // Let signer1 get some usdc through the exchange
+            await _exchange.connect(signers[1]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("100"), 0, { value: ethers.utils.parseEther("100") })
+            // We first need some existing position in direction 1.
+            // Deposit some usdc through the strategyFirst
+            let signerBalanceUsdc = await usdc.balanceOf(signers[1].address);
+            await usdc.connect(signers[1]).approve(_exchange.address, signerBalanceUsdc);
+            // Swap to "MAI-USDC beefy"
+            await _exchange.connect(signers[1]).exchange(usdc.address, beefyVaultLp.address, signerBalanceUsdc, 0);
+            let beefyVaultLpBalance = await beefyVaultLp.balanceOf(signers[1].address);
+            console.log(beefyVaultLpBalance)
+            await beefyVaultLp.connect(signers[1]).transfer(beefyStrategy.address, beefyVaultLpBalance)
+            let directionData = await alluoStrategyHandler.liquidityDirection(1);
+            // Deposit through the strategy
+            await beefyStrategy.connect(admin).invest(directionData.entryData, beefyVaultLpBalance)
+
+            // Now exeucte the vote
+            await alluoVoteExecutor.connect(admin).executeSpecificData(0);
+
+            // There should be alot of balance held in the vote executor
+            let voteExecutorWethBalance = await weth.balanceOf(alluoVoteExecutor.address);
+            console.log("Vote executor weth balance", voteExecutorWethBalance.toString())
+            // This should be approximately 100 eth
+            expect(voteExecutorWethBalance).to.be.closeTo(ethers.utils.parseEther("100"), ethers.utils.parseEther("0.3"))
+
+            // Now we bridge it over.
+            // Now should expect that two events are emitted called Bridging 
+            await expect(alluoVoteExecutorUtils.connect(admin).triggerBridging()).to.emit(alluoStrategyHandler, "Bridged")
+            let voteExecutorWethBalanceAfter = await weth.balanceOf(alluoVoteExecutor.address);
+            console.log("Vote executor weth balance after", voteExecutorWethBalanceAfter.toString())
+            expect(voteExecutorWethBalanceAfter).to.equal("0");
+            // As all have been bridged.
+        });
+
+        it("Execute specific data should fail if slippage exceeds limit", async () => {
+            await beefyStrategy.connect(admin).setOracle(exchangePriceOracle.address);
+            await beefyStrategy.connect(admin).setPriceDeadline(60);
+            await beefyStrategy.connect(admin).setAcceptableSlippage(3000); // 3%
+
+            //             __Exchange__
+            // from 0xefde221f306152971d8e9f181bfe998447975810
+            // to 0x4200000000000000000000000000000000000006
+            // amount 97.104650302229072876
+            // result output: 99.861924694063452840
+            // per token: 1.092834874840000000
+
+            // +3.5% - 1.131308409550000000
+
+            await exchangePriceOracle.submitPrice(
+                "0xefde221f306152971d8e9f181bfe998447975810",
+                "0x4200000000000000000000000000000000000006",
+                ethers.BigNumber.from("1131308409550000000"),
+                18
+            );
+
+            // Send some usdc to the voteExecutor so it can bridge
+            await _exchange.connect(signers[2]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("10"), 0, { value: ethers.utils.parseEther("10") })
+            await usdc.connect(signers[2]).transfer(alluoVoteExecutor.address, ethers.utils.parseUnits("100", 6));
+
+            // First set the parameters correctly 
+            // 3 executors, ids 0 , 1 ,2 
+            // Executor addresses 0 = me, 1 = signers[9], 2= signers[10]
+            // Executor balances : Lets put 100 eth inside the main one, and 50 eth in the other two.
+            // Then in the data, we will set it so that there is expected to be 50eth  transfer each to the other two
+            await alluoVoteExecutorUtils.connect(admin).setExecutorInternalIds([0, 1, 2], [alluoVoteExecutor.address, signers[9].address, signers[10].address], [0, 1, 137]);
+            await alluoVoteExecutorUtils.connect(admin).setUniversalExecutorBalances([[0, 0, ethers.utils.parseEther("100"), 0], [0, 0, ethers.utils.parseEther("50"), 0], [0, 0, ethers.utils.parseEther("50"), 0]]);
+            await alluoVoteExecutorUtils.connect(admin).setCrossChainInformation(signers[0].address, signers[1].address, signers[2].address, 99, 1 /*Important param here, next chainid*/, 10, 3, 0)
+
+            // await alluoVoteExecutor.connect(admin).setCrossChainInformation(signers[0].address, signers[1].address, signers[2].address, 99, 1 /*Important param here, next chainid*/, 10, 3, 0)
+            // Lets fake that TVL call happened correctly
+
+
+            // Now let's encode the data and submit it as usual
+            let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategy", 0, 0)
+            let encodedCommand2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategyChain69", 5000, 1)
+            let encodedCommand3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategyChain96", 5000, 2)
+
+            let allEncoded = await alluoVoteExecutorUtils.encodeAllMessages([encodedCommand1[0], encodedCommand2[0], encodedCommand3[0]], [encodedCommand1[1], encodedCommand2[1], encodedCommand3[1]]);
+            await alluoVoteExecutor.connect(admin).submitData(allEncoded.inputData);
+            await alluoVoteExecutor.connect(admin).setMinSigns(0);
+
+
+            // Fake a 100 eth deposit into this current chain
+            // Let signer1 get some usdc through the exchange
+            await _exchange.connect(signers[1]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("100"), 0, { value: ethers.utils.parseEther("100") })
+            // We first need some existing position in direction 1.
+            // Deposit some usdc through the strategyFirst
+            let signerBalanceUsdc = await usdc.balanceOf(signers[1].address);
+            await usdc.connect(signers[1]).approve(_exchange.address, signerBalanceUsdc);
+            // Swap to "MAI-USDC beefy"
+            await _exchange.connect(signers[1]).exchange(usdc.address, beefyVaultLp.address, signerBalanceUsdc, 0);
+            let beefyVaultLpBalance = await beefyVaultLp.balanceOf(signers[1].address);
+            console.log(beefyVaultLpBalance)
+            await beefyVaultLp.connect(signers[1]).transfer(beefyStrategy.address, beefyVaultLpBalance)
+            let directionData = await alluoStrategyHandler.liquidityDirection(1);
+            // Deposit through the strategy
+            await beefyStrategy.connect(admin).invest(directionData.entryData, beefyVaultLpBalance)
+
+            // Execution should fail because of 3.5% slippage (with only 3% allowed)
+            const tx = alluoVoteExecutor.connect(admin).executeSpecificData(0);
+            await expect(tx).to.be.revertedWith("Exchange: slippage");
+        });
+
+        it("Execute specific data should fail if prices are outdated", async () => {
+            await beefyStrategy.connect(admin).setOracle(exchangePriceOracle.address);
+            await beefyStrategy.connect(admin).setPriceDeadline(60);
+            await beefyStrategy.connect(admin).setAcceptableSlippage(3000); // 3%
+
+            //             __Exchange__
+            // from 0xefde221f306152971d8e9f181bfe998447975810
+            // to 0x4200000000000000000000000000000000000006
+            // amount 97.104650302229072876
+            // result output: 99.861924694063452840
+            // per token: 1.092834874840000000
+
+            // +3.5% - 1.131308409550000000
+
+            await exchangePriceOracle.submitPrice(
+                "0xefde221f306152971d8e9f181bfe998447975810",
+                "0x4200000000000000000000000000000000000006",
+                ethers.BigNumber.from("1028394874840000000"),
+                18
+            );
+
+            // Send some usdc to the voteExecutor so it can bridge
+            await _exchange.connect(signers[2]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("10"), 0, { value: ethers.utils.parseEther("10") })
+            await usdc.connect(signers[2]).transfer(alluoVoteExecutor.address, ethers.utils.parseUnits("100", 6));
+
+            // First set the parameters correctly 
+            // 3 executors, ids 0 , 1 ,2 
+            // Executor addresses 0 = me, 1 = signers[9], 2= signers[10]
+            // Executor balances : Lets put 100 eth inside the main one, and 50 eth in the other two.
+            // Then in the data, we will set it so that there is expected to be 50eth  transfer each to the other two
+            await alluoVoteExecutorUtils.connect(admin).setExecutorInternalIds([0, 1, 2], [alluoVoteExecutor.address, signers[9].address, signers[10].address], [0, 1, 137]);
+            await alluoVoteExecutorUtils.connect(admin).setUniversalExecutorBalances([[0, 0, ethers.utils.parseEther("100"), 0], [0, 0, ethers.utils.parseEther("50"), 0], [0, 0, ethers.utils.parseEther("50"), 0]]);
+            await alluoVoteExecutorUtils.connect(admin).setCrossChainInformation(signers[0].address, signers[1].address, signers[2].address, 99, 1 /*Important param here, next chainid*/, 10, 3, 0)
+
+            // await alluoVoteExecutor.connect(admin).setCrossChainInformation(signers[0].address, signers[1].address, signers[2].address, 99, 1 /*Important param here, next chainid*/, 10, 3, 0)
+            // Lets fake that TVL call happened correctly
+
+
+            // Now let's encode the data and submit it as usual
+            let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategy", 0, 0)
+            let encodedCommand2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategyChain69", 5000, 1)
+            let encodedCommand3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategyChain96", 5000, 2)
+
+            let allEncoded = await alluoVoteExecutorUtils.encodeAllMessages([encodedCommand1[0], encodedCommand2[0], encodedCommand3[0]], [encodedCommand1[1], encodedCommand2[1], encodedCommand3[1]]);
+            await alluoVoteExecutor.connect(admin).submitData(allEncoded.inputData);
+            await alluoVoteExecutor.connect(admin).setMinSigns(0);
+
+
+            // Fake a 100 eth deposit into this current chain
+            // Let signer1 get some usdc through the exchange
+            await _exchange.connect(signers[1]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("100"), 0, { value: ethers.utils.parseEther("100") })
+            // We first need some existing position in direction 1.
+            // Deposit some usdc through the strategyFirst
+            let signerBalanceUsdc = await usdc.balanceOf(signers[1].address);
+            await usdc.connect(signers[1]).approve(_exchange.address, signerBalanceUsdc);
+            // Swap to "MAI-USDC beefy"
+            await _exchange.connect(signers[1]).exchange(usdc.address, beefyVaultLp.address, signerBalanceUsdc, 0);
+            let beefyVaultLpBalance = await beefyVaultLp.balanceOf(signers[1].address);
+            console.log(beefyVaultLpBalance)
+            await beefyVaultLp.connect(signers[1]).transfer(beefyStrategy.address, beefyVaultLpBalance)
+            let directionData = await alluoStrategyHandler.liquidityDirection(1);
+            // Deposit through the strategy
+            await beefyStrategy.connect(admin).invest(directionData.entryData, beefyVaultLpBalance)
+
+            // Limit is set to 60s,
+            await time.increase(60);
+
+            // Execution should fail because submitted prices are outdated
+            const tx = alluoVoteExecutor.connect(admin).executeSpecificData(0);
+            await expect(tx).to.be.revertedWith("Oracle: Price too old");
+        });
     })
 
 
