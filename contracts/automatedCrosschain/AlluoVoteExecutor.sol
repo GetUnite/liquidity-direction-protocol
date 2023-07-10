@@ -335,6 +335,10 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
             );
         }
         emit logged(finalData);
+
+        // Since all withdrawals have been processed, it should be able to immediately trigger bridging. The only time we get to this code is if we have executed liquidity direction
+        // If we only did TVL calculations, it would not get to this point
+        utils.triggerBridging();
     }
 
     function executeQueuedDeposits(

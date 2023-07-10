@@ -185,7 +185,6 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         AssetInfo storage assetInfo = assetIdToAssetInfo[assetId];
         address primaryToken = assetInfo.chainIdToPrimaryToken[block.chainid];
-        console.log("primarytoken, chainid", primaryToken, chainId);
         _bridgeTo(amount, primaryToken, to, chainId);
         emit Bridged(amount, primaryToken, to, chainId);
     }
@@ -281,12 +280,18 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         DepositQueue storage _depositQueue = assetIdToDepositQueue[assetId];
         address primaryToken = getPrimaryTokenForAsset(assetId);
         uint256 totalDepositAmount = _depositQueue.totalDepositAmount;
+
+        require(totalDepositAmount > 0, "No deposits queued");
+
         uint256 fundsReady = IERC20MetadataUpgradeable(primaryToken).balanceOf(
             msg.sender
         );
 
-        uint256 fundsReadyIn18Decimals = fundsReady *
-            10 ** (18 - IERC20MetadataUpgradeable(primaryToken).decimals());
+        uint256 fundsReadyIn18Decimals = DecimalConverter.toDecimals(
+            fundsReady,
+            IERC20MetadataUpgradeable(primaryToken).decimals(),
+            18
+        );
         console.log("totalDepositAmount", totalDepositAmount);
         console.log("fundsReady", fundsReadyIn18Decimals);
         console.log("slippageTolerance", slippageTolerance);
@@ -294,11 +299,13 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         if (fundsReadyIn18Decimals > totalDepositAmount) {
             // This means that there should be a surplus sitting in the executor contract
             // Just take hte deposit amount
+            // Also change fundsReady because otherwies it will transfer an excess from the executor.
             fundsReadyIn18Decimals = totalDepositAmount;
-            // also adjust fundsReady
-            fundsReady =
-                fundsReadyIn18Decimals /
-                10 ** (18 - IERC20MetadataUpgradeable(primaryToken).decimals());
+            fundsReady = DecimalConverter.toDecimals(
+                fundsReadyIn18Decimals,
+                18,
+                IERC20MetadataUpgradeable(primaryToken).decimals()
+            );
         }
         // Look at this again
         require(
@@ -325,12 +332,16 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
             totalDepositAmount,
             fundsReadyIn18Decimals
         );
+
         for (uint256 i; i < _depositQueue.deposits.length; i++) {
             Deposit memory _deposit = _depositQueue.deposits[i];
             // Scale deposit.amount to primaryToken decimals
-            _deposit.amount =
-                _deposit.amount /
-                10 ** (18 - IERC20MetadataUpgradeable(primaryToken).decimals());
+
+            _deposit.amount = DecimalConverter.toDecimals(
+                _deposit.amount,
+                18,
+                IERC20MetadataUpgradeable(primaryToken).decimals()
+            );
 
             console.log("Adjusted depositamount", _deposit.amount);
             _depositToDirection(
@@ -385,6 +396,7 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
             );
             _inputToken = _direction.entryToken;
         }
+
         // Send the funds to the strategy
         IERC20MetadataUpgradeable(_inputToken).transfer(
             _direction.strategyAddress,
@@ -432,7 +444,7 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         console.log("timestamp", timestamp);
 
         require(
-            timestamp + priceDeadline <= block.timestamp,
+            timestamp + priceDeadline >= block.timestamp,
             "Oracle: Price too old"
         );
 
@@ -581,8 +593,8 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         assetIdToAssetInfo[_assetId].ibAlluo = _ibAlluo;
         for (uint256 i; i < _chainIds.length; i++) {
             assetIdToAssetInfo[_assetId].chainIdToPrimaryToken[
-                _chainIds[i]
-            ] = _chainIdToPrimaryToken[i];
+                    _chainIds[i]
+                ] = _chainIdToPrimaryToken[i];
         }
     }
 
@@ -598,5 +610,60 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         address primaryToken = assetIdToAssetInfo[direction.assetId]
             .chainIdToPrimaryToken[direction.chainId];
         return (primaryToken, direction);
+    }
+
+    function isReadyToExecuteQueuedDeposits(
+        uint256 _assetId,
+        address _depositor
+    ) public view returns (bool) {
+        DepositQueue storage _depositQueue = assetIdToDepositQueue[_assetId];
+        address primaryToken = getPrimaryTokenForAsset(_assetId);
+        uint256 totalDepositAmount = _depositQueue.totalDepositAmount;
+
+        if (totalDepositAmount == 0) {
+            return false;
+        }
+
+        uint256 fundsReady = IERC20MetadataUpgradeable(primaryToken).balanceOf(
+            _depositor
+        );
+        uint256 fundsReadyIn18Decimals = DecimalConverter.toDecimals(
+            fundsReady,
+            IERC20MetadataUpgradeable(primaryToken).decimals(),
+            18
+        );
+
+        if (fundsReady >= totalDepositAmount) {
+            return true;
+        } else {
+            return
+                IAlluoVoteExecutorUtils(voteExecutorUtils)
+                    .isWithinSlippageTolerance(
+                        totalDepositAmount,
+                        fundsReadyIn18Decimals,
+                        slippageTolerance
+                    );
+        }
+    }
+
+    function checkDepositsReady()
+        public
+        view
+        returns (bool canExec, bytes memory execPayload)
+    {
+        address depositor = IAlluoVoteExecutorUtils(voteExecutorUtils)
+            .voteExecutor();
+        for (uint256 i; i < numberOfAssets; i++) {
+            if (isReadyToExecuteQueuedDeposits(i, depositor)) {
+                return (
+                    true,
+                    abi.encodeWithSelector(
+                        this.executeQueuedDeposits.selector,
+                        i
+                    )
+                );
+            }
+        }
+        return (false, "");
     }
 }

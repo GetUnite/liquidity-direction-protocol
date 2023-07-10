@@ -75,7 +75,9 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
     }
 
     function triggerBridging() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        // This requires some check that data has been executed and tvl has been updated...
+        // Since this is called immediately after data is executed on each chain (non TVL execution), then we are sure that new data has been submitted and executed
+        // Since the data can't be executed without TVL being updated, it is sufficient to not have TVL checks here.
+        // However, it may be wise to add some revert logic
 
         IAlluoStrategyHandler handler = IAlluoStrategyHandler(strategyHandler);
         uint8 numberOfAssets = handler.numberOfAssets();
@@ -89,7 +91,6 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
             tokenIds,
             desiredPercentagesByChain
         );
-        // Consolelog for debugging
 
         // ALso i have to scale the amount to what is actually in the executor vs expected balance
         for (uint256 i; i < toTransfer.length; i++) {
@@ -420,27 +421,17 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
         address[] memory uniqueSigners = new address[](owners.length);
         uint256 numberOfSigns;
         for (uint256 i; i < _signs.length; i++) {
-            // Skip the iteration if the _signs element is "0x"
-            if (
-                keccak256(abi.encodePacked(bytesToHex(_signs[i]))) ==
-                keccak256(abi.encodePacked("0x"))
-            ) {
-                console.log("Gotinhere");
-                continue;
-            }
             for (uint256 j; j < owners.length; j++) {
                 if (
                     verify(_hashed, _signs[i], owners[j]) &&
                     checkUniqueSignature(uniqueSigners, owners[j])
                 ) {
-                    console.log("here");
                     uniqueSigners[numberOfSigns] = owners[j];
                     numberOfSigns++;
                     break;
                 }
             }
         }
-        console.log("number of signs", numberOfSigns);
         return numberOfSigns >= minSigns ? true : false;
     }
 
@@ -456,21 +447,6 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
             }
         }
         return false;
-    }
-
-    function bytesToHex(
-        bytes memory _bytes
-    ) public pure returns (string memory) {
-        bytes memory alphabet = "0123456789abcdef";
-
-        bytes memory str = new bytes(2 * _bytes.length + 2);
-        str[0] = "0";
-        str[1] = "x";
-        for (uint256 i = 0; i < _bytes.length; i++) {
-            str[2 * i + 2] = alphabet[uint8(_bytes[i] >> 4)];
-            str[2 * i + 3] = alphabet[uint8(_bytes[i] & 0x0f)];
-        }
-        return string(str);
     }
 
     function verify(
