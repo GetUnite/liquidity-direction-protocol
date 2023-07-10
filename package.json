@@ -18,6 +18,7 @@
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.6",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.8",
     "@nomicfoundation/hardhat-toolbox": "^2.0.2",
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
     "@openzeppelin/contracts": "^4.8.2",
     "@openzeppelin/contracts-upgradeable": "^4.8.2",
     "@openzeppelin/hardhat-upgrades": "^1.21.0",
@@ -52,7 +53,7 @@
     "prettier:solidity": "prettier --write contracts/**/*.sol",
     "alluo-ready": "solhint -f table contracts/**/*.sol && prettier --write contracts/**/*.sol && hardhat test",
     "prepare": "husky install",
-    "testLd" : "hh test test/automatedVoting/AlluoStrategyHandler.test.ts test/automatedVoting/AlluoVoteExecutor.test.ts test/automatedVoting/AlluoVoteExecutorUtils.test.ts"
+    "testLd": "hh test test/automatedVoting/AlluoStrategyHandler.test.ts test/automatedVoting/AlluoVoteExecutor.test.ts test/automatedVoting/AlluoVoteExecutorUtils.test.ts"
   },
   "dependencies": {
     "@across-protocol/sdk-v2": "^0.2.3"

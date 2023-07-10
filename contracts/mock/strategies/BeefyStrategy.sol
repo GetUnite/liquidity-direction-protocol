@@ -567,7 +567,7 @@ contract BeefyStrategy is
         console.log("timestamp", timestamp);
 
         require(
-            timestamp + priceDeadline <= block.timestamp,
+            timestamp + priceDeadline >= block.timestamp,
             "Oracle: Price too old"
         );
 
