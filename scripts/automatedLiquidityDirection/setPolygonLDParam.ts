@@ -80,17 +80,22 @@ async function main() {
     let optimismWETHAddress = "0x4200000000000000000000000000000000000006"
 
 
-    let entryData3 = await beefyStrategy.encodeData("0xcAdC68d5834898D54929E694eD19e833e0117694", ethers.constants.AddressZero, 2, optimismWETHAddress)
-    let exitData3 = entryData3
-    let rewardsData3 = entryData3
-    await alluoStrategyHandler.setLiquidityDirection("BeefyStETHOptimism", 5, beefyStrategy.address, optimismWETHAddress, 2, 10, entryData3, exitData3, rewardsData3);
+    // let entryData3 = await beefyStrategy.encodeData("0xcAdC68d5834898D54929E694eD19e833e0117694", ethers.constants.AddressZero, 2, optimismWETHAddress)
+    // let exitData3 = entryData3
+    // let rewardsData3 = entryData3
+    // await alluoStrategyHandler.setLiquidityDirection("BeefyStETHOptimism", 5, beefyStrategy.address, optimismWETHAddress, 2, 10, entryData3, exitData3, rewardsData3);
 
-    // // mooStargateUSDC Polygon
-    let entryData4 = await beefyStrategy.encodeData("0x1b620BE62788e940b4c4ae6Df933c50981AcAB80", ethers.constants.AddressZero, 2, optimismWETHAddress)
-    let exitData4 = entryData4
-    let rewardsData4 = entryData4
-    await alluoStrategyHandler.setLiquidityDirection("BeefyFrxETHOptimism", 6, beefyStrategy.address, optimismWETHAddress, 2, 10, entryData4, exitData4, rewardsData4);
+    // // // mooStargateUSDC Polygon
+    // let entryData4 = await beefyStrategy.encodeData("0x1b620BE62788e940b4c4ae6Df933c50981AcAB80", ethers.constants.AddressZero, 2, optimismWETHAddress)
+    // let exitData4 = entryData4
+    // let rewardsData4 = entryData4
+    // await alluoStrategyHandler.setLiquidityDirection("BeefyFrxETHOptimism", 6, beefyStrategy.address, optimismWETHAddress, 2, 10, entryData4, exitData4, rewardsData4);
 
+
+    let entryData5 = await beefyStrategy.encodeData("0x5A0801BAd20B6c62d86C566ca90688A6b9ea1d3f", ethers.constants.AddressZero, 2, weth.address);
+    let exitData5 = entryData5;
+    let rewardsData5 = entryData5;
+    await alluoStrategyHandler.setLiquidityDirection("BeefyaTriCrypto3EthPolygon", 7, beefyStrategy.address, weth.address, 2, 137, entryData5, exitData5, rewardsData5);
 
     // Set bridging fee correctly
 
