@@ -18,29 +18,35 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
     using ECDSAUpgradeable for bytes32;
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
 
+    // Address of the local strategyHandler
     address public strategyHandler;
+
+    // Address of the local voteExecutor
     address public voteExecutor;
+
+    // Timestamp of when the tvl was lasted updated
     uint256 public universalTVLUpdated;
 
+    // Used to store all necessary crosschain information
     CrossChainInformation public crossChainInformation;
 
-    mapping(string => address) public ibAlluoSymbolToAddress;
-    mapping(bytes32 => uint256) public hashExecutionTime;
-    mapping(uint256 => Deposit[]) public assetIdToDepositPercentages;
-
+    // Used to store the universal TVL across all chains, for each asset class
     mapping(uint256 => uint256) public universalTVL;
+
+    // Used to map each executor's internal ID to its local address (for most executors, we will deploy on the same address)
     mapping(uint256 => address) public executorInternalIdToAddress;
+
+    // Used to map each executor's internal ID to its chainId
     mapping(uint256 => uint256) public executorInternalIdToChainId;
 
-    uint256[][] public universalExecutorBalances;
-    uint256[][] public desiredPercentagesByChain;
-
+    // Mapping from asset classs to its relevant local iballuo address
     mapping(uint256 => address) public assetIdToIbAlluoAddress;
 
-    struct Deposit {
-        uint256 directionId;
-        uint256 amount;
-    }
+    // Matrix of each asset class and the respective balances each executor holds on every chain (using its internal ID)
+    uint256[][] public universalExecutorBalances;
+
+    // Matrix of each asset class and the desired percentage each executor should hold on each chain (using its internal ID)
+    uint256[][] public desiredPercentagesByChain;
 
     struct ExecutorTransfer {
         uint256 fromExecutor;

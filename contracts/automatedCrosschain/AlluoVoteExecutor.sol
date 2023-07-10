@@ -33,39 +33,66 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
 
-    address public constant ALLUO = 0x1E5193ccC53f25638Aa22a940af899B692e10B09;
-    address public constant FUND_MANAGER =
-        0xBac731029f8F92D147Acc701aB1B4B099C31A3c4;
-
-    IWrappedEther public constant WETH =
-        IWrappedEther(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    // Used for granting permissions to our crosschain relayers
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
 
+    // Used for EIP-712 signing
     bytes4 internal constant MAGICVALUE = 0x1626ba7e;
+
+    // Determines which executor is exclusively the master of the execution chain
     bool public isMaster;
 
+    // Address of the Alluo multisig
     address public gnosis;
+
+    // Address of a variable that will be used to distribute excess rewards
     address public locker;
+
+    // Address of the exchange
     address public exchangeAddress;
+
+    // Address of the priceFeed onchain oracles
     address public priceFeed;
+
+    // Address of the local liquidity handler
     address public liquidityHandler;
+
+    // Address of the local strategyHandler
     address public strategyHandler;
+
     address public cvxDistributor;
+
+    // Address of the utility contract that holds logic and some storage
     address public voteExecutorUtils;
 
+    // Uint that determines how long a vote can remain valid from submission
     uint256 public timeLock;
+
+    // Uint that determines how many multisig signers are required to execute liquidity direction
     uint256 public minSigns;
 
+    // Mapping that holds the iballuo symbol to address
     mapping(string => address) public ibAlluoSymbolToAddress;
+
+    // Mapping that saves when and if a certain vote has been executed to prevent duplicates
     mapping(bytes32 => uint256) public hashExecutionTime;
+
+    // Mapping that saves the current state of the liquidity direction vote
     mapping(uint256 => Deposit[]) public assetIdToDepositPercentages;
 
+    // Array that holds all historical submitted data
     SubmittedData[] public submittedData;
+
+    // Array that holds all historical executed data
     bytes[] public executionHistory;
+
+    // Array that holds all crosschain submitted data
     bytes[] public storedCrosschainData;
 
+    // Mapping that holds the indexes for storedCrosschainData that should be executed
     EnumerableSetUpgradeable.UintSet private queuedCrosschainMessageIndexes;
 
+    // Offchain price oracle that can be invoked for prices
     ExchangePriceOracle public oracle;
 
     struct Deposit {
@@ -122,11 +149,7 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
     }
 
-    receive() external payable {
-        // if (msg.sender != address(WETH)) {
-        //     WETH.deposit{value: msg.value}();
-        // }
-    }
+    receive() external payable {}
 
     /// @notice Allows anyone to submit data for execution of votes
     /// @dev Attempts to parse at high level and then confirm hash before submitting to queue

@@ -22,24 +22,51 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
     using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
+
+    // For EIP-712 signing
     bytes4 internal constant MAGICVALUE = 0x1626ba7e;
 
+    // Used to map offchain votes to the information required to execute the vote
     mapping(string => uint256) public directionNameToId;
-    mapping(uint256 => LiquidityDirection) public liquidityDirection;
-    mapping(uint256 => AssetInfo) private assetIdToAssetInfo;
-    mapping(uint256 => DepositQueue) public assetIdToDepositQueue;
-    mapping(address => uint8) public tokenToAssetId;
-    uint8 public numberOfAssets;
-    uint256 public lastDirectionId;
-    uint256 public slippageTolerance;
-    address public exchange;
-    address public voteExecutorUtils;
-    address public gnosis;
 
+    // Required for offchain pool health monitoring
     mapping(uint256 => string) public directionIdToName;
 
-    ExchangePriceOracle public oracle;
+    // Used to store all information about each direction
+    mapping(uint256 => LiquidityDirection) public liquidityDirection;
+
+    // Used to store information for each asset class
+    mapping(uint256 => AssetInfo) private assetIdToAssetInfo;
+
+    // Used to store information needed to execute deosits for each asset class
+    mapping(uint256 => DepositQueue) public assetIdToDepositQueue;
+
+    // Convenience mapping to map each primary token to its asset id class
+    mapping(address => uint8) public tokenToAssetId;
+
+    // uint8 that holds the number of asset classes, used in many loops
+    uint8 public numberOfAssets;
+
+    // uint256 that holds the last directionId so that offchain architecture can loop
+    uint256 public lastDirectionId;
+
+    // uint256 from 0 --> 10000, where 300= 3%. Used to determine when deposits/withdrawals should be manually overridden to avoid massive slippage losses
+    uint256 public slippageTolerance;
+
+    // The duration for which prices from offchain oracles are valid
     uint32 public priceDeadline;
+
+    // Address of the exchange
+    address public exchange;
+
+    // Address of the utility contract that holds lots of the logic and some storage
+    address public voteExecutorUtils;
+
+    // Address of the Alluo Multisig
+    address public gnosis;
+
+    // The offchain price oracle that can be invoked to fetch latest prices
+    ExchangePriceOracle public oracle;
 
     struct LiquidityDirection {
         address strategyAddress;
@@ -49,15 +76,12 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         bytes entryData;
         bytes exitData;
         bytes rewardsData;
-        uint256 latestAmount;
     }
 
     struct AssetInfo {
         mapping(uint256 => address) chainIdToPrimaryToken;
         address ibAlluo;
         EnumerableSetUpgradeable.UintSet activeDirections;
-        EnumerableSetUpgradeable.AddressSet needToTransferFrom;
-        uint256 amountDeployed;
     }
 
     struct DepositQueue {
@@ -486,7 +510,6 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         assetIdToAssetInfo[liquidityDirection[_directionId].assetId]
             .activeDirections
             .remove(_directionId);
-        liquidityDirection[_directionId].latestAmount = 0;
     }
 
     function setLiquidityDirection(
@@ -510,8 +533,7 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
             _chainId,
             _entryData,
             _exitData,
-            _rewardsData,
-            0
+            _rewardsData
         );
     }
 
@@ -593,13 +615,9 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         assetIdToAssetInfo[_assetId].ibAlluo = _ibAlluo;
         for (uint256 i; i < _chainIds.length; i++) {
             assetIdToAssetInfo[_assetId].chainIdToPrimaryToken[
-                _chainIds[i]
-            ] = _chainIdToPrimaryToken[i];
+                    _chainIds[i]
+                ] = _chainIdToPrimaryToken[i];
         }
-    }
-
-    function getAssetAmount(uint _id) external view returns (uint256) {
-        return (assetIdToAssetInfo[_id].amountDeployed);
     }
 
     function getDirectionFullInfoById(
