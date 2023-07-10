@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import { AlluoVoteExecutorUtils, PseudoMultisigWallet, VoteExecutorMasterLog } from "../../typechain-types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { mine, reset } from "@nomicfoundation/hardhat-network-helpers";
+import { mine, reset, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("AlluoVoteExecutorUtils Tests", function () {
     let alluoVoteExecutorUtils: AlluoVoteExecutorUtils;
@@ -29,10 +29,34 @@ describe("AlluoVoteExecutorUtils Tests", function () {
         const voteExecutor = signers[2].address;
 
         await alluoVoteExecutorUtils.connect(admin).setStorageAddresses(strategyHandler, voteExecutor);
-
-
     })
 
+    it("Should set assetID to IbAlluoAddress correctly", async () => {
+        const iballuoAddress = signers[1].address;
+        expect(await alluoVoteExecutorUtils.assetIdToIbAlluoAddress(5)).to.equal(ethers.constants.AddressZero);
+
+        await alluoVoteExecutorUtils.connect(admin).setAssetIdToIbAlluoAddresses(iballuoAddress, 5);
+        expect(await alluoVoteExecutorUtils.assetIdToIbAlluoAddress(5)).to.equal(iballuoAddress);
+    })
+
+    it("Should set assetId to IbAlluo and retrieve correct APY", async () => {
+        let iballuoFactory = await ethers.getContractFactory("IbAlluo");
+        let iballuo = await iballuoFactory.deploy();
+        await expect(alluoVoteExecutorUtils.getLatestAPY(5)).to.be.reverted;
+        await alluoVoteExecutorUtils.connect(admin).setAssetIdToIbAlluoAddresses(iballuo.address, 5);
+        expect(await alluoVoteExecutorUtils.getLatestAPY(5)).to.equal(0);
+    })
+
+    it("Should removeLastArray correctly", async () => {
+        let executorBalances = [[5, 6], [69, 69]];
+        let executorBalancesAfter = [[5, 6]];
+        expect(await alluoVoteExecutorUtils.removeLastArray(executorBalances)).to.deep.equal(executorBalancesAfter);
+    })
+
+    it("Should revert if removeLastArray is called with empty array", async () => {
+        let executorBalances: any = [];
+        await expect(alluoVoteExecutorUtils.removeLastArray(executorBalances)).to.be.reverted;
+    })
     it("Should return true if number is within (ABOVE) slippage tolerance", async () => {
         let slippageTolerance = 100; // This is 1%
         let number = 1005;
@@ -207,7 +231,8 @@ describe("Tests with forks", async () => {
     let signers: SignerWithAddress[];
     let admin: SignerWithAddress;
     let pseudoMultiSig: PseudoMultisigWallet;
-    beforeEach(async () => {
+
+    async function setupContracts() {
         // Fork ethereum mainnet
         await reset(process.env.MAINNET_FORKING_URL, 17121936)
         // Deploy the contract with correct params
@@ -227,6 +252,9 @@ describe("Tests with forks", async () => {
         ], {
             initializer: "initialize"
         })) as AlluoVoteExecutorUtils;
+    }
+    beforeEach(async () => {
+        await loadFixture(setupContracts);
     })
 
     it("Should revert if we try to getDirectionIdByName for a non-existent direction", async () => {

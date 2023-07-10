@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
-import { AlluoStrategyHandler, AlluoVoteExecutor, AlluoVoteExecutorUtils, BeefyStrategy, IBeefyBoost, IBeefyVaultV6, IERC20, IERC20Metadata, IExchange, IPriceFeedRouter, IPriceFeedRouterV2, ISpokePoolNew, IWrappedEther, LiquidityHandler, PseudoMultisigWallet } from "../../typechain-types";
+import { AlluoStrategyHandler, AlluoVoteExecutor, AlluoVoteExecutorUtils, BeefyStrategy, ExchangePriceOracle, ExchangePriceOracle__factory, IBeefyBoost, IBeefyVaultV6, IERC20, IERC20Metadata, IExchange, IPriceFeedRouter, IPriceFeedRouterV2, ISpokePoolNew, IWrappedEther, LiquidityHandler, PseudoMultisigWallet } from "../../typechain-types";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { mine, reset } from "@nomicfoundation/hardhat-network-helpers";
+import { mine, reset, loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { LiquidityHandlerCurrent, SpokePoolMock } from "../../typechain";
 
 describe("AlluoVoteExecutor Tests", function () {
@@ -24,18 +24,15 @@ describe("AlluoVoteExecutor Tests", function () {
     let beefyStrategy: BeefyStrategy;
     let ldo: IERC20Metadata;
     let liquidityHandler: LiquidityHandlerCurrent;
-    // let maiUSDCLp: IERC20Metadata;
-    // let maiUSDCBeefy: IBeefyVaultV6;
 
     let beefyVault: IBeefyVaultV6;
     let beefyBoost: IBeefyBoost;
     let beefyVaultLp: IERC20Metadata;
 
-    beforeEach(async () => {
-        // Test on optimism
+    let exchangePriceOracle: ExchangePriceOracle;
+
+    async function setupContracts() {
         await reset(process.env.OPTIMISM_URL, 102871832);
-
-
         const pseudoMultiSigFactory = await ethers.getContractFactory("PseudoMultisigWallet");
         pseudoMultiSig = await pseudoMultiSigFactory.deploy(true) as PseudoMultisigWallet;
         admin = await ethers.getImpersonatedSigner(pseudoMultiSig.address)
@@ -87,7 +84,7 @@ describe("AlluoVoteExecutor Tests", function () {
 
         await alluoStrategyHandler.connect(admin).changeNumberOfAssets(4);
         await alluoStrategyHandler.connect(admin).setTokenToAssetId(weth.address, 2);
-        liquidityHandler = await ethers.getContractAt("LiquidityHandler", "0x937F7125994a91d5E2Ce31846b97578131056Bb4") as LiquidityHandlerCurrent;
+        liquidityHandler = await ethers.getContractAt("LiquidityHandlerCurrent", "0x937F7125994a91d5E2Ce31846b97578131056Bb4") as unknown as LiquidityHandlerCurrent;
 
         // Now deploy AlluoVoteExecutor
         //
@@ -109,10 +106,18 @@ describe("AlluoVoteExecutor Tests", function () {
 
         // Also the voteExecutor should approve each primary token to the utils contract
         let approve = usdc.interface.encodeFunctionData("approve", [alluoVoteExecutorUtils.address, ethers.constants.MaxUint256]);
-        await alluoVoteExecutor.connect(admin).multicall([usdc.address, weth.address], [approve, approve])
+        await alluoVoteExecutor.connect(admin).multicall([usdc.address, weth.address], [approve, approve]);
+
+        const oracleFactory = await ethers.getContractFactory("ExchangePriceOracle") as ExchangePriceOracle__factory;
+        exchangePriceOracle = await oracleFactory.deploy();
+    }
+    beforeEach(async () => {
+        // Test on optimism
+        await loadFixture(setupContracts)
+
     });
     describe("Test TVL information", async () => {
-        this.beforeEach(async () => {
+        async function additionalSetup() {
             let beefyStrategyFactory = await ethers.getContractFactory("BeefyStrategy");
             beefyVault = await ethers.getContractAt("IBeefyVaultV6", "0x0892a178c363b4739e5Ac89E9155B9c30214C0c0") as IBeefyVaultV6;
             beefyVaultLp = await ethers.getContractAt("IERC20Metadata", await beefyVault.want()) as IERC20Metadata;
@@ -136,24 +141,74 @@ describe("AlluoVoteExecutor Tests", function () {
             let entryData = await beefyStrategy.encodeData(beefyVault.address, beefyBoost.address, 2)
             let exitData = entryData;
             let rewardsData = entryData;
-            await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategy", 1, beefyStrategy.address, weth.address, 2, 31337, entryData, exitData, rewardsData);
+            await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategy", 1, beefyStrategy.address, beefyVaultLp.address, 2, 31337, entryData, exitData, rewardsData);
             // await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategy2", 2, beefyStrategy.address, weth.address, 2, 10, entryData, exitData, rewardsData);
             // Now lets set Liquidity direction ifnormation
-            await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategyChain69", 3, beefyStrategy.address, weth.address, 2, 69, entryData, exitData, rewardsData);
-            await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategyChain96", 4, beefyStrategy.address, weth.address, 2, 96, entryData, exitData, rewardsData);
+            await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategyChain69", 2, beefyStrategy.address, beefyVaultLp.address, 2, 69, entryData, exitData, rewardsData);
+            await alluoStrategyHandler.connect(admin).setLiquidityDirection("BeefyETHStrategyChain96", 3, beefyStrategy.address, beefyVaultLp.address, 2, 96, entryData, exitData, rewardsData);
+            await alluoStrategyHandler.connect(admin).setLastDirectionId(2);
 
             await alluoStrategyHandler.connect(admin).addToActiveDirections(1);
             await alluoStrategyHandler.connect(admin).changeAssetInfo(2, [31337, 69, 96], [weth.address, weth.address, weth.address], usdc.address);
             // await alluoVoteExecutor.connect(admin).setCrossChainInformation(signers[0].address, signers[1].address, signers[2].address, 99, 1 /*Important param here, next chainid*/, 10, 3, 0)
             await alluoVoteExecutorUtils.connect(admin).setCrossChainInformation(signers[0].address, signers[1].address, signers[2].address, 99, 1 /*Important param here, next chainid*/, 10, 3, 0)
 
+            await alluoVoteExecutor.setAcrossInformation(spokePool, 10000000)
 
-
-        })
-        it("Test that speedup works on the VoteExecutor contract", async () => {
-            // Send some usdc to the voteExecutor so it can bridge
             await _exchange.connect(signers[1]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("10"), 0, { value: ethers.utils.parseEther("10") })
             await usdc.connect(signers[1]).transfer(alluoVoteExecutor.address, ethers.utils.parseUnits("100", 6));
+
+            // First set the parameters correctly 
+            // 3 executors, ids 0 , 1 ,2 
+            // Executor addresses 0 = me, 1 = signers[9], 2= signers[10]
+            // Executor balances : Lets put 100 eth inside the main one, and 50 eth in the other two.
+            // Then in the data, we will set it so that there is expected to be 50eth  transfer each to the other two
+            // Lets fake that TVL call happened correctly
+
+            await alluoVoteExecutorUtils.connect(admin).setExecutorInternalIds([0, 1, 2], [alluoVoteExecutor.address, signers[9].address, signers[10].address], [0, 1, 137]);
+            await alluoVoteExecutorUtils.connect(admin).setUniversalExecutorBalances([[0, 0, ethers.utils.parseEther("100"), 0], [0, 0, ethers.utils.parseEther("50"), 0], [0, 0, ethers.utils.parseEther("50"), 0]]);
+            await alluoVoteExecutorUtils.connect(admin).setCrossChainInformation(signers[0].address, signers[1].address, signers[2].address, 99, 1 /*Important param here, next chainid*/, 10, 3, 0)
+        }
+
+        async function votePreparation() {
+            // Fake a 100 eth deposit into this current chain
+            // Let signer1 get some usdc through the exchange
+            await _exchange.connect(signers[1]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", beefyVaultLp.address, ethers.utils.parseEther("100"), 0, { value: ethers.utils.parseEther("100") })
+            let beefyVaultLpBalance = await beefyVaultLp.balanceOf(signers[1].address);
+            await beefyVaultLp.connect(signers[1]).transfer(beefyStrategy.address, beefyVaultLpBalance)
+            let directionData = await alluoStrategyHandler.liquidityDirection(1);
+            // Deposit through the strategy
+            await beefyStrategy.connect(admin).invest(directionData.entryData, beefyVaultLpBalance)
+
+
+            // Now let's encode the data and submit it as usual
+            let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategy", 0, 0)
+            let encodedCommand2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategyChain69", 5000, 1)
+            let encodedCommand3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategyChain96", 5000, 2)
+
+            let allEncoded = await alluoVoteExecutorUtils.encodeAllMessages([encodedCommand1[0], encodedCommand2[0], encodedCommand3[0]], [encodedCommand1[1], encodedCommand2[1], encodedCommand3[1]]);
+            await alluoVoteExecutor.connect(admin).submitData(allEncoded.inputData);
+
+            await alluoVoteExecutor.connect(admin).setMinSigns(0);
+        }
+
+        async function priceOracleSetup() {
+            // Setup price oracle for this test case
+            await alluoVoteExecutor.setOracle(exchangePriceOracle.address);
+            await exchangePriceOracle.grantRole(
+                await exchangePriceOracle.PRICE_REQUESTER_ROLE(),
+                alluoVoteExecutor.address
+            )
+
+            await beefyStrategy.connect(admin).setPriceDeadline(60);
+            await beefyStrategy.connect(admin).setAcceptableSlippage(3000); // 3%
+            await beefyStrategy.connect(admin).setOracle(exchangePriceOracle.address);
+        }
+        beforeEach(async () => {
+            await loadFixture(additionalSetup);
+            await loadFixture(votePreparation);
+        })
+        it("Test that speedup works on the VoteExecutor contract", async () => {
             await alluoVoteExecutor.connect(admin).markAllChainPositions();
             let spokePoolContract = await ethers.getContractAt("ISpokePoolNew", spokePool) as ISpokePoolNew
             let depositId = await spokePoolContract.numberOfDeposits();
@@ -190,9 +245,6 @@ describe("AlluoVoteExecutor Tests", function () {
         })
 
         it("Test that speedup reverts if the signer is not part of the multisig", async () => {
-            // Send some usdc to the voteExecutor so it can bridge
-            await _exchange.connect(signers[1]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("10"), 0, { value: ethers.utils.parseEther("10") })
-            await usdc.connect(signers[1]).transfer(alluoVoteExecutor.address, ethers.utils.parseUnits("100", 6));
             await alluoVoteExecutor.connect(admin).markAllChainPositions();
             let spokePoolContract = await ethers.getContractAt("ISpokePoolNew", spokePool) as ISpokePoolNew
             let depositId = await spokePoolContract.numberOfDeposits();
@@ -227,95 +279,173 @@ describe("AlluoVoteExecutor Tests", function () {
             const signature = await signers[12]._signTypedData(typedData.domain, typedData.types, typedData.message);
             await expect(alluoVoteExecutor.connect(admin).speedUpDeposit(modifiedRelayerFeePct, depositId, updatedRecipient, updatedMessage, signature)).to.be.revertedWith("invalid signature")
         })
-        it("Test markAllChainPositions", async () => {
-            // Send some usdc to the voteExecutor so it can bridge
-            await _exchange.connect(signers[1]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("10"), 0, { value: ethers.utils.parseEther("10") })
-            await usdc.connect(signers[1]).transfer(alluoVoteExecutor.address, ethers.utils.parseUnits("100", 6));
-
-
-            // Let signer1 get some usdc through the exchange
-            await _exchange.connect(signers[1]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("10"), 0, { value: ethers.utils.parseEther("10") })
-            // We first need some existing position in direction 1.
-            // Deposit some usdc through the strategyFirst
-            let signerBalanceUsdc = await usdc.balanceOf(signers[1].address);
-            await usdc.connect(signers[1]).approve(_exchange.address, signerBalanceUsdc);
-            // Swap to "MAI-USDC beefy"
-            await _exchange.connect(signers[1]).exchange(usdc.address, beefyVaultLp.address, signerBalanceUsdc, 0);
-            let beefyVaultLpBalance = await beefyVaultLp.balanceOf(signers[1].address);
-            console.log(beefyVaultLpBalance)
-            await beefyVaultLp.connect(signers[1]).transfer(beefyStrategy.address, beefyVaultLpBalance)
-            let directionData = await alluoStrategyHandler.liquidityDirection(1);
-            // Deposit through the strategy
-            await beefyStrategy.connect(admin).invest(directionData.entryData, beefyVaultLpBalance)
+        it("Test markAllChainPositions after fixtures loads", async () => {
+            await loadFixture(priceOracleSetup);
             await alluoVoteExecutor.connect(admin).markAllChainPositions();
         });
 
         it("Test that the bridging triggering works as expected", async () => {
-
-            // Send some usdc to the voteExecutor so it can bridge
-            await _exchange.connect(signers[2]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("10"), 0, { value: ethers.utils.parseEther("10") })
-            await usdc.connect(signers[2]).transfer(alluoVoteExecutor.address, ethers.utils.parseUnits("100", 6));
-
-            // First set the parameters correctly 
-            // 3 executors, ids 0 , 1 ,2 
-            // Executor addresses 0 = me, 1 = signers[9], 2= signers[10]
-            // Executor balances : Lets put 100 eth inside the main one, and 50 eth in the other two.
-            // Then in the data, we will set it so that there is expected to be 50eth  transfer each to the other two
-            await alluoVoteExecutorUtils.connect(admin).setExecutorInternalIds([0, 1, 2], [alluoVoteExecutor.address, signers[9].address, signers[10].address], [0, 1, 137]);
-            await alluoVoteExecutorUtils.connect(admin).setUniversalExecutorBalances([[0, 0, ethers.utils.parseEther("100"), 0], [0, 0, ethers.utils.parseEther("50"), 0], [0, 0, ethers.utils.parseEther("50"), 0]]);
-            await alluoVoteExecutorUtils.connect(admin).setCrossChainInformation(signers[0].address, signers[1].address, signers[2].address, 99, 1 /*Important param here, next chainid*/, 10, 3, 0)
-
-            // await alluoVoteExecutor.connect(admin).setCrossChainInformation(signers[0].address, signers[1].address, signers[2].address, 99, 1 /*Important param here, next chainid*/, 10, 3, 0)
-            // Lets fake that TVL call happened correctly
-
-
-            // Now let's encode the data and submit it as usual
-            let encodedCommand1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategy", 0, 0)
-            let encodedCommand2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategyChain69", 5000, 1)
-            let encodedCommand3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("BeefyETHStrategyChain96", 5000, 2)
-
-            let allEncoded = await alluoVoteExecutorUtils.encodeAllMessages([encodedCommand1[0], encodedCommand2[0], encodedCommand3[0]], [encodedCommand1[1], encodedCommand2[1], encodedCommand3[1]]);
-            await alluoVoteExecutor.connect(admin).submitData(allEncoded.inputData);
-            await alluoVoteExecutor.connect(admin).setMinSigns(0);
-
-
-            // Fake a 100 eth deposit into this current chain
-            // Let signer1 get some usdc through the exchange
-            await _exchange.connect(signers[1]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", usdc.address, ethers.utils.parseEther("100"), 0, { value: ethers.utils.parseEther("100") })
-            // We first need some existing position in direction 1.
-            // Deposit some usdc through the strategyFirst
-            let signerBalanceUsdc = await usdc.balanceOf(signers[1].address);
-            await usdc.connect(signers[1]).approve(_exchange.address, signerBalanceUsdc);
-            // Swap to "MAI-USDC beefy"
-            await _exchange.connect(signers[1]).exchange(usdc.address, beefyVaultLp.address, signerBalanceUsdc, 0);
-            let beefyVaultLpBalance = await beefyVaultLp.balanceOf(signers[1].address);
-            console.log(beefyVaultLpBalance)
-            await beefyVaultLp.connect(signers[1]).transfer(beefyStrategy.address, beefyVaultLpBalance)
-            let directionData = await alluoStrategyHandler.liquidityDirection(1);
-            // Deposit through the strategy
-            await beefyStrategy.connect(admin).invest(directionData.entryData, beefyVaultLpBalance)
-
-            // Now exeucte the vote
-            await alluoVoteExecutor.connect(admin).executeSpecificData(0);
-
-            // There should be alot of balance held in the vote executor
+            // Now execte the vote
+            let tx = await alluoVoteExecutor.connect(admin).executeSpecificData(0);
+            await expect(tx).to.emit(alluoStrategyHandler, "Bridged")
+            // There should be 0 balance held in the vote executor since bridge was triggered above
             let voteExecutorWethBalance = await weth.balanceOf(alluoVoteExecutor.address);
             console.log("Vote executor weth balance", voteExecutorWethBalance.toString())
-            // This should be approximately 100 eth
-            expect(voteExecutorWethBalance).to.be.closeTo(ethers.utils.parseEther("100"), ethers.utils.parseEther("0.3"))
-
-            // Now we bridge it over.
-            // Now should expect that two events are emitted called Bridging 
-            await expect(alluoVoteExecutorUtils.connect(admin).triggerBridging()).to.emit(alluoStrategyHandler, "Bridged")
-            let voteExecutorWethBalanceAfter = await weth.balanceOf(alluoVoteExecutor.address);
-            console.log("Vote executor weth balance after", voteExecutorWethBalanceAfter.toString())
-            expect(voteExecutorWethBalanceAfter).to.equal("0");
-            // As all have been bridged.
+            expect(voteExecutorWethBalance).to.equal(0)
         })
 
 
-    })
+        it("Test markAllChainPositions (with price oracle)", async () => {
+            await loadFixture(priceOracleSetup);
 
+            const tx = await alluoVoteExecutor.connect(admin).markAllChainPositions();
+
+            // Check that Price Oracle receives correct set of requests
+
+            // primaryToken -> entryToken
+            await expect(tx).to.emit(exchangePriceOracle, "PriceRequested")
+                .withArgs("0x4200000000000000000000000000000000000006", "0xEfDE221f306152971D8e9f181bFe998447975810");
+            // entryToken -> primaryToken
+            await expect(tx).to.emit(exchangePriceOracle, "PriceRequested")
+                .withArgs("0xEfDE221f306152971D8e9f181bFe998447975810", "0x4200000000000000000000000000000000000006");
+            // rewards
+            await expect(tx).to.emit(exchangePriceOracle, "PriceRequested")
+                .withArgs("0xFdb794692724153d1488CcdBE0C56c252596735F", "0x4200000000000000000000000000000000000006");
+        });
+
+        it("Test that the bridging triggering works as expected (with price oracles)", async () => {
+            await loadFixture(priceOracleSetup);
+
+            //             __Exchange__
+            // from 0xefde221f306152971d8e9f181bfe998447975810
+            // to 0x4200000000000000000000000000000000000006
+            // amount 97.104650302229072876
+            // result output: 99.861924694063452840
+            // per token: 1.028394874840000000
+
+            await exchangePriceOracle.submitPrice(
+                "0xefde221f306152971d8e9f181bfe998447975810",
+                "0x4200000000000000000000000000000000000006",
+                ethers.BigNumber.from("1028394874840000000"),
+                18
+            );
+
+            // Now exeucte the vote
+            await alluoVoteExecutor.connect(admin).executeSpecificData(0);
+            let voteExecutorWethBalanceAfter = await weth.balanceOf(alluoVoteExecutor.address);
+            console.log("Vote executor weth balance after", voteExecutorWethBalanceAfter.toString())
+            expect(voteExecutorWethBalanceAfter).to.equal("0");
+        });
+
+        it("Execute specific data should fail if slippage exceeds limit (with price oracles)", async () => {
+            await loadFixture(priceOracleSetup);
+
+            //             __Exchange__
+            // from 0xefde221f306152971d8e9f181bfe998447975810
+            // to 0x4200000000000000000000000000000000000006
+            // amount 97.104650302229072876
+            // result output: 99.861924694063452840
+            // per token: 1.092834874840000000
+
+            // +3.5% - 1.131308409550000000
+
+            await exchangePriceOracle.submitPrice(
+                "0xefde221f306152971d8e9f181bfe998447975810",
+                "0x4200000000000000000000000000000000000006",
+                ethers.BigNumber.from("1131308409550000000"),
+                18
+            );
+
+            // Execution should fail because of 3.5% slippage (with only 3% allowed)
+            const tx = alluoVoteExecutor.connect(admin).executeSpecificData(0);
+            await expect(tx).to.be.revertedWith("Exchange: slippage");
+        });
+
+        it("Execute specific data should fail if prices are outdated (with price oracles)", async () => {
+            await loadFixture(priceOracleSetup);
+
+            //             __Exchange__
+            // from 0xefde221f306152971d8e9f181bfe998447975810
+            // to 0x4200000000000000000000000000000000000006
+            // amount 97.104650302229072876
+            // result output: 99.861924694063452840
+            // per token: 1.092834874840000000
+
+            // +3.5% - 1.131308409550000000
+
+            await exchangePriceOracle.submitPrice(
+                "0xefde221f306152971d8e9f181bfe998447975810",
+                "0x4200000000000000000000000000000000000006",
+                ethers.BigNumber.from("1028394874840000000"),
+                18
+            );
+
+            // Limit is set to 60s,
+            await time.increase(60);
+
+            // Execution should fail because submitted prices are outdated
+            const tx = alluoVoteExecutor.connect(admin).executeSpecificData(0);
+            await expect(tx).to.be.revertedWith("Oracle: Price too old");
+        });
+
+
+    })
+    describe("All tests for simulating crosschain message functions", async () => {
+        beforeEach(async () => {
+            // Need to set a custom spokePool
+            await alluoVoteExecutor.connect(admin).setAcrossInformation(signers[6].address, 999);
+            // Need to set a custom relayer
+            let RELAYER_ROLE = await alluoVoteExecutor.RELAYER_ROLE();
+            await alluoVoteExecutor.connect(admin).grantRole(RELAYER_ROLE, signers[7].address);
+        })
+        it("Should receive an across message and add it to the queue successfully", async () => {
+            let message = ethers.utils.formatBytes32String("Hello world");
+            expect((await alluoVoteExecutor.getSequentialQueuedCrosschainIndex()).canExec).to.equal(false);
+            await expect(alluoVoteExecutor.storedCrosschainData(0)).to.be.reverted
+
+            await alluoVoteExecutor.connect(signers[6]).handleAcrossMessage(usdc.address, 100, true, signers[7].address, message);
+            expect((await alluoVoteExecutor.getSequentialQueuedCrosschainIndex()).canExec).to.equal(true);
+            expect(await alluoVoteExecutor.storedCrosschainData(0)).to.equal(message)
+        })
+
+        it("Should not receive an across message if the relayer is not the correct one", async () => {
+            let message = ethers.utils.formatBytes32String("Hello world");
+            await expect(alluoVoteExecutor.connect(signers[6]).handleAcrossMessage(usdc.address, 100, true, signers[5].address, message)).to.be.revertedWith("Only approved relayers");
+            expect((await alluoVoteExecutor.getSequentialQueuedCrosschainIndex()).canExec).to.equal(false);
+            await expect(alluoVoteExecutor.storedCrosschainData(0)).to.be.reverted
+        })
+
+        it("Should not receive an across message if the spokePool is not the correct one", async () => {
+            let message = ethers.utils.formatBytes32String("Hello world");
+            await expect(alluoVoteExecutor.connect(signers[5]).handleAcrossMessage(usdc.address, 100, true, signers[7].address, message)).to.be.revertedWith("Only spoke pool");
+            expect((await alluoVoteExecutor.getSequentialQueuedCrosschainIndex()).canExec).to.equal(false);
+            await expect(alluoVoteExecutor.storedCrosschainData(0)).to.be.reverted
+        })
+
+        it("Should succeed but not enter logic if fill is not completed", async () => {
+            let message = ethers.utils.formatBytes32String("Hello world");
+            await alluoVoteExecutor.connect(signers[6]).handleAcrossMessage(usdc.address, 100, false, signers[6].address, message)
+            expect((await alluoVoteExecutor.getSequentialQueuedCrosschainIndex()).canExec).to.equal(false);
+            await expect(alluoVoteExecutor.storedCrosschainData(0)).to.be.reverted
+        })
+        it("Should succeed but not enter logic if message length is zero", async () => {
+            let message = "0x"
+            await alluoVoteExecutor.connect(signers[6]).handleAcrossMessage(usdc.address, 100, true, signers[7].address, message)
+            expect((await alluoVoteExecutor.getSequentialQueuedCrosschainIndex()).canExec).to.equal(false);
+            await expect(alluoVoteExecutor.storedCrosschainData(0)).to.be.reverted
+        })
+
+        it("Should be able to force remove a crosschain message", async () => {
+            let message = ethers.utils.formatBytes32String("Hello world");
+            await alluoVoteExecutor.connect(signers[6]).handleAcrossMessage(usdc.address, 100, true, signers[7].address, message)
+            expect((await alluoVoteExecutor.getSequentialQueuedCrosschainIndex()).canExec).to.equal(true);
+            await alluoVoteExecutor.connect(admin).forceRemoveQueuedCrosschainIndex(0);
+            expect((await alluoVoteExecutor.getSequentialQueuedCrosschainIndex()).canExec).to.equal(false);
+            expect(await alluoVoteExecutor.storedCrosschainData(0)).to.equal(message)
+            // Even though it is removed from the queued list, it should have still been stored.
+        })
+
+    })
 
     describe("All configuration and view functions", async () => {
         it("Test multiCall", async () => {
@@ -394,6 +524,50 @@ describe("AlluoVoteExecutor Tests", function () {
 
             let submittedData = await alluoVoteExecutor.getSubmittedData(0);
             expect(submittedData[2].length).to.equal(0);
+        })
+
+        it("Should set Master correctly to true", async () => {
+            expect(await alluoVoteExecutor.isMaster()).to.be.true;
+            await alluoVoteExecutor.connect(admin).setMaster(true);
+            expect(await alluoVoteExecutor.isMaster()).to.be.true;
+        })
+        it("Should set Master correctly to false", async () => {
+            expect(await alluoVoteExecutor.isMaster()).to.be.true;
+            await alluoVoteExecutor.connect(admin).setMaster(false);
+            expect(await alluoVoteExecutor.isMaster()).to.be.false;
+        })
+
+        it("Should set Gnosis correctly and they should get the correct roles", async () => {
+            let newGnosis = signers[8].address;
+            expect(await alluoVoteExecutor.gnosis()).to.not.equal(newGnosis);
+            let DEFAULT_ADMIN_ROLE = await alluoVoteExecutor.DEFAULT_ADMIN_ROLE();
+            let UPGRADER_ROLE = await alluoVoteExecutor.UPGRADER_ROLE();
+            let hasDefaultAdmin = await alluoVoteExecutor.hasRole(DEFAULT_ADMIN_ROLE, newGnosis);
+            let hasUpgrader = await alluoVoteExecutor.hasRole(UPGRADER_ROLE, newGnosis);
+            expect(hasDefaultAdmin).to.be.false;
+            expect(hasUpgrader).to.be.false;
+
+            await alluoVoteExecutor.connect(admin).setGnosis(newGnosis);
+            expect(await alluoVoteExecutor.gnosis()).to.equal(newGnosis);
+            hasDefaultAdmin = await alluoVoteExecutor.hasRole(DEFAULT_ADMIN_ROLE, newGnosis);
+            hasUpgrader = await alluoVoteExecutor.hasRole(UPGRADER_ROLE, newGnosis);
+
+            expect(hasDefaultAdmin).to.be.true;
+            expect(hasUpgrader).to.be.true;
+        })
+
+        it("Should set timelock correctly", async () => {
+            let newTimelock = 69;
+            expect(await alluoVoteExecutor.timeLock()).to.not.equal(newTimelock);
+            await alluoVoteExecutor.connect(admin).setTimelock(newTimelock);
+            expect(await alluoVoteExecutor.timeLock()).to.equal(newTimelock);
+        })
+
+        it("Should set Oracle address correctly", async () => {
+            let newOracle = signers[9].address;
+            expect(await alluoVoteExecutor.oracle()).to.not.equal(newOracle);
+            await alluoVoteExecutor.connect(admin).setOracle(newOracle);
+            expect(await alluoVoteExecutor.oracle()).to.equal(newOracle);
         })
         describe("Testing balanceTokens function extensively", async () => {
             it("Should return an empty array when no tokens are present", async () => {
