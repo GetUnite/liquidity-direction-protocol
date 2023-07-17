@@ -115,6 +115,8 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         );
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(UPGRADER_ROLE, msg.sender);
 
         slippageTolerance = _slippageTolerance;
         exchange = _exchange;

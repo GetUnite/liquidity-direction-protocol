@@ -239,22 +239,31 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
         } else {
             // Now we definitely know that it has passed through at least once. Therefore we save this information locally (global tvl + executor balances)
             // Clear the universalTVL before updating
+            console.log("Gothere1");
+
             for (uint8 i = 0; i < numberOfAssets; i++) {
                 universalTVL[i] = 0;
             }
+            console.log("Gothere2");
 
             for (uint8 i; i < executorBalances.length - 1; i++) {
                 for (uint8 j; j < numberOfAssets; j++) {
                     universalTVL[j] += executorBalances[i][j];
                 }
             }
-
+            console.log("Gothere3");
             // New logic added here
             // Maybe only add this
             for (uint8 i = 0; i < numberOfAssets; i++) {
+                console.log(
+                    "currentExecutorInternalId",
+                    currentExecutorInternalId
+                );
+                console.log(i);
                 uint256 oldExecutorBalance = universalExecutorBalances[
                     currentExecutorInternalId
                 ][i];
+                console.log("Gothere3.5", oldExecutorBalance);
                 uint256 expectedAddition = (oldExecutorBalance *
                     getLatestAPY(i) *
                     (block.timestamp - universalTVLUpdated)) /
@@ -263,6 +272,7 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
 
                 uint256 expectedExecutorBalance = oldExecutorBalance +
                     expectedAddition;
+                console.log("Gothere4");
 
                 if (
                     executorBalances[currentExecutorInternalId][i] >
@@ -315,6 +325,7 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
 
     function getLatestAPY(uint256 assetId) public view returns (uint256) {
         address ibAlluoAddress = assetIdToIbAlluoAddress[assetId];
+        console.log("ibAlluoAddress", ibAlluoAddress);
         return IIbAlluo(ibAlluoAddress).annualInterest();
     }
 
@@ -367,6 +378,9 @@ contract AlluoVoteExecutorUtils is AlluoUpgradeableBase {
         strategyHandler = _strategyHandler;
         voteExecutor = _voteExecutor;
         _grantRole(DEFAULT_ADMIN_ROLE, _multisig);
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(UPGRADER_ROLE, msg.sender);
     }
 
     function submitData(

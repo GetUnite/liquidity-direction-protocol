@@ -60,6 +60,9 @@ contract OmnivaultStrategy is
         _grantRole(DEFAULT_ADMIN_ROLE, _strategyHandler);
 
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(UPGRADER_ROLE, msg.sender);
     }
 
     function getExpectedRewards() external view returns (address[] memory) {
@@ -188,10 +191,10 @@ contract OmnivaultStrategy is
             ).getPriceOfAmount(activeVaults[i], balance, assetId);
 
             totalValueInFiat += IPriceFeedRouterV2(priceFeed).decimalsConverter(
-                fiatPrice,
-                fiatDecimals,
-                18
-            );
+                    fiatPrice,
+                    fiatDecimals,
+                    18
+                );
         }
 
         return totalValueInFiat;
@@ -223,10 +226,10 @@ contract OmnivaultStrategy is
             ).getPriceOfAmount(activeVaults[i], balance, assetId);
 
             totalValueInFiat += IPriceFeedRouterV2(priceFeed).decimalsConverter(
-                fiatPrice,
-                fiatDecimals,
-                18
-            );
+                    fiatPrice,
+                    fiatDecimals,
+                    18
+                );
         }
 
         return totalValueInFiat;

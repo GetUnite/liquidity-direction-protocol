@@ -72,6 +72,9 @@ contract BeefyStrategyUniversal is
         _grantRole(DEFAULT_ADMIN_ROLE, _strategyHandler);
 
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(UPGRADER_ROLE, msg.sender);
     }
 
     function getExpectedRewards() external view returns (address[] memory) {
@@ -247,46 +250,6 @@ contract BeefyStrategyUniversal is
             );
         }
     }
-
-    // function getDeployedAmountAndRewards(
-    //     bytes calldata data
-    // ) external returns (uint256) {
-    //     (
-    //         address beefyVaultAddress,
-    //         address beefyBoostAddress,
-    //         uint256 assetId
-    //     ) = decodeData(data);
-
-    //     uint256 lpAmount;
-    //     if (beefyBoostAddress != address(0)) {
-    //         lpAmount = IBeefyBoost(beefyBoostAddress).balanceOf(address(this));
-    //         IBeefyBoost(beefyBoostAddress).getReward();
-    //     } else {
-    //         lpAmount = IBeefyVaultV6(beefyVaultAddress).balanceOf(
-    //             address(this)
-    //         );
-    //     }
-
-    //     if (lpAmount == 0) {
-    //         return 0;
-    //     }
-
-    //     lpAmount =
-    //         (lpAmount *
-    //             IBeefyVaultV6(beefyVaultAddress).getPricePerFullShare()) /
-    //         1e18;
-    //     address tokenInvested = IBeefyVaultV6(beefyVaultAddress).want();
-
-    //     (uint256 fiatPrice, uint8 fiatDecimals) = IPriceFeedRouterV2(priceFeed)
-    //         .getPriceOfAmount(tokenInvested, lpAmount, assetId);
-
-    //     return
-    //         IPriceFeedRouterV2(priceFeed).decimalsConverter(
-    //             fiatPrice,
-    //             fiatDecimals,
-    //             18
-    //         );
-    // }
 
     /// @notice Claim available rewards.
     /// @param data whatever data you want to pass to strategy from vote extry.
