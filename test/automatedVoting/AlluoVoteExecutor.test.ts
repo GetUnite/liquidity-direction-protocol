@@ -32,7 +32,8 @@ describe("AlluoVoteExecutor Tests", function () {
     let exchangePriceOracle: ExchangePriceOracle;
 
     async function setupContracts() {
-        await reset(process.env.OPTIMISM_URL, 102871832);
+        await reset(process.env.OPTIMISM_URL, 107294920);
+
         const pseudoMultiSigFactory = await ethers.getContractFactory("PseudoMultisigWallet");
         pseudoMultiSig = await pseudoMultiSigFactory.deploy(true) as PseudoMultisigWallet;
         admin = await ethers.getImpersonatedSigner(pseudoMultiSig.address)
@@ -80,7 +81,8 @@ describe("AlluoVoteExecutor Tests", function () {
             initializer: "initialize"
         })) as AlluoVoteExecutorUtils;
 
-        alluoStrategyHandler = (await upgrades.deployProxy(strategyHandlerFactory, [admin.address, spokePool, _recipient, _recipientChainId, _relayerFeePct, _slippageTolerance, _exchange.address, alluoVoteExecutorUtils.address])) as AlluoStrategyHandler;
+        let contract = (await upgrades.deployProxy(strategyHandlerFactory, [admin.address, spokePool, _recipient, _recipientChainId, _relayerFeePct, _slippageTolerance, _exchange.address, alluoVoteExecutorUtils.address]))
+        alluoStrategyHandler = contract as AlluoStrategyHandler
 
         await alluoStrategyHandler.connect(admin).changeNumberOfAssets(4);
         await alluoStrategyHandler.connect(admin).setTokenToAssetId(weth.address, 2);
@@ -110,6 +112,7 @@ describe("AlluoVoteExecutor Tests", function () {
 
         const oracleFactory = await ethers.getContractFactory("ExchangePriceOracle") as ExchangePriceOracle__factory;
         exchangePriceOracle = await oracleFactory.deploy();
+
     }
     beforeEach(async () => {
         // Test on optimism
@@ -118,6 +121,7 @@ describe("AlluoVoteExecutor Tests", function () {
     });
     describe("Test TVL information", async () => {
         async function additionalSetup() {
+
             let beefyStrategyFactory = await ethers.getContractFactory("BeefyStrategy");
             beefyVault = await ethers.getContractAt("IBeefyVaultV6", "0x0892a178c363b4739e5Ac89E9155B9c30214C0c0") as IBeefyVaultV6;
             beefyVaultLp = await ethers.getContractAt("IERC20Metadata", await beefyVault.want()) as IERC20Metadata;
@@ -171,6 +175,7 @@ describe("AlluoVoteExecutor Tests", function () {
         }
 
         async function votePreparation() {
+
             // Fake a 100 eth deposit into this current chain
             // Let signer1 get some usdc through the exchange
             await _exchange.connect(signers[1]).exchange("0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", beefyVaultLp.address, ethers.utils.parseEther("100"), 0, { value: ethers.utils.parseEther("100") })
@@ -388,7 +393,72 @@ describe("AlluoVoteExecutor Tests", function () {
             await expect(tx).to.be.revertedWith("Oracle: Price too old");
         });
 
+        describe("Test that APYs are set correctly through vote execution", async () => {
+            it("Set iballuoUSD, ETH and BTC APYs through vote execution", async () => {
+                // Now let's encode the data and submit it as usual
+                await alluoVoteExecutor.connect(admin).updateAllIbAlluoAddresses();
 
+                // Check if we have the correct iballuo addresses
+                let iballuoUSDAddress = await alluoVoteExecutor.ibAlluoSymbolToAddress("IbAlluoUSD");
+                let iballuoETHAddress = await alluoVoteExecutor.ibAlluoSymbolToAddress("IbAlluoETH");
+                let iballuoBTCAddress = await alluoVoteExecutor.ibAlluoSymbolToAddress("IbAlluoBTC");
+
+
+                // Now we should expect the iballuos to have 0% apy
+                let realGnosis = await ethers.getImpersonatedSigner("0xc7061dD515B602F86733Fa0a0dBb6d6E6B34aED4")
+                // Send some eth to realGnosis
+                await signers[0].sendTransaction({ to: realGnosis.address, value: ethers.utils.parseEther("1") })
+                let iballuoUSD = await ethers.getContractAt("IbAlluo", iballuoUSDAddress);
+                let iballuoETH = await ethers.getContractAt("IbAlluo", iballuoETHAddress);
+                let iballuoBTC = await ethers.getContractAt("IbAlluo", iballuoBTCAddress);
+
+                // Grant admin role to the voteExecutor
+                await iballuoUSD.connect(realGnosis).grantRole(await iballuoUSD.DEFAULT_ADMIN_ROLE(), alluoVoteExecutor.address);
+                await iballuoETH.connect(realGnosis).grantRole(await iballuoETH.DEFAULT_ADMIN_ROLE(), alluoVoteExecutor.address);
+                await iballuoBTC.connect(realGnosis).grantRole(await iballuoBTC.DEFAULT_ADMIN_ROLE(), alluoVoteExecutor.address);
+
+                expect(iballuoUSDAddress).to.not.equal(ethers.constants.AddressZero);
+                expect(iballuoETHAddress).to.not.equal(ethers.constants.AddressZero);
+                expect(iballuoBTCAddress).to.not.equal(ethers.constants.AddressZero);
+
+                // also expect interest to not be 0
+                let iballuoUSDAPY = await iballuoUSD.interestPerSecond();
+                let iballuoETHAPY = await iballuoETH.interestPerSecond();
+                let iballuoBTCAPY = await iballuoBTC.interestPerSecond();
+
+                expect(iballuoUSDAPY).to.not.equal(0);
+                expect(iballuoETHAPY).to.not.equal(0);
+                expect(iballuoBTCAPY).to.not.equal(0);
+
+                // Now adjust it
+                let encodedCommand1 = await alluoVoteExecutorUtils.encodeApyCommand("IbAlluoUSD", 0, 0)
+                let encodedCommand2 = await alluoVoteExecutorUtils.encodeApyCommand("IbAlluoETH", 0, 0)
+                let encodedCommand3 = await alluoVoteExecutorUtils.encodeApyCommand("IbAlluoBTC", 0, 0)
+                let allEncoded = await alluoVoteExecutorUtils.encodeAllMessages([encodedCommand1[0], encodedCommand2[0], encodedCommand3[0]], [encodedCommand1[1], encodedCommand2[1], encodedCommand3[1]]);
+
+                await alluoVoteExecutor.connect(admin).submitData(allEncoded.inputData);
+                await alluoVoteExecutor.connect(admin).executeSpecificData(1);
+
+
+                let iballuoUSDAPY1 = await iballuoUSD.interestPerSecond();
+                let iballuoETHAPY1 = await iballuoETH.interestPerSecond();
+                let iballuoBTCAPY1 = await iballuoBTC.interestPerSecond();
+
+                let iballuoUSDFormatted = await iballuoUSD.annualInterest();
+                let iballuoETHFormatted = await iballuoETH.annualInterest();
+                let iballuoBTCFormatted = await iballuoBTC.annualInterest();
+
+                expect(iballuoUSDFormatted).to.equal(0);
+                expect(iballuoETHFormatted).to.equal(0);
+                expect(iballuoBTCFormatted).to.equal(0);
+
+                expect(iballuoUSDAPY1).to.equal(0);
+                expect(iballuoETHAPY1).to.equal(0);
+                expect(iballuoBTCAPY1).to.equal(0);
+
+
+            })
+        })
     })
     describe("All tests for simulating crosschain message functions", async () => {
         beforeEach(async () => {

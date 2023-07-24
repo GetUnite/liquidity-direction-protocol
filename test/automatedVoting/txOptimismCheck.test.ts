@@ -34,7 +34,8 @@ describe("AlluoVoteExecutor Tests", function () {
     let nullStrategy: NullStrategy;
 
     async function instantiateExistingSetup() {
-        await reset(process.env.OPTIMISM_URL, 106864451);
+        // await reset(process.env.OPTIMISM_URL, 106864451);
+        await reset(process.env.OPTIMISM_URL);
 
         admin = await ethers.getImpersonatedSigner("0xc7061dD515B602F86733Fa0a0dBb6d6E6B34aED4")
 
@@ -125,11 +126,43 @@ describe("AlluoVoteExecutor Tests", function () {
             await alluoVoteExecutorUtils.connect(admin).upgradeTo(newImp.address);
 
             let caller = await ethers.getImpersonatedSigner("0xc5f1e9424217802880ac62cd24f8103e3017134d")
+            await alluoVoteExecutorUtils.connect(admin).setUniversalExecutorBalances([[ethers.utils.parseEther("1010"), 0, 329890000000000, 0], [ethers.utils.parseEther("10"), 0, 0, 0]])
 
-            await alluoVoteExecutorUtils.connect(admin).setUniversalExecutorBalances([[0, 0, 0, 0], [0, 0, 0, 0]])
-            await signers[0].sendTransaction({ to: caller.address, value: ethers.utils.parseEther("1") })
+            // Encode the data:
 
-            await alluoVoteExecutor.connect(caller).executeCrosschainData(0);
+            // await addNullStrategy("NullUSDCOptimism", 1, usdc.address, 0, 10);
+            // await addNullStrategy("NullAGEUROptimism", 2, ageur.address, 1, 10);
+            // await addNullStrategy("NullWETHOptimism", 3, weth.address, 2, 10);
+            // await addNullStrategy("NullWBTCOptimism", 4, wbtc.address, 3, 10);
+
+            // // Then for polygon 
+            // // The token addresses dont matter because the chainID will filter irrelevant strategies out
+            // await addNullStrategy("NullUSDCPolygon", 5, usdc.address, 0, 137);
+            // await addNullStrategy("NullAGEURPolygon", 6, ageur.address, 1, 137);
+            // await addNullStrategy("NullWETHPolygon", 7, usdc.address, 2, 137);
+            // await addNullStrategy("NullWBTCPolygon", 8, usdc.address, 3, 137);
+
+            // let vote1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("NullUSDCPolygon", 10000, 1)
+            // let vote2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("NullUSDCOptimism", 0, 0)
+            // let encodedVotes = await alluoVoteExecutorUtils.encodeAllMessages([vote1[0], vote2[0]], [vote1[1], vote2[1]])
+            // let messageHash = encodedVotes.messagesHash;
+
+            // console.log("This is the messages hash", messageHash)
+            // console.log("This is the raw data", encodedVotes.inputData)
+            // await alluoVoteExecutor.submitData(encodedVotes.inputData);
+
+
+
+            let vote3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("NullUSDCPolygon", 0, 1)
+            let vote4 = await alluoVoteExecutorUtils.encodeLiquidityCommand("NullUSDCOptimism", 1000, 0)
+            let vote5 = await alluoVoteExecutorUtils.encodeLiquidityCommand("TopUSDYearnOmnivaultOptimism", 9000, 0)
+            let encodedVotes2 = await alluoVoteExecutorUtils.encodeAllMessages([vote3[0], vote4[0], vote5[0]], [vote3[1], vote4[1], vote5[1]])
+            let messageHash2 = encodedVotes2.messagesHash;
+
+            console.log("This is the messages hash 2", messageHash2)
+            console.log("This is the raw data 2", encodedVotes2.inputData)
+
+            // await alluoVoteExecutor.submitData(encodedVotes2.inputData);
 
         })
 

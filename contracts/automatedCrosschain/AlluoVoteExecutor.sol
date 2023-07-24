@@ -285,7 +285,7 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
         for (uint256 i; i < messages.length; i++) {
             Message memory currentMessage = messages[i];
             if (currentMessage.commandIndex == 0) {
-                // _executeAPYCommand(currentMessage.commandData);
+                _executeAPYCommand(currentMessage.commandData);
             } else if (currentMessage.commandIndex == 1) {
                 // _executeMintCommand(currentMessage.commandData);
             } else if (
@@ -361,7 +361,21 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
 
         // Since all withdrawals have been processed, it should be able to immediately trigger bridging. The only time we get to this code is if we have executed liquidity direction
         // If we only did TVL calculations, it would not get to this point
-        utils.triggerBridging();
+        try utils.triggerBridging() {} catch {}
+    }
+
+    function _executeAPYCommand(bytes memory data) internal {
+        (
+            string memory _ibAlluoName,
+            uint256 _newAnnualInterest,
+            uint256 _newInterestPerSecond
+        ) = abi.decode(data, (string, uint256, uint256));
+
+        address ibAlluoAddress = ibAlluoSymbolToAddress[_ibAlluoName];
+        IIbAlluo(ibAlluoAddress).setInterest(
+            _newAnnualInterest,
+            _newInterestPerSecond
+        );
     }
 
     function executeQueuedDeposits(

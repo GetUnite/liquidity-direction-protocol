@@ -42,9 +42,10 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       allowUnlimitedContractSize: true,
-      accounts: {
-        mnemonic: process.env.MNEMONIC
-      }
+      // accounts: {
+      //   mnemonic: process.env.MNEMONIC,
+      //   initialIndex: 7
+      // }
     },
     mainnet: {
       url: process.env.MAINNET_URL,
@@ -56,7 +57,7 @@ const config: HardhatUserConfig = {
     polygon: {
       url: process.env.POLYGON_URL,
       gasPrice: "auto",
-      accounts: { mnemonic: process.env.MNEMONIC as string }
+      accounts: process.env.ALLUO_DEPLOYER_PRIVATE_KEY != undefined ? [process.env.ALLUO_DEPLOYER_PRIVATE_KEY] : { mnemonic: process.env.MNEMONIC as string }
 
     },
     // fantom: {
@@ -84,7 +85,7 @@ const config: HardhatUserConfig = {
     optimisticEthereum: {
       url: process.env.OPTIMISM_URL,
       gasPrice: "auto",
-      accounts: { mnemonic: process.env.MNEMONIC as string }
+      accounts: process.env.ALLUO_DEPLOYER_PRIVATE_KEY != undefined ? [process.env.ALLUO_DEPLOYER_PRIVATE_KEY] : { mnemonic: process.env.MNEMONIC as string }
 
     },
     goerli: {

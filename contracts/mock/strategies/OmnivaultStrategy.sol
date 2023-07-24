@@ -191,10 +191,10 @@ contract OmnivaultStrategy is
             ).getPriceOfAmount(activeVaults[i], balance, assetId);
 
             totalValueInFiat += IPriceFeedRouterV2(priceFeed).decimalsConverter(
-                    fiatPrice,
-                    fiatDecimals,
-                    18
-                );
+                fiatPrice,
+                fiatDecimals,
+                18
+            );
         }
 
         return totalValueInFiat;
@@ -226,10 +226,10 @@ contract OmnivaultStrategy is
             ).getPriceOfAmount(activeVaults[i], balance, assetId);
 
             totalValueInFiat += IPriceFeedRouterV2(priceFeed).decimalsConverter(
-                    fiatPrice,
-                    fiatDecimals,
-                    18
-                );
+                fiatPrice,
+                fiatDecimals,
+                18
+            );
         }
 
         return totalValueInFiat;
