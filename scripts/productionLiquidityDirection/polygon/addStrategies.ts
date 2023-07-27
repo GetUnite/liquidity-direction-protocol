@@ -105,25 +105,45 @@ async function main() {
     }
 
 
-    // Add strategies and then 
-    // Add a null strategy for each asset
-    // Hardhat forks require 10 as chainID
-    await addNullStrategy("NullUSDCOptimism", 1, usdc.address, 0, 10);
-    await addNullStrategy("NullAGEUROptimism", 2, ageur.address, 1, 10);
-    await addNullStrategy("NullWETHOptimism", 3, weth.address, 2, 10);
-    await addNullStrategy("NullWBTCOptimism", 4, wbtc.address, 3, 10);
+    // // Add strategies and then 
+    // // Add a null strategy for each asset
+    // // Hardhat forks require 10 as chainID
+    // await addNullStrategy("NullUSDCOptimism", 1, usdc.address, 0, 10);
+    // await addNullStrategy("NullAGEUROptimism", 2, ageur.address, 1, 10);
+    // await addNullStrategy("NullWETHOptimism", 3, weth.address, 2, 10);
+    // await addNullStrategy("NullWBTCOptimism", 4, wbtc.address, 3, 10);
 
-    // Then for polygon 
-    // The token addresses dont matter because the chainID will filter irrelevant strategies out
-    await addNullStrategy("NullUSDCPolygon", 5, usdc.address, 0, 137);
-    await addNullStrategy("NullAGEURPolygon", 6, ageur.address, 1, 137);
-    await addNullStrategy("NullWETHPolygon", 7, usdc.address, 2, 137);
-    await addNullStrategy("NullWBTCPolygon", 8, usdc.address, 3, 137);
+    // // Then for polygon 
+    // // The token addresses dont matter because the chainID will filter irrelevant strategies out
+    // await addNullStrategy("NullUSDCPolygon", 5, usdc.address, 0, 137);
+    // await addNullStrategy("NullAGEURPolygon", 6, ageur.address, 1, 137);
+    // await addNullStrategy("NullWETHPolygon", 7, usdc.address, 2, 137);
+    // await addNullStrategy("NullWBTCPolygon", 8, usdc.address, 3, 137);
+
+    // // Add omnivault strategies
+    // await addOmnivaultStrategy("TopUSDYearnOmnivaultOptimism", 9, "0x306Df6b5D50abeD3f7bCbe7399C4b8e6BD55cB81", usdc.address, 0, 10);
+    // await addOmnivaultStrategy("TopUSDBeefyOmnivaultOptimism", 10, "0xAf332f4d7A82854cB4B6345C4c133eC60c4eAd87", usdc.address, 0, 10);
 
     // Add omnivault strategies
-    await addOmnivaultStrategy("TopUSDYearnOmnivaultOptimism", 9, "0x306Df6b5D50abeD3f7bCbe7399C4b8e6BD55cB81", usdc.address, 0, 10);
-    await addOmnivaultStrategy("TopUSDBeefyOmnivaultOptimism", 10, "0xAf332f4d7A82854cB4B6345C4c133eC60c4eAd87", usdc.address, 0, 10);
-    await alluoStrategyHandler.setLastDirectionId(10);
+    // "Alluo/Yearn TopOmnivaultUSD - 7.64%",
+    // "Alluo/Yearn Top3OmnivaultUSD - 8.03%",
+    // "Alluo/Beefy TopOmnivaultUSD - 22.60%",
+    // "Alluo/Beefy Top3OmnivaultUSD - 17.03%"
+    // "Alluo/Yearn TopOmnivaultETH - 4.53%",
+    // "Alluo/Yearn Top3OmnivaultETH - 4.53%",
+    // "Alluo/Beefy TopOmnivaultETH - 9.13%",
+    // "Alluo/Beefy Top3OmnivaultETH - 8.91%"
+    await addOmnivaultStrategy("Alluo/Yearn TopOmnivaultUSD", 11, "0x306Df6b5D50abeD3f7bCbe7399C4b8e6BD55cB81", usdc.address, 0, 10);
+    await addOmnivaultStrategy("Alluo/Yearn Top3OmnivaultUSD", 12, "0x2682c8057426FE5c462237eb3bfcfEDFb9539004", usdc.address, 0, 10);
+    await addOmnivaultStrategy("Alluo/Beefy TopOmnivaultUSD", 13, "0xAf332f4d7A82854cB4B6345C4c133eC60c4eAd87", usdc.address, 0, 10);
+    await addOmnivaultStrategy("Alluo/Beefy Top3OmnivaultUSD", 14, "0x75862d2fEdb1c6a9123F3b5d5E36D614570B404d", usdc.address, 0, 10);
+
+    // Add eth strategies
+    await addOmnivaultStrategy("Alluo/Yearn TopOmnivaultETH", 15, "0x4eC3177F5c2500AAABE56DDbD8907d41d17Fc2E9", weth.address, 2, 10);
+    await addOmnivaultStrategy("Alluo/Yearn Top3OmnivaultETH", 16, "0xDd7ebC54b851E629E61bc49DFcAed41C13fc67Da", weth.address, 2, 10);
+    await addOmnivaultStrategy("Alluo/Beefy TopOmnivaultETH", 17, "0xA430432eEf5C062D34e4078540b91C2ec7DBe0c9", weth.address, 2, 10);
+    await addOmnivaultStrategy("Alluo/Beefy Top3OmnivaultETH", 18, "0x2EC847395B6247Ab72b7B37432989f4547A0e947", weth.address, 2, 10);
+    await alluoStrategyHandler.setLastDirectionId(18);
 }
 
 main()

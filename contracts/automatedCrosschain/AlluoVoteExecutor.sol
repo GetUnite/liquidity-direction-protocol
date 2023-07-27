@@ -361,6 +361,7 @@ contract AlluoVoteExecutor is AlluoUpgradeableBase, AlluoAcrossMessaging {
 
         // Since all withdrawals have been processed, it should be able to immediately trigger bridging. The only time we get to this code is if we have executed liquidity direction
         // If we only did TVL calculations, it would not get to this point
+        // The reason we need a try catch is because certain votes do not require bridging to be triggered. It is more safe to just try and catch the error than to check if it is required.
         try utils.triggerBridging() {} catch {}
     }
 

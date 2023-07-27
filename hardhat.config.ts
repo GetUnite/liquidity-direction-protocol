@@ -46,6 +46,7 @@ const config: HardhatUserConfig = {
       //   mnemonic: process.env.MNEMONIC,
       //   initialIndex: 7
       // }
+      chainId: 10
     },
     mainnet: {
       url: process.env.MAINNET_URL,

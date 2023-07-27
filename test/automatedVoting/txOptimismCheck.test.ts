@@ -36,7 +36,7 @@ describe("AlluoVoteExecutor Tests", function () {
     async function instantiateExistingSetup() {
         // await reset(process.env.OPTIMISM_URL, 106864451);
         await reset(process.env.OPTIMISM_URL);
-
+        // await reset("https://rpc.tenderly.co/fork/9d595778-c1e8-4a94-a31b-be64cb512203")
         admin = await ethers.getImpersonatedSigner("0xc7061dD515B602F86733Fa0a0dBb6d6E6B34aED4")
 
         signers = await ethers.getSigners();
@@ -116,6 +116,7 @@ describe("AlluoVoteExecutor Tests", function () {
 
         })
         it("Check", async function () {
+            // Be wary that all chainIds will show up as 31337 because of how hardhat forks with normal rpcs 
             // Upgrade the contract
             // Send some eth to admin 
             let signers = await ethers.getSigners();
@@ -126,43 +127,56 @@ describe("AlluoVoteExecutor Tests", function () {
             await alluoVoteExecutorUtils.connect(admin).upgradeTo(newImp.address);
 
             let caller = await ethers.getImpersonatedSigner("0xc5f1e9424217802880ac62cd24f8103e3017134d")
-            await alluoVoteExecutorUtils.connect(admin).setUniversalExecutorBalances([[ethers.utils.parseEther("1010"), 0, 329890000000000, 0], [ethers.utils.parseEther("10"), 0, 0, 0]])
-
-            // Encode the data:
-
-            // await addNullStrategy("NullUSDCOptimism", 1, usdc.address, 0, 10);
-            // await addNullStrategy("NullAGEUROptimism", 2, ageur.address, 1, 10);
-            // await addNullStrategy("NullWETHOptimism", 3, weth.address, 2, 10);
-            // await addNullStrategy("NullWBTCOptimism", 4, wbtc.address, 3, 10);
-
-            // // Then for polygon 
-            // // The token addresses dont matter because the chainID will filter irrelevant strategies out
-            // await addNullStrategy("NullUSDCPolygon", 5, usdc.address, 0, 137);
-            // await addNullStrategy("NullAGEURPolygon", 6, ageur.address, 1, 137);
-            // await addNullStrategy("NullWETHPolygon", 7, usdc.address, 2, 137);
-            // await addNullStrategy("NullWBTCPolygon", 8, usdc.address, 3, 137);
-
-            // let vote1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("NullUSDCPolygon", 10000, 1)
-            // let vote2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("NullUSDCOptimism", 0, 0)
-            // let encodedVotes = await alluoVoteExecutorUtils.encodeAllMessages([vote1[0], vote2[0]], [vote1[1], vote2[1]])
-            // let messageHash = encodedVotes.messagesHash;
-
-            // console.log("This is the messages hash", messageHash)
-            // console.log("This is the raw data", encodedVotes.inputData)
-            // await alluoVoteExecutor.submitData(encodedVotes.inputData);
+            await alluoVoteExecutorUtils.connect(admin).setUniversalExecutorBalances([[ethers.utils.parseEther("11000"), 0, 329890000000000, 0], [0, 0, 0, 0]])
 
 
 
-            let vote3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("NullUSDCPolygon", 0, 1)
-            let vote4 = await alluoVoteExecutorUtils.encodeLiquidityCommand("NullUSDCOptimism", 1000, 0)
-            let vote5 = await alluoVoteExecutorUtils.encodeLiquidityCommand("TopUSDYearnOmnivaultOptimism", 9000, 0)
-            let encodedVotes2 = await alluoVoteExecutorUtils.encodeAllMessages([vote3[0], vote4[0], vote5[0]], [vote3[1], vote4[1], vote5[1]])
+            function getInterestPerSecondParam(apyPercent: number): string {
+                const secondsInYear = 31536000;
+                const decimalApy = 1 + (apyPercent / 100);
+                const decimalInterest = Math.pow(decimalApy, 1 / secondsInYear);
+                return Math.round(decimalInterest * (10 ** 17)).toString();
+            }
+
+            function getAnnualInterestParam(apyPercent: number): number {
+                return Math.round(apyPercent * 100);
+            }
+
+            // let vote1 = await alluoVoteExecutorUtils.encodeLiquidityCommand("Alluo/Yearn Top3OmnivaultUSD", 5000, 0)
+            // let vote2 = await alluoVoteExecutorUtils.encodeLiquidityCommand("Alluo/Beefy Top3OmnivaultUSD", 5000, 0)
+            // let vote3 = await alluoVoteExecutorUtils.encodeLiquidityCommand("NullUSDCOptimism", 0, 0)
+            // let vote4 = await alluoVoteExecutorUtils.encodeLiquidityCommand("TopUSDYearnOmnivaultOptimism", 0, 0)
+
+
+            let vote5 = await alluoVoteExecutorUtils.encodeApyCommand("IbAlluoUSD", getAnnualInterestParam(7), getInterestPerSecondParam(7));
+            let vote6 = await alluoVoteExecutorUtils.encodeApyCommand("IbAlluoBTC", getAnnualInterestParam(2.5), getInterestPerSecondParam(2.5));
+            let vote7 = await alluoVoteExecutorUtils.encodeApyCommand("IbAlluoETH", getAnnualInterestParam(5), getInterestPerSecondParam(5));
+
+            // let encodedVotes2 = await alluoVoteExecutorUtils.encodeAllMessages([vote1[0], vote2[0], vote3[0], vote4[0], vote5[0], vote6[0], vote7[0]], [vote1[1], vote2[1], vote3[1], vote4[1], vote5[1], vote6[1], vote7[1]])
+            let encodedVotes2 = await alluoVoteExecutorUtils.encodeAllMessages([vote5[0], vote6[0], vote7[0]], [vote5[1], vote6[1], vote7[1]])
             let messageHash2 = encodedVotes2.messagesHash;
 
             console.log("This is the messages hash 2", messageHash2)
             console.log("This is the raw data 2", encodedVotes2.inputData)
 
-            // await alluoVoteExecutor.submitData(encodedVotes2.inputData);
+            await alluoVoteExecutor.submitData(encodedVotes2.inputData);
+
+            await alluoVoteExecutor.connect(admin).setMinSigns(0);
+
+            let iballuoUSD = await ethers.getContractAt("IbAlluo", "0x6b55495947F3793597C0777562C37C14cb958097");
+            let iballuoBTC = await ethers.getContractAt("IbAlluo", "0x253eB6077db17a43Fd7b4f4E6e5a2D8b2F9A244d");
+            let iballuoETH = await ethers.getContractAt("IbAlluo", "0x8BF24fea0Cae18DAB02A5b23c409E8E1f04Ff0ba");
+            await iballuoUSD.connect(admin).grantRole(await iballuoUSD.DEFAULT_ADMIN_ROLE(), alluoVoteExecutor.address);
+            await iballuoBTC.connect(admin).grantRole(await iballuoBTC.DEFAULT_ADMIN_ROLE(), alluoVoteExecutor.address);
+            await iballuoETH.connect(admin).grantRole(await iballuoETH.DEFAULT_ADMIN_ROLE(), alluoVoteExecutor.address);
+
+            await admin.sendTransaction({ to: "0xdA32d82e3b5275424F130612797aDc6EFaB06515", data: "0x673ee86f0000000000000000000000000000000000000000000000000000000000002710" })
+            await alluoVoteExecutor.connect(admin).executeSpecificData(4);
+
+            // Execute specific data complete:
+
+            // await alluoVoteExecutor.connect(admin).executeQueuedDeposits(0);
+
 
         })
 
