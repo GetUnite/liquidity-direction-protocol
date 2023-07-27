@@ -494,6 +494,12 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         return depositQueue.deposits;
     }
 
+    function getActiveDirectionsForAssetId(
+        uint256 assetId
+    ) public view returns (uint256[] memory) {
+        return assetIdToAssetInfo[assetId].activeDirections.values();
+    }
+
     // Admin functions
     //
     //
@@ -617,8 +623,8 @@ contract AlluoStrategyHandler is AlluoUpgradeableBase, AlluoBridging {
         assetIdToAssetInfo[_assetId].ibAlluo = _ibAlluo;
         for (uint256 i; i < _chainIds.length; i++) {
             assetIdToAssetInfo[_assetId].chainIdToPrimaryToken[
-                _chainIds[i]
-            ] = _chainIdToPrimaryToken[i];
+                    _chainIds[i]
+                ] = _chainIdToPrimaryToken[i];
         }
     }
 
