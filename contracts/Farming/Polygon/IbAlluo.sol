@@ -257,7 +257,7 @@ contract IbAlluo is
     function deposit(
         address _token,
         uint256 _amount
-    ) external returns (uint256 alluoMinted) {
+    ) external whenNotPaused returns (uint256 alluoMinted) {
         // The main token is the one which isn't converted to primary tokens.
         // Small issue with deposits and withdrawals though. Need to approve.
         if (supportedTokens.contains(_token) == false) {
@@ -332,7 +332,7 @@ contract IbAlluo is
         address _recipient,
         address _targetToken,
         uint256 _amount
-    ) public returns (uint256 targetTokenReceived, uint256 ibAlluoBurned) {
+    ) public whenNotPaused returns (uint256 targetTokenReceived, uint256 ibAlluoBurned) {
         updateRatio();
         uint256 fiatAmount = _amount;
         uint256 adjustedAmount = (_amount * multiplier) / growingRatio;
