@@ -25,10 +25,12 @@
     "@types/chai": "^4.3.0",
     "@types/mocha": "^9.1.1",
     "@types/node": "^12.20.41",
+    "@types/papaparse": "^5.3.8",
     "@typescript-eslint/eslint-plugin": "^4.33.0",
     "@typescript-eslint/parser": "^4.33.0",
     "alluo-exchange": "github:GetAlluo/exchange",
     "alluo-strategies": "github:GetAlluo/investment-strategies#V2MigrationCleanup",
+    "csv-parse": "^5.5.0",
     "dotenv": "^10.0.0",
     "eslint": "^7.32.0",
     "eslint-config-prettier": "^8.3.0",
@@ -41,6 +43,7 @@
     "hardhat-contract-sizer": "^2.3.1",
     "hardhat-tracer": "^1.2.1",
     "husky": "^8.0.2",
+    "papaparse": "^5.4.1",
     "prettier": "^2.8.0",
     "prettier-plugin-solidity": "^1.0.0",
     "solhint": "^3.3.7",
@@ -56,6 +59,7 @@
     "testLd": "hh test test/automatedVoting/AlluoStrategyHandler.test.ts test/automatedVoting/AlluoVoteExecutor.test.ts test/automatedVoting/AlluoVoteExecutorUtils.test.ts"
   },
   "dependencies": {
+    "@1inch/fusion-sdk": "^0.1.9",
     "@across-protocol/sdk-v2": "^0.2.3"
   }
 }
