@@ -103,8 +103,8 @@ contract LiquidityHandlerPolygon is
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        require(_multiSigWallet.isContract(), "Handler: Not contract");
-        require(_exchangeAddress.isContract(), "Handler: Not contract");
+        // require(_multiSigWallet.isContract(), "Handler: Not contract");
+        // require(_exchangeAddress.isContract(), "Handler: Not contract");
         exchangeAddress = _exchangeAddress;
         _grantRole(DEFAULT_ADMIN_ROLE, _multiSigWallet);
         _grantRole(UPGRADER_ROLE, _multiSigWallet);

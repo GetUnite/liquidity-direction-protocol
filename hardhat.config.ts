@@ -109,6 +109,7 @@ const config: HardhatUserConfig = {
       polygon: process.env.POLYGONSCAN_API_KEY != undefined ? process.env.POLYGONSCAN_API_KEY : "",
       optimisticEthereum: process.env.OPTIMISMSCAN_API_KEY != undefined ? process.env.OPTIMISMSCAN_API_KEY : "",
       arbitrumGoerli: process.env.GOERLISCAN_API_KEY != undefined ? process.env.GOERLISCAN_API_KEY : "",
+      polygonMumbai: process.env.POLYGONSCAN_API_KEY != undefined ? process.env.POLYGONSCAN_API_KEY : "",
     }
 
   },

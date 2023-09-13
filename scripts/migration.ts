@@ -11,12 +11,10 @@ function getAddressesFromCSV(filePath: any): string[] {
     });
 
     const records = result.data;
+    console.log(records)
     // console.log(records)
-    const addresses = (records as Array<{ address: string; }>).map(record => {
-        const correctedJson = record.address.replace(/'/g, '"');
-        let parsedAddress = JSON.parse(correctedJson);
-
-        return parsedAddress.S;
+    const addresses = (records as any).map((record: { lowerCaseAddress: any; })=> {
+        return record.lowerCaseAddress
     });
 
     return addresses;
@@ -69,25 +67,25 @@ async function main() {
 
 
 
-    // for (let i = 0; i < allHoldersAddresses.length; i += BATCH_SIZE) {
-    //     // Create a batch of promises for each slice of addresses
-    //     console.log("At index", i, "of", allHoldersAddresses.length)
-    //     const batchPromises = allHoldersAddresses.slice(i, i + BATCH_SIZE).map(address => {
-    //         return iballuoUSD.getBalance(address).then(balance => {
-    //             return { address, balance };
-    //         });
-    //     });
+    for (let i = 0; i < allHoldersAddresses.length; i += BATCH_SIZE) {
+        // Create a batch of promises for each slice of addresses
+        console.log("At index", i, "of", allHoldersAddresses.length)
+        const batchPromises = allHoldersAddresses.slice(i, i + BATCH_SIZE).map(address => {
+            return iballuoUSD.getBalance(address).then(balance => {
+                return { address, balance };
+            });
+        });
 
-    //     // Execute the batch and wait for all to complete
-    //     const batchResults = await Promise.all(batchPromises);
-    //     for (const result of batchResults) {
-    //         allBalances[result.address] = result.balance.toString();
-    //     }
-    // }
+        // Execute the batch and wait for all to complete
+        const batchResults = await Promise.all(batchPromises);
+        for (const result of batchResults) {
+            allBalances[result.address] = result.balance.toString();
+        }
+    }
 
 
-    // // Save the allBalances json
-    // saveToJSON(allBalances, './allBalances.json');
+    // Save the allBalances json
+    saveToJSON(allBalances, './allBalances.json');
 
     // Load the json
     allBalances = JSON.parse(fs.readFileSync('./allBalances.json', 'utf-8'));
