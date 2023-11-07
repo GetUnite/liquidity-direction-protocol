@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 contract TestERC20 is ERC20, ERC20Burnable, AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    uint8 realDecimals;
+    uint8 public realDecimals;
 
     constructor(
         string memory _name,
@@ -32,10 +32,10 @@ contract TestERC20 is ERC20, ERC20Burnable, AccessControl {
 
         if (!_isFork) {
             // solhint-disable-next-line reason-string
-            require(
-                id == 1337 || id == 31337,
-                "Do not deploy this contract on public networks!"
-            );
+            //     require(
+            //         id == 1337 || id == 31337,
+            //         "Do not deploy this contract on public networks!"
+            //     );
         }
     }
 

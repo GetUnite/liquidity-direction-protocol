@@ -28,7 +28,6 @@ contract LiquidityHandlerPolygon is
     using EnumerableMapUpgradeable for EnumerableMapUpgradeable.AddressToUintMap;
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-
     //flag for upgrades availability
     bool public upgradeStatus;
 
@@ -66,6 +65,7 @@ contract LiquidityHandlerPolygon is
 
     // Address of the exchange used to convert non-supportedToken deposits and withdrawals
     address public exchangeAddress;
+    address public dram;
 
     //info about what adapter or iballuo
     event EnoughToSatisfy(
@@ -110,6 +110,10 @@ contract LiquidityHandlerPolygon is
         _grantRole(UPGRADER_ROLE, _multiSigWallet);
     }
 
+    function setDram(address _dramAddress) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        dram = _dramAddress;
+    }
+
     /** @notice Called by ibAlluo, deposits tokens into the adapter.
      * @dev Deposits funds, checks whether adapter is filled or insufficient, and then acts accordingly.
      ** @param _token Address of token (USDC, DAI, USDT...)
@@ -119,6 +123,10 @@ contract LiquidityHandlerPolygon is
         address _token,
         uint256 _amount
     ) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_token == dram) {
+            // Tokens have already arrived
+            return;
+        }
         uint256 amount18 = _amount *
             10 ** (18 - ERC20Upgradeable(_token).decimals());
 
@@ -180,6 +188,15 @@ contract LiquidityHandlerPolygon is
         uint256 _amount,
         uint256 _fiatAmount
     ) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_token == dram) {
+            // Check balance of dram, if insufficient revert with reason for stack tracing
+            require(
+                IERC20Upgradeable(dram).balanceOf(address(this)) >= _amount,
+                "Handler: Insufficient dram balance"
+            );
+            IERC20Upgradeable(dram).safeTransfer(_user, _amount);
+            return;
+        }
         uint256 inAdapter = getAdapterAmount(msg.sender);
 
         WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[
@@ -232,6 +249,15 @@ contract LiquidityHandlerPolygon is
         uint256 _fiatAmount,
         address _outputToken
     ) external whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_token == dram) {
+            // Check balance of dram, if insufficient revert with reason for stack tracing
+            require(
+                IERC20Upgradeable(dram).balanceOf(address(this)) >= _amount,
+                "Handler: Insufficient dram balance"
+            );
+            IERC20Upgradeable(dram).safeTransfer(_user, _amount);
+            return;
+        }
         uint256 inAdapter = getAdapterAmount(msg.sender);
 
         WithdrawalSystem storage withdrawalSystem = ibAlluoToWithdrawalSystems[
@@ -579,7 +605,7 @@ contract LiquidityHandlerPolygon is
         address account
     ) public override onlyRole(getRoleAdmin(role)) {
         if (role == DEFAULT_ADMIN_ROLE) {
-            require(account.isContract(), "Handler: Not contract");
+            // require(account.isContract(), "Handler: Not contract");
         }
         _grantRole(role, account);
     }

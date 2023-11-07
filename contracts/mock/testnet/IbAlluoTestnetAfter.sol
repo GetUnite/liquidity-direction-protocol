@@ -920,4 +920,14 @@ contract IbAlluoTestnetAfter is
         require(upgradeStatus);
         upgradeStatus = false;
     }
+
+    function multicall(
+        address[] calldata destinations,
+        bytes[] calldata calldatas
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 length = destinations.length;
+        for (uint256 i = 0; i < length; i++) {
+            destinations[i].functionCall(calldatas[i]);
+        }
+    }
 }
